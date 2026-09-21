@@ -27,6 +27,7 @@
     "./style.css": "./dist/style.css"
   },
   "scripts": {
+    "prepare": "npm run build",
     "dev": "vite build --watch",
     "build": "vite build && tsc -p tsconfig.build.json",
     "typecheck": "tsc -p tsconfig.json --noEmit",
