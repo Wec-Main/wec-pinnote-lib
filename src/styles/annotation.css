@@ -61,8 +61,8 @@ body.wpn-mode-active {
   transform: translateX(-50%);
   display: flex;
   align-items: center;
-  gap: 3px;
-  padding: 3px 5px;
+  gap: 4px;
+  padding: 4px 6px;
   background: rgba(0, 0, 0, 0.82);
   border: 1px solid rgba(255, 255, 255, 0.16);
   border-radius: 12px;
@@ -78,11 +78,9 @@ body.wpn-mode-active {
 }
 
 .wpn-toolbar--launcher {
-  width: 36px;
-  height: 36px;
-  padding: 0;
-  border-radius: 999px;
-  justify-content: center;
+  gap: 2px;
+  padding: 5px;
+  border-radius: 12px;
   cursor: grab;
   touch-action: none;
 }
@@ -91,12 +89,47 @@ body.wpn-mode-active {
   cursor: grabbing;
 }
 
-.wpn-toolbar__launcher-icon {
-  width: 18px;
-  height: 18px;
+.wpn-launcher-item {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  cursor: pointer;
+}
+
+.wpn-launcher-item__icon-wrap {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 10px;
+}
+
+.wpn-launcher-item__icon {
+  width: 16px;
+  height: 16px;
   display: block;
   object-fit: contain;
   filter: invert(1);
+}
+
+.wpn-launcher-item__logo-wrap {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  touch-action: none;
+}
+
+.wpn-launcher-item__logo {
+  width: 20px;
+  height: 20px;
+  display: block;
+  object-fit: cover;
+  border-radius: 5px;
 }
 
 .wpn-toolbar__drag {
@@ -199,7 +232,7 @@ body.wpn-mode-active {
 .wpn-toolbar__name-sizer {
   display: block;
   min-width: 72px;
-  height: 24px;
+  height: 32px;
   padding: 0 12px 0 9px;
   border: 1px solid transparent;
   font-weight: 500;
@@ -212,7 +245,7 @@ body.wpn-mode-active {
   position: absolute;
   inset: 0;
   width: 100%;
-  height: 24px;
+  height: 32px;
   padding: 0 9px;
   border: 1px solid rgba(255, 255, 255, 0.16);
   border-radius: 8px;
@@ -269,8 +302,8 @@ body.wpn-mode-active {
 .wpn-toggle,
 .wpn-toolbar__eye,
 .wpn-toolbar__refresh {
-  width: 28px;
-  height: 28px;
+  width: 32px;
+  height: 32px;
   border-radius: 999px;
   display: grid;
   place-items: center;
@@ -285,6 +318,8 @@ body.wpn-mode-active {
   width: 15px;
   height: 15px;
   display: block;
+  object-fit: contain;
+  filter: brightness(0) invert(1);
 }
 
 .wpn-toolbar__refresh--spinning .wpn-toolbar__refresh-icon {
@@ -299,13 +334,13 @@ body.wpn-mode-active {
 
 .wpn-toolbar__close {
   box-sizing: border-box;
-  flex: 0 0 24px;
-  width: 24px;
-  height: 24px;
-  margin: 0 8px 0 6px;
+  flex: 0 0 32px;
+  width: 32px;
+  height: 32px;
+  margin: 0 8px 0 2px;
   padding: 0;
-  border: 1.5px solid #ef4444;
-  border-radius: 4px;
+  border: 0;
+  border-radius: 6px;
   background: transparent;
   color: #ef4444;
   display: inline-flex;
@@ -317,9 +352,16 @@ body.wpn-mode-active {
 }
 
 .wpn-toolbar__close-icon {
-  width: 10px;
-  height: 10px;
+  width: 26px;
+  height: 26px;
   display: block;
+  background-color: #ef4444;
+  -webkit-mask-size: contain;
+  mask-size: contain;
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
+  -webkit-mask-position: center;
+  mask-position: center;
 }
 
 .wpn-toggle:hover,
@@ -333,7 +375,10 @@ body.wpn-mode-active {
 .wpn-toolbar__close:hover {
   background: rgba(239, 68, 68, 0.16);
   color: #f87171;
-  border-color: #f87171;
+}
+
+.wpn-toolbar__close:hover .wpn-toolbar__close-icon {
+  background-color: #f87171;
 }
 
 .wpn-toggle--active {
@@ -359,8 +404,8 @@ img.wpn-toggle__icon {
 
 .wpn-toolbar__list,
 .wpn-toolbar__retry {
-  min-width: 28px;
-  height: 28px;
+  min-width: 32px;
+  height: 32px;
   padding: 0;
   border-radius: 999px;
   font-size: 11px;
@@ -378,6 +423,8 @@ img.wpn-toggle__icon {
   width: 16px;
   height: 16px;
   display: block;
+  object-fit: contain;
+  filter: invert(1);
 }
 
 .wpn-toolbar__count {

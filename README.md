@@ -206,10 +206,16 @@ createRoot(document.getElementById("root")!).render(
 
 ## Example project
 
-There is no bundled `examples/` folder in this repo. To try the library, see the sibling `wec-pinnote-consumer` project (under the same `wec-lib` parent folder as this one) — a minimal login/home app wired up per Option B2 above, hitting the real `wec-pinnote-api` backend.
+`examples/demo` is the canonical example for checking `wec-pinnote-lib` integration — a minimal login/home app wired up per Option B2 above, aliased straight to this package's own `src/`. It defaults to the real `wec-pinnote-api` backend; set `VITE_USE_MOCK_API=true` in `examples/demo/.env` to use the bundled in-memory mock instead.
 
 ```bash
-cd ../wec-pinnote-consumer
+npm run demo
+```
+
+or, from inside the folder:
+
+```bash
+cd examples/demo
 npm install
 npm run dev
 ```
@@ -220,6 +226,7 @@ npm run dev
 npm run typecheck
 npm run lint
 npm run build
+npm run demo:build
 ```
 
 Build output:

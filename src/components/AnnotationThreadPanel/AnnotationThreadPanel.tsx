@@ -4,7 +4,7 @@ import { useFloatingPanel } from "../../hooks/useAnnotationPosition";
 import { AnnotationReplyComposer } from "../AnnotationReplyComposer";
 import { AnnotationStatusSelect } from "../AnnotationStatusSelect";
 import { AnnotationThread } from "../AnnotationThread";
-import wecLogo from "../../assets/wec-logo.png?inline";
+import { Icons } from "../../assets/icons";
 
 interface AnnotationThreadPanelProps {
   annotationId: string;
@@ -71,7 +71,7 @@ export function AnnotationThreadPanel({
         <div className="wpn-panel__toolbar">
           <div className="wpn-thread-panel__brand">
             <span>Powered by</span>
-            <img src={wecLogo} alt="" />
+            <img src={Icons.wecLogo} alt="" />
             <span className="wpn-thread-panel__brand-name">Wec.ai</span>
           </div>
           <div className="wpn-panel__toolbar-end">

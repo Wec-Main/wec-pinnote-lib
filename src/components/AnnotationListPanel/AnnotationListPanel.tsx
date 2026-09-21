@@ -2,7 +2,7 @@ import { useMemo } from "react";
 import { useAnnotationContext } from "../../context/AnnotationContext";
 import { formatTimestamp, getInitials } from "../../utils/format";
 import { isDoneStatus, statusLabel } from "../../utils/status";
-import wecLogo from "../../assets/wec-logo.png?inline";
+import { Icons } from "../../assets/icons";
 
 export function AnnotationListPanel() {
   const { annotations, selectedId, selectAnnotation, setListOpen, loading, error, retry } =
@@ -88,7 +88,7 @@ export function AnnotationListPanel() {
       </ul>
       <div className="wpn-list-panel__brand">
         <span>Powered by</span>
-        <img src={wecLogo} alt="" />
+        <img src={Icons.wecLogo} alt="" />
         <span className="wpn-list-panel__brand-name">Wec.ai</span>
       </div>
     </div>

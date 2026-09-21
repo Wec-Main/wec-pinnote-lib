@@ -3,7 +3,7 @@ import { useAnnotationContext } from "../../context/AnnotationContext";
 import { useFloatingPanel } from "../../hooks/useAnnotationPosition";
 import type { AnnotationStatus } from "../../types/annotation.types";
 import { AnnotationStatusSelect } from "../AnnotationStatusSelect";
-import wecLogo from "../../assets/wec-logo.png?inline";
+import { Icons } from "../../assets/icons";
 
 interface AnnotationComposerProps {
   x: number;
@@ -129,7 +129,7 @@ export function AnnotationComposer({ x, y }: AnnotationComposerProps) {
           <div className="wpn-panel__toolbar">
             <div className="wpn-thread-panel__brand">
               <span>Powered by</span>
-              <img src={wecLogo} alt="" />
+              <img src={Icons.wecLogo} alt="" />
               <span className="wpn-thread-panel__brand-name">Wec.ai</span>
             </div>
             <AnnotationStatusSelect value={status} onChange={setStatus} disabled={submitting} />

@@ -1,0 +1,135 @@
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  background: #f1f5f9;
+  color: #0f172a;
+}
+
+.demo-shell {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 40px 20px;
+}
+
+.demo-card {
+  width: 100%;
+  max-width: 380px;
+  background: #fff;
+  border-radius: 12px;
+  padding: 32px;
+  box-shadow: 0 20px 40px rgba(15, 23, 42, 0.08);
+}
+
+.demo-card--wide {
+  max-width: 720px;
+}
+
+.demo-kicker {
+  margin: 0 0 8px;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #6366f1;
+}
+
+.demo-card h1 {
+  margin: 0 0 8px;
+  font-size: 24px;
+}
+
+.demo-copy {
+  margin: 0 0 24px;
+  color: #64748b;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.demo-form {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.demo-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #334155;
+}
+
+.demo-field input {
+  padding: 10px 12px;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  font-size: 14px;
+}
+
+.demo-submit {
+  margin-top: 8px;
+  padding: 10px 12px;
+  border: 0;
+  border-radius: 8px;
+  background: #6366f1;
+  color: #fff;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.demo-submit:hover {
+  background: #4f46e5;
+}
+
+.demo-secondary {
+  margin-top: 16px;
+  border: 0;
+  background: transparent;
+  color: #6366f1;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 0;
+}
+
+.demo-status {
+  margin: 16px 0 0;
+  font-size: 13px;
+  color: #16a34a;
+}
+
+.demo-home-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 24px;
+}
+
+.demo-stats {
+  margin-top: 24px;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
+}
+
+.demo-stat {
+  background: #f8fafc;
+  border-radius: 10px;
+  padding: 16px;
+}
+
+.demo-stat p {
+  margin: 0 0 6px;
+  font-size: 12px;
+  color: #64748b;
+}
+
+.demo-stat strong {
+  font-size: 20px;
+}

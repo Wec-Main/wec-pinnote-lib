@@ -8,7 +8,7 @@ import {
 import { useAnnotationContext } from "../../context/AnnotationContext";
 import { AnnotationToggleButton } from "../AnnotationToggleButton";
 import { PAGE_STATUS_OPTIONS, pageStatusLabel } from "../../utils/status";
-import penIcon from "../../assets/pen_icon.png?inline";
+import { Icons } from "../../assets/icons";
 
 const EDGE = 8;
 const LAUNCHER_SIZE = 36;
@@ -93,7 +93,7 @@ export function AnnotationToolbar() {
     return () => document.removeEventListener("pointerdown", onPointerDown, true);
   }, [screenStatusOpen]);
 
-  const onDragStart = (event: ReactPointerEvent<HTMLButtonElement>) => {
+  const onDragStart = (event: ReactPointerEvent<HTMLElement>) => {
     const el = toolbarRef.current;
     if (!el) {
       return;
@@ -109,7 +109,7 @@ export function AnnotationToolbar() {
     event.currentTarget.setPointerCapture(event.pointerId);
   };
 
-  const onDragMove = (event: ReactPointerEvent<HTMLButtonElement>) => {
+  const onDragMove = (event: ReactPointerEvent<HTMLElement>) => {
     const el = toolbarRef.current;
     if (!dragging.current || !el) {
       return;
@@ -151,30 +151,98 @@ export function AnnotationToolbar() {
   };
 
   if (!barOpen) {
+    const openToolbar = () => {
+      if (didDrag.current) {
+        didDrag.current = false;
+        return;
+      }
+      setPosition(null);
+      setBarOpen(true);
+    };
+    const ignoreDrag = () => {
+      didDrag.current = false;
+    };
+
     return (
-      <button
+      <div
         ref={setToolbarRef}
-        type="button"
         className={["wpn-toolbar", "wpn-toolbar--launcher", position ? "wpn-toolbar--placed" : ""]
           .filter(Boolean)
           .join(" ")}
         style={position ? { left: position.x, top: position.y } : undefined}
-        aria-label="Open annotation toolbar"
-        onPointerDown={onDragStart}
-        onPointerMove={onDragMove}
-        onPointerUp={onDragEnd}
-        onPointerCancel={onDragEnd}
-        onClick={() => {
-          if (didDrag.current) {
-            didDrag.current = false;
-            return;
-          }
-          setPosition(null);
-          setBarOpen(true);
-        }}
       >
-        <img src={penIcon} alt="" className="wpn-toolbar__launcher-icon" />
-      </button>
+        <span
+          className="wpn-launcher-item__logo-wrap"
+          onPointerDown={onDragStart}
+          onPointerMove={onDragMove}
+          onPointerUp={onDragEnd}
+          onPointerCancel={onDragEnd}
+        >
+          <img src={Icons.wecLogo} alt="" className="wpn-launcher-item__logo" />
+        </span>
+        <button
+          type="button"
+          className="wpn-toolbar__drag"
+          aria-label="Drag annotation toolbar"
+          onPointerDown={onDragStart}
+          onPointerMove={onDragMove}
+          onPointerUp={onDragEnd}
+          onPointerCancel={onDragEnd}
+        >
+          <svg viewBox="0 0 16 16" aria-hidden="true" className="wpn-toolbar__drag-icon">
+            <circle cx="5" cy="3" r="1.3" fill="currentColor" />
+            <circle cx="11" cy="3" r="1.3" fill="currentColor" />
+            <circle cx="5" cy="8" r="1.3" fill="currentColor" />
+            <circle cx="11" cy="8" r="1.3" fill="currentColor" />
+            <circle cx="5" cy="13" r="1.3" fill="currentColor" />
+            <circle cx="11" cy="13" r="1.3" fill="currentColor" />
+          </svg>
+        </button>
+        <button
+          type="button"
+          className="wpn-launcher-item wpn-launcher-item--active"
+          aria-label="Open annotation toolbar"
+          onPointerDown={onDragStart}
+          onPointerMove={onDragMove}
+          onPointerUp={onDragEnd}
+          onPointerCancel={onDragEnd}
+          onClick={openToolbar}
+        >
+          <span className="wpn-launcher-item__icon-wrap">
+            <img src={Icons.pen} alt="" className="wpn-launcher-item__icon" />
+          </span>
+        </button>
+        <button
+          type="button"
+          className="wpn-launcher-item"
+          aria-label="Epic (coming soon)"
+          aria-disabled="true"
+          onPointerDown={onDragStart}
+          onPointerMove={onDragMove}
+          onPointerUp={onDragEnd}
+          onPointerCancel={onDragEnd}
+          onClick={ignoreDrag}
+        >
+          <span className="wpn-launcher-item__icon-wrap">
+            <img src={Icons.epic} alt="" className="wpn-launcher-item__icon" />
+          </span>
+        </button>
+        <button
+          type="button"
+          className="wpn-launcher-item"
+          aria-label="Settings (coming soon)"
+          aria-disabled="true"
+          onPointerDown={onDragStart}
+          onPointerMove={onDragMove}
+          onPointerUp={onDragEnd}
+          onPointerCancel={onDragEnd}
+          onClick={ignoreDrag}
+        >
+          <span className="wpn-launcher-item__icon-wrap">
+            <img src={Icons.settings} alt="" className="wpn-launcher-item__icon" />
+          </span>
+        </button>
+      </div>
     );
   }
 
@@ -184,6 +252,15 @@ export function AnnotationToolbar() {
       className={["wpn-toolbar", position ? "wpn-toolbar--placed" : ""].filter(Boolean).join(" ")}
       style={position ? { left: position.x, top: position.y } : undefined}
     >
+      <span
+        className="wpn-launcher-item__logo-wrap"
+        onPointerDown={onDragStart}
+        onPointerMove={onDragMove}
+        onPointerUp={onDragEnd}
+        onPointerCancel={onDragEnd}
+      >
+        <img src={Icons.wecLogo} alt="" className="wpn-launcher-item__logo" />
+      </span>
       <button
         type="button"
         className="wpn-toolbar__drag"
@@ -265,37 +342,11 @@ export function AnnotationToolbar() {
         aria-label={pinsVisible ? "Hide pins" : "Show pins"}
         onClick={() => setPinsVisible(!pinsVisible)}
       >
-        {pinsVisible ? (
-          <svg viewBox="0 0 24 24" className="wpn-toggle__icon" aria-hidden="true">
-            <path
-              fill="none"
-              stroke="currentColor"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth="1.8"
-              d="M2.5 12s3.4-7 9.5-7 9.5 7 9.5 7-3.4 7-9.5 7-9.5-7-9.5-7Z"
-            />
-            <circle cx="12" cy="12" r="3" fill="none" stroke="currentColor" strokeWidth="1.8" />
-          </svg>
-        ) : (
-          <svg viewBox="0 0 24 24" className="wpn-toggle__icon" aria-hidden="true">
-            <path
-              fill="none"
-              stroke="currentColor"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth="1.8"
-              d="M3 3l18 18M10.5 6.2A9.8 9.8 0 0 1 12 6c6.1 0 9.5 7 9.5 7a16 16 0 0 1-2.4 3.1M6.2 6.2A16 16 0 0 0 2.5 13s3.4 7 9.5 7c1.7 0 3.2-.4 4.5-1.1"
-            />
-            <path
-              fill="none"
-              stroke="currentColor"
-              strokeLinecap="round"
-              strokeWidth="1.8"
-              d="M9.9 9.9a3 3 0 0 0 4.2 4.2"
-            />
-          </svg>
-        )}
+        <img
+          src={pinsVisible ? Icons.eyeEnabled : Icons.eyeDisable}
+          alt=""
+          className="wpn-toggle__icon"
+        />
       </button>
       <button
         type="button"
@@ -306,16 +357,7 @@ export function AnnotationToolbar() {
         aria-label="Toggle annotation list"
         onClick={() => setListOpen(!listOpen)}
       >
-        <svg viewBox="0 0 24 24" className="wpn-toolbar__list-icon" aria-hidden="true">
-          <path
-            fill="none"
-            stroke="currentColor"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth="1.8"
-            d="M5 5h14a1.5 1.5 0 0 1 1.5 1.5v10A1.5 1.5 0 0 1 19 18H8.5L4.5 21.5V6.5A1.5 1.5 0 0 1 6 5Z"
-          />
-        </svg>
+        <img src={Icons.comment} alt="" className="wpn-toolbar__list-icon" />
         <span className="wpn-toolbar__count">{annotations.length}</span>
       </button>
       <button
@@ -327,16 +369,7 @@ export function AnnotationToolbar() {
         disabled={loading}
         onClick={() => retry()}
       >
-        <svg viewBox="0 0 24 24" className="wpn-toolbar__refresh-icon" aria-hidden="true">
-          <path
-            fill="none"
-            stroke="currentColor"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth="1.8"
-            d="M4.5 12a7.5 7.5 0 0 1 12.7-5.4M19.5 12a7.5 7.5 0 0 1-12.7 5.4M17.5 4.5v3.6h-3.6M6.5 19.5v-3.6h3.6"
-          />
-        </svg>
+        <img src={Icons.refresh} alt="" className="wpn-toolbar__refresh-icon" />
       </button>
       <button
         type="button"
@@ -344,16 +377,14 @@ export function AnnotationToolbar() {
         aria-label="Close annotation toolbar"
         onClick={closeBar}
       >
-        <svg viewBox="0 0 16 16" className="wpn-toolbar__close-icon" aria-hidden="true">
-          <path
-            fill="none"
-            stroke="currentColor"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth="1.7"
-            d="M3.2 3.2l9.6 9.6M12.8 3.2L3.2 12.8"
-          />
-        </svg>
+        <span
+          aria-hidden="true"
+          className="wpn-toolbar__close-icon"
+          style={{
+            WebkitMaskImage: `url(${Icons.close})`,
+            maskImage: `url(${Icons.close})`,
+          }}
+        />
       </button>
       {loading ? <span className="wpn-toolbar__status">Loading</span> : null}
       {error ? (

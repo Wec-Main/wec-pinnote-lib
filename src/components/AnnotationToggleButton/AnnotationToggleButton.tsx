@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useAnnotationContext } from "../../context/AnnotationContext";
-import penIcon from "../../assets/pen_icon.png?inline";
+import { Icons } from "../../assets/icons";
 
 export interface AnnotationToggleButtonProps {
   className?: string;
@@ -44,7 +44,7 @@ export function AnnotationToggleButton({ className }: AnnotationToggleButtonProp
         setModeEnabled(!modeEnabled);
       }}
     >
-      <img src={penIcon} alt="" className="wpn-toggle__icon" />
+      <img src={Icons.pen} alt="" className="wpn-toggle__icon" />
     </button>
     {nameError ? <span className="wpn-toolbar__name-error">Enter your name</span> : null}
     </>

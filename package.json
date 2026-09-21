@@ -34,7 +34,9 @@
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
     "format": "prettier --write .",
-    "format:check": "prettier --check ."
+    "format:check": "prettier --check .",
+    "demo": "npm run dev --prefix examples/demo",
+    "demo:build": "npm run build --prefix examples/demo"
   },
   "peerDependencies": {
     "react": ">=18",
