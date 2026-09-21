@@ -1472,11 +1472,15 @@ img.wpn-toggle__icon {
 }
 
 .wpn-list__message {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 5;
   color: #334155;
   font-size: 13px;
   line-height: 1.45;
   white-space: pre-wrap;
   word-break: break-word;
+  overflow: hidden;
 }
 
 .wpn-error-boundary {
