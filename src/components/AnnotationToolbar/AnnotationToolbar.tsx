@@ -11,6 +11,7 @@ import { PAGE_STATUS_OPTIONS, pageStatusLabel } from "../../utils/status";
 import penIcon from "../../assets/pen_icon.png?inline";
 
 const EDGE = 8;
+const LAUNCHER_SIZE = 36;
 
 function clampPosition(x: number, y: number, width: number, height: number) {
   return {
@@ -134,11 +135,14 @@ export function AnnotationToolbar() {
   };
 
   const closeBar = () => {
-    const el = toolbarRef.current;
-    if (el) {
-      const rect = el.getBoundingClientRect();
-      setPosition({ x: rect.left, y: rect.top });
-    }
+    setPosition(
+      clampPosition(
+        EDGE,
+        window.innerHeight - LAUNCHER_SIZE - EDGE,
+        LAUNCHER_SIZE,
+        LAUNCHER_SIZE,
+      ),
+    );
     setModeEnabled(false);
     setListOpen(false);
     selectAnnotation(null);
@@ -165,6 +169,7 @@ export function AnnotationToolbar() {
             didDrag.current = false;
             return;
           }
+          setPosition(null);
           setBarOpen(true);
         }}
       >

@@ -132,6 +132,22 @@ export function AnnotationProvider({ config, children }: AnnotationProviderProps
     setDraft(null);
   }, []);
 
+  const updateDraftLabel = useCallback((label: string) => {
+    const trimmed = label.trim();
+    if (!trimmed) {
+      return;
+    }
+    setDraft((current) =>
+      current
+        ? {
+            ...current,
+            label: trimmed,
+            anchor: { ...current.anchor, elementIdentifier: trimmed },
+          }
+        : current,
+    );
+  }, []);
+
   const submitDraft = useCallback(
     async (message: string, status?: AnnotationStatus) => {
       if (!draft) {
@@ -177,6 +193,7 @@ export function AnnotationProvider({ config, children }: AnnotationProviderProps
       selectAnnotation,
       draft,
       startDraft,
+      updateDraftLabel,
       cancelDraft,
       submitDraft,
       addComment: collection.addComment,
@@ -220,6 +237,7 @@ export function AnnotationProvider({ config, children }: AnnotationProviderProps
       selectedId,
       startDraft,
       submitDraft,
+      updateDraftLabel,
     ],
   );
 

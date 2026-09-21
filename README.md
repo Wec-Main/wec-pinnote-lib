@@ -15,12 +15,12 @@ Peer dependencies: `react` and `react-dom` >= 18.
 Add it straight to your host app's `package.json` (or run the equivalent `npm install` command) using a git URL instead of a version:
 
 ```bash
-npm install git+https://github.com/<org>/wec-pinnote-lib.git
+npm install git+https://github.com/Wec-Main/wec-pinnote-lib.git
 # or, pinned to a branch/tag/commit:
-npm install git+https://github.com/<org>/wec-pinnote-lib.git#main
+npm install git+https://github.com/Wec-Main/wec-pinnote-lib.git#main
 ```
 
-npm clones the repo, runs its `prepare`/`build` step, and installs it like any other dependency. Replace `<org>/wec-pinnote-lib` with the actual GitHub path once the repo is hosted there.
+npm clones the repo, runs its `prepare`/`build` step, and installs it like any other dependency.
 
 ### Option B: from a local checkout
 

@@ -24,6 +24,7 @@ export interface AnnotationContextValue {
   selectAnnotation: (id: string | null) => void;
   draft: DraftAnnotation | null;
   startDraft: (anchor: AnnotationAnchor, label: string) => void;
+  updateDraftLabel: (label: string) => void;
   cancelDraft: () => void;
   submitDraft: (message: string, status?: AnnotationStatus) => Promise<void>;
   addComment: (annotationId: string, message: string) => Promise<void>;

@@ -3,6 +3,10 @@
   "version": "1.0.0",
   "description": "Figma-like website annotation and commenting library for React applications.",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Wec-Main/wec-pinnote-lib.git"
+  },
   "type": "module",
   "sideEffects": [
     "**/*.css"

@@ -65,7 +65,7 @@ body.wpn-mode-active {
   padding: 3px 5px;
   background: rgba(0, 0, 0, 0.82);
   border: 1px solid rgba(255, 255, 255, 0.16);
-  border-radius: 999px;
+  border-radius: 12px;
   box-shadow: var(--wpn-shadow-sm);
   backdrop-filter: none;
   color: #fff;
@@ -81,6 +81,7 @@ body.wpn-mode-active {
   width: 36px;
   height: 36px;
   padding: 0;
+  border-radius: 999px;
   justify-content: center;
   cursor: grab;
   touch-action: none;
@@ -121,8 +122,9 @@ body.wpn-mode-active {
 }
 
 .wpn-toolbar__screen {
+  /* Page status dropdown hidden per product request; keep markup/logic intact. */
+  display: none;
   position: relative;
-  display: flex;
   align-items: center;
   margin-right: 2px;
 }
@@ -213,7 +215,7 @@ body.wpn-mode-active {
   height: 24px;
   padding: 0 9px;
   border: 1px solid rgba(255, 255, 255, 0.16);
-  border-radius: 999px;
+  border-radius: 8px;
   background: rgba(255, 255, 255, 0.1);
   color: #fff;
   font-weight: 500;
@@ -419,12 +421,16 @@ img.wpn-toggle__icon {
   width: 30px;
   height: 30px;
   margin: 0;
+  padding: 0;
   border: 2px solid #fff;
   border-radius: 999px;
   background: var(--wpn-accent);
   color: #fff;
   font-size: 12px;
   font-weight: 700;
+  display: grid;
+  place-items: center;
+  appearance: none;
   transform: translate(-50%, -50%);
   box-shadow: 0 8px 20px rgba(67, 56, 202, 0.32);
   cursor: pointer;
@@ -488,7 +494,7 @@ img.wpn-toggle__icon {
   flex-direction: column;
   background: rgba(0, 0, 0, 0.82);
   border: 1px solid rgba(255, 255, 255, 0.16);
-  border-radius: 24px;
+  border-radius: 12px;
   box-shadow: 0 18px 40px rgba(0, 0, 0, 0.2);
   color: #fff;
   backdrop-filter: none;
@@ -603,6 +609,33 @@ img.wpn-toggle__icon {
   white-space: nowrap;
 }
 
+.wpn-panel__title-group {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  flex: 1;
+  min-width: 0;
+}
+
+.wpn-panel__title-input {
+  flex: 1;
+  min-width: 0;
+  font-size: 16px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  padding: 2px 8px;
+  border: 1px solid rgba(255, 255, 255, 0.24);
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.1);
+  color: inherit;
+  outline: none;
+}
+
+.wpn-panel__title-input:focus {
+  border-color: #c4b5fd;
+  box-shadow: 0 0 0 3px rgba(91, 77, 255, 0.2);
+}
+
 .wpn-composer form,
 .wpn-thread-panel {
   min-height: 0;
@@ -612,6 +645,11 @@ img.wpn-toggle__icon {
   display: flex;
   flex-direction: column;
   padding: 12px 20px 18px;
+}
+
+.wpn-composer .wpn-status {
+  /* Status picker hidden on the new-comment composer per product request; keep markup/logic intact. */
+  display: none;
 }
 
 .wpn-thread {
@@ -646,8 +684,21 @@ img.wpn-toggle__icon {
 }
 
 .wpn-thread-panel .wpn-panel__title,
-.wpn-composer .wpn-panel__title {
+.wpn-composer .wpn-panel__title,
+.wpn-thread-panel .wpn-panel__title-input,
+.wpn-composer .wpn-panel__title-input {
   font-size: 13px;
+}
+
+.wpn-composer .wpn-panel__title-group .wpn-link--icon {
+  width: 22px;
+  height: 22px;
+  flex: 0 0 auto;
+}
+
+.wpn-composer .wpn-panel__title-group .wpn-action-icon {
+  width: 12px;
+  height: 12px;
 }
 
 .wpn-thread-panel .wpn-status-chip,

@@ -38,6 +38,20 @@ export function resolveElement(anchor: AnnotationAnchor): Element | null {
   return null;
 }
 
+function getAssociatedLabelText(element: HTMLElement): string | null {
+  if (
+    element instanceof HTMLInputElement ||
+    element instanceof HTMLTextAreaElement ||
+    element instanceof HTMLSelectElement
+  ) {
+    const text = element.labels?.[0]?.textContent?.trim();
+    if (text) {
+      return text;
+    }
+  }
+  return null;
+}
+
 export function getElementLabel(element: Element): string {
   if (!(element instanceof HTMLElement)) {
     return element.tagName.toLowerCase();
@@ -51,6 +65,11 @@ export function getElementLabel(element: Element): string {
   const ariaLabel = element.getAttribute("aria-label");
   if (ariaLabel) {
     return ariaLabel;
+  }
+
+  const associatedLabel = getAssociatedLabelText(element);
+  if (associatedLabel) {
+    return associatedLabel;
   }
 
   if (element instanceof HTMLInputElement) {
