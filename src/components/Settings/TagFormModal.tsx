@@ -1,20 +1,19 @@
-import { useState, type FormEvent } from "react";
+import { useId, useRef, useState, type FormEvent } from "react";
 import { Icon, SearchableSelect, Spinner, Tooltip } from "../primitives";
 import { useEscapeKey } from "../../hooks/useEscapeKey";
 import { useScrimDismiss } from "../../hooks/useScrimDismiss";
+import { useFocusTrap } from "./useFocusTrap";
+import { Field } from "./Field";
 import { TAG_COLORS, type ProjectTag, type TagDraft, type TagStatus } from "../../types/tag.types";
 import type { Project } from "../../types/organization.types";
-
-const STATUS_OPTIONS = [
-  { value: "active", label: "Active" },
-  { value: "inactive", label: "Inactive" },
-];
+import { TAG_STATUS_OPTIONS } from "./tagOptions";
 
 interface TagFormModalProps {
   tag: ProjectTag | null;
   projects: Project[];
   defaultProjectId?: string;
   busy?: boolean;
+  fieldErrors?: Record<string, string[]> | null;
   onCancel: () => void;
   onSubmit: (draft: TagDraft) => void;
 }
@@ -24,11 +23,16 @@ export function TagFormModal({
   projects,
   defaultProjectId,
   busy = false,
+  fieldErrors,
   onCancel,
   onSubmit,
 }: TagFormModalProps) {
   useEscapeKey(onCancel);
   const scrimProps = useScrimDismiss(onCancel);
+  const titleId = useId();
+  const dialogRef = useRef<HTMLFormElement>(null);
+  const nameInputRef = useRef<HTMLInputElement>(null);
+  useFocusTrap(dialogRef, nameInputRef);
 
   const [projectId, setProjectId] = useState(tag?.projectId ?? defaultProjectId ?? "");
   const [name, setName] = useState(tag?.name ?? "");
@@ -44,6 +48,8 @@ export function TagFormModal({
 
   const nameValid = name.trim().length > 0;
   const projectValid = projectId.length > 0;
+  const nameServerError = fieldErrors?.name?.[0];
+  const projectServerError = fieldErrors?.projectId?.[0];
 
   const handleSubmit = (event: FormEvent) => {
     event.preventDefault();
@@ -57,14 +63,15 @@ export function TagFormModal({
   return (
     <div className="wpn-epicflow-modal-scrim" {...scrimProps}>
       <form
+        ref={dialogRef}
         className="wpn-epicflow-modal wpn-users-modal"
         role="dialog"
         aria-modal="true"
-        aria-labelledby="wpn-tag-title"
+        aria-labelledby={titleId}
         onSubmit={handleSubmit}
       >
         <div className="wpn-epicflow-modal__header">
-          <h2 className="wpn-epicflow-modal__title" id="wpn-tag-title">
+          <h2 className="wpn-epicflow-modal__title" id={titleId}>
             {tag ? "Edit tag" : "New tag"}
           </h2>
           <Tooltip label="Close" placement="left">
@@ -81,21 +88,22 @@ export function TagFormModal({
 
         <div className="wpn-users-modal__body">
           <div className="wpn-epicflow-modal__row">
-            <label className="wpn-epicflow-modal__field">
-              <span className="wpn-epicflow-modal__label">
-                Tag name <span className="wpn-epicflow-modal__required">*</span>
-              </span>
-              <input
-                className="wpn-epicflow-modal__input"
-                value={name}
-                onChange={(event) => setName(event.target.value)}
-                placeholder="Accessibility"
-                autoFocus
-              />
-              {touched && !nameValid ? (
-                <span className="wpn-users-modal__error">A tag name is required.</span>
-              ) : null}
-            </label>
+            <Field
+              label="Tag name"
+              required
+              error={nameServerError ?? (touched && !nameValid ? "A tag name is required." : null)}
+            >
+              {(fieldProps) => (
+                <input
+                  {...fieldProps}
+                  ref={nameInputRef}
+                  className="wpn-epicflow-modal__input"
+                  value={name}
+                  onChange={(event) => setName(event.target.value)}
+                  placeholder="Accessibility"
+                />
+              )}
+            </Field>
           </div>
 
           <div className="wpn-epicflow-modal__row">
@@ -127,14 +135,16 @@ export function TagFormModal({
                   placeholder="Select a project"
                 />
               )}
-              {touched && !projectValid ? (
-                <span className="wpn-users-modal__error">A project is required.</span>
+              {(touched && !projectValid) || projectServerError ? (
+                <span className="wpn-users-modal__error">
+                  {projectServerError ?? "A project is required."}
+                </span>
               ) : null}
             </div>
             <div className="wpn-epicflow-modal__field">
               <span className="wpn-epicflow-modal__label">Status</span>
               <SearchableSelect
-                options={STATUS_OPTIONS}
+                options={TAG_STATUS_OPTIONS}
                 value={status}
                 onChange={(value) => setStatus(value as TagStatus)}
                 ariaLabel="Status"

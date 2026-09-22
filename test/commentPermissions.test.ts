@@ -43,13 +43,7 @@ describe("canDeleteComment", () => {
 });
 
 describe("canEditComment", () => {
-  it("is limited to the author, even for admins", () => {
-    expect(canEditComment(comment("u1"), owner)).toBe(true);
-    expect(canEditComment(comment("u1"), admin)).toBe(false);
-    expect(canEditComment(comment("u1"), superAdmin)).toBe(false);
-  });
-
-  it("matches on id, not display name", () => {
-    expect(canEditComment(comment("u1"), { id: "u9", name: "Ada Lovelace" })).toBe(false);
+  it("is open to every signed-in role, not just the author", () => {
+    expect(canEditComment()).toBe(true);
   });
 });

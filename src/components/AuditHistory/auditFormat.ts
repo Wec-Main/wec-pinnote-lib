@@ -26,6 +26,17 @@ const ACTION_META: Record<string, ActionMeta> = {
   "project.created": { label: "Project created", tone: "success" },
   "project.updated": { label: "Project updated", tone: "warning" },
   "project.deleted": { label: "Project deleted", tone: "danger" },
+  "epic.created": { label: "Epic created", tone: "success" },
+  "epic.updated": { label: "Epic updated", tone: "warning" },
+  "epic.deleted": { label: "Epic deleted", tone: "danger" },
+  "user_story.created": { label: "User story created", tone: "success" },
+  "user_story.updated": { label: "User story updated", tone: "warning" },
+  "user_story.deleted": { label: "User story deleted", tone: "danger" },
+  "annotation_tag.created": { label: "Tag pinned", tone: "success" },
+  "annotation_tag.deleted": { label: "Tag pin removed", tone: "danger" },
+  "tag.created": { label: "Tag created", tone: "success" },
+  "tag.updated": { label: "Tag updated", tone: "warning" },
+  "tag.deleted": { label: "Tag deleted", tone: "danger" },
 };
 
 const ENTITY_LABELS: Record<string, string> = {
@@ -35,6 +46,10 @@ const ENTITY_LABELS: Record<string, string> = {
   page_status: "Page status",
   organization: "Organization",
   project: "Project",
+  epic: "Epic",
+  user_story: "User story",
+  annotation_tag: "Tag pin",
+  tag: "Tag",
 };
 
 export const ACTION_OPTIONS = Object.entries(ACTION_META).map(([value, meta]) => ({

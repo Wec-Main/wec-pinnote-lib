@@ -1,8 +1,9 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useId, useRef, useState } from "react";
 import { useEscapeKey } from "../../hooks/useEscapeKey";
 import { useScrimDismiss } from "../../hooks/useScrimDismiss";
+import { useFocusTrap } from "../Settings/useFocusTrap";
 import { getInitials } from "../../utils/format";
-import { Icon } from "../primitives";
+import { Icon, Spinner } from "../primitives";
 import type { LoginOption } from "../../types/auth.types";
 
 interface LoginDialogProps {
@@ -16,14 +17,21 @@ export function LoginDialog({ user, onCancel, onSubmit }: LoginDialogProps) {
   const [revealed, setRevealed] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
+  const titleId = useId();
+  const dialogRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  useFocusTrap(dialogRef, inputRef);
 
-  useEscapeKey(onCancel);
-  const scrimProps = useScrimDismiss(onCancel);
+  // Dismissing mid-request would leave the login resolving against a closed
+  // dialog, so the exits stay shut until it settles.
+  const dismiss = useCallback(() => {
+    if (!pending) {
+      onCancel();
+    }
+  }, [onCancel, pending]);
 
-  useEffect(() => {
-    inputRef.current?.focus();
-  }, []);
+  useEscapeKey(dismiss);
+  const scrimProps = useScrimDismiss(dismiss);
 
   const submit = async () => {
     if (!password || pending) {
@@ -45,9 +53,11 @@ export function LoginDialog({ user, onCancel, onSubmit }: LoginDialogProps) {
   return (
     <div className="wpn-epicflow-modal-scrim" {...scrimProps}>
       <div
+        ref={dialogRef}
         className="wpn-epicflow-modal wpn-login-dialog"
         role="dialog"
-        aria-label={`Log in as ${user.name}`}
+        aria-modal="true"
+        aria-labelledby={titleId}
       >
         <div className="wpn-login-dialog__identity">
           <span className="wpn-avatar wpn-avatar--fallback wpn-login-dialog__avatar">
@@ -58,6 +68,9 @@ export function LoginDialog({ user, onCancel, onSubmit }: LoginDialogProps) {
             <span className="wpn-login-dialog__email">{user.email}</span>
           </span>
         </div>
+        <h2 className="wpn-sr-only" id={titleId}>
+          Log in as {user.name}
+        </h2>
 
         <form
           className="wpn-login-dialog__form"
@@ -70,10 +83,7 @@ export function LoginDialog({ user, onCancel, onSubmit }: LoginDialogProps) {
             Password
           </label>
           <div
-            className={[
-              "wpn-login-dialog__field",
-              error ? "wpn-login-dialog__field--invalid" : "",
-            ]
+            className={["wpn-login-dialog__field", error ? "wpn-login-dialog__field--invalid" : ""]
               .filter(Boolean)
               .join(" ")}
           >
@@ -125,7 +135,11 @@ export function LoginDialog({ user, onCancel, onSubmit }: LoginDialogProps) {
               className="wpn-btn wpn-btn--primary"
               disabled={!password || pending}
             >
-              <Icon name="check" className="wpn-btn__icon" />
+              {pending ? (
+                <Spinner className="wpn-btn__icon" />
+              ) : (
+                <Icon name="check" className="wpn-btn__icon" />
+              )}
               {pending ? "Logging in..." : "Log in"}
             </button>
           </div>

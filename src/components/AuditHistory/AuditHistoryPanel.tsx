@@ -50,7 +50,7 @@ export interface AuditHistoryPanelProps {
 
 export function AuditHistoryPanel({ embedded = false }: AuditHistoryPanelProps = {}) {
   const { config, activeAccount, setAuditHistoryOpen } = useAnnotationContext();
-  const actorId = activeAccount?.id;
+  const authToken = activeAccount?.token;
   const [entries, setEntries] = useState<AuditRecord[]>([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
@@ -85,7 +85,7 @@ export function AuditHistoryPanel({ embedded = false }: AuditHistoryPanelProps =
 
     fetchAuditPage(
       config.apiBaseUrl,
-      actorId,
+      authToken,
       {
         projectId: config.projectId,
         scope,
@@ -116,7 +116,7 @@ export function AuditHistoryPanel({ embedded = false }: AuditHistoryPanelProps =
   }, [
     config.apiBaseUrl,
     config.projectId,
-    actorId,
+    authToken,
     scope,
     actionFilter,
     entityFilter,

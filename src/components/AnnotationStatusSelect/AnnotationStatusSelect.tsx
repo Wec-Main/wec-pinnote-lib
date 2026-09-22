@@ -31,7 +31,7 @@ export function AnnotationStatusSelect({ value, onChange, disabled }: Annotation
         type="button"
         className={`wpn-status__trigger wpn-tone--${value}`}
         disabled={disabled}
-        aria-label="Status"
+        aria-label={`Status: ${statusLabel(value)}`}
         aria-haspopup="listbox"
         aria-expanded={open}
         onClick={() => setOpen((current) => !current)}

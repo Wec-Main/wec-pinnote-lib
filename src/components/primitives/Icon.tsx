@@ -27,6 +27,8 @@ export type IconName =
   | "alert"
   | "copy"
   | "settings"
+  | "calendar"
+  | "tag"
   | "building"
   | "folder"
   | "drag";
@@ -69,6 +71,18 @@ const PATHS: Record<IconName, ReactElement> = {
     </>
   ),
   windowMinimize: <path d="M5 12h14" />,
+  tag: (
+    <>
+      <path d="M3.6 11.4V4.6a1 1 0 0 1 1-1h6.8a1 1 0 0 1 .7.3l8 8a1 1 0 0 1 0 1.4l-6.8 6.8a1 1 0 0 1-1.4 0l-8-8a1 1 0 0 1-.3-.7Z" />
+      <circle cx="8.1" cy="8.1" r="1.5" />
+    </>
+  ),
+  calendar: (
+    <>
+      <rect x="3.5" y="5" width="17" height="15.5" rx="2.5" />
+      <path d="M3.5 10h17M8 3.5V6.5M16 3.5V6.5" />
+    </>
+  ),
   chevronDown: <path d="m5 9 7 7 7-7" />,
   chevronLeft: <path d="m14 5-7 7 7 7" />,
   chevronRight: <path d="m10 5 7 7-7 7" />,

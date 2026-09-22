@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import type { Annotation, AnnotationComment, AnnotationUser } from "../../types/annotation.types";
 import { formatTimestamp, getInitials } from "../../utils/format";
 import { canDeleteComment, canEditComment } from "../../utils/commentPermissions";
@@ -8,6 +8,7 @@ interface AnnotationThreadProps {
   currentUser: AnnotationUser;
   onEdit: (commentId: string, message: string) => Promise<void>;
   onDelete: (commentId: string) => Promise<void>;
+  onEditingChange?: (editing: boolean) => void;
 }
 
 function Avatar({ user }: { user: AnnotationUser }) {
@@ -22,17 +23,24 @@ function CommentItem({
   currentUser,
   onEdit,
   onDelete,
+  onEditingChange,
 }: {
   comment: AnnotationComment;
   currentUser: AnnotationUser;
   onEdit: (commentId: string, message: string) => Promise<void>;
   onDelete: (commentId: string) => Promise<void>;
+  onEditingChange?: (commentId: string, editing: boolean) => void;
 }) {
-  const canEdit = canEditComment(comment, currentUser);
+  const canEdit = canEditComment();
   const canDelete = canDeleteComment(comment, currentUser);
   const [editing, setEditing] = useState(false);
   const [value, setValue] = useState(comment.message);
   const [confirmDelete, setConfirmDelete] = useState(false);
+
+  useEffect(() => {
+    onEditingChange?.(comment.id, editing && value.trim() !== comment.message.trim());
+    return () => onEditingChange?.(comment.id, false);
+  }, [comment.id, comment.message, editing, onEditingChange, value]);
 
   return (
     <article className="wpn-comment">
@@ -48,6 +56,7 @@ function CommentItem({
               className="wpn-input"
               value={value}
               onChange={(event) => setValue(event.target.value)}
+              aria-label="Edit comment"
               rows={2}
             />
             <div className="wpn-comment__actions">
@@ -145,7 +154,30 @@ export function AnnotationThread({
   currentUser,
   onEdit,
   onDelete,
+  onEditingChange,
 }: AnnotationThreadProps) {
+  const [dirtyEditIds, setDirtyEditIds] = useState<Set<string>>(new Set());
+
+  useEffect(() => {
+    onEditingChange?.(dirtyEditIds.size > 0);
+  }, [dirtyEditIds, onEditingChange]);
+
+  const setCommentEditing = useCallback((commentId: string, editing: boolean) => {
+    setDirtyEditIds((current) => {
+      const isEditing = current.has(commentId);
+      if (isEditing === editing) {
+        return current;
+      }
+      const next = new Set(current);
+      if (editing) {
+        next.add(commentId);
+      } else {
+        next.delete(commentId);
+      }
+      return next;
+    });
+  }, []);
+
   return (
     <div className="wpn-thread">
       {annotation.comments.map((comment) => (
@@ -155,6 +187,7 @@ export function AnnotationThread({
           currentUser={currentUser}
           onEdit={onEdit}
           onDelete={onDelete}
+          onEditingChange={setCommentEditing}
         />
       ))}
     </div>

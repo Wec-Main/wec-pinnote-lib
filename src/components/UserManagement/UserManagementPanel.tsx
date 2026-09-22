@@ -4,6 +4,7 @@ import { formatRelativeTime, getInitials } from "../../utils/format";
 import {
   Icon,
   ListSearchBar,
+  RefreshButton,
   SearchableSelect,
   TablePagination,
   TableSkeleton,
@@ -31,9 +32,17 @@ import { canCreateUsers, canDeleteUser, canEditUser, userScopeFor } from "../../
 import { UserFormModal } from "./UserFormModal";
 import { ResetPasswordModal } from "./ResetPasswordModal";
 import { ConfirmDialog } from "./ConfirmDialog";
+import { GeneratedPasswordModal } from "./GeneratedPasswordModal";
+import { validationDetailsFrom } from "../Settings/validationError";
 
 type PendingAction =
   { kind: "delete"; user: ManagedUser } | { kind: "create"; draft: ManagedUserDraft };
+
+interface GeneratedPassword {
+  title: string;
+  description: string;
+  password: string;
+}
 
 function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : "Something went wrong.";
@@ -42,6 +51,7 @@ function errorMessage(error: unknown): string {
 export function UserManagementPanel() {
   const { config, activeAccount, reloadLoginOptions } = useAnnotationContext();
   const actorId = activeAccount?.id;
+  const authToken = activeAccount?.token;
   const actorRole = activeAccount?.roleId ?? "developer";
   const selfOnly = userScopeFor(actorRole) === "self";
   const mayCreate = canCreateUsers(actorRole);
@@ -63,6 +73,8 @@ export function UserManagementPanel() {
   const [resetTarget, setResetTarget] = useState<ManagedUser | null>(null);
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string[]> | null>(null);
+  const [generatedPassword, setGeneratedPassword] = useState<GeneratedPassword | null>(null);
   const [reloadToken, setReloadToken] = useState(0);
 
   const reload = useCallback(() => setReloadToken((value) => value + 1), []);
@@ -79,7 +91,7 @@ export function UserManagementPanel() {
 
     fetchUsers(
       config.apiBaseUrl,
-      actorId,
+      authToken,
       {
         projectId: config.projectId,
         search: searchQuery || undefined,
@@ -109,7 +121,7 @@ export function UserManagementPanel() {
   }, [
     config.apiBaseUrl,
     config.projectId,
-    actorId,
+    authToken,
     searchQuery,
     roleFilter,
     statusFilter,
@@ -145,11 +157,13 @@ export function UserManagementPanel() {
 
   const openCreate = () => {
     setEditTarget(null);
+    setFieldErrors(null);
     setFormOpen(true);
   };
 
   const openEdit = (user: ManagedUser) => {
     setEditTarget(user);
+    setFieldErrors(null);
     setFormOpen(true);
   };
 
@@ -160,14 +174,16 @@ export function UserManagementPanel() {
     }
     setBusy(true);
     setNotice(null);
+    setFieldErrors(null);
     try {
-      await updateUser(config.apiBaseUrl, actorId, config.projectId, editTarget.id, draft);
+      await updateUser(config.apiBaseUrl, authToken, config.projectId, editTarget.id, draft);
       setNotice(`${draft.firstName} ${draft.lastName} updated.`);
       setFormOpen(false);
       setEditTarget(null);
       reloadAll();
     } catch (err) {
       setNotice(errorMessage(err));
+      setFieldErrors(validationDetailsFrom(err)?.fieldErrors ?? null);
     } finally {
       setBusy(false);
     }
@@ -182,13 +198,20 @@ export function UserManagementPanel() {
     try {
       const result = await resetUserPassword(
         config.apiBaseUrl,
-        actorId,
+        authToken,
         config.projectId,
         resetTarget.id,
         password,
       );
-      setNotice(`New password for ${resetTarget.email}: ${result.password}`);
+      setNotice(`Password reset for ${resetTarget.email} successfully.`);
       setResetTarget(null);
+      if (!password) {
+        setGeneratedPassword({
+          title: "Password reset",
+          description: `A new password was generated for ${resetTarget.firstName} ${resetTarget.lastName} (${resetTarget.email}).`,
+          password: result.password,
+        });
+      }
       reloadAll();
     } catch (err) {
       setNotice(errorMessage(err));
@@ -206,16 +229,19 @@ export function UserManagementPanel() {
     try {
       if (pending.kind === "delete") {
         const { user } = pending;
-        await deleteUser(config.apiBaseUrl, actorId, config.projectId, user.id);
+        await deleteUser(config.apiBaseUrl, authToken, config.projectId, user.id);
         setNotice(`${user.firstName} ${user.lastName} deleted.`);
       } else {
         const { draft } = pending;
-        const created = await createUser(config.apiBaseUrl, actorId, config.projectId, draft);
-        setNotice(
-          created.generatedPassword
-            ? `${draft.firstName} ${draft.lastName} created. Temporary password: ${created.generatedPassword}`
-            : `${draft.firstName} ${draft.lastName} created.`,
-        );
+        const created = await createUser(config.apiBaseUrl, authToken, config.projectId, draft);
+        setNotice(`${draft.firstName} ${draft.lastName} created.`);
+        if (created.generatedPassword) {
+          setGeneratedPassword({
+            title: "User created",
+            description: `A temporary password was generated for ${draft.firstName} ${draft.lastName} (${draft.email}).`,
+            password: created.generatedPassword,
+          });
+        }
         setPage(1);
         setFormOpen(false);
         setEditTarget(null);
@@ -314,27 +340,7 @@ export function UserManagementPanel() {
                 />
               </>
             )}
-            <Tooltip label={loading ? "Refreshing..." : "Refresh"} placement="bottom">
-              <button
-                type="button"
-                className="wpn-refresh-btn"
-                aria-label="Refresh users"
-                aria-busy={loading}
-                disabled={loading}
-                onClick={reload}
-              >
-                <Icon
-                  name="refresh"
-                  className={[
-                    "wpn-refresh-btn__icon",
-                    loading ? "wpn-icon-btn__icon--spinning" : "",
-                  ]
-                    .filter(Boolean)
-                    .join(" ")}
-                />
-                {loading ? "Refreshing" : "Refresh"}
-              </button>
-            </Tooltip>
+            <RefreshButton label="Refresh users" loading={loading} onRefresh={reload} />
             {mayCreate ? (
               <Tooltip label="Add a new user" placement="bottom">
                 <button type="button" className="wpn-users-create" onClick={openCreate}>
@@ -532,9 +538,11 @@ export function UserManagementPanel() {
         <UserFormModal
           user={editTarget}
           busy={busy}
+          fieldErrors={fieldErrors}
           onClose={() => {
             setFormOpen(false);
             setEditTarget(null);
+            setFieldErrors(null);
           }}
           onSubmit={(draft) => void handleFormSubmit(draft)}
         />
@@ -555,6 +563,15 @@ export function UserManagementPanel() {
           busy={busy}
           onCancel={() => setPending(null)}
           onConfirm={() => void confirmPending()}
+        />
+      ) : null}
+
+      {generatedPassword ? (
+        <GeneratedPasswordModal
+          title={generatedPassword.title}
+          description={generatedPassword.description}
+          password={generatedPassword.password}
+          onClose={() => setGeneratedPassword(null)}
         />
       ) : null}
     </div>

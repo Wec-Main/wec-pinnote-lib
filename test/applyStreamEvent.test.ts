@@ -52,7 +52,10 @@ describe("applyStreamEvent", () => {
     const existing = [annotation("a-2", 2, "2026-01-01T00:00:00.000Z")];
     const incoming = annotation("a-1", 1, "2026-01-01T00:00:01.000Z");
 
-    const result = applyStreamEvent(existing, event("annotation.created", { annotation: incoming }));
+    const result = applyStreamEvent(
+      existing,
+      event("annotation.created", { annotation: incoming }),
+    );
 
     expect(result.annotations.map((item) => item.id)).toEqual(["a-1", "a-2"]);
   });
@@ -61,7 +64,10 @@ describe("applyStreamEvent", () => {
     const existing = [annotation("a-1", 1, "2026-01-01T00:00:00.000Z")];
     const incoming = annotation("a-1", 1, "2026-01-01T00:00:00.000Z");
 
-    const result = applyStreamEvent(existing, event("annotation.created", { annotation: incoming }));
+    const result = applyStreamEvent(
+      existing,
+      event("annotation.created", { annotation: incoming }),
+    );
 
     expect(result.annotations).toHaveLength(1);
   });

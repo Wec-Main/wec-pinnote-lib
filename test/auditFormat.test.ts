@@ -51,6 +51,17 @@ describe("actionMeta", () => {
       "project.created",
       "project.updated",
       "project.deleted",
+      "epic.created",
+      "epic.updated",
+      "epic.deleted",
+      "user_story.created",
+      "user_story.updated",
+      "user_story.deleted",
+      "annotation_tag.created",
+      "annotation_tag.deleted",
+      "tag.created",
+      "tag.updated",
+      "tag.deleted",
     ];
 
     for (const action of emitted) {

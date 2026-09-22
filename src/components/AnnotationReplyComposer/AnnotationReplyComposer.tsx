@@ -31,6 +31,7 @@ export function AnnotationReplyComposer({ onSubmit }: AnnotationReplyComposerPro
         value={message}
         onChange={(event) => setMessage(event.target.value)}
         placeholder="Reply"
+        aria-label="Reply"
         rows={1}
       />
       <Tooltip label="Send reply" placement="top">

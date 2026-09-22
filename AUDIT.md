@@ -12,52 +12,58 @@
 
 A **competent, carefully-built single-player annotation overlay** with a genuinely above-average DOM-anchoring engine, strict TypeScript, and a clean bring-your-own-backend seam. It is held back by four things: it is **unusable without a mouse**, roughly **a third of it is non-functional mock code that ships to consumers**, its **built-in login blocks the primary integration path**, and it has **zero tests and zero CI**.
 
-Both quality gates the project defines for itself pass clean — `npx tsc --noEmit` and `npx eslint .` each exit 0, with zero `any`, zero non-null assertions and zero `eslint-disable` comments in `src/`. The gaps are overwhelmingly in checks that *do not exist*.
+Both quality gates the project defines for itself pass clean — `npx tsc --noEmit` and `npx eslint .` each exit 0, with zero `any`, zero non-null assertions and zero `eslint-disable` comments in `src/`. The gaps are overwhelmingly in checks that _do not exist_.
 
-| Dimension | Grade | One-line summary |
-|---|---|---|
-| Code quality & types | **B+** | Strict TS done properly; `noUncheckedIndexedAccess` respected throughout |
-| DOM anchoring | **A−** | The standout: five-tier identity ladder, reasoned fallbacks, honest orphan state |
-| Security | **C** | No XSS; but tokenless self-asserted identity and name-based authorization |
-| Performance | **C−** | 44% of bundle is one PNG; observer churn; per-mousemove forced reflow |
-| UI/UX | **C** | Strong empty/optimistic states; data-loss flows and no responsive story |
-| Accessibility | **D** | No focus trap in any of 6 dialogs; keyboard-trapping annotation mode |
-| Features vs. peers | **C−** | No realtime, attachments, mentions or context capture |
-| API & DX | **C+** | Real adapter seam, undersold; built-in auth blocks adoption |
-| Testing & CI | **F** | No test file, no runner, no CI workflow |
+| Dimension            | Grade  | One-line summary                                                                 |
+| -------------------- | ------ | -------------------------------------------------------------------------------- |
+| Code quality & types | **B+** | Strict TS done properly; `noUncheckedIndexedAccess` respected throughout         |
+| DOM anchoring        | **A−** | The standout: five-tier identity ladder, reasoned fallbacks, honest orphan state |
+| Security             | **C**  | No XSS; but tokenless self-asserted identity and name-based authorization        |
+| Performance          | **C−** | 44% of bundle is one PNG; observer churn; per-mousemove forced reflow            |
+| UI/UX                | **C**  | Strong empty/optimistic states; data-loss flows and no responsive story          |
+| Accessibility        | **D**  | No focus trap in any of 6 dialogs; keyboard-trapping annotation mode             |
+| Features vs. peers   | **C−** | No realtime, attachments, mentions or context capture                            |
+| API & DX             | **C+** | Real adapter seam, undersold; built-in auth blocks adoption                      |
+| Testing & CI         | **F**  | No test file, no runner, no CI workflow                                          |
 
 ---
 
 ## P0 — Fix before any further adoption
 
 ### 1. Annotation mode traps keyboard users
+
 `AnnotationOverlay.tsx:69-73` installs a capture-phase handler that `preventDefault` + `stopImmediatePropagation`s **Enter and Space on every host element**, with no `Escape` branch anywhere in the overlay. Host UI becomes focusable-but-dead, and there is no keyboard way to exit the mode.
 
-Mitigating detail (verified): a keyboard-activated click *is* handled — `AnnotationOverlay.tsx:63-66` detects `clientX === 0 && clientY === 0` and creates a pin at the focused element's center. So pin *placement* has a keyboard path; **exiting the mode does not**. WCAG 2.2 SC 2.1.1, 2.1.2.
+Mitigating detail (verified): a keyboard-activated click _is_ handled — `AnnotationOverlay.tsx:63-66` detects `clientX === 0 && clientY === 0` and creates a pin at the focused element's center. So pin _placement_ has a keyboard path; **exiting the mode does not**. WCAG 2.2 SC 2.1.1, 2.1.2.
 
 ### 2. No dialog has a focus trap or focus restoration
+
 Verified by grep: **zero** occurrences of `activeElement`, `inert` or any focus-trap logic in `src/`. All six dialogs (`LoginDialog`, `ConfirmDialog`, `UserFormModal`, `CreateEpicModal`, `CreateUserStoryModal`, `CreateEpicNoteModal`) let Tab walk out behind a `rgba(0,0,0,0.6)` scrim onto controls the user cannot see, and return focus to `<body>` on close. `ConfirmDialog` and `LoginDialog` additionally lack `aria-modal` (the other four have it). APG Modal Dialog; SC 2.4.3, 2.4.11.
 
 ### 3. Built-in login blocks the documented integration path
-`AnnotationProvider.tsx:57-62` — `setModeEnabled` **silently returns** when there is no `activeAccount`. A host that already authenticated its user and passed `currentUser` still cannot annotate until the user logs in *again* through the library's own dialog. It fails with no error, no message, no indication. This is the single largest adoption blocker.
+
+`AnnotationProvider.tsx:57-62` — `setModeEnabled` **silently returns** when there is no `activeAccount`. A host that already authenticated its user and passed `currentUser` still cannot annotate until the user logs in _again_ through the library's own dialog. It fails with no error, no message, no indication. This is the single largest adoption blocker.
 
 Compounding: `useAuthSessions.ts:76-95` fires `GET /auth/users` **unconditionally on mount**, so a consumer supplying only `apiClient` gets an unexpected request to an endpoint they never intended to serve. Neither `/auth/users` nor `/auth/login` appears in `docs/api-contract.md`.
 
 ### 4. Authorization by display-name string comparison
+
 `AnnotationThread.tsx:30` — `const canEdit = comment.createdBy.name === currentUser.name;`
 
 `AnnotationUser` carries a stable `id` (`annotation.types.ts:24`) that is deliberately ignored. Two users named "Alex Chen" can edit and delete each other's comments; renaming yourself forfeits edit rights on your own history. `docs/api-contract.md:222` documents this as intentional ("name-based, not id-based"), which makes it a design decision to reverse rather than an oversight. **One-token fix.**
 
 ### 5. ~32% of the library is non-functional mock code that ships
+
 Measured: EpicFlow 1,104 + UserManagement 675 + seed data 300 + their types 71 = **2,150 of 6,701 TS/TSX lines**.
 
 - Verified: **zero** `fetch`/`apiClient` calls in either feature. All state is `useState` seeded from `src/data/*`; every create/edit/delete is lost on unmount.
 - `UserManagementPanel.tsx:140` displays **`Temporary password sent to {email}.`** — no email is sent anywhere in the codebase. A fabricated success message.
 - Both are **statically imported** by `AnnotationLayer.tsx:6-7`, so tree-shaking cannot remove them. `UserManagementPanel` is a public export (`index.ts:12`).
-- **There is no config flag to disable either** — `AnnotationConfig` has no `showEpicFlow`/`showUserManagement`, so consumers cannot opt out. Both occupy slots in the *collapsed* launcher (`AnnotationToolbar.tsx:233,249`), the most prominent real estate in the library.
+- **There is no config flag to disable either** — `AnnotationConfig` has no `showEpicFlow`/`showUserManagement`, so consumers cannot opt out. Both occupy slots in the _collapsed_ launcher (`AnnotationToolbar.tsx:233,249`), the most prominent real estate in the library.
 - Twelve fabricated person records with real-format corporate emails (`@wec.ai`) and phone numbers ship inside `dist/index.es.js` (confirmed by grep).
 
 ### 6. No tests, no CI
+
 No `*.test.*`/`*.spec.*` in `src/`, no runner in `devDependencies`, no `test` script, no `.github/`. `tsconfig.build.json:13` already excludes test globs — tests were anticipated and never written. Since `prepare: npm run build` runs on git install, **a broken `main` breaks every consumer's `npm install`**, with nothing gating it.
 
 ---
@@ -67,7 +73,7 @@ No `*.test.*`/`*.spec.*` in `src/`, no runner in `devDependencies`, no `test` sc
 ### Performance
 
 **44% of the JS bundle is one decorative PNG.** `src/assets/icons/index.ts:9` imports `wec-logo.png?inline`, forcing base64 embedding: 127,106 of 287,150 bytes in `dist/index.es.js`. Used only for "Powered by Wec.ai" in five places, three with `alt=""`.
-*Correction to one agent's claim:* the other eight PNGs are imported with `?inline` but are **dead code** — only `Icons.wecLogo` is referenced; all UI icons use the inline-SVG `Icon.tsx`. Exactly one base64 payload exists in the bundle, so tree-shaking already dropped them. Deleting them is hygiene, **not** a size win. The single logo is the whole 44%.
+_Correction to one agent's claim:_ the other eight PNGs are imported with `?inline` but are **dead code** — only `Icons.wecLogo` is referenced; all UI icons use the inline-SVG `Icon.tsx`. Exactly one base64 payload exists in the bundle, so tree-shaking already dropped them. Deleting them is hygiene, **not** a size win. The single logo is the whole 44%.
 
 **Observer churn.** `useAnnotationPosition.ts:100` depends on `[items, itemsKey]`; `items` is a fresh array identity on every layer render, so the entire observer graph is torn down and rebuilt on every annotation update. Each rebuild observes **every ancestor of every pin** (`:70-80`, O(pins × depth), duplicates not deduped) plus a `MutationObserver` on `document.body` with `subtree: true` (`:82-91`). On any host with an animation or spinner this recomputes all pin positions continuously.
 
@@ -83,7 +89,7 @@ No `*.test.*`/`*.spec.*` in `src/`, no runner in `devDependencies`, no `test` sc
 
 **Duplicate pin numbers.** `nextNumber(annotations)` (`useAnnotations.ts:99`) reads the render closure; two creates before the first commit compute the same number, and `docs/table-query.md:72` declares `UNIQUE (project_id, page_key, number)` — the second POST 409s. The allocation is duplicated at `AnnotationProvider.tsx:98`, so draft and optimistic numbering can disagree.
 
-**Error boundary protects the wrong scope.** `AnnotationProvider.tsx:251-262` wraps only the portaled `<AnnotationLayer />`. Everything riskier runs *outside* it — `useAnnotationCollection`, `useAuthSessions` (`JSON.parse` of localStorage), `usePageKey` (host callback), and `createPortal` itself. A throw in any of those unmounts **the host application's entire tree**, inverting the guarantee the boundary exists to provide.
+**Error boundary protects the wrong scope.** `AnnotationProvider.tsx:251-262` wraps only the portaled `<AnnotationLayer />`. Everything riskier runs _outside_ it — `useAnnotationCollection`, `useAuthSessions` (`JSON.parse` of localStorage), `usePageKey` (host callback), and `createPortal` itself. A throw in any of those unmounts **the host application's entire tree**, inverting the guarantee the boundary exists to provide.
 
 **Mutations carry no abort signal.** Verified: all seven mutation call sites pass none, though the client accepts one. No timeout anywhere either — a hung backend leaves the optimistic UI stuck permanently.
 
@@ -95,7 +101,7 @@ No XSS was found, and the rich-text path is genuinely well-designed — see Stre
 
 **Tokenless, self-asserted identity.** `AuthSession` (`auth.types.ts:12-19`) contains **no token and no expiry** — only profile fields. `login()` returns a user object; `useAuthSessions.ts:34` persists it to `localStorage`, whose `readStored` validates only `Array.isArray(parsed.accounts)`. Any script in the host origin can write `wpn-auth:<projectId>` with `roleId: "super_admin"` and the library adopts it. "Logout" is purely local — there is nothing to revoke. Sessions never expire.
 
-*Severity note:* because no credential is stored, this is **not** token theft. It is forgeable client-side identity plus PII at rest. The library's own docs are candid (`docs/api-contract.md:138`: "the library has no real auth"), and `README.md:177` correctly defers authorization to the backend — the right posture. The defect is that the client presents this as authentication.
+_Severity note:_ because no credential is stored, this is **not** token theft. It is forgeable client-side identity plus PII at rest. The library's own docs are candid (`docs/api-contract.md:138`: "the library has no real auth"), and `README.md:177` correctly defers authorization to the backend — the right posture. The defect is that the client presents this as authentication.
 
 **Client-asserted authorship.** Verified at `useAnnotations.ts:163-167`: `authorId` and `authorName` are chosen by the client and sent in the body; `:168` then overwrites the server's `createdBy` with the local user, discarding any server canonicalization. The server should derive authorship from the authenticated principal.
 
@@ -131,8 +137,8 @@ No XSS was found, and the rich-text path is genuinely well-designed — see Stre
 - **No attachments or screenshots** — `AnnotationComment` is `{id, message, createdBy, createdAt, updatedAt}`. This is the feature buyers of Marker.io/BugHerd/Usersnap evaluate first.
 - **No context capture** — no UA, URL, console or network metadata. `viewportWidth/Height` is stored on the anchor but never read back.
 - **No pagination** — `listAnnotations` takes only `{projectId, pageKey}`; every annotation with every comment arrives in one unbounded response.
-- **No mentions, assignment, notifications, reactions, read state, labels, priority or export.** Ironically `Epic`/`UserStory` *do* have `priority` and `tags` — the mock feature is richer than the real one.
-- **The adapter seam is real but undersold.** `apiClient`/`authClient` injection genuinely works end-to-end (proven by `examples/demo`), yet `README.md:101` labels it *"Advanced/demo override"* and never documents `authClient`. This is the library's best adoption story, buried in a parenthetical.
+- **No mentions, assignment, notifications, reactions, read state, labels, priority or export.** Ironically `Epic`/`UserStory` _do_ have `priority` and `tags` — the mock feature is richer than the real one.
+- **The adapter seam is real but undersold.** `apiClient`/`authClient` injection genuinely works end-to-end (proven by `examples/demo`), yet `README.md:101` labels it _"Advanced/demo override"_ and never documents `authClient`. This is the library's best adoption story, buried in a parenthetical.
 - **`apiBaseUrl`/`projectId` are required even with a full `apiClient`.**
 - **SSR:** no module-scope DOM access (verified — importing will not crash Node), but no `"use client"` anywhere, and `usePageKey.ts:7` and `useAuthSessions.ts:58` both read `window` in `useState` initializers **during render**. `README.md:117`'s Next.js claim does not hold for the App Router.
 - **Exactly one TSDoc comment in `src/`** (`richText.tsx:46`). Not one exported symbol is documented.
@@ -162,7 +168,7 @@ No XSS was found, and the rich-text path is genuinely well-designed — see Stre
 9. **Zero runtime dependencies**, fully-hashed lockfile, only two expected install scripts. The strongest possible supply-chain posture for an embedded library.
 10. **Honest licensing** — `NOTICE` names the upstream project, lists the specific concepts adapted, states the source is not vendored, and ships in `files`.
 11. **Optimistic updates with rollback on all seven mutations** — the intent and coverage are right even where the snapshot granularity is wrong.
-12. **`Icon.tsx` is exemplary** — `aria-hidden` *and* `focusable="false"` on every SVG; ~60 `aria-label`s and 82 real `<button>`s against 84 `onClick`s, so interactive elements are semantic rather than click-handling divs.
+12. **`Icon.tsx` is exemplary** — `aria-hidden` _and_ `focusable="false"` on every SVG; ~60 `aria-label`s and 82 real `<button>`s against 84 `onClick`s, so interactive elements are semantic rather than click-handling divs.
 
 ---
 
@@ -170,13 +176,13 @@ No XSS was found, and the rich-text path is genuinely well-designed — see Stre
 
 **Now — before the API ossifies**
 
-1. Drop to `0.x`; add `CHANGELOG.md`. *(1h)*
-2. `AnnotationThread.tsx:30` → compare `.id`. *(1 line)*
-3. Make host-provided `currentUser` sufficient; gate built-in auth behind opt-in; skip the auth fetch when unconfigured. *(P0 #3)*
-4. Add `showEpicFlow`/`showUserManagement` flags defaulting to `false`, unexport `UserManagementPanel`, `React.lazy` both panels, delete the fabricated password message. *(P0 #5)*
+1. Drop to `0.x`; add `CHANGELOG.md`. _(1h)_
+2. `AnnotationThread.tsx:30` → compare `.id`. _(1 line)_
+3. Make host-provided `currentUser` sufficient; gate built-in auth behind opt-in; skip the auth fetch when unconfigured. _(P0 #3)_
+4. Add `showEpicFlow`/`showUserManagement` flags defaulting to `false`, unexport `UserManagementPanel`, `React.lazy` both panels, delete the fabricated password message. _(P0 #5)_
 5. Stand up `vitest` + `jsdom` + CI running the four scripts that already pass. Start with `selectorGenerator`, `elementAnchor`, `positioning`, `elementResolver` — all pure and untested.
 6. Freeze wire-format extension points while cheap: tag `AnnotationAnchor` with `kind`, add `attachments` to the comment model, add cursor/limit to `listAnnotations`, add a version precondition to updates.
-7. Shared focus-trap + restore hook across all six dialogs; Escape at the layer level; let Escape through the overlay. *(P0 #1, #2)*
+7. Shared focus-trap + restore hook across all six dialogs; Escape at the layer level; let Escape through the overlay. _(P0 #1, #2)_
 8. Fix the focus-ring contrast, name the pins, add `role="status"` regions and a `.wpn-sr-only` utility.
 
 **Next**
@@ -201,18 +207,18 @@ No XSS was found, and the rich-text path is genuinely well-designed — see Stre
 
 ## Appendix — verified baseline
 
-| Check | Result |
-|---|---|
-| `npx tsc -p tsconfig.json --noEmit` | **exit 0**, zero diagnostics |
-| `npx eslint .` | **exit 0**, zero errors/warnings |
-| `any` / `!` / `eslint-disable` in `src/` | **0 / 0 / 0** |
-| Test files · runner · CI | **0 · none · none** |
-| TSDoc blocks in `src/` | **1** (`richText.tsx:46`) |
-| `dist/index.es.js` | 287,150 B — **127,106 B (44.3%) base64 PNG** |
-| Sourcemaps | 945 KB, `sourcesContent` for all 52 modules |
-| Mock-feature share of `src/` | **2,150 / 6,701 lines (32%)** |
-| CSS | 3,349 lines · 308 `wpn-`-prefixed classes · 177 custom properties · **2** media queries |
-| a11y attributes | 60 `aria-label` · 82 `<button>` vs 84 `onClick` · **0** `aria-live` · **0** focus traps |
-| Dialogs with `aria-modal` | **4 of 6** |
-| Module-scope DOM access | **none** (SSR-import-safe) |
-| Runtime dependencies | **0** · lockfile fully hashed |
+| Check                                    | Result                                                                                  |
+| ---------------------------------------- | --------------------------------------------------------------------------------------- |
+| `npx tsc -p tsconfig.json --noEmit`      | **exit 0**, zero diagnostics                                                            |
+| `npx eslint .`                           | **exit 0**, zero errors/warnings                                                        |
+| `any` / `!` / `eslint-disable` in `src/` | **0 / 0 / 0**                                                                           |
+| Test files · runner · CI                 | **0 · none · none**                                                                     |
+| TSDoc blocks in `src/`                   | **1** (`richText.tsx:46`)                                                               |
+| `dist/index.es.js`                       | 287,150 B — **127,106 B (44.3%) base64 PNG**                                            |
+| Sourcemaps                               | 945 KB, `sourcesContent` for all 52 modules                                             |
+| Mock-feature share of `src/`             | **2,150 / 6,701 lines (32%)**                                                           |
+| CSS                                      | 3,349 lines · 308 `wpn-`-prefixed classes · 177 custom properties · **2** media queries |
+| a11y attributes                          | 60 `aria-label` · 82 `<button>` vs 84 `onClick` · **0** `aria-live` · **0** focus traps |
+| Dialogs with `aria-modal`                | **4 of 6**                                                                              |
+| Module-scope DOM access                  | **none** (SSR-import-safe)                                                              |
+| Runtime dependencies                     | **0** · lockfile fully hashed                                                           |

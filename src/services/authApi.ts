@@ -11,8 +11,8 @@ async function readError(response: Response): Promise<string> {
     return `Request failed (${response.status})`;
   }
   try {
-    const payload = JSON.parse(text) as { message?: string; error?: string };
-    return payload.message ?? payload.error ?? text;
+    const payload = JSON.parse(text) as { error?: string; message?: string };
+    return payload.error ?? payload.message ?? text;
   } catch {
     return text;
   }
@@ -46,8 +46,11 @@ export function createAuthApi(apiBaseUrl: string): AuthApiClient {
           response.status,
         );
       }
-      const payload = (await response.json()) as { user: AuthSession };
-      return payload.user;
+      const payload = (await response.json()) as {
+        user: Omit<AuthSession, "token">;
+        token: string;
+      };
+      return { ...payload.user, token: payload.token };
     },
 
     async logout(projectId, userId, signal) {

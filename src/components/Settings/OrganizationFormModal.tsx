@@ -1,13 +1,16 @@
-import { useState, type FormEvent } from "react";
+import { useId, useRef, useState, type FormEvent } from "react";
 import { Icon, SearchableSelect, Spinner, Tooltip } from "../primitives";
 import { useEscapeKey } from "../../hooks/useEscapeKey";
 import { useScrimDismiss } from "../../hooks/useScrimDismiss";
+import { useFocusTrap } from "./useFocusTrap";
+import { Field } from "./Field";
 import { USER_COUNTRY_OPTIONS, USER_STATUS_OPTIONS } from "../../data/userManagementOptions";
 import type { Organization, OrganizationDraft } from "../../types/organization.types";
 
 interface OrganizationFormModalProps {
   organization: Organization | null;
   busy?: boolean;
+  fieldErrors?: Record<string, string[]> | null;
   onCancel: () => void;
   onSubmit: (draft: OrganizationDraft) => void;
 }
@@ -22,11 +25,16 @@ function slugify(value: string): string {
 export function OrganizationFormModal({
   organization,
   busy = false,
+  fieldErrors,
   onCancel,
   onSubmit,
 }: OrganizationFormModalProps) {
   useEscapeKey(onCancel);
   const scrimProps = useScrimDismiss(onCancel);
+  const titleId = useId();
+  const dialogRef = useRef<HTMLFormElement>(null);
+  const nameInputRef = useRef<HTMLInputElement>(null);
+  useFocusTrap(dialogRef, nameInputRef);
 
   const [companyName, setCompanyName] = useState(organization?.companyName ?? "");
   const [slug, setSlug] = useState(organization?.slug ?? "");
@@ -38,6 +46,8 @@ export function OrganizationFormModal({
   const effectiveSlug = slugEdited ? slug : slugify(companyName);
   const nameValid = companyName.trim().length > 0;
   const slugValid = /^[a-z0-9][a-z0-9-]*$/.test(effectiveSlug);
+  const nameServerError = fieldErrors?.companyName?.[0];
+  const slugServerError = fieldErrors?.slug?.[0];
 
   const handleSubmit = (event: FormEvent) => {
     event.preventDefault();
@@ -56,14 +66,15 @@ export function OrganizationFormModal({
   return (
     <div className="wpn-epicflow-modal-scrim" {...scrimProps}>
       <form
+        ref={dialogRef}
         className="wpn-epicflow-modal wpn-users-modal"
         role="dialog"
         aria-modal="true"
-        aria-labelledby="wpn-org-title"
+        aria-labelledby={titleId}
         onSubmit={handleSubmit}
       >
         <div className="wpn-epicflow-modal__header">
-          <h2 className="wpn-epicflow-modal__title" id="wpn-org-title">
+          <h2 className="wpn-epicflow-modal__title" id={titleId}>
             {organization ? "Edit organization" : "New organization"}
           </h2>
           <Tooltip label="Close" placement="left">
@@ -80,43 +91,48 @@ export function OrganizationFormModal({
 
         <div className="wpn-users-modal__body">
           <div className="wpn-epicflow-modal__row">
-            <label className="wpn-epicflow-modal__field">
-              <span className="wpn-epicflow-modal__label">
-                Company name <span className="wpn-epicflow-modal__required">*</span>
-              </span>
-              <input
-                className="wpn-epicflow-modal__input"
-                value={companyName}
-                onChange={(event) => setCompanyName(event.target.value)}
-                placeholder="Acme Industries"
-                autoFocus
-              />
-              {touched && !nameValid ? (
-                <span className="wpn-users-modal__error">A company name is required.</span>
-              ) : null}
-            </label>
+            <Field
+              label="Company name"
+              required
+              error={
+                nameServerError ?? (touched && !nameValid ? "A company name is required." : null)
+              }
+            >
+              {(fieldProps) => (
+                <input
+                  {...fieldProps}
+                  ref={nameInputRef}
+                  className="wpn-epicflow-modal__input"
+                  value={companyName}
+                  onChange={(event) => setCompanyName(event.target.value)}
+                  placeholder="Acme Industries"
+                />
+              )}
+            </Field>
           </div>
 
           <div className="wpn-epicflow-modal__row">
-            <label className="wpn-epicflow-modal__field">
-              <span className="wpn-epicflow-modal__label">
-                Slug <span className="wpn-epicflow-modal__required">*</span>
-              </span>
-              <input
-                className="wpn-epicflow-modal__input"
-                value={effectiveSlug}
-                onChange={(event) => {
-                  setSlugEdited(true);
-                  setSlug(event.target.value);
-                }}
-                placeholder="acme-industries"
-              />
-              {touched && !slugValid ? (
-                <span className="wpn-users-modal__error">
-                  Lowercase letters, numbers and hyphens only.
-                </span>
-              ) : null}
-            </label>
+            <Field
+              label="Slug"
+              required
+              error={
+                slugServerError ??
+                (touched && !slugValid ? "Lowercase letters, numbers and hyphens only." : null)
+              }
+            >
+              {(fieldProps) => (
+                <input
+                  {...fieldProps}
+                  className="wpn-epicflow-modal__input"
+                  value={effectiveSlug}
+                  onChange={(event) => {
+                    setSlugEdited(true);
+                    setSlug(event.target.value);
+                  }}
+                  placeholder="acme-industries"
+                />
+              )}
+            </Field>
           </div>
 
           <div className="wpn-epicflow-modal__row">

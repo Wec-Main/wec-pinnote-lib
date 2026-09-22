@@ -49,7 +49,10 @@ import { resolve } from "node:path";
 export default defineConfig({
   resolve: {
     alias: {
-      "wec-pinnote-lib/style.css": resolve(__dirname, "../wec-pinnote-lib/src/styles/annotation.css"),
+      "wec-pinnote-lib/style.css": resolve(
+        __dirname,
+        "../wec-pinnote-lib/src/styles/annotation.css",
+      ),
       "wec-pinnote-lib": resolve(__dirname, "../wec-pinnote-lib/src/index.ts"),
     },
   },
@@ -91,14 +94,14 @@ That is enough to enable the floating comment button, annotation mode, pins, thr
 
 Optional config:
 
-| Field | Default | Purpose |
-| --- | --- | --- |
-| `zIndex` | `2147483000` | Overlay stacking |
-| `enabled` | `true` | Hide the entire library |
-| `showToggleButton` | `true` | Set `false` to place `AnnotationToggleButton` yourself |
-| `showPinsWhenIdle` | `true` | Keep pins visible when annotation mode is off |
-| `showResolved` | `true` | Show completed/closed pins |
-| `apiClient` | REST client | Advanced/demo override. The library default is HTTP |
+| Field              | Default      | Purpose                                                |
+| ------------------ | ------------ | ------------------------------------------------------ |
+| `zIndex`           | `2147483000` | Overlay stacking                                       |
+| `enabled`          | `true`       | Hide the entire library                                |
+| `showToggleButton` | `true`       | Set `false` to place `AnnotationToggleButton` yourself |
+| `showPinsWhenIdle` | `true`       | Keep pins visible when annotation mode is off          |
+| `showResolved`     | `true`       | Show completed/closed pins                             |
+| `apiClient`        | REST client  | Advanced/demo override. The library default is HTTP    |
 
 ## Authentication
 
@@ -133,9 +136,7 @@ Each annotation also stores `relativeX` / `relativeY` plus fallback coordinates.
 For the most stable anchors, add:
 
 ```html
-<button data-annotation-id="login-submit">
-  Login
-</button>
+<button data-annotation-id="login-submit">Login</button>
 ```
 
 ## Annotation mode

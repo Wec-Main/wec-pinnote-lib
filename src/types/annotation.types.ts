@@ -149,6 +149,7 @@ export interface DraftAnnotation {
   label: string;
   anchor: AnnotationAnchor;
   number: number;
+  message: string;
 }
 
 export class AnnotationApiError extends Error {

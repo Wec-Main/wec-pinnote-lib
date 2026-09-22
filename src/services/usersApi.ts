@@ -46,13 +46,17 @@ function usersUrl(
   return url.toString();
 }
 
-async function request<T>(url: string, actorId: string | undefined, init?: RequestInit): Promise<T> {
+async function request<T>(
+  url: string,
+  authToken: string | undefined,
+  init?: RequestInit,
+): Promise<T> {
   const response = await fetch(url, {
     ...init,
     headers: {
       Accept: "application/json",
       ...(init?.body ? { "Content-Type": "application/json" } : {}),
-      ...actorHeaders(actorId),
+      ...actorHeaders(authToken),
       ...init?.headers,
     },
   });
@@ -61,14 +65,14 @@ async function request<T>(url: string, actorId: string | undefined, init?: Reque
     const text = await response.text().catch(() => "");
     let message = `Request failed (${response.status})`;
     try {
-      const parsed = JSON.parse(text) as { message?: string };
-      message = parsed.message ?? message;
+      const parsed = JSON.parse(text) as { error?: string; message?: string };
+      message = parsed.error ?? parsed.message ?? message;
     } catch {
       if (text) {
         message = text;
       }
     }
-    throw new AnnotationApiError(message, response.status);
+    throw new AnnotationApiError(message, response.status, text || null);
   }
 
   if (response.status === 204) {
@@ -79,11 +83,11 @@ async function request<T>(url: string, actorId: string | undefined, init?: Reque
 
 export function fetchUsers(
   apiBaseUrl: string,
-  actorId: string | undefined,
+  authToken: string | undefined,
   query: UserListQuery,
   signal?: AbortSignal,
 ): Promise<UserPage> {
-  return request<UserPage>(usersUrl(apiBaseUrl, "", { ...query }), actorId, { signal });
+  return request<UserPage>(usersUrl(apiBaseUrl, "", { ...query }), authToken, { signal });
 }
 
 function toPayload(projectId: string, draft: ManagedUserDraft) {
@@ -98,12 +102,12 @@ function toUpdatePayload(projectId: string, draft: ManagedUserDraft) {
 
 export function createUser(
   apiBaseUrl: string,
-  actorId: string | undefined,
+  authToken: string | undefined,
   projectId: string,
   draft: ManagedUserDraft,
   signal?: AbortSignal,
 ): Promise<CreatedUser> {
-  return request<CreatedUser>(usersUrl(apiBaseUrl), actorId, {
+  return request<CreatedUser>(usersUrl(apiBaseUrl), authToken, {
     method: "POST",
     body: JSON.stringify(toPayload(projectId, draft)),
     signal,
@@ -112,13 +116,13 @@ export function createUser(
 
 export function updateUser(
   apiBaseUrl: string,
-  actorId: string | undefined,
+  authToken: string | undefined,
   projectId: string,
   userId: string,
   draft: ManagedUserDraft,
   signal?: AbortSignal,
 ): Promise<ManagedUser> {
-  return request<ManagedUser>(usersUrl(apiBaseUrl, `/${encodeURIComponent(userId)}`), actorId, {
+  return request<ManagedUser>(usersUrl(apiBaseUrl, `/${encodeURIComponent(userId)}`), authToken, {
     method: "PUT",
     body: JSON.stringify(toUpdatePayload(projectId, draft)),
     signal,
@@ -127,20 +131,24 @@ export function updateUser(
 
 export function deleteUser(
   apiBaseUrl: string,
-  actorId: string | undefined,
+  authToken: string | undefined,
   projectId: string,
   userId: string,
   signal?: AbortSignal,
 ): Promise<void> {
-  return request<void>(usersUrl(apiBaseUrl, `/${encodeURIComponent(userId)}`, { projectId }), actorId, {
-    method: "DELETE",
-    signal,
-  });
+  return request<void>(
+    usersUrl(apiBaseUrl, `/${encodeURIComponent(userId)}`, { projectId }),
+    authToken,
+    {
+      method: "DELETE",
+      signal,
+    },
+  );
 }
 
 export function resetUserPassword(
   apiBaseUrl: string,
-  actorId: string | undefined,
+  authToken: string | undefined,
   projectId: string,
   userId: string,
   password?: string,
@@ -148,7 +156,7 @@ export function resetUserPassword(
 ): Promise<PasswordReset> {
   return request<PasswordReset>(
     usersUrl(apiBaseUrl, `/${encodeURIComponent(userId)}/password-reset`),
-    actorId,
+    authToken,
     { method: "POST", body: JSON.stringify({ projectId, password }), signal },
   );
 }

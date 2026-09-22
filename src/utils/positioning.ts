@@ -72,11 +72,7 @@ export function placePanel(
         ? anchorX - panelWidth - GAP
         : anchorX - panelWidth / 2;
   let top =
-    side === "bottom"
-      ? anchorY + GAP
-      : side === "top"
-        ? anchorY - panelHeight - GAP
-        : anchorY - 20;
+    side === "bottom" ? anchorY + GAP : side === "top" ? anchorY - panelHeight - GAP : anchorY - 20;
 
   left = Math.max(VIEWPORT_PADDING, Math.min(left, viewportWidth - panelWidth - VIEWPORT_PADDING));
   top = Math.max(TOP_SAFE, Math.min(top, viewportHeight - panelHeight - VIEWPORT_PADDING));

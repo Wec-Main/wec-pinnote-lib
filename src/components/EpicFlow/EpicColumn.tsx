@@ -1,3 +1,5 @@
+import { Icon, Tooltip } from "../primitives";
+import { AuthorBadge } from "./AuthorBadge";
 import type { Epic } from "../../types/epicFlow.types";
 import { formatTimestamp } from "../../utils/format";
 
@@ -24,27 +26,24 @@ export function EpicColumn({
 }: EpicColumnProps) {
   return (
     <div className="wpn-epicflow-column">
-      <div className="wpn-epicflow-column__header">
+      <div className="wpn-epicflow-column__header wpn-epicflow-column__header--epic">
         <span className="wpn-epicflow-column__title">
+          <span className="wpn-epicflow-column__badge wpn-epicflow-column__badge--epic">
+            <Icon name="epic" />
+          </span>
           Epic
           <span className="wpn-epicflow-column__count">{epics.length}</span>
         </span>
-        <button
-          type="button"
-          className="wpn-epicflow-column__add"
-          aria-label="Create epic"
-          onClick={onCreate}
-        >
-          <svg viewBox="0 0 24 24" className="wpn-epicflow-column__add-icon" aria-hidden="true">
-            <path
-              fill="none"
-              stroke="currentColor"
-              strokeLinecap="round"
-              strokeWidth="2"
-              d="M12 5v14M5 12h14"
-            />
-          </svg>
-        </button>
+        <Tooltip label="Create epic" placement="bottom">
+          <button
+            type="button"
+            className="wpn-epicflow-column__add"
+            aria-label="Create epic"
+            onClick={onCreate}
+          >
+            <Icon name="plus" className="wpn-epicflow-column__add-icon" />
+          </button>
+        </Tooltip>
       </div>
       <div className="wpn-epicflow-column__body">
         {epics.length === 0 ? (
@@ -55,67 +54,72 @@ export function EpicColumn({
           epics.map((epic) => (
             <div
               key={epic.id}
+              role="button"
+              tabIndex={0}
+              aria-pressed={selectedEpicId === epic.id}
               className={[
                 "wpn-epicflow-card",
                 selectedEpicId === epic.id ? "wpn-epicflow-card--selected" : "",
               ]
                 .filter(Boolean)
                 .join(" ")}
+              onClick={() => onSelect(epic.id)}
+              onKeyDown={(event) => {
+                if (event.key === "Enter" || event.key === " ") {
+                  event.preventDefault();
+                  onSelect(epic.id);
+                }
+              }}
             >
-              <button
-                type="button"
-                className="wpn-epicflow-card__surface"
-                aria-pressed={selectedEpicId === epic.id}
-                onClick={() => onSelect(epic.id)}
-              >
-                <span className="wpn-epicflow-card__title">{epic.title}</span>
-              </button>
+              <span className="wpn-epicflow-card__title">{epic.title}</span>
               <div className="wpn-epicflow-card__footer">
-                <span className="wpn-epicflow-card__meta">
-                  By {epic.createdByUser} · {formatTimestamp(epic.createdAt)} ·{" "}
-                  {storyCounts[epic.id] ?? 0} user {(storyCounts[epic.id] ?? 0) === 1 ? "story" : "stories"}
-                </span>
+                <div className="wpn-epicflow-card__meta">
+                  <AuthorBadge name={epic.createdByUser} />
+                  <span
+                    className="wpn-epicflow-card__stat"
+                    title={`Created ${formatTimestamp(epic.createdAt)}`}
+                  >
+                    <Icon name="calendar" className="wpn-epicflow-card__stat-icon" />
+                    {formatTimestamp(epic.createdAt)}
+                  </span>
+                  <span
+                    className="wpn-epicflow-card__stat"
+                    title={`${storyCounts[epic.id] ?? 0} user ${
+                      (storyCounts[epic.id] ?? 0) === 1 ? "story" : "stories"
+                    }`}
+                  >
+                    <Icon name="users" className="wpn-epicflow-card__stat-icon" />
+                    {storyCounts[epic.id] ?? 0} user{" "}
+                    {(storyCounts[epic.id] ?? 0) === 1 ? "story" : "stories"}
+                  </span>
+                </div>
                 <div className="wpn-epicflow-card__actions">
-                  <button
-                    type="button"
-                    className="wpn-epicflow-card__action-btn"
-                    aria-label="Edit epic"
-                    onClick={(event) => {
-                      event.stopPropagation();
-                      onEdit(epic);
-                    }}
-                  >
-                    <svg viewBox="0 0 24 24" width="13" height="13" aria-hidden="true">
-                      <path
-                        fill="none"
-                        stroke="currentColor"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth="2"
-                        d="M12 20h9M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5Z"
-                      />
-                    </svg>
-                  </button>
-                  <button
-                    type="button"
-                    className="wpn-epicflow-card__action-btn wpn-epicflow-card__action-btn--danger"
-                    aria-label="Delete epic"
-                    onClick={(event) => {
-                      event.stopPropagation();
-                      onDelete(epic);
-                    }}
-                  >
-                    <svg viewBox="0 0 24 24" width="13" height="13" aria-hidden="true">
-                      <path
-                        fill="none"
-                        stroke="currentColor"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth="2"
-                        d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m3 0-1 14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2L4 6h16Z"
-                      />
-                    </svg>
-                  </button>
+                  <Tooltip label="Edit epic" placement="bottom">
+                    <button
+                      type="button"
+                      className="wpn-epicflow-card__action-btn"
+                      aria-label="Edit epic"
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        onEdit(epic);
+                      }}
+                    >
+                      <Icon name="edit" />
+                    </button>
+                  </Tooltip>
+                  <Tooltip label="Delete epic" placement="bottom">
+                    <button
+                      type="button"
+                      className="wpn-epicflow-card__action-btn wpn-epicflow-card__action-btn--danger"
+                      aria-label="Delete epic"
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        onDelete(epic);
+                      }}
+                    >
+                      <Icon name="trash" />
+                    </button>
+                  </Tooltip>
                 </div>
               </div>
             </div>

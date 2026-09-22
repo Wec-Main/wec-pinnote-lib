@@ -1,8 +1,14 @@
-import type { Annotation } from "../../types/annotation.types";
-import { isDoneStatus } from "../../utils/status";
+import { memo } from "react";
+import { Icon } from "../primitives/Icon";
+import type { AnnotationStatus } from "../../types/annotation.types";
+import { isDoneStatus, statusLabel } from "../../utils/status";
 
 interface AnnotationPinProps {
-  annotation: Pick<Annotation, "id" | "number" | "status">;
+  id: string;
+  number: number;
+  status: AnnotationStatus;
+  elementIdentifier?: string;
+  commentsCount?: number;
   x: number;
   y: number;
   resolvedTarget: boolean;
@@ -10,8 +16,12 @@ interface AnnotationPinProps {
   onSelect: (id: string | null) => void;
 }
 
-export function AnnotationPin({
-  annotation,
+function AnnotationPinComponent({
+  id,
+  number,
+  status,
+  elementIdentifier,
+  commentsCount,
   x,
   y,
   resolvedTarget,
@@ -20,37 +30,41 @@ export function AnnotationPin({
 }: AnnotationPinProps) {
   const classes = [
     "wpn-pin",
-    `wpn-pin--${annotation.status}`,
+    `wpn-pin--${status}`,
     resolvedTarget ? "" : "wpn-pin--orphaned",
     selected ? "wpn-pin--selected" : "",
   ]
     .filter(Boolean)
     .join(" ");
 
+  const label = [
+    `Comment ${number}`,
+    statusLabel(status),
+    elementIdentifier ? `on ${elementIdentifier}` : null,
+    typeof commentsCount === "number"
+      ? `${commentsCount} ${commentsCount === 1 ? "reply" : "replies"}`
+      : null,
+  ]
+    .filter(Boolean)
+    .join(", ");
+
   return (
     <button
       type="button"
       className={classes}
       style={{ left: x, top: y }}
-      aria-label={selected ? "Close comment" : "Open comment"}
-      onClick={() => onSelect(selected ? null : annotation.id)}
+      aria-label={selected ? `Close ${label}` : `Open ${label}`}
+      onClick={() => onSelect(selected ? null : id)}
     >
-      {isDoneStatus(annotation.status) ? (
+      {isDoneStatus(status) ? (
         <span className="wpn-pin__check" aria-hidden="true">
           ✓
         </span>
       ) : (
-        <svg viewBox="0 0 24 24" aria-hidden="true" className="wpn-pin__icon">
-          <path
-            fill="none"
-            stroke="currentColor"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth="1.8"
-            d="M5 5h14a1.5 1.5 0 0 1 1.5 1.5v10A1.5 1.5 0 0 1 19 18H8.5L4.5 21.5V6.5A1.5 1.5 0 0 1 6 5Z"
-          />
-        </svg>
+        <Icon name="comment" className="wpn-pin__icon" />
       )}
     </button>
   );
 }
+
+export const AnnotationPin = memo(AnnotationPinComponent);

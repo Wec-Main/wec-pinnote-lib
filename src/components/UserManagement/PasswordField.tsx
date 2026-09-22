@@ -10,6 +10,7 @@ interface PasswordFieldProps {
   placeholder: string;
   hint: string;
   invalid?: boolean;
+  readOnly?: boolean;
   onChange: (value: string) => void;
 }
 
@@ -19,10 +20,11 @@ export function PasswordField({
   placeholder,
   hint,
   invalid = false,
+  readOnly = false,
   onChange,
 }: PasswordFieldProps) {
   const labelId = useId();
-  const [revealed, setRevealed] = useState(false);
+  const [revealed, setRevealed] = useState(readOnly);
   const [copied, setCopied] = useState(false);
 
   const copy = async () => {
@@ -48,7 +50,11 @@ export function PasswordField({
             autoComplete="new-password"
             placeholder={placeholder}
             aria-labelledby={labelId}
+            readOnly={readOnly}
             onChange={(event) => {
+              if (readOnly) {
+                return;
+              }
               onChange(event.target.value);
               setCopied(false);
             }}
@@ -67,18 +73,20 @@ export function PasswordField({
           ) : null}
         </div>
         <div className="wpn-password-field__buttons">
-          <button
-            type="button"
-            className="wpn-password-field__generate"
-            onClick={() => {
-              onChange(generatePassword());
-              setRevealed(true);
-              setCopied(false);
-            }}
-          >
-            <Icon name="reset" className="wpn-password-field__btn-icon" />
-            Generate
-          </button>
+          {readOnly ? null : (
+            <button
+              type="button"
+              className="wpn-password-field__generate"
+              onClick={() => {
+                onChange(generatePassword());
+                setRevealed(true);
+                setCopied(false);
+              }}
+            >
+              <Icon name="reset" className="wpn-password-field__btn-icon" />
+              Generate
+            </button>
+          )}
           {value ? (
             <button
               type="button"

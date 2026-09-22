@@ -1,10 +1,10 @@
 import { useRef, useState, type FormEvent } from "react";
-import { useAnnotationContext } from "../../context/AnnotationContext";
+import { useAnnotationData, useAnnotationUi } from "../../context/AnnotationContext";
 import { useFloatingPanel } from "../../hooks/useAnnotationPosition";
 import type { AnnotationStatus } from "../../types/annotation.types";
 import { AnnotationStatusSelect } from "../AnnotationStatusSelect";
 import { Icons } from "../../assets/icons";
-import { Icon, Tooltip } from "../primitives";
+import { Tooltip } from "../primitives";
 
 interface AnnotationComposerProps {
   x: number;
@@ -12,10 +12,10 @@ interface AnnotationComposerProps {
 }
 
 export function AnnotationComposer({ x, y }: AnnotationComposerProps) {
-  const { draft, cancelDraft, submitDraft, updateDraftLabel } = useAnnotationContext();
+  const { draft, requestCancelDraft, updateDraftLabel, updateDraftMessage } = useAnnotationUi();
+  const { submitDraft } = useAnnotationData();
   const panelRef = useRef<HTMLDivElement>(null);
   const placement = useFloatingPanel(Boolean(draft), x, y, panelRef);
-  const [message, setMessage] = useState("");
   const [status, setStatus] = useState<AnnotationStatus>("open");
   const [submitting, setSubmitting] = useState(false);
   const [editingLabel, setEditingLabel] = useState(false);
@@ -24,6 +24,8 @@ export function AnnotationComposer({ x, y }: AnnotationComposerProps) {
   if (!draft) {
     return null;
   }
+
+  const message = draft.message;
 
   const onSubmit = async (event: FormEvent) => {
     event.preventDefault();
@@ -113,7 +115,7 @@ export function AnnotationComposer({ x, y }: AnnotationComposerProps) {
             type="button"
             className="wpn-icon-btn"
             aria-label="Cancel comment"
-            onClick={cancelDraft}
+            onClick={requestCancelDraft}
           >
             ×
           </button>
@@ -123,8 +125,9 @@ export function AnnotationComposer({ x, y }: AnnotationComposerProps) {
         <textarea
           className="wpn-input"
           value={message}
-          onChange={(event) => setMessage(event.target.value)}
+          onChange={(event) => updateDraftMessage(event.target.value)}
           placeholder="Add your comment..."
+          aria-label="Comment"
           rows={3}
           autoFocus
         />
@@ -137,8 +140,7 @@ export function AnnotationComposer({ x, y }: AnnotationComposerProps) {
             </div>
             <AnnotationStatusSelect value={status} onChange={setStatus} disabled={submitting} />
             <div className="wpn-panel__actions">
-              <button type="button" className="wpn-btn wpn-btn--ghost" onClick={cancelDraft}>
-                <Icon name="close" className="wpn-btn__icon" />
+              <button type="button" className="wpn-btn wpn-btn--ghost" onClick={requestCancelDraft}>
                 Cancel
               </button>
               <button
@@ -146,7 +148,6 @@ export function AnnotationComposer({ x, y }: AnnotationComposerProps) {
                 className="wpn-btn wpn-btn--primary"
                 disabled={!message.trim() || submitting}
               >
-                <Icon name="comment" className="wpn-btn__icon" />
                 Add comment
               </button>
             </div>

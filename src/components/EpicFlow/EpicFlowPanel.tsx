@@ -6,7 +6,8 @@ import {
   useState,
   type MouseEvent as ReactMouseEvent,
 } from "react";
-import { useAnnotationContext } from "../../context/AnnotationContext";
+import { useAnnotationData, useAnnotationUi } from "../../context/AnnotationContext";
+import { Icon, ListSearchBar, RefreshButton, Tooltip } from "../primitives";
 import { Icons } from "../../assets/icons";
 import { useEpicFlowApi } from "../../hooks/useEpicFlowApi";
 import { EpicFlowApiError } from "../../services/epicFlowApi";
@@ -16,8 +17,9 @@ import { UserStoryColumn } from "./UserStoryColumn";
 import { NotesPanel, type NotesPanelTarget } from "./NotesPanel";
 import { EpicFormModal } from "./EpicFormModal";
 import { UserStoryFormModal } from "./UserStoryFormModal";
-import { ConfirmDialog } from "./ConfirmDialog";
+import { ConfirmDialog } from "../UserManagement/ConfirmDialog";
 import { ResizeHandle } from "./ResizeHandle";
+import { BoardSkeleton } from "./BoardSkeleton";
 
 type EpicModalState = { mode: "create" } | { mode: "edit"; epic: Epic } | null;
 type StoryModalState = { mode: "create" } | { mode: "edit"; story: UserStory } | null;
@@ -33,25 +35,33 @@ function describeApiError(err: unknown): string {
 }
 
 export function EpicFlowPanel() {
-  const { setEpicFlowOpen, activeAccount, config } = useAnnotationContext();
+  const { config } = useAnnotationData();
+  const { setEpicFlowOpen } = useAnnotationUi();
   const api = useEpicFlowApi(config);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [apiError, setApiError] = useState<string | null>(null);
   const [epics, setEpics] = useState<Epic[]>([]);
   const [allUserStories, setAllUserStories] = useState<UserStory[]>([]);
   const [selectedEpicId, setSelectedEpicId] = useState<string | null>(null);
   const [selectedUserStoryId, setSelectedUserStoryId] = useState<string | null>(null);
-  const [fullscreen, setFullscreen] = useState(false);
+  const [minimized, setMinimized] = useState(false);
+  const [searchInput, setSearchInput] = useState("");
   const [query, setQuery] = useState("");
   const [epicModal, setEpicModal] = useState<EpicModalState>(null);
   const [storyModal, setStoryModal] = useState<StoryModalState>(null);
   const [pendingDelete, setPendingDelete] = useState<PendingDelete>(null);
+  const [busy, setBusy] = useState(false);
   const [notesExpanded, setNotesExpanded] = useState(false);
   const [colWeights, setColWeights] = useState<[number, number, number]>([1, 1, 1]);
   const paneRefA = useRef<HTMLDivElement>(null);
   const paneRefB = useRef<HTMLDivElement>(null);
   const paneRefC = useRef<HTMLDivElement>(null);
-  const paneRefs: [typeof paneRefA, typeof paneRefB, typeof paneRefC] = [paneRefA, paneRefB, paneRefC];
+  const paneRefs: [typeof paneRefA, typeof paneRefB, typeof paneRefC] = [
+    paneRefA,
+    paneRefB,
+    paneRefC,
+  ];
   const dragCleanupRef = useRef<(() => void) | null>(null);
 
   const normalizedQuery = query.trim().toLowerCase();
@@ -105,41 +115,48 @@ export function EpicFlowPanel() {
     };
   }, []);
 
-  const reloadAll = useCallback(async () => {
-    const nextEpics = await api.getEpics(config.projectId);
-    const storiesByEpic = await Promise.all(
-      nextEpics.map((epic) => api.getUserStoriesByEpic(epic.id)),
-    );
-    const nextStories = storiesByEpic.flat();
-    setEpics(nextEpics);
-    setAllUserStories(nextStories);
-    return { nextEpics, nextStories };
-  }, [api, config.projectId]);
+  const reloadAll = useCallback(
+    async (signal?: AbortSignal) => {
+      const [nextEpics, nextStories] = await Promise.all([
+        api.getEpics(config.projectId, signal),
+        api.getUserStoriesByProject(config.projectId, signal),
+      ]);
+      setEpics(nextEpics);
+      setAllUserStories(nextStories);
+      return { nextEpics, nextStories };
+    },
+    [api, config.projectId],
+  );
+
+  const handleRefresh = useCallback(() => {
+    setRefreshing(true);
+    setApiError(null);
+    void reloadAll()
+      .catch((err: unknown) => setApiError(describeApiError(err)))
+      .finally(() => setRefreshing(false));
+  }, [reloadAll]);
 
   useEffect(() => {
-    let cancelled = false;
+    const controller = new AbortController();
     (async () => {
       try {
-        const { nextEpics } = await reloadAll();
-        if (!cancelled) {
-          setSelectedEpicId((current) => current ?? nextEpics[0]?.id ?? null);
-        }
+        const { nextEpics } = await reloadAll(controller.signal);
+        setSelectedEpicId((current) => current ?? nextEpics[0]?.id ?? null);
       } catch (err) {
-        if (!cancelled) {
-          setApiError(describeApiError(err));
+        if (controller.signal.aborted) {
+          return;
         }
+        setApiError(describeApiError(err));
       } finally {
-        if (!cancelled) {
+        if (!controller.signal.aborted) {
           setLoading(false);
         }
       }
     })();
     return () => {
-      cancelled = true;
+      controller.abort();
     };
   }, [reloadAll]);
-
-  const displayName = () => activeAccount?.name.trim() || undefined;
 
   const filteredEpics = useMemo(() => {
     if (!normalizedQuery) {
@@ -209,15 +226,12 @@ export function EpicFlowPanel() {
 
   // ---- Epic actions ----
   const handleSubmitEpic = async (data: { title: string; description: string }) => {
+    setBusy(true);
     try {
       if (epicModal?.mode === "edit") {
         await api.updateEpic(epicModal.epic.id, data);
       } else {
-        const created = await api.createEpic({
-          ...data,
-          projectId: config.projectId,
-          createdByUser: displayName(),
-        });
+        const created = await api.createEpic({ ...data, projectId: config.projectId });
         setSelectedEpicId(created.id);
         setSelectedUserStoryId(null);
       }
@@ -225,10 +239,13 @@ export function EpicFlowPanel() {
       setEpicModal(null);
     } catch (err) {
       setApiError(describeApiError(err));
+    } finally {
+      setBusy(false);
     }
   };
 
   const confirmDeleteEpic = async (epic: Epic) => {
+    setBusy(true);
     try {
       await api.deleteEpic(epic.id);
       if (selectedEpicId === epic.id) {
@@ -239,29 +256,32 @@ export function EpicFlowPanel() {
       setPendingDelete(null);
     } catch (err) {
       setApiError(describeApiError(err));
+    } finally {
+      setBusy(false);
     }
   };
 
   // ---- User story actions ----
   const handleSubmitStory = async (data: { title: string; description: string }) => {
+    setBusy(true);
     try {
       if (storyModal?.mode === "edit") {
         await api.updateUserStory(storyModal.story.id, data);
       } else if (selectedEpicId) {
-        const created = await api.createUserStory(selectedEpicId, {
-          ...data,
-          createdByUser: displayName(),
-        });
+        const created = await api.createUserStory(selectedEpicId, data);
         setSelectedUserStoryId(created.id);
       }
       await reloadAll();
       setStoryModal(null);
     } catch (err) {
       setApiError(describeApiError(err));
+    } finally {
+      setBusy(false);
     }
   };
 
   const confirmDeleteStory = async (story: UserStory) => {
+    setBusy(true);
     try {
       await api.deleteUserStory(story.id);
       if (selectedUserStoryId === story.id) {
@@ -271,6 +291,8 @@ export function EpicFlowPanel() {
       setPendingDelete(null);
     } catch (err) {
       setApiError(describeApiError(err));
+    } finally {
+      setBusy(false);
     }
   };
 
@@ -304,72 +326,53 @@ export function EpicFlowPanel() {
 
   return (
     <div
-      className={["wpn-epicflow-panel", fullscreen ? "wpn-epicflow-panel--fullscreen" : ""]
+      className={["wpn-epicflow-panel", minimized ? "wpn-epicflow-panel--minimized" : ""]
         .filter(Boolean)
         .join(" ")}
     >
       <div className="wpn-epicflow-panel__header">
-        <span className="wpn-panel__title">EpicFlow</span>
+        <span className="wpn-epicflow-panel__brand">
+          <img src={Icons.epic} alt="" className="wpn-epicflow-panel__brand-icon" />
+          <span className="wpn-panel__title">EpicFlow</span>
+        </span>
         <div className="wpn-epicflow-panel__header-actions">
-          <button
-            type="button"
-            className="wpn-icon-btn"
-            aria-label={fullscreen ? "Exit fullscreen" : "Expand EpicFlow"}
-            onClick={() => setFullscreen((current) => !current)}
-          >
-            {fullscreen ? (
-              <svg viewBox="0 0 24 24" className="wpn-epicflow-panel__header-icon" aria-hidden="true">
-                <path
-                  fill="none"
-                  stroke="currentColor"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth="1.8"
-                  d="M4 10V5h5M4 14v5h5M20 10V5h-5M20 14v5h-5"
-                />
-              </svg>
-            ) : (
-              <svg viewBox="0 0 24 24" className="wpn-epicflow-panel__header-icon" aria-hidden="true">
-                <path
-                  fill="none"
-                  stroke="currentColor"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth="1.8"
-                  d="M9 4H4v5M15 4h5v5M9 20H4v-5M15 20h5v-5"
-                />
-              </svg>
-            )}
-          </button>
-          <button
-            type="button"
-            className="wpn-icon-btn"
-            aria-label="Close EpicFlow"
-            onClick={() => setEpicFlowOpen(false)}
-          >
-            <span
-              aria-hidden="true"
-              className="wpn-epicflow-panel__close-icon"
-              style={{
-                WebkitMaskImage: `url(${Icons.close})`,
-                maskImage: `url(${Icons.close})`,
-              }}
-            />
-          </button>
+          <Tooltip label={minimized ? "Maximize" : "Minimize"} placement="bottom">
+            <button
+              type="button"
+              className="wpn-icon-btn"
+              aria-label={minimized ? "Maximize EpicFlow" : "Minimize EpicFlow"}
+              onClick={() => setMinimized((current) => !current)}
+            >
+              <Icon name={minimized ? "expand" : "windowMinimize"} />
+            </button>
+          </Tooltip>
+          <Tooltip label="Close" placement="bottom">
+            <button
+              type="button"
+              className="wpn-icon-btn wpn-icon-btn--danger"
+              aria-label="Close EpicFlow"
+              onClick={() => setEpicFlowOpen(false)}
+            >
+              <Icon name="close" />
+            </button>
+          </Tooltip>
         </div>
       </div>
-      <input
-        className="wpn-epicflow-panel__search"
-        type="search"
-        value={query}
-        onChange={(event) => setQuery(event.target.value)}
-        placeholder="Search epics or user stories..."
-        aria-label="Search EpicFlow"
+      <ListSearchBar
+        value={searchInput}
+        onValueChange={setSearchInput}
+        onSubmit={() => setQuery(searchInput)}
+        onClear={() => {
+          setSearchInput("");
+          setQuery("");
+        }}
+        placeholder="Search epics or user stories"
+        trailing={
+          <RefreshButton label="Refresh EpicFlow" loading={refreshing} onRefresh={handleRefresh} />
+        }
       />
       {loading ? (
-        <div className="wpn-epicflow-panel__columns">
-          <p className="wpn-epicflow-empty">Loading EpicFlow…</p>
-        </div>
+        <BoardSkeleton />
       ) : notesExpanded ? (
         <div className="wpn-epicflow-panel__columns">
           <div className="wpn-epicflow-pane" style={{ flexGrow: 1 }}>
@@ -426,6 +429,7 @@ export function EpicFlowPanel() {
         <EpicFormModal
           mode={epicModal.mode}
           initialEpic={epicModal.mode === "edit" ? epicModal.epic : undefined}
+          busy={busy}
           onClose={() => setEpicModal(null)}
           onSubmit={handleSubmitEpic}
         />
@@ -436,6 +440,7 @@ export function EpicFlowPanel() {
           mode={storyModal.mode}
           epic={selectedEpic}
           initialStory={storyModal.mode === "edit" ? storyModal.story : undefined}
+          busy={busy}
           onClose={() => setStoryModal(null)}
           onSubmit={handleSubmitStory}
         />
@@ -443,17 +448,21 @@ export function EpicFlowPanel() {
 
       {pendingDelete ? (
         <ConfirmDialog
-          title={pendingDelete.kind === "epic" ? "Delete Epic" : "Delete User Story"}
-          message={
+          title={pendingDelete.kind === "epic" ? "Delete epic" : "Delete user story"}
+          description={
             pendingDelete.kind === "epic"
-              ? `Delete "${pendingDelete.epic.title}"? This also permanently deletes its ${
-                  storyCounts[pendingDelete.epic.id] ?? 0
-                } user ${
+              ? `This epic and its ${storyCounts[pendingDelete.epic.id] ?? 0} user ${
                   (storyCounts[pendingDelete.epic.id] ?? 0) === 1 ? "story" : "stories"
-                }. This cannot be undone.`
-              : `Delete "${pendingDelete.story.title}"? This cannot be undone.`
+                } will be permanently deleted. This cannot be undone.`
+              : "This user story will be permanently deleted. This cannot be undone."
+          }
+          detail={
+            pendingDelete.kind === "epic" ? pendingDelete.epic.title : pendingDelete.story.title
           }
           confirmLabel="Delete"
+          confirmIcon="trash"
+          destructive
+          busy={busy}
           onCancel={() => setPendingDelete(null)}
           onConfirm={handleConfirmDelete}
         />

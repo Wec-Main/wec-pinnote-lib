@@ -93,7 +93,10 @@ function generatedPathSelector(element: Element): string {
   return parts.join(" > ");
 }
 
-export function generateSelector(element: Element): { selector: string; elementIdentifier: string } {
+export function generateSelector(element: Element): {
+  selector: string;
+  elementIdentifier: string;
+} {
   const annotationId = element.getAttribute("data-annotation-id");
   if (annotationId) {
     const selector = `[data-annotation-id="${cssEscape(annotationId)}"]`;

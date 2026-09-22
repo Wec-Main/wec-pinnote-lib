@@ -17,6 +17,7 @@ interface RequestOptions {
   path: string;
   query?: Record<string, string>;
   body?: unknown;
+  signal?: AbortSignal;
 }
 
 function joinUrl(baseUrl: string, path: string, query?: Record<string, string>): string {
@@ -40,22 +41,28 @@ export interface EpicFlowApiConfig {
 
 export interface CreateEpicRequest extends EpicFlowFormInput {
   projectId: string;
-  createdByUser?: string;
 }
 
-export interface CreateUserStoryRequest extends EpicFlowFormInput {
-  createdByUser?: string;
-}
+export type CreateUserStoryRequest = EpicFlowFormInput;
 
 export interface EpicFlowApiClient {
-  getEpics(projectId: string): Promise<Epic[]>;
-  createEpic(data: CreateEpicRequest): Promise<Epic>;
-  updateEpic(epicId: string, data: EpicFlowFormInput): Promise<Epic>;
-  deleteEpic(epicId: string): Promise<void>;
-  getUserStoriesByEpic(epicId: string): Promise<UserStory[]>;
-  createUserStory(epicId: string, data: CreateUserStoryRequest): Promise<UserStory>;
-  updateUserStory(userStoryId: string, data: EpicFlowFormInput): Promise<UserStory>;
-  deleteUserStory(userStoryId: string): Promise<void>;
+  getEpics(projectId: string, signal?: AbortSignal): Promise<Epic[]>;
+  createEpic(data: CreateEpicRequest, signal?: AbortSignal): Promise<Epic>;
+  updateEpic(epicId: string, data: EpicFlowFormInput, signal?: AbortSignal): Promise<Epic>;
+  deleteEpic(epicId: string, signal?: AbortSignal): Promise<void>;
+  getUserStoriesByEpic(epicId: string, signal?: AbortSignal): Promise<UserStory[]>;
+  getUserStoriesByProject(projectId: string, signal?: AbortSignal): Promise<UserStory[]>;
+  createUserStory(
+    epicId: string,
+    data: CreateUserStoryRequest,
+    signal?: AbortSignal,
+  ): Promise<UserStory>;
+  updateUserStory(
+    userStoryId: string,
+    data: EpicFlowFormInput,
+    signal?: AbortSignal,
+  ): Promise<UserStory>;
+  deleteUserStory(userStoryId: string, signal?: AbortSignal): Promise<void>;
 }
 
 /**
@@ -81,6 +88,7 @@ export function createEpicFlowApi(config: EpicFlowApiConfig): EpicFlowApiClient 
       method: options.method,
       headers,
       body: options.body === undefined ? undefined : JSON.stringify(options.body),
+      signal: options.signal,
     });
 
     if (!response.ok) {
@@ -105,50 +113,72 @@ export function createEpicFlowApi(config: EpicFlowApiConfig): EpicFlowApiClient 
   }
 
   return {
-    getEpics(projectId) {
-      return request<Epic[]>({ method: "GET", path: "/epics", query: { projectId } });
+    getEpics(projectId, signal) {
+      return request<Epic[]>({ method: "GET", path: "/epics", query: { projectId }, signal });
     },
 
-    createEpic(data) {
-      return request<Epic>({ method: "POST", path: "/epics", body: data });
+    createEpic(data, signal) {
+      return request<Epic>({ method: "POST", path: "/epics", body: data, signal });
     },
 
-    updateEpic(epicId, data) {
+    updateEpic(epicId, data, signal) {
       return request<Epic>({
         method: "PATCH",
         path: `/epics/${encodeURIComponent(epicId)}`,
         body: data,
+        signal,
       });
     },
 
-    deleteEpic(epicId) {
-      return request<void>({ method: "DELETE", path: `/epics/${encodeURIComponent(epicId)}` });
+    deleteEpic(epicId, signal) {
+      return request<void>({
+        method: "DELETE",
+        path: `/epics/${encodeURIComponent(epicId)}`,
+        signal,
+      });
     },
 
-    getUserStoriesByEpic(epicId) {
-      return request<UserStory[]>({ method: "GET", path: "/user-stories", query: { epicId } });
+    getUserStoriesByEpic(epicId, signal) {
+      return request<UserStory[]>({
+        method: "GET",
+        path: "/user-stories",
+        query: { epicId },
+        signal,
+      });
     },
 
-    createUserStory(epicId, data) {
+    getUserStoriesByProject(projectId, signal) {
+      return request<UserStory[]>({
+        method: "GET",
+        path: "/user-stories",
+        query: { projectId },
+        signal,
+      });
+    },
+
+    createUserStory(epicId, data, signal) {
       return request<UserStory>({
         method: "POST",
         path: "/user-stories",
         body: { epicId, ...data },
+        signal,
       });
     },
 
-    updateUserStory(userStoryId, data) {
+    updateUserStory(userStoryId, data, signal) {
       return request<UserStory>({
         method: "PATCH",
         path: `/user-stories/${encodeURIComponent(userStoryId)}`,
         body: data,
+        signal,
       });
     },
 
-    deleteUserStory(userStoryId) {
+    deleteUserStory(userStoryId, signal) {
       return request<void>({
         method: "DELETE",
         path: `/user-stories/${encodeURIComponent(userStoryId)}`,
+        signal,
       });
     },
   };

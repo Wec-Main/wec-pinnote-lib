@@ -1,5 +1,5 @@
 import { useRef, useState } from "react";
-import { useAnnotationContext } from "../../context/AnnotationContext";
+import { useAnnotationData, useAnnotationUi } from "../../context/AnnotationContext";
 import { useFloatingPanel } from "../../hooks/useAnnotationPosition";
 import { AnnotationReplyComposer } from "../AnnotationReplyComposer";
 import { AnnotationStatusSelect } from "../AnnotationStatusSelect";
@@ -23,23 +23,33 @@ export function AnnotationThreadPanel({
   const {
     annotations,
     config,
-    selectAnnotation,
     addComment,
     editComment,
     removeComment,
     setStatus,
     removeAnnotation,
-  } = useAnnotationContext();
+  } = useAnnotationData();
+  const { selectAnnotation } = useAnnotationUi();
   const annotation = annotations.find((item) => item.id === annotationId);
   const panelRef = useRef<HTMLDivElement>(null);
   const placement = useFloatingPanel(Boolean(annotation), x, y, panelRef);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [hasUnsavedEdit, setHasUnsavedEdit] = useState(false);
+  const [confirmClose, setConfirmClose] = useState(false);
 
   if (!annotation) {
     return null;
   }
 
   const title = annotation.anchor.elementIdentifier.replace(/[-_]/g, " ");
+
+  const requestClose = () => {
+    if (hasUnsavedEdit) {
+      setConfirmClose(true);
+      return;
+    }
+    selectAnnotation(null);
+  };
 
   return (
     <div
@@ -49,25 +59,51 @@ export function AnnotationThreadPanel({
     >
       <div className="wpn-panel__header">
         <span className="wpn-panel__title">{title}</span>
-        <Tooltip label="Close" placement="left">
-          <button
-            type="button"
-            className="wpn-icon-btn"
-            aria-label="Close thread"
-            onClick={() => selectAnnotation(null)}
-          >
-            ×
-          </button>
-        </Tooltip>
+        {confirmClose ? (
+          <span className="wpn-panel__title-group">
+            <span className="wpn-muted">Discard unsaved edit?</span>
+            <button
+              type="button"
+              className="wpn-link wpn-link--chip"
+              onClick={() => setConfirmClose(false)}
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              className="wpn-link wpn-link--chip wpn-link--danger"
+              onClick={() => {
+                setConfirmClose(false);
+                selectAnnotation(null);
+              }}
+            >
+              Discard
+            </button>
+          </span>
+        ) : (
+          <Tooltip label="Close" placement="left">
+            <button
+              type="button"
+              className="wpn-icon-btn"
+              aria-label="Close thread"
+              onClick={requestClose}
+            >
+              ×
+            </button>
+          </Tooltip>
+        )}
       </div>
       {orphaned ? (
-        <div className="wpn-orphaned">Original element is not on screen. Showing fallback position.</div>
+        <div className="wpn-orphaned">
+          Original element is not on screen. Showing fallback position.
+        </div>
       ) : null}
       <AnnotationThread
         annotation={annotation}
         currentUser={config.currentUser}
         onEdit={(commentId, message) => editComment(annotation.id, commentId, message)}
         onDelete={(commentId) => removeComment(annotation.id, commentId)}
+        onEditingChange={setHasUnsavedEdit}
       />
       <div className="wpn-panel__composer">
         <AnnotationReplyComposer onSubmit={(message) => addComment(annotation.id, message)} />
@@ -83,19 +119,32 @@ export function AnnotationThreadPanel({
               onChange={(status) => setStatus(annotation.id, status)}
             />
             {confirmDelete ? (
+              <>
+                <button
+                  type="button"
+                  className="wpn-btn wpn-btn--ghost"
+                  onClick={() => setConfirmDelete(false)}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  className="wpn-btn-delete"
+                  onClick={async () => {
+                    await removeAnnotation(annotation.id);
+                    selectAnnotation(null);
+                  }}
+                >
+                  <Icon name="trash" className="wpn-btn__icon" />
+                  Confirm delete
+                </button>
+              </>
+            ) : (
               <button
                 type="button"
                 className="wpn-btn-delete"
-                onClick={async () => {
-                  await removeAnnotation(annotation.id);
-                  selectAnnotation(null);
-                }}
+                onClick={() => setConfirmDelete(true)}
               >
-                <Icon name="trash" className="wpn-btn__icon" />
-                Confirm delete
-              </button>
-            ) : (
-              <button type="button" className="wpn-btn-delete" onClick={() => setConfirmDelete(true)}>
                 <Icon name="trash" className="wpn-btn__icon" />
                 Delete
               </button>

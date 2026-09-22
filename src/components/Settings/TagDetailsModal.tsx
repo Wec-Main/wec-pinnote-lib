@@ -1,6 +1,9 @@
+import { useId, useRef } from "react";
 import { Icon, Tooltip } from "../primitives";
 import { useEscapeKey } from "../../hooks/useEscapeKey";
 import { useScrimDismiss } from "../../hooks/useScrimDismiss";
+import { formatTimestamp } from "../../utils/format";
+import { useFocusTrap } from "./useFocusTrap";
 import type { ProjectTag } from "../../types/tag.types";
 
 interface TagDetailsModalProps {
@@ -9,14 +12,13 @@ interface TagDetailsModalProps {
   onClose: () => void;
 }
 
-function formatTimestamp(value: string): string {
-  const parsed = new Date(value);
-  return Number.isNaN(parsed.getTime()) ? value : parsed.toLocaleString();
-}
-
 export function TagDetailsModal({ tag, projectName, onClose }: TagDetailsModalProps) {
   useEscapeKey(onClose);
   const scrimProps = useScrimDismiss(onClose);
+  const titleId = useId();
+  const dialogRef = useRef<HTMLDivElement>(null);
+  const closeButtonRef = useRef<HTMLButtonElement>(null);
+  useFocusTrap(dialogRef, closeButtonRef);
 
   const rows = [
     { label: "Project", value: projectName },
@@ -28,17 +30,19 @@ export function TagDetailsModal({ tag, projectName, onClose }: TagDetailsModalPr
   return (
     <div className="wpn-epicflow-modal-scrim" {...scrimProps}>
       <div
+        ref={dialogRef}
         className="wpn-epicflow-modal wpn-users-modal"
         role="dialog"
         aria-modal="true"
-        aria-labelledby="wpn-tag-details-title"
+        aria-labelledby={titleId}
       >
         <div className="wpn-epicflow-modal__header">
-          <h2 className="wpn-epicflow-modal__title" id="wpn-tag-details-title">
+          <h2 className="wpn-epicflow-modal__title" id={titleId}>
             Tag details
           </h2>
           <Tooltip label="Close" placement="left">
             <button
+              ref={closeButtonRef}
               type="button"
               className="wpn-icon-btn wpn-icon-btn--danger"
               aria-label="Close tag details"

@@ -1,11 +1,6 @@
 export type UserManagementStatus = "active" | "inactive" | "invited";
 
-export type UserManagementRole =
-  | "super_admin"
-  | "admin"
-  | "contributor"
-  | "reviewer"
-  | "developer";
+export type UserManagementRole = "super_admin" | "admin" | "contributor" | "reviewer" | "developer";
 
 export type UserManagementCategory = "internal" | "external" | "customer";
 

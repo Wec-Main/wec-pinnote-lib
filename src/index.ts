@@ -65,14 +65,24 @@ export type {
   Project,
   ProjectDraft,
 } from "./types/organization.types";
-export type {
-  StreamConnectionState,
-  StreamEvent,
-  StreamEventType,
-} from "./types/stream.types";
+export type { StreamConnectionState, StreamEvent, StreamEventType } from "./types/stream.types";
 export type {
   ManagedUser,
   ManagedUserDraft,
   UserManagementRole,
   UserManagementStatus,
 } from "./types/userManagement.types";
+export type {
+  AnnotationTag,
+  CreateAnnotationTagInput,
+  DraftTagPin,
+  UserPreferences,
+} from "./types/annotationTag.types";
+export type { ProjectTag, TagDraft, TagStatus } from "./types/tag.types";
+export {
+  createAnnotationTag,
+  deleteAnnotationTag,
+  fetchAnnotationTags,
+  fetchPreferences,
+  saveTagsVisible,
+} from "./services/annotationTagsApi";

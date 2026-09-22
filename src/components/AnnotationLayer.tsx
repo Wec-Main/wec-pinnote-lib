@@ -1,6 +1,10 @@
-import { useMemo } from "react";
-import { useAnnotationContext } from "../context/AnnotationContext";
-import { useAnnotationPositions } from "../hooks/useAnnotationPosition";
+import { useMemo, useRef } from "react";
+import {
+  useAnnotationAuth,
+  useAnnotationData,
+  useAnnotationUi,
+} from "../context/AnnotationContext";
+import { useAnnotationPositions, type PositionedItem } from "../hooks/useAnnotationPosition";
 import { AnnotationComposer } from "./AnnotationComposer";
 import { AnnotationListPanel } from "./AnnotationListPanel";
 import { EpicFlowPanel } from "./EpicFlow";
@@ -9,35 +13,64 @@ import { AnnotationOverlay } from "./AnnotationOverlay";
 import { AnnotationPin } from "./AnnotationPin";
 import { AnnotationThreadPanel } from "./AnnotationThreadPanel";
 import { AnnotationToolbar } from "./AnnotationToolbar";
+import { TagPicker, TagPin } from "./TagPin";
+import { ConfirmDialog } from "./UserManagement/ConfirmDialog";
+
+function positionItemsKey(items: PositionedItem[]): string {
+  return items.map((item) => `${item.id}:${item.anchor.selector}`).join("|");
+}
 
 export function AnnotationLayer() {
   const {
     annotations,
     config,
+    annotationTags,
+    removeAnnotationTag,
+    actionError,
+    clearActionError,
+  } = useAnnotationData();
+  const {
     modeEnabled,
     selectedId,
     selectAnnotation,
     draft,
     pinsVisible,
+    tagsVisible,
+    tagDraft,
     listOpen,
     epicFlowOpen,
     userManagementOpen,
-    actionError,
-    clearActionError,
-  } = useAnnotationContext();
+    discardPrompt,
+    confirmDiscard,
+    cancelDiscardPrompt,
+  } = useAnnotationUi();
+  const { activeAccount } = useAnnotationAuth();
 
+  // Pins expose comment content, so they stay hidden until someone is signed in.
   const visible = useMemo(() => {
-    if (!pinsVisible || (!modeEnabled && !config.showPinsWhenIdle)) {
+    if (!activeAccount || !pinsVisible || (!modeEnabled && !config.showPinsWhenIdle)) {
       return [];
     }
     return annotations.filter(
       (item) => config.showResolved || (item.status !== "completed" && item.status !== "closed"),
     );
-  }, [annotations, config.showPinsWhenIdle, config.showResolved, modeEnabled, pinsVisible]);
+  }, [
+    activeAccount,
+    annotations,
+    config.showPinsWhenIdle,
+    config.showResolved,
+    modeEnabled,
+    pinsVisible,
+  ]);
 
-  const selected = annotations.find((item) => item.id === selectedId);
+  const visibleTags = useMemo(
+    () => (activeAccount && tagsVisible ? annotationTags : []),
+    [activeAccount, annotationTags, tagsVisible],
+  );
 
-  const positionItems = useMemo(() => {
+  const selected = activeAccount ? annotations.find((item) => item.id === selectedId) : undefined;
+
+  const rawPositionItems = useMemo(() => {
     const items = visible.map((item) => ({ id: item.id, anchor: item.anchor }));
     if (selected && !items.some((item) => item.id === selected.id)) {
       items.push({ id: selected.id, anchor: selected.anchor });
@@ -45,11 +78,38 @@ export function AnnotationLayer() {
     if (draft) {
       items.push({ id: draft.id, anchor: draft.anchor });
     }
+    for (const tag of visibleTags) {
+      items.push({ id: tag.id, anchor: tag });
+    }
+    if (tagDraft) {
+      items.push({ id: tagDraft.id, anchor: tagDraft.anchor });
+    }
     return items;
-  }, [draft, selected, visible]);
+  }, [draft, selected, tagDraft, visible, visibleTags]);
+
+  // useAnnotationPositions tears down and rebuilds its resize/mutation
+  // observers whenever the `items` array identity changes, so a stable key of
+  // the position-relevant fields (id + selector) keeps that identity across
+  // renders where no anchor actually moved (e.g. every SSE-driven annotations
+  // replacement that only touches unrelated fields like comments or status).
+  const nextItemsKey = positionItemsKey(rawPositionItems);
+  const positionItemsRef = useRef(rawPositionItems);
+  const previousKeyRef = useRef(nextItemsKey);
+  if (previousKeyRef.current !== nextItemsKey) {
+    previousKeyRef.current = nextItemsKey;
+    positionItemsRef.current = rawPositionItems;
+  }
+  const positionItems = positionItemsRef.current;
 
   const positions = useAnnotationPositions(positionItems);
   const selectedPosition = selected ? positions.get(selected.id) : undefined;
+  const tagDraftPosition = tagDraft
+    ? (positions.get(tagDraft.id) ?? {
+        x: tagDraft.anchor.fallbackX,
+        y: tagDraft.anchor.fallbackY,
+        resolved: true,
+      })
+    : undefined;
   const draftPosition = draft
     ? (positions.get(draft.id) ?? {
         x: draft.anchor.fallbackX,
@@ -70,7 +130,11 @@ export function AnnotationLayer() {
         return (
           <AnnotationPin
             key={annotation.id}
-            annotation={annotation}
+            id={annotation.id}
+            number={annotation.number}
+            status={annotation.status}
+            elementIdentifier={annotation.anchor.elementIdentifier}
+            commentsCount={annotation.comments.length}
             x={position.x}
             y={position.y}
             resolvedTarget={position.resolved}
@@ -79,11 +143,34 @@ export function AnnotationLayer() {
           />
         );
       })}
+      {visibleTags.map((tag) => {
+        const position = positions.get(tag.id);
+        if (!position) {
+          return null;
+        }
+        return (
+          <TagPin
+            key={tag.id}
+            name={tag.tagName}
+            color={tag.tagColor}
+            x={position.x}
+            y={position.y}
+            resolvedTarget={position.resolved}
+            onRemove={() => void removeAnnotationTag(tag.id)}
+          />
+        );
+      })}
+      {tagDraft && tagDraftPosition ? (
+        <TagPicker x={tagDraftPosition.x} y={tagDraftPosition.y} />
+      ) : null}
       {draft && draftPosition ? (
         <>
           {pinsVisible ? (
             <AnnotationPin
-              annotation={{ id: draft.id, number: draft.number, status: "open" }}
+              id={draft.id}
+              number={draft.number}
+              status="open"
+              elementIdentifier={draft.label}
               x={draftPosition.x}
               y={draftPosition.y}
               resolvedTarget={draftPosition.resolved}
@@ -96,15 +183,27 @@ export function AnnotationLayer() {
       ) : null}
       {selected && selectedPosition ? (
         <AnnotationThreadPanel
+          key={selected.id}
           annotationId={selected.id}
           x={selectedPosition.x}
           y={selectedPosition.y}
           orphaned={!selectedPosition.resolved}
         />
       ) : null}
-      {listOpen ? <AnnotationListPanel /> : null}
-      {epicFlowOpen ? <EpicFlowPanel /> : null}
+      {listOpen && activeAccount ? <AnnotationListPanel /> : null}
+      {epicFlowOpen && activeAccount ? <EpicFlowPanel /> : null}
       {userManagementOpen ? <SettingsPanel /> : null}
+      {discardPrompt ? (
+        <ConfirmDialog
+          title="Discard comment?"
+          description="Your comment text hasn't been saved yet. Discarding it cannot be undone."
+          confirmLabel="Discard"
+          cancelLabel="Keep editing"
+          destructive
+          onCancel={cancelDiscardPrompt}
+          onConfirm={confirmDiscard}
+        />
+      ) : null}
       {actionError ? (
         <div className="wpn-toast" role="alert">
           <span>{actionError}</span>

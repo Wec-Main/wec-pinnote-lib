@@ -1,6 +1,17 @@
-import { useCallback, useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
-import { useAnnotationContext } from "../../context/AnnotationContext";
-import { createElementAnchor, findAnnotatableElement, isAnnotatableTarget } from "../../utils/elementAnchor";
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  type PointerEvent as ReactPointerEvent,
+} from "react";
+import { useAnnotationUi } from "../../context/AnnotationContext";
+import { useEscapeKey } from "../../hooks/useEscapeKey";
+import {
+  createElementAnchor,
+  findAnnotatableElement,
+  isAnnotatableTarget,
+} from "../../utils/elementAnchor";
 import { getElementLabel, isLibraryElement } from "../../utils/elementResolver";
 
 function hitElement(clientX: number, clientY: number, overlay: HTMLElement): Element | null {
@@ -11,22 +22,71 @@ function hitElement(clientX: number, clientY: number, overlay: HTMLElement): Ele
   return hit;
 }
 
+function rectsEqual(left: DOMRect | null, right: DOMRect | null): boolean {
+  if (left === right) {
+    return true;
+  }
+  if (!left || !right) {
+    return false;
+  }
+  return (
+    left.x === right.x &&
+    left.y === right.y &&
+    left.width === right.width &&
+    left.height === right.height
+  );
+}
+
 export function AnnotationOverlay() {
-  const { modeEnabled, draft, startDraft } = useAnnotationContext();
+  const {
+    modeEnabled,
+    setModeEnabled,
+    draft,
+    startDraft,
+    tagModeEnabled,
+    setTagModeEnabled,
+    tagDraft,
+    startTagDraft,
+  } = useAnnotationUi();
+  const placing = modeEnabled || tagModeEnabled;
+  const pendingDraft = draft ?? tagDraft;
   const [highlight, setHighlight] = useState<DOMRect | null>(null);
+  const [announcement, setAnnouncement] = useState("");
   const overlayRef = useRef<HTMLDivElement>(null);
   const draftLock = useRef(false);
+  const frameRef = useRef(0);
+  const highlightRef = useRef<DOMRect | null>(null);
+
+  useEscapeKey(() => {
+    if (!placing) {
+      return;
+    }
+    if (modeEnabled) {
+      setModeEnabled(false);
+    }
+    if (tagModeEnabled) {
+      setTagModeEnabled(false);
+    }
+  });
 
   useEffect(() => {
-    if (!draft) {
+    if (placing) {
+      setAnnouncement(tagModeEnabled ? "Tagging mode enabled" : "Annotation mode enabled");
+    } else {
+      setAnnouncement((current) => (current ? "Annotation mode disabled" : current));
+    }
+  }, [placing, tagModeEnabled]);
+
+  useEffect(() => {
+    if (!pendingDraft) {
       draftLock.current = false;
     }
-  }, [draft]);
+  }, [pendingDraft]);
 
   const createFromPoint = useCallback(
     (clientX: number, clientY: number) => {
       const overlay = overlayRef.current;
-      if (!overlay || draft || draftLock.current) {
+      if (!overlay || pendingDraft || draftLock.current) {
         return;
       }
       const hit = hitElement(clientX, clientY, overlay);
@@ -35,13 +95,19 @@ export function AnnotationOverlay() {
       }
       const target = findAnnotatableElement(hit);
       draftLock.current = true;
-      startDraft(createElementAnchor(target, clientX, clientY), getElementLabel(target));
+      const anchor = createElementAnchor(target, clientX, clientY);
+      const label = getElementLabel(target);
+      if (tagModeEnabled) {
+        startTagDraft(anchor, label);
+      } else {
+        startDraft(anchor, label);
+      }
     },
-    [draft, startDraft],
+    [pendingDraft, startDraft, startTagDraft, tagModeEnabled],
   );
 
   useEffect(() => {
-    if (!modeEnabled) {
+    if (!placing) {
       setHighlight(null);
       return;
     }
@@ -81,24 +147,45 @@ export function AnnotationOverlay() {
       document.removeEventListener("submit", blockHostEvent, true);
       document.removeEventListener("keydown", onKeyDown, true);
     };
-  }, [createFromPoint, modeEnabled]);
+  }, [createFromPoint, placing]);
 
   const onPointerMove = (event: ReactPointerEvent<HTMLDivElement>) => {
-    const overlay = overlayRef.current;
-    if (!overlay) {
+    if (frameRef.current) {
       return;
     }
-    const hit = hitElement(event.clientX, event.clientY, overlay);
-    if (!hit || isLibraryElement(hit) || !isAnnotatableTarget(hit)) {
-      setHighlight(null);
-      return;
-    }
-    setHighlight(findAnnotatableElement(hit).getBoundingClientRect());
+    const clientX = event.clientX;
+    const clientY = event.clientY;
+    frameRef.current = window.requestAnimationFrame(() => {
+      frameRef.current = 0;
+      const overlay = overlayRef.current;
+      if (!overlay) {
+        return;
+      }
+      const hit = hitElement(clientX, clientY, overlay);
+      const nextRect =
+        hit && !isLibraryElement(hit) && isAnnotatableTarget(hit)
+          ? findAnnotatableElement(hit).getBoundingClientRect()
+          : null;
+      if (rectsEqual(highlightRef.current, nextRect)) {
+        return;
+      }
+      highlightRef.current = nextRect;
+      setHighlight(nextRect);
+    });
   };
 
   useEffect(() => {
+    return () => {
+      if (frameRef.current) {
+        window.cancelAnimationFrame(frameRef.current);
+        frameRef.current = 0;
+      }
+    };
+  }, []);
+
+  useEffect(() => {
     const overlay = overlayRef.current;
-    if (!modeEnabled || !overlay) {
+    if (!placing || !overlay) {
       return;
     }
     const onNativePointerDown = (event: PointerEvent) => {
@@ -108,25 +195,40 @@ export function AnnotationOverlay() {
     };
     overlay.addEventListener("pointerdown", onNativePointerDown);
     return () => overlay.removeEventListener("pointerdown", onNativePointerDown);
-  }, [createFromPoint, modeEnabled]);
+  }, [createFromPoint, placing]);
 
-  if (!modeEnabled) {
-    return null;
+  const liveRegion = (
+    <span className="wpn-sr-only" role="status" aria-live="polite">
+      {announcement}
+    </span>
+  );
+
+  if (!placing) {
+    return liveRegion;
   }
 
   return (
-    <div ref={overlayRef} className="wpn-overlay" onPointerMove={onPointerMove}>
-      {highlight ? (
-        <div
-          className="wpn-hover-highlight"
-          style={{
-            left: highlight.left,
-            top: highlight.top,
-            width: highlight.width,
-            height: highlight.height,
-          }}
-        />
-      ) : null}
-    </div>
+    <>
+      {liveRegion}
+      <div
+        ref={overlayRef}
+        className={["wpn-overlay", tagModeEnabled ? "wpn-overlay--tag" : ""]
+          .filter(Boolean)
+          .join(" ")}
+        onPointerMove={onPointerMove}
+      >
+        {highlight ? (
+          <div
+            className="wpn-hover-highlight"
+            style={{
+              left: highlight.left,
+              top: highlight.top,
+              width: highlight.width,
+              height: highlight.height,
+            }}
+          />
+        ) : null}
+      </div>
+    </>
   );
 }

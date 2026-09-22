@@ -39,10 +39,7 @@ export interface StreamApplication {
   pageStatus: PageStatus | null;
 }
 
-export function applyStreamEvent(
-  annotations: Annotation[],
-  event: StreamEvent,
-): StreamApplication {
+export function applyStreamEvent(annotations: Annotation[], event: StreamEvent): StreamApplication {
   const unchanged: StreamApplication = { annotations, pageStatus: null };
   const payload = event.payload;
   if (!payload || typeof payload !== "object") {
@@ -85,11 +82,17 @@ export function applyStreamEvent(
       if (!annotationId || !comment) {
         return unchanged;
       }
+      const target = annotations.find((item) => item.id === annotationId);
+      if (!target) {
+        return unchanged;
+      }
+      const nextComments = upsertComment(target.comments, comment);
+      if (nextComments === target.comments) {
+        return unchanged;
+      }
       return {
         annotations: annotations.map((item) =>
-          item.id === annotationId
-            ? { ...item, comments: upsertComment(item.comments, comment) }
-            : item,
+          item.id === annotationId ? { ...item, comments: nextComments } : item,
         ),
         pageStatus: null,
       };
@@ -100,6 +103,10 @@ export function applyStreamEvent(
         annotationId: string;
         commentId: string;
       };
+      const target = annotations.find((item) => item.id === annotationId);
+      if (!target || !target.comments.some((comment) => comment.id === commentId)) {
+        return unchanged;
+      }
       return {
         annotations: annotations.map((item) =>
           item.id === annotationId

@@ -1,7 +1,8 @@
-import { useState, type FormEvent } from "react";
+import { useId, useRef, useState, type FormEvent } from "react";
 import { Icon, Spinner, Tooltip } from "../primitives";
 import { useEscapeKey } from "../../hooks/useEscapeKey";
 import { useScrimDismiss } from "../../hooks/useScrimDismiss";
+import { useFocusTrap } from "../Settings/useFocusTrap";
 import { MIN_PASSWORD_LENGTH, PasswordField } from "./PasswordField";
 import type { ManagedUser } from "../../types/userManagement.types";
 
@@ -20,6 +21,10 @@ export function ResetPasswordModal({
 }: ResetPasswordModalProps) {
   useEscapeKey(onClose);
   const scrimProps = useScrimDismiss(onClose);
+  const titleId = useId();
+  const dialogRef = useRef<HTMLFormElement>(null);
+  const closeButtonRef = useRef<HTMLButtonElement>(null);
+  useFocusTrap(dialogRef, closeButtonRef);
   const [password, setPassword] = useState("");
   const [touched, setTouched] = useState(false);
 
@@ -37,18 +42,20 @@ export function ResetPasswordModal({
   return (
     <div className="wpn-epicflow-modal-scrim" {...scrimProps}>
       <form
+        ref={dialogRef}
         className="wpn-epicflow-modal wpn-users-modal wpn-users-reset"
         role="dialog"
         aria-modal="true"
-        aria-labelledby="wpn-reset-title"
+        aria-labelledby={titleId}
         onSubmit={handleSubmit}
       >
         <div className="wpn-epicflow-modal__header">
-          <h2 className="wpn-epicflow-modal__title" id="wpn-reset-title">
+          <h2 className="wpn-epicflow-modal__title" id={titleId}>
             Reset password
           </h2>
           <Tooltip label="Close" placement="left">
             <button
+              ref={closeButtonRef}
               type="button"
               className="wpn-icon-btn wpn-icon-btn--danger"
               aria-label="Close reset password"

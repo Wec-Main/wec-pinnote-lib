@@ -16,6 +16,7 @@ export interface AuthSession {
   roleId: UserManagementRole;
   organizationId?: string;
   avatarUrl?: string;
+  token: string;
 }
 
 export interface AuthApiClient {

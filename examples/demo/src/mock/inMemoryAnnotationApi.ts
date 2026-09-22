@@ -63,7 +63,9 @@ function savePageStatuses(records: Record<string, PageStatusRecord>): void {
   localStorage.setItem(PAGE_STATUS_STORAGE_KEY, JSON.stringify(records));
 }
 
-export function createInMemoryAnnotationApi(getCurrentUser: () => AnnotationUser): AnnotationApiClient {
+export function createInMemoryAnnotationApi(
+  getCurrentUser: () => AnnotationUser,
+): AnnotationApiClient {
   let items = loadStore();
   let pageStatuses = loadPageStatuses();
 

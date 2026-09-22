@@ -1,7 +1,9 @@
-import { useState, type FormEvent } from "react";
+import { useId, useRef, useState, type FormEvent } from "react";
 import { Icon, SearchableSelect, Spinner, Tooltip } from "../primitives";
 import { useEscapeKey } from "../../hooks/useEscapeKey";
 import { useScrimDismiss } from "../../hooks/useScrimDismiss";
+import { useFocusTrap } from "./useFocusTrap";
+import { Field } from "./Field";
 import { USER_STATUS_OPTIONS } from "../../data/userManagementOptions";
 import type { Organization, Project, ProjectDraft } from "../../types/organization.types";
 
@@ -10,6 +12,7 @@ interface ProjectFormModalProps {
   organizations: Organization[];
   defaultOrganizationId?: string;
   busy?: boolean;
+  fieldErrors?: Record<string, string[]> | null;
   onCancel: () => void;
   onSubmit: (draft: ProjectDraft) => void;
 }
@@ -19,11 +22,17 @@ export function ProjectFormModal({
   organizations,
   defaultOrganizationId,
   busy = false,
+  fieldErrors,
   onCancel,
   onSubmit,
 }: ProjectFormModalProps) {
   useEscapeKey(onCancel);
   const scrimProps = useScrimDismiss(onCancel);
+  const titleId = useId();
+  const dialogRef = useRef<HTMLFormElement>(null);
+  const idInputRef = useRef<HTMLInputElement>(null);
+  const nameInputRef = useRef<HTMLInputElement>(null);
+  useFocusTrap(dialogRef, project ? nameInputRef : idInputRef);
 
   const [projectId, setProjectId] = useState(project?.id ?? "");
   const [organizationId, setOrganizationId] = useState(
@@ -43,6 +52,9 @@ export function ProjectFormModal({
   const idValid = /^[A-Za-z0-9][A-Za-z0-9._-]*$/.test(projectId);
   const nameValid = name.trim().length > 0;
   const organizationValid = organizationId.length > 0;
+  const nameServerError = fieldErrors?.name?.[0];
+  const organizationServerError = fieldErrors?.organizationId?.[0];
+  const idServerError = fieldErrors?.projectId?.[0];
 
   const handleSubmit = (event: FormEvent) => {
     event.preventDefault();
@@ -62,14 +74,15 @@ export function ProjectFormModal({
   return (
     <div className="wpn-epicflow-modal-scrim" {...scrimProps}>
       <form
+        ref={dialogRef}
         className="wpn-epicflow-modal wpn-users-modal"
         role="dialog"
         aria-modal="true"
-        aria-labelledby="wpn-project-title"
+        aria-labelledby={titleId}
         onSubmit={handleSubmit}
       >
         <div className="wpn-epicflow-modal__header">
-          <h2 className="wpn-epicflow-modal__title" id="wpn-project-title">
+          <h2 className="wpn-epicflow-modal__title" id={titleId}>
             {project ? "Edit project" : "New project"}
           </h2>
           <Tooltip label="Close" placement="left">
@@ -86,47 +99,54 @@ export function ProjectFormModal({
 
         <div className="wpn-users-modal__body">
           <div className="wpn-epicflow-modal__row">
-            <label className="wpn-epicflow-modal__field">
-              <span className="wpn-epicflow-modal__label">
-                Project id <span className="wpn-epicflow-modal__required">*</span>
-              </span>
-              <input
-                className="wpn-epicflow-modal__input"
-                value={projectId}
-                onChange={(event) => setProjectId(event.target.value)}
-                placeholder="acme-web"
-                disabled={Boolean(project)}
-                autoFocus={!project}
-              />
-              <span className="wpn-password-field__hint">
-                {project
+            <Field
+              label="Project id"
+              required
+              hint={
+                project
                   ? "The project id cannot be changed after creation."
-                  : "Used by the client as VITE_ANNOTATION_PROJECT_ID."}
-              </span>
-              {touched && !project && !idValid ? (
-                <span className="wpn-users-modal__error">
-                  Letters, numbers, dots, underscores and hyphens only.
-                </span>
-              ) : null}
-            </label>
+                  : "Used by the client as VITE_ANNOTATION_PROJECT_ID."
+              }
+              error={
+                idServerError ??
+                (touched && !project && !idValid
+                  ? "Letters, numbers, dots, underscores and hyphens only."
+                  : null)
+              }
+            >
+              {(fieldProps) => (
+                <input
+                  {...fieldProps}
+                  ref={idInputRef}
+                  className="wpn-epicflow-modal__input"
+                  value={projectId}
+                  onChange={(event) => setProjectId(event.target.value)}
+                  placeholder="acme-web"
+                  disabled={Boolean(project)}
+                />
+              )}
+            </Field>
           </div>
 
           <div className="wpn-epicflow-modal__row">
-            <label className="wpn-epicflow-modal__field">
-              <span className="wpn-epicflow-modal__label">
-                Name <span className="wpn-epicflow-modal__required">*</span>
-              </span>
-              <input
-                className="wpn-epicflow-modal__input"
-                value={name}
-                onChange={(event) => setName(event.target.value)}
-                placeholder="Acme Web"
-                autoFocus={Boolean(project)}
-              />
-              {touched && !nameValid ? (
-                <span className="wpn-users-modal__error">A project name is required.</span>
-              ) : null}
-            </label>
+            <Field
+              label="Name"
+              required
+              error={
+                nameServerError ?? (touched && !nameValid ? "A project name is required." : null)
+              }
+            >
+              {(fieldProps) => (
+                <input
+                  {...fieldProps}
+                  ref={nameInputRef}
+                  className="wpn-epicflow-modal__input"
+                  value={name}
+                  onChange={(event) => setName(event.target.value)}
+                  placeholder="Acme Web"
+                />
+              )}
+            </Field>
           </div>
 
           <div className="wpn-epicflow-modal__row">
@@ -141,8 +161,10 @@ export function ProjectFormModal({
                 ariaLabel="Organization"
                 placeholder="Select an organization"
               />
-              {touched && !organizationValid ? (
-                <span className="wpn-users-modal__error">An organization is required.</span>
+              {organizationServerError || (touched && !organizationValid) ? (
+                <span className="wpn-users-modal__error">
+                  {organizationServerError ?? "An organization is required."}
+                </span>
               ) : null}
             </div>
             <div className="wpn-epicflow-modal__field">

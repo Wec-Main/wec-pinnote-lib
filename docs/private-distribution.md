@@ -246,11 +246,11 @@ Members of the organization with a valid `read:packages` token can install once 
 
 ## Troubleshooting
 
-| Symptom | Cause | Fix |
-|---|---|---|
-| `401 Unauthorized` on install | Token missing, expired, or env var not exported in this shell | `echo $GITHUB_PACKAGES_TOKEN` must print the token; re-source the profile |
-| `403 Forbidden` on install | Token lacks `read:packages`, not SSO-authorized, or user has no package access | Recreate token with the scope; authorize SSO; add user in Part 5 |
-| `404 Not Found` on install | Scope missing from `.npmrc`, or package name misspelled | Confirm `@wec-main:registry=` line and exact package name |
-| `E404` on publish | `name` in `package.json` lacks the `@wec-main/` scope | Fix the name and republish |
-| `403` on publish | Workflow lacks `packages: write` permission | Add the `permissions` block from 1.5 |
-| Types not found in consumer | `dist/index.d.ts` missing from the published tarball | Run `npm run build` locally, confirm `dist/index.d.ts` exists, republish |
+| Symptom                       | Cause                                                                          | Fix                                                                       |
+| ----------------------------- | ------------------------------------------------------------------------------ | ------------------------------------------------------------------------- |
+| `401 Unauthorized` on install | Token missing, expired, or env var not exported in this shell                  | `echo $GITHUB_PACKAGES_TOKEN` must print the token; re-source the profile |
+| `403 Forbidden` on install    | Token lacks `read:packages`, not SSO-authorized, or user has no package access | Recreate token with the scope; authorize SSO; add user in Part 5          |
+| `404 Not Found` on install    | Scope missing from `.npmrc`, or package name misspelled                        | Confirm `@wec-main:registry=` line and exact package name                 |
+| `E404` on publish             | `name` in `package.json` lacks the `@wec-main/` scope                          | Fix the name and republish                                                |
+| `403` on publish              | Workflow lacks `packages: write` permission                                    | Add the `permissions` block from 1.5                                      |
+| Types not found in consumer   | `dist/index.d.ts` missing from the published tarball                           | Run `npm run build` locally, confirm `dist/index.d.ts` exists, republish  |

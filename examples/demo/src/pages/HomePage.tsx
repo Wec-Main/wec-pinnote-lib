@@ -20,7 +20,12 @@ export function HomePage({ onGoLogin }: HomePageProps) {
               This page has a different pageKey than /login, so annotations pinned here stay here.
             </p>
           </div>
-          <button type="button" className="demo-secondary" data-annotation-id="home-logout" onClick={onGoLogin}>
+          <button
+            type="button"
+            className="demo-secondary"
+            data-annotation-id="home-logout"
+            onClick={onGoLogin}
+          >
             Back to login
           </button>
         </header>

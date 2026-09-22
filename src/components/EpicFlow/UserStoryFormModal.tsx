@@ -1,5 +1,7 @@
 import { useState, type FormEvent } from "react";
-import { Icons } from "../../assets/icons";
+import { Icon, Spinner, Tooltip } from "../primitives";
+import { useEscapeKey } from "../../hooks/useEscapeKey";
+import { useScrimDismiss } from "../../hooks/useScrimDismiss";
 import type { Epic, UserStory } from "../../types/epicFlow.types";
 
 const TITLE_MAX = 100;
@@ -9,53 +11,90 @@ interface UserStoryFormModalProps {
   mode: "create" | "edit";
   epic: Epic;
   initialStory?: UserStory;
+  busy?: boolean;
   onClose: () => void;
   onSubmit: (data: { title: string; description: string }) => void;
 }
 
-export function UserStoryFormModal({ mode, epic, initialStory, onClose, onSubmit }: UserStoryFormModalProps) {
+export function UserStoryFormModal({
+  mode,
+  epic,
+  initialStory,
+  busy = false,
+  onClose,
+  onSubmit,
+}: UserStoryFormModalProps) {
   const [title, setTitle] = useState(initialStory?.title ?? "");
   const [description, setDescription] = useState(initialStory?.description ?? "");
+  const [touched, setTouched] = useState(false);
+
+  const dismiss = () => {
+    if (!busy) {
+      onClose();
+    }
+  };
+
+  useEscapeKey(dismiss);
+  const scrimProps = useScrimDismiss(dismiss);
+
   const trimmedTitle = title.trim();
   const trimmedDescription = description.trim();
-  const canSubmit = Boolean(trimmedTitle) && Boolean(trimmedDescription);
+  const titleValid = trimmedTitle.length > 0;
+  const descriptionValid = trimmedDescription.length > 0;
   const isEdit = mode === "edit";
 
   const handleSubmit = (event: FormEvent) => {
     event.preventDefault();
-    if (!canSubmit) return;
+    setTouched(true);
+    if (!titleValid || !descriptionValid || busy) {
+      return;
+    }
     onSubmit({ title: trimmedTitle, description: trimmedDescription });
   };
 
   return (
-    <div className="wpn-epicflow-modal-scrim" onClick={onClose}>
-      <form className="wpn-epicflow-modal" onClick={(event) => event.stopPropagation()} onSubmit={handleSubmit}>
+    <div className="wpn-epicflow-modal-scrim" {...scrimProps}>
+      <form
+        className="wpn-epicflow-modal"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="wpn-story-form-title"
+        onSubmit={handleSubmit}
+      >
         <div className="wpn-epicflow-modal__header">
           <div>
-            <h2 className="wpn-epicflow-modal__title">{isEdit ? "Edit User Story" : "Create User Story"}</h2>
+            <h2 className="wpn-epicflow-modal__title" id="wpn-story-form-title">
+              {isEdit ? "Edit user story" : "Create user story"}
+            </h2>
             <p className="wpn-epicflow-modal__subtitle">
-              {isEdit ? "Update the details of this user story." : "Add a new user story to this epic."}
+              {isEdit
+                ? "Update the details of this user story."
+                : "Add a new user story to this epic."}
             </p>
           </div>
-          <button
-            type="button"
-            className="wpn-icon-btn"
-            aria-label={`Close ${isEdit ? "edit" : "create"} user story`}
-            onClick={onClose}
-          >
-            <span
-              aria-hidden="true"
-              className="wpn-epicflow-panel__close-icon"
-              style={{ WebkitMaskImage: `url(${Icons.close})`, maskImage: `url(${Icons.close})` }}
-            />
-          </button>
+          <Tooltip label="Close" placement="left">
+            <button
+              type="button"
+              className="wpn-icon-btn wpn-icon-btn--danger"
+              aria-label={isEdit ? "Close edit user story" : "Close create user story"}
+              onClick={onClose}
+              disabled={busy}
+            >
+              <Icon name="close" />
+            </button>
+          </Tooltip>
         </div>
+
         <div className="wpn-epicflow-modal__body">
           <div className="wpn-epicflow-modal__fields">
             <div className="wpn-epicflow-modal__field">
               <span className="wpn-epicflow-modal__label">Epic</span>
-              <div className="wpn-epicflow-modal__readonly">{epic.title}</div>
+              <div className="wpn-epicflow-modal__readonly">
+                <Icon name="epic" className="wpn-epicflow-modal__readonly-icon" />
+                {epic.title}
+              </div>
             </div>
+
             <label className="wpn-epicflow-modal__field">
               <span className="wpn-epicflow-modal__label">
                 Title <span className="wpn-epicflow-modal__required">*</span>
@@ -71,7 +110,11 @@ export function UserStoryFormModal({ mode, epic, initialStory, onClose, onSubmit
               <span className="wpn-epicflow-modal__counter">
                 {title.length}/{TITLE_MAX}
               </span>
+              {touched && !titleValid ? (
+                <span className="wpn-users-modal__error">A title is required.</span>
+              ) : null}
             </label>
+
             <label className="wpn-epicflow-modal__field">
               <span className="wpn-epicflow-modal__label">
                 Description <span className="wpn-epicflow-modal__required">*</span>
@@ -87,15 +130,30 @@ export function UserStoryFormModal({ mode, epic, initialStory, onClose, onSubmit
               <span className="wpn-epicflow-modal__counter">
                 {description.length}/{DESCRIPTION_MAX}
               </span>
+              {touched && !descriptionValid ? (
+                <span className="wpn-users-modal__error">A description is required.</span>
+              ) : null}
             </label>
           </div>
         </div>
+
         <div className="wpn-epicflow-modal__footer">
-          <button type="button" className="wpn-btn wpn-btn--ghost" onClick={onClose}>
+          <button
+            type="button"
+            className="wpn-btn wpn-btn--ghost"
+            onClick={onClose}
+            disabled={busy}
+          >
+            <Icon name="close" className="wpn-btn__icon" />
             Cancel
           </button>
-          <button type="submit" className="wpn-btn wpn-btn--primary" disabled={!canSubmit}>
-            {isEdit ? "Save Changes" : "Create User Story"}
+          <button type="submit" className="wpn-btn wpn-btn--primary" disabled={busy}>
+            {busy ? (
+              <Spinner className="wpn-btn__icon" />
+            ) : (
+              <Icon name={isEdit ? "check" : "plus"} className="wpn-btn__icon" />
+            )}
+            {isEdit ? "Save changes" : "Create user story"}
           </button>
         </div>
       </form>

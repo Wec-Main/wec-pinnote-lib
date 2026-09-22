@@ -19,9 +19,25 @@ function getVisiblePages(currentPage: number, totalPages: number): PageSlot[] {
     return [1, 2, 3, 4, 5, "ellipsis-end", totalPages];
   }
   if (currentPage >= totalPages - 3) {
-    return [1, "ellipsis-start", totalPages - 4, totalPages - 3, totalPages - 2, totalPages - 1, totalPages];
+    return [
+      1,
+      "ellipsis-start",
+      totalPages - 4,
+      totalPages - 3,
+      totalPages - 2,
+      totalPages - 1,
+      totalPages,
+    ];
   }
-  return [1, "ellipsis-start", currentPage - 1, currentPage, currentPage + 1, "ellipsis-end", totalPages];
+  return [
+    1,
+    "ellipsis-start",
+    currentPage - 1,
+    currentPage,
+    currentPage + 1,
+    "ellipsis-end",
+    totalPages,
+  ];
 }
 
 interface TablePaginationProps {
@@ -49,9 +65,7 @@ export function TablePagination({
   return (
     <div className="wpn-pagination">
       <div className="wpn-pagination__summary">
-        {totalItems === 0
-          ? `No ${itemLabel}`
-          : `${start}–${end} of ${totalItems} ${itemLabel}`}
+        {totalItems === 0 ? `No ${itemLabel}` : `${start}–${end} of ${totalItems} ${itemLabel}`}
       </div>
 
       <div className="wpn-pagination__nav">

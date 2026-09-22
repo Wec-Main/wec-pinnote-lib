@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type FormEvent } from "react";
+import { useId, useMemo, useRef, useState, type FormEvent } from "react";
 import {
   Icon,
   MultiSelect,
@@ -9,6 +9,8 @@ import {
 } from "../primitives";
 import { useEscapeKey } from "../../hooks/useEscapeKey";
 import { useScrimDismiss } from "../../hooks/useScrimDismiss";
+import { useFocusTrap } from "../Settings/useFocusTrap";
+import { Field } from "../Settings/Field";
 import {
   categoryLabel,
   roleLabel,
@@ -20,6 +22,7 @@ import { useAnnotationContext } from "../../context/AnnotationContext";
 import { assignableRoles, canChangePrivileges } from "../../utils/permissions";
 import { fetchProjects } from "../../services/organizationsApi";
 import type { Project } from "../../types/organization.types";
+import { useSharedFetch } from "../../hooks/useSharedFetch";
 import { MIN_PASSWORD_LENGTH, PasswordField } from "./PasswordField";
 import type {
   ManagedUser,
@@ -33,6 +36,7 @@ const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 interface UserFormModalProps {
   user: ManagedUser | null;
   busy?: boolean;
+  fieldErrors?: Record<string, string[]> | null;
   onClose: () => void;
   onSubmit: (draft: ManagedUserDraft) => void;
 }
@@ -40,11 +44,16 @@ interface UserFormModalProps {
 export function UserFormModal({
   user,
   busy = false,
+  fieldErrors,
   onClose,
   onSubmit,
 }: UserFormModalProps) {
   useEscapeKey(onClose);
   const scrimProps = useScrimDismiss(onClose);
+  const titleId = useId();
+  const dialogRef = useRef<HTMLFormElement>(null);
+  const firstNameInputRef = useRef<HTMLInputElement>(null);
+  useFocusTrap(dialogRef, firstNameInputRef);
   const { activeAccount, config } = useAnnotationContext();
   const actorRole = activeAccount?.roleId ?? "developer";
   const mayChangePrivileges = canChangePrivileges(actorRole, activeAccount?.id ?? "", user);
@@ -59,32 +68,32 @@ export function UserFormModal({
     const allowed = assignableRoles(actorRole);
     return allowed.includes("contributor") ? "contributor" : (allowed[0] ?? "contributor");
   });
-  const [countryCode, setCountryCode] = useState(user?.countryCode ?? USER_COUNTRY_OPTIONS[0].value);
+  const [countryCode, setCountryCode] = useState(
+    user?.countryCode ?? USER_COUNTRY_OPTIONS[0].value,
+  );
   const [category, setCategory] = useState<UserManagementCategory>(user?.category ?? "internal");
   const [password, setPassword] = useState("");
   const [touched, setTouched] = useState(false);
   const [projectIds, setProjectIds] = useState<string[]>(
     () => user?.projects.map((project) => project.id) ?? [],
   );
-  const [projects, setProjects] = useState<Project[]>([]);
-  const [projectsError, setProjectsError] = useState<string | null>(null);
-
   const apiBaseUrl = config.apiBaseUrl;
-  const actorId = activeAccount?.id;
+  const authToken = activeAccount?.token;
   const organizationId = activeAccount?.organizationId;
 
-  useEffect(() => {
-    const controller = new AbortController();
-    setProjectsError(null);
-    fetchProjects(apiBaseUrl, actorId, organizationId, controller.signal)
-      .then(setProjects)
-      .catch((err: unknown) => {
-        if (!controller.signal.aborted) {
-          setProjectsError(err instanceof Error ? err.message : "Could not load projects.");
-        }
-      });
-    return () => controller.abort();
-  }, [apiBaseUrl, actorId, organizationId]);
+  const projectsKey = `projects:${apiBaseUrl}:${authToken ?? ""}:${organizationId ?? ""}`;
+  const {
+    data: projectsData,
+    error: projectsFetchError,
+  } = useSharedFetch<Project[]>(projectsKey, (signal) =>
+    fetchProjects(apiBaseUrl, authToken, organizationId, signal),
+  );
+  const projects = useMemo(() => projectsData ?? [], [projectsData]);
+  const projectsError = projectsFetchError
+    ? projectsFetchError instanceof Error
+      ? projectsFetchError.message
+      : "Could not load projects."
+    : null;
 
   const roleOptions = useMemo<SelectOption[]>(() => {
     const allowed = assignableRoles(actorRole);
@@ -129,6 +138,9 @@ export function UserFormModal({
   const passwordValid = password.length === 0 || password.length >= MIN_PASSWORD_LENGTH;
   const canSubmit =
     Boolean(trimmedFirstName) && Boolean(trimmedLastName) && emailValid && passwordValid;
+  const firstNameServerError = fieldErrors?.firstName?.[0];
+  const lastNameServerError = fieldErrors?.lastName?.[0];
+  const emailServerError = fieldErrors?.email?.[0];
 
   const handleSubmit = (event: FormEvent) => {
     event.preventDefault();
@@ -153,14 +165,17 @@ export function UserFormModal({
   return (
     <div className="wpn-epicflow-modal-scrim" {...scrimProps}>
       <form
+        ref={dialogRef}
         className="wpn-epicflow-modal wpn-users-modal"
         role="dialog"
         aria-modal="true"
-        aria-labelledby="wpn-users-modal-title"
+        aria-labelledby={titleId}
         onSubmit={handleSubmit}
       >
         <div className="wpn-epicflow-modal__header">
-          <h2 className="wpn-epicflow-modal__title" id="wpn-users-modal-title">{user ? "Edit user" : "Create user"}</h2>
+          <h2 className="wpn-epicflow-modal__title" id={titleId}>
+            {user ? "Edit user" : "Create user"}
+          </h2>
           <Tooltip label="Close" placement="left">
             <button
               type="button"
@@ -175,47 +190,64 @@ export function UserFormModal({
 
         <div className="wpn-users-modal__body">
           <div className="wpn-epicflow-modal__row">
-            <label className="wpn-epicflow-modal__field">
-              <span className="wpn-epicflow-modal__label">
-                First name <span className="wpn-epicflow-modal__required">*</span>
-              </span>
-              <input
-                className="wpn-epicflow-modal__input"
-                value={firstName}
-                placeholder="e.g. Priya"
-                onChange={(event) => setFirstName(event.target.value)}
-                autoFocus
-              />
-            </label>
-            <label className="wpn-epicflow-modal__field">
-              <span className="wpn-epicflow-modal__label">
-                Last name <span className="wpn-epicflow-modal__required">*</span>
-              </span>
-              <input
-                className="wpn-epicflow-modal__input"
-                value={lastName}
-                placeholder="e.g. Raghavan"
-                onChange={(event) => setLastName(event.target.value)}
-              />
-            </label>
+            <Field
+              label="First name"
+              required
+              error={
+                firstNameServerError ??
+                (touched && !trimmedFirstName ? "A first name is required." : null)
+              }
+            >
+              {(fieldProps) => (
+                <input
+                  {...fieldProps}
+                  ref={firstNameInputRef}
+                  className="wpn-epicflow-modal__input"
+                  value={firstName}
+                  placeholder="e.g. Priya"
+                  onChange={(event) => setFirstName(event.target.value)}
+                />
+              )}
+            </Field>
+            <Field
+              label="Last name"
+              required
+              error={
+                lastNameServerError ??
+                (touched && !trimmedLastName ? "A last name is required." : null)
+              }
+            >
+              {(fieldProps) => (
+                <input
+                  {...fieldProps}
+                  className="wpn-epicflow-modal__input"
+                  value={lastName}
+                  placeholder="e.g. Raghavan"
+                  onChange={(event) => setLastName(event.target.value)}
+                />
+              )}
+            </Field>
           </div>
 
           <div className="wpn-epicflow-modal__row">
-            <label className="wpn-epicflow-modal__field">
-              <span className="wpn-epicflow-modal__label">
-                Email <span className="wpn-epicflow-modal__required">*</span>
-              </span>
-              <input
-                className="wpn-epicflow-modal__input"
-                type="email"
-                value={email}
-                placeholder="name@company.com"
-                onChange={(event) => setEmail(event.target.value)}
-              />
-              {touched && !emailValid ? (
-                <span className="wpn-users-modal__error">Enter a valid email address.</span>
-              ) : null}
-            </label>
+            <Field
+              label="Email"
+              required
+              error={
+                emailServerError ?? (touched && !emailValid ? "Enter a valid email address." : null)
+              }
+            >
+              {(fieldProps) => (
+                <input
+                  {...fieldProps}
+                  className="wpn-epicflow-modal__input"
+                  type="email"
+                  value={email}
+                  placeholder="name@company.com"
+                  onChange={(event) => setEmail(event.target.value)}
+                />
+              )}
+            </Field>
             <label className="wpn-epicflow-modal__field">
               <span className="wpn-epicflow-modal__label">Phone</span>
               <input
@@ -241,9 +273,7 @@ export function UserFormModal({
               ) : (
                 <>
                   <span className="wpn-settings-readonly">{roleLabel(roleId)}</span>
-                  <span className="wpn-password-field__hint">
-                    Your role cannot change this.
-                  </span>
+                  <span className="wpn-password-field__hint">Your role cannot change this.</span>
                 </>
               )}
             </div>
@@ -338,11 +368,7 @@ export function UserFormModal({
             <Icon name="close" className="wpn-btn__icon" />
             Cancel
           </button>
-          <button
-            type="submit"
-            className="wpn-btn wpn-btn--primary"
-            disabled={!canSubmit || busy}
-          >
+          <button type="submit" className="wpn-btn wpn-btn--primary" disabled={!canSubmit || busy}>
             {busy ? (
               <Spinner className="wpn-btn__icon" />
             ) : (

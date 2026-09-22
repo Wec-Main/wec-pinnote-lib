@@ -5,7 +5,11 @@ import {
   useState,
   type PointerEvent as ReactPointerEvent,
 } from "react";
-import { useAnnotationContext } from "../../context/AnnotationContext";
+import {
+  useAnnotationAuth,
+  useAnnotationData,
+  useAnnotationUi,
+} from "../../context/AnnotationContext";
 import { AnnotationToggleButton } from "../AnnotationToggleButton";
 import { ToolbarAuthControl } from "../Auth";
 import { PAGE_STATUS_OPTIONS, pageStatusLabel } from "../../utils/status";
@@ -40,8 +44,9 @@ function clampPosition(x: number, y: number, width: number, height: number) {
 }
 
 export function AnnotationToolbar() {
+  const { config, annotations, loading, error, retry, connectionState, pageStatus, setPageStatus } =
+    useAnnotationData();
   const {
-    config,
     listOpen,
     setListOpen,
     epicFlowOpen,
@@ -49,20 +54,17 @@ export function AnnotationToolbar() {
     userManagementOpen,
     setUserManagementOpen,
     setAuditHistoryOpen,
-    annotations,
-    loading,
-    error,
-    retry,
-    connectionState,
-    activeAccount,
     pinsVisible,
     setPinsVisible,
+    tagModeEnabled,
+    setTagModeEnabled,
+    tagsVisible,
+    setTagsVisible,
     setModeEnabled,
     selectAnnotation,
-    cancelDraft,
-    pageStatus,
-    setPageStatus,
-  } = useAnnotationContext();
+    requestCancelDraft,
+  } = useAnnotationUi();
+  const { activeAccount } = useAnnotationAuth();
   const toolbarRef = useRef<HTMLElement | null>(null);
   const setToolbarRef = (node: HTMLElement | null) => {
     toolbarRef.current = node;
@@ -182,6 +184,79 @@ export function AnnotationToolbar() {
     setBarExpanded(!barExpanded);
   };
 
+  const guardedClick = (action: () => void) => () => {
+    if (didDrag.current) {
+      didDrag.current = false;
+      return;
+    }
+    action();
+  };
+
+  // Every panel behind these icons needs a signed-in actor, so a logged-out
+  // visitor keeps the icon but cannot open the panel.
+  const loggedOut = !activeAccount;
+
+  const launcherShortcuts = (
+    <>
+      <Tooltip label={loggedOut ? "Log in first" : "EpicFlow"} placement="right">
+        <button
+          type="button"
+          className={[
+            "wpn-launcher-item",
+            epicFlowOpen ? "wpn-launcher-item--active" : "",
+            loggedOut ? "wpn-launcher-item--blocked" : "",
+          ]
+            .filter(Boolean)
+            .join(" ")}
+          aria-label="Open EpicFlow"
+          aria-pressed={epicFlowOpen}
+          aria-disabled={loggedOut}
+          onPointerDown={onDragStart}
+          onPointerMove={onDragMove}
+          onPointerUp={onDragEnd}
+          onPointerCancel={onDragEnd}
+          onClick={guardedClick(() => {
+            if (!loggedOut) {
+              setEpicFlowOpen(true);
+            }
+          })}
+        >
+          <span className="wpn-launcher-item__icon-wrap">
+            <img src={Icons.epic} alt="" className="wpn-launcher-item__icon" />
+          </span>
+        </button>
+      </Tooltip>
+      <Tooltip label={loggedOut ? "Log in first" : "Settings"} placement="right">
+        <button
+          type="button"
+          className={[
+            "wpn-launcher-item",
+            userManagementOpen ? "wpn-launcher-item--active" : "",
+            loggedOut ? "wpn-launcher-item--blocked" : "",
+          ]
+            .filter(Boolean)
+            .join(" ")}
+          aria-label="Open settings"
+          aria-pressed={userManagementOpen}
+          aria-disabled={loggedOut}
+          onPointerDown={onDragStart}
+          onPointerMove={onDragMove}
+          onPointerUp={onDragEnd}
+          onPointerCancel={onDragEnd}
+          onClick={guardedClick(() => {
+            if (!loggedOut) {
+              setUserManagementOpen(true);
+            }
+          })}
+        >
+          <span className="wpn-launcher-item__icon-wrap">
+            <img src={Icons.settings} alt="" className="wpn-launcher-item__icon" />
+          </span>
+        </button>
+      </Tooltip>
+    </>
+  );
+
   const closeBar = () => {
     setPosition(
       clampPosition(EDGE, window.innerHeight - LAUNCHER_SIZE - EDGE, LAUNCHER_SIZE, LAUNCHER_SIZE),
@@ -191,75 +266,136 @@ export function AnnotationToolbar() {
     setUserManagementOpen(false);
     setAuditHistoryOpen(false);
     selectAnnotation(null);
-    cancelDraft();
+    requestCancelDraft();
     setBarOpen(false);
   };
 
-  if (!barOpen) {
-    const openToolbar = () => {
-      if (didDrag.current) {
-        didDrag.current = false;
-        return;
-      }
-      setPosition(null);
-      setBarOpen(true);
-    };
-    const openEpicFlow = () => {
-      if (didDrag.current) {
-        didDrag.current = false;
-        return;
-      }
-      setEpicFlowOpen(true);
-    };
-    const openUserManagement = () => {
-      if (didDrag.current) {
-        didDrag.current = false;
-        return;
-      }
-      setUserManagementOpen(true);
-    };
-    const toggleLauncher = () => {
-      if (didDrag.current) {
-        didDrag.current = false;
-        return;
-      }
-      setLauncherExpanded(!launcherExpanded);
-    };
+  const openToolbar = () => {
+    if (didDrag.current) {
+      didDrag.current = false;
+      return;
+    }
+    setPosition(null);
+    setBarOpen(true);
+  };
 
-    return (
+  const toggleLauncher = () => {
+    if (didDrag.current) {
+      didDrag.current = false;
+      return;
+    }
+    setLauncherExpanded(!launcherExpanded);
+  };
+
+  const openToolbarButton = (
+    <Tooltip label={barOpen ? "Close toolbar" : "Open toolbar"} placement="right">
+      <button
+        type="button"
+        className={["wpn-launcher-item", barOpen ? "wpn-launcher-item--active" : ""]
+          .filter(Boolean)
+          .join(" ")}
+        aria-label={barOpen ? "Close annotation toolbar" : "Open annotation toolbar"}
+        aria-pressed={barOpen}
+        onPointerDown={barOpen ? undefined : onDragStart}
+        onPointerMove={barOpen ? undefined : onDragMove}
+        onPointerUp={barOpen ? undefined : onDragEnd}
+        onPointerCancel={barOpen ? undefined : onDragEnd}
+        onClick={barOpen ? closeBar : openToolbar}
+      >
+        <span className="wpn-launcher-item__icon-wrap">
+          <img src={Icons.pen} alt="" className="wpn-launcher-item__icon" />
+        </span>
+      </button>
+    </Tooltip>
+  );
+
+  // The launcher stays on screen while the toolbar is open, so it only follows
+  // the dragged position when it is the sole element; otherwise it keeps its own
+  // corner and the toolbar owns `position`.
+  const launcher = (
+    <div
+      ref={barOpen ? undefined : setToolbarRef}
+      className={[
+        "wpn-toolbar",
+        "wpn-toolbar--launcher",
+        launcherExpanded ? "" : "wpn-toolbar--launcher-collapsed",
+        !barOpen && position ? "wpn-toolbar--placed" : "",
+        barOpen ? "wpn-toolbar--launcher-docked" : "",
+      ]
+        .filter(Boolean)
+        .join(" ")}
+      style={!barOpen && position ? { left: position.x, top: position.y } : undefined}
+    >
+      <Tooltip label={launcherExpanded ? "Collapse launcher" : "Expand launcher"} placement="right">
+        <button
+          type="button"
+          className="wpn-launcher-item__logo-wrap"
+          aria-label={launcherExpanded ? "Collapse launcher" : "Expand launcher"}
+          aria-expanded={launcherExpanded}
+          onPointerDown={barOpen ? undefined : onDragStart}
+          onPointerMove={barOpen ? undefined : onDragMove}
+          onPointerUp={barOpen ? undefined : onDragEnd}
+          onPointerCancel={barOpen ? undefined : onDragEnd}
+          onClick={toggleLauncher}
+        >
+          <img src={Icons.wecLogo} alt="" className="wpn-launcher-item__logo" />
+        </button>
+      </Tooltip>
+      {launcherExpanded ? (
+        <Tooltip label="Drag to move" placement="right">
+          <button
+            type="button"
+            className="wpn-toolbar__drag"
+            aria-label="Drag annotation toolbar"
+            onPointerDown={barOpen ? undefined : onDragStart}
+            onPointerMove={barOpen ? undefined : onDragMove}
+            onPointerUp={barOpen ? undefined : onDragEnd}
+            onPointerCancel={barOpen ? undefined : onDragEnd}
+          >
+            <Icon name="drag" className="wpn-toolbar__drag-icon" />
+          </button>
+        </Tooltip>
+      ) : null}
+      {openToolbarButton}
+      {launcherShortcuts}
+    </div>
+  );
+
+  if (!barOpen) {
+    return launcher;
+  }
+
+  return (
+    <>
       <div
         ref={setToolbarRef}
         className={[
           "wpn-toolbar",
-          "wpn-toolbar--launcher",
-          launcherExpanded ? "" : "wpn-toolbar--launcher-collapsed",
+          barExpanded ? "" : "wpn-toolbar--collapsed",
           position ? "wpn-toolbar--placed" : "",
         ]
           .filter(Boolean)
           .join(" ")}
         style={position ? { left: position.x, top: position.y } : undefined}
       >
-        <Tooltip
-          label={launcherExpanded ? "Collapse launcher" : "Expand launcher"}
-          placement="right"
-        >
+        <Tooltip label={barExpanded ? "Collapse toolbar" : "Expand toolbar"} placement="bottom">
           <button
             type="button"
             className="wpn-launcher-item__logo-wrap"
-            aria-label={launcherExpanded ? "Collapse launcher" : "Expand launcher"}
-            aria-expanded={launcherExpanded}
+            aria-label={barExpanded ? "Collapse toolbar" : "Expand toolbar"}
+            aria-expanded={barExpanded}
             onPointerDown={onDragStart}
             onPointerMove={onDragMove}
             onPointerUp={onDragEnd}
             onPointerCancel={onDragEnd}
-            onClick={toggleLauncher}
+            onClick={toggleBar}
           >
-            <img src={Icons.wecLogo} alt="" className="wpn-launcher-item__logo" />
+            <img src={Icons.wecLogo} alt="Wec.ai" className="wpn-launcher-item__logo" />
           </button>
         </Tooltip>
-        {launcherExpanded ? (
+        {barExpanded ? (
           <>
-            <Tooltip label="Drag to move" placement="right">
+            <Tooltip label="Drag to move" placement="bottom">
               <button
                 type="button"
                 className="wpn-toolbar__drag"
@@ -272,229 +408,183 @@ export function AnnotationToolbar() {
                 <Icon name="drag" className="wpn-toolbar__drag-icon" />
               </button>
             </Tooltip>
-            <Tooltip label="Open toolbar" placement="right">
+            <div className="wpn-toolbar__screen" ref={screenStatusRef}>
               <button
                 type="button"
-                className="wpn-launcher-item wpn-launcher-item--active"
-                aria-label="Open annotation toolbar"
-                onPointerDown={onDragStart}
-                onPointerMove={onDragMove}
-                onPointerUp={onDragEnd}
-                onPointerCancel={onDragEnd}
-                onClick={openToolbar}
+                className="wpn-toolbar__screen-trigger"
+                aria-haspopup="listbox"
+                aria-expanded={screenStatusOpen}
+                aria-label={`Screen status: ${pageStatusLabel(pageStatus)}`}
+                onClick={() => setScreenStatusOpen((open) => !open)}
               >
-                <span className="wpn-launcher-item__icon-wrap">
-                  <img src={Icons.pen} alt="" className="wpn-launcher-item__icon" />
-                </span>
+                {pageStatusLabel(pageStatus)}
+                <svg viewBox="0 0 16 16" className="wpn-toolbar__screen-chevron" aria-hidden="true">
+                  <path fill="currentColor" d="M4.2 6.2 8 10l3.8-3.8L13 7.4 8 12.4 3 7.4z" />
+                </svg>
+              </button>
+              {screenStatusOpen ? (
+                <div className="wpn-toolbar__screen-menu" role="listbox">
+                  {PAGE_STATUS_OPTIONS.map((option) => (
+                    <button
+                      key={option.value}
+                      type="button"
+                      role="option"
+                      aria-selected={option.value === pageStatus}
+                      className={[
+                        "wpn-toolbar__screen-option",
+                        option.value === pageStatus ? "wpn-toolbar__screen-option--active" : "",
+                      ]
+                        .filter(Boolean)
+                        .join(" ")}
+                      onClick={() => {
+                        void setPageStatus(option.value);
+                        setScreenStatusOpen(false);
+                      }}
+                    >
+                      {option.label}
+                    </button>
+                  ))}
+                </div>
+              ) : null}
+            </div>
+            <ToolbarAuthControl />
+            <span className="wpn-toolbar__divider" aria-hidden="true" />
+            <AnnotationToggleButton />
+            <Tooltip label={pinsVisible ? "Hide pins" : "Show pins"} placement="bottom">
+              <button
+                type="button"
+                className={["wpn-toolbar__eye", pinsVisible ? "" : "wpn-toolbar__eye--hidden"]
+                  .filter(Boolean)
+                  .join(" ")}
+                aria-pressed={!pinsVisible}
+                aria-label={pinsVisible ? "Hide pins" : "Show pins"}
+                onClick={() => setPinsVisible(!pinsVisible)}
+              >
+                <Icon name={pinsVisible ? "eye" : "eyeOff"} className="wpn-toggle__icon" />
               </button>
             </Tooltip>
-            <Tooltip label="EpicFlow" placement="right">
+            <span className="wpn-toolbar__divider" aria-hidden="true" />
+            <Tooltip
+              label={
+                loggedOut ? "Log in first" : tagModeEnabled ? "Stop tagging" : "Tag an element"
+              }
+              placement="bottom"
+            >
               <button
                 type="button"
                 className={[
-                  "wpn-launcher-item",
-                  epicFlowOpen ? "wpn-launcher-item--active" : "",
+                  "wpn-toggle",
+                  tagModeEnabled ? "wpn-toggle--active" : "",
+                  loggedOut ? "wpn-toggle--blocked" : "",
                 ]
                   .filter(Boolean)
                   .join(" ")}
-                aria-label="Open EpicFlow"
-                aria-pressed={epicFlowOpen}
-                onPointerDown={onDragStart}
-                onPointerMove={onDragMove}
-                onPointerUp={onDragEnd}
-                onPointerCancel={onDragEnd}
-                onClick={openEpicFlow}
+                aria-pressed={tagModeEnabled}
+                aria-disabled={loggedOut}
+                aria-label={tagModeEnabled ? "Stop tagging" : "Tag an element"}
+                onClick={() => setTagModeEnabled(!tagModeEnabled)}
               >
-                <span className="wpn-launcher-item__icon-wrap">
-                  <img src={Icons.epic} alt="" className="wpn-launcher-item__icon" />
-                </span>
+                <Icon name="tag" className="wpn-toggle__icon" />
               </button>
             </Tooltip>
-            {activeAccount ? (
-              <Tooltip label="Settings" placement="right">
-                <button
-                  type="button"
-                  className={[
-                    "wpn-launcher-item",
-                    userManagementOpen ? "wpn-launcher-item--active" : "",
-                  ]
-                    .filter(Boolean)
-                    .join(" ")}
-                  aria-label="Open settings"
-                  aria-pressed={userManagementOpen}
-                  onPointerDown={onDragStart}
-                  onPointerMove={onDragMove}
-                  onPointerUp={onDragEnd}
-                  onPointerCancel={onDragEnd}
-                  onClick={openUserManagement}
-                >
-                  <span className="wpn-launcher-item__icon-wrap">
-                    <img src={Icons.settings} alt="" className="wpn-launcher-item__icon" />
-                  </span>
-                </button>
-              </Tooltip>
-            ) : null}
-          </>
-        ) : null}
-      </div>
-    );
-  }
-
-  return (
-    <div
-      ref={setToolbarRef}
-      className={[
-        "wpn-toolbar",
-        barExpanded ? "" : "wpn-toolbar--collapsed",
-        position ? "wpn-toolbar--placed" : "",
-      ]
-        .filter(Boolean)
-        .join(" ")}
-      style={position ? { left: position.x, top: position.y } : undefined}
-    >
-      <Tooltip label={barExpanded ? "Collapse toolbar" : "Expand toolbar"} placement="bottom">
-        <button
-          type="button"
-          className="wpn-launcher-item__logo-wrap"
-          aria-label={barExpanded ? "Collapse toolbar" : "Expand toolbar"}
-          aria-expanded={barExpanded}
-          onPointerDown={onDragStart}
-          onPointerMove={onDragMove}
-          onPointerUp={onDragEnd}
-          onPointerCancel={onDragEnd}
-          onClick={toggleBar}
-        >
-          <img src={Icons.wecLogo} alt="Wec.ai" className="wpn-launcher-item__logo" />
-        </button>
-      </Tooltip>
-      {barExpanded ? (
-        <>
-          <Tooltip label="Drag to move" placement="bottom">
-            <button
-              type="button"
-              className="wpn-toolbar__drag"
-              aria-label="Drag annotation toolbar"
-              onPointerDown={onDragStart}
-              onPointerMove={onDragMove}
-              onPointerUp={onDragEnd}
-              onPointerCancel={onDragEnd}
-            >
-              <Icon name="drag" className="wpn-toolbar__drag-icon" />
-            </button>
-          </Tooltip>
-          <div className="wpn-toolbar__screen" ref={screenStatusRef}>
-            <button
-              type="button"
-              className="wpn-toolbar__screen-trigger"
-              aria-haspopup="listbox"
-              aria-expanded={screenStatusOpen}
-              aria-label="Screen status"
-              onClick={() => setScreenStatusOpen((open) => !open)}
-            >
-              {pageStatusLabel(pageStatus)}
-              <svg viewBox="0 0 16 16" className="wpn-toolbar__screen-chevron" aria-hidden="true">
-                <path fill="currentColor" d="M4.2 6.2 8 10l3.8-3.8L13 7.4 8 12.4 3 7.4z" />
-              </svg>
-            </button>
-            {screenStatusOpen ? (
-              <div className="wpn-toolbar__screen-menu" role="listbox">
-                {PAGE_STATUS_OPTIONS.map((option) => (
+            <Tooltip label={tagsVisible ? "Hide tags" : "Show tags"} placement="bottom">
+              <button
+                type="button"
+                className={["wpn-toolbar__eye", tagsVisible ? "" : "wpn-toolbar__eye--hidden"]
+                  .filter(Boolean)
+                  .join(" ")}
+                aria-pressed={!tagsVisible}
+                aria-label={tagsVisible ? "Hide tags" : "Show tags"}
+                onClick={() => setTagsVisible(!tagsVisible)}
+              >
+                <Icon name={tagsVisible ? "eye" : "eyeOff"} className="wpn-toggle__icon" />
+              </button>
+            </Tooltip>
+            <span className="wpn-toolbar__divider" aria-hidden="true" />
+            <Tooltip label={loggedOut ? "Log in first" : "Comments"} placement="bottom">
+              <button
+                type="button"
+                className={[
+                  "wpn-toolbar__list",
+                  listOpen ? "wpn-toolbar__list--active" : "",
+                  loggedOut ? "wpn-toolbar__list--blocked" : "",
+                ]
+                  .filter(Boolean)
+                  .join(" ")}
+                aria-pressed={listOpen}
+                aria-disabled={loggedOut}
+                aria-label="Toggle comments"
+                onClick={() => {
+                  if (!loggedOut) {
+                    setListOpen(!listOpen);
+                  }
+                }}
+              >
+                <Icon name="comment" className="wpn-toolbar__list-icon" />
+                <span className="wpn-toolbar__count">{annotations.length}</span>
+              </button>
+            </Tooltip>
+            {/* Comments only load for a signed-in actor, so refreshing and the
+                failure it would report are meaningless while logged out. */}
+            {loggedOut ? null : (
+              <>
+                <span className="wpn-toolbar__divider" aria-hidden="true" />
+                <Tooltip label={loading ? "Refreshing..." : "Refresh comments"} placement="bottom">
                   <button
-                    key={option.value}
                     type="button"
-                    role="option"
-                    aria-selected={option.value === pageStatus}
                     className={[
-                      "wpn-toolbar__screen-option",
-                      option.value === pageStatus ? "wpn-toolbar__screen-option--active" : "",
+                      "wpn-toolbar__refresh",
+                      loading ? "wpn-toolbar__refresh--spinning" : "",
                     ]
                       .filter(Boolean)
                       .join(" ")}
-                    onClick={() => {
-                      void setPageStatus(option.value);
-                      setScreenStatusOpen(false);
-                    }}
+                    aria-label="Refresh comments"
+                    disabled={loading}
+                    onClick={() => retry()}
                   >
-                    {option.label}
+                    <Icon name="refresh" className="wpn-toolbar__refresh-icon" />
                   </button>
-                ))}
-              </div>
+                </Tooltip>
+              </>
+            )}
+            {loggedOut ? null : error ? (
+              <Tooltip label={error} placement="bottom">
+                <button
+                  type="button"
+                  className="wpn-toolbar__retry"
+                  aria-label={`Comments failed to load: ${error}. Retry`}
+                  onClick={() => retry()}
+                >
+                  <Icon name="alert" className="wpn-toolbar__retry-icon" />
+                  Retry
+                </button>
+              </Tooltip>
+            ) : connectionState === "reconnecting" ? (
+              <Tooltip label="Reconnecting to live updates" placement="bottom">
+                <span
+                  className="wpn-toolbar__live wpn-toolbar__live--reconnecting"
+                  role="status"
+                  aria-label="Reconnecting to live updates"
+                >
+                  <span className="wpn-toolbar__live-dot" />
+                </span>
+              </Tooltip>
             ) : null}
-          </div>
-          <ToolbarAuthControl />
-          <span className="wpn-toolbar__divider" aria-hidden="true" />
-          <AnnotationToggleButton />
-          <Tooltip label={pinsVisible ? "Hide pins" : "Show pins"} placement="bottom">
-            <button
-              type="button"
-              className={["wpn-toolbar__eye", pinsVisible ? "" : "wpn-toolbar__eye--hidden"]
-                .filter(Boolean)
-                .join(" ")}
-              aria-pressed={!pinsVisible}
-              aria-label={pinsVisible ? "Hide pins" : "Show pins"}
-              onClick={() => setPinsVisible(!pinsVisible)}
-            >
-              <Icon name={pinsVisible ? "eye" : "eyeOff"} className="wpn-toggle__icon" />
-            </button>
-          </Tooltip>
-          <span className="wpn-toolbar__divider" aria-hidden="true" />
-          <Tooltip label="Comments" placement="bottom">
-            <button
-              type="button"
-              className={["wpn-toolbar__list", listOpen ? "wpn-toolbar__list--active" : ""]
-                .filter(Boolean)
-                .join(" ")}
-              aria-pressed={listOpen}
-              aria-label="Toggle comments"
-              onClick={() => setListOpen(!listOpen)}
-            >
-              <Icon name="comment" className="wpn-toolbar__list-icon" />
-              <span className="wpn-toolbar__count">{annotations.length}</span>
-            </button>
-          </Tooltip>
-          <span className="wpn-toolbar__divider" aria-hidden="true" />
-          <Tooltip label={loading ? "Refreshing..." : "Refresh comments"} placement="bottom">
-            <button
-              type="button"
-              className={["wpn-toolbar__refresh", loading ? "wpn-toolbar__refresh--spinning" : ""]
-                .filter(Boolean)
-                .join(" ")}
-              aria-label="Refresh comments"
-              disabled={loading}
-              onClick={() => retry()}
-            >
-              <Icon name="refresh" className="wpn-toolbar__refresh-icon" />
-            </button>
-          </Tooltip>
-          <Tooltip label="Close toolbar" placement="bottom">
-            <button
-              type="button"
-              className="wpn-toolbar__close"
-              aria-label="Close annotation toolbar"
-              onClick={closeBar}
-            >
-              <Icon name="close" className="wpn-toolbar__close-icon" />
-            </button>
-          </Tooltip>
-          {connectionState === "reconnecting" ? (
-            <Tooltip label="Reconnecting to live updates" placement="bottom">
-              <span
-                className="wpn-toolbar__live wpn-toolbar__live--reconnecting"
-                aria-live="polite"
+            <span className="wpn-toolbar__divider" aria-hidden="true" />
+            <Tooltip label="Close toolbar" placement="bottom">
+              <button
+                type="button"
+                className="wpn-toolbar__close"
+                aria-label="Close annotation toolbar"
+                onClick={closeBar}
               >
-                <span className="wpn-toolbar__live-dot" />
-                Reconnecting
-              </span>
+                <Icon name="close" className="wpn-toolbar__close-icon" />
+              </button>
             </Tooltip>
-          ) : null}
-          {loading ? <span className="wpn-toolbar__status">Loading</span> : null}
-          {error ? (
-            <button type="button" className="wpn-toolbar__retry" onClick={retry}>
-              Retry
-            </button>
-          ) : null}
-        </>
-      ) : null}
-    </div>
+          </>
+        ) : null}
+      </div>
+      {launcher}
+    </>
   );
 }

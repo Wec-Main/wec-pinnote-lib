@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useMemo } from "react";
 import { useAnnotationContext } from "../../context/AnnotationContext";
 import {
   createOrganization,
@@ -7,54 +7,62 @@ import {
   updateOrganization,
 } from "../../services/organizationsApi";
 import type { Organization, OrganizationDraft } from "../../types/organization.types";
-import { Icon, ListSearchBar, TableSkeleton, Tooltip } from "../primitives";
+import { Icon, ListSearchBar, RefreshButton, TableSkeleton, Tooltip } from "../primitives";
 import { ConfirmDialog } from "../UserManagement/ConfirmDialog";
 import { OrganizationFormModal } from "./OrganizationFormModal";
 import { countryLabel } from "../../data/userManagementOptions";
-
-function errorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : "Something went wrong.";
-}
+import { useResourceTable } from "./useResourceTable";
+import { invalidateSharedFetch } from "../../hooks/useSharedFetch";
 
 export function OrganizationsTab() {
   const { config, activeAccount } = useAnnotationContext();
-  const actorId = activeAccount?.id;
+  const authToken = activeAccount?.token;
+  const organizationsKey = `organizations:${config.apiBaseUrl}:${authToken ?? ""}`;
 
-  const [organizations, setOrganizations] = useState<Organization[]>([]);
-  const [search, setSearch] = useState("");
-  const [query, setQuery] = useState("");
-  const [loading, setLoading] = useState(true);
-  const [loaded, setLoaded] = useState(false);
-  const [loadError, setLoadError] = useState<string | null>(null);
-  const [reloadToken, setReloadToken] = useState(0);
-  const [formOpen, setFormOpen] = useState(false);
-  const [editTarget, setEditTarget] = useState<Organization | null>(null);
-  const [pendingDelete, setPendingDelete] = useState<Organization | null>(null);
-  const [busy, setBusy] = useState(false);
-  const [notice, setNotice] = useState<string | null>(null);
-
-  const reload = useCallback(() => setReloadToken((value) => value + 1), []);
-
-  useEffect(() => {
-    const controller = new AbortController();
-    setLoading(true);
-    setLoadError(null);
-    fetchOrganizations(config.apiBaseUrl, actorId, controller.signal)
-      .then((result) => {
-        setOrganizations(result);
-        setLoading(false);
-        setLoaded(true);
-      })
-      .catch((err: unknown) => {
-        if (controller.signal.aborted) {
-          return;
-        }
-        setLoadError(errorMessage(err));
-        setLoading(false);
-        setLoaded(true);
-      });
-    return () => controller.abort();
-  }, [config.apiBaseUrl, actorId, reloadToken]);
+  const {
+    items: organizations,
+    loading,
+    loaded,
+    error: loadError,
+    notice,
+    busy,
+    formOpen,
+    editTarget,
+    pendingDelete,
+    submitDetails,
+    search,
+    setSearch,
+    query,
+    setQuery,
+    open,
+    closeForm,
+    askDelete,
+    cancelDelete,
+    submit,
+    confirmDelete,
+    dismissNotice,
+    reload,
+  } = useResourceTable<Organization, OrganizationDraft>({
+    load: (_query, signal) => fetchOrganizations(config.apiBaseUrl, authToken, signal),
+    create: async (draft) => {
+      const result = await createOrganization(config.apiBaseUrl, authToken, draft);
+      invalidateSharedFetch(organizationsKey);
+      return result;
+    },
+    update: async (id, draft) => {
+      const result = await updateOrganization(config.apiBaseUrl, authToken, id, draft);
+      invalidateSharedFetch(organizationsKey);
+      return result;
+    },
+    remove: async (id) => {
+      await deleteOrganization(config.apiBaseUrl, authToken, id);
+      invalidateSharedFetch(organizationsKey);
+    },
+    getId: (organization) => organization.id,
+    draftLabel: (draft) => draft.companyName,
+    itemLabel: (organization) => organization.companyName,
+    deps: [config.apiBaseUrl, authToken],
+  });
 
   const visible = useMemo(() => {
     const needle = query.trim().toLowerCase();
@@ -68,47 +76,6 @@ export function OrganizationsTab() {
     );
   }, [organizations, query]);
 
-  const submit = useCallback(
-    async (draft: OrganizationDraft) => {
-      setBusy(true);
-      setNotice(null);
-      try {
-        if (editTarget) {
-          await updateOrganization(config.apiBaseUrl, actorId, editTarget.id, draft);
-          setNotice(`${draft.companyName} updated.`);
-        } else {
-          await createOrganization(config.apiBaseUrl, actorId, draft);
-          setNotice(`${draft.companyName} created.`);
-        }
-        setFormOpen(false);
-        setEditTarget(null);
-        reload();
-      } catch (err) {
-        setNotice(errorMessage(err));
-      } finally {
-        setBusy(false);
-      }
-    },
-    [config.apiBaseUrl, actorId, editTarget, reload],
-  );
-
-  const confirmDelete = useCallback(async () => {
-    if (!pendingDelete) {
-      return;
-    }
-    setBusy(true);
-    try {
-      await deleteOrganization(config.apiBaseUrl, actorId, pendingDelete.id);
-      setNotice(`${pendingDelete.companyName} deleted.`);
-      setPendingDelete(null);
-      reload();
-    } catch (err) {
-      setNotice(errorMessage(err));
-    } finally {
-      setBusy(false);
-    }
-  }, [config.apiBaseUrl, actorId, pendingDelete, reload]);
-
   return (
     <div className="wpn-settings-tab">
       <ListSearchBar
@@ -121,24 +88,20 @@ export function OrganizationsTab() {
         }}
         placeholder="Search organizations"
         trailing={
-          <button
-            type="button"
-            className="wpn-users-create"
-            onClick={() => {
-              setEditTarget(null);
-              setFormOpen(true);
-            }}
-          >
-            <Icon name="plus" className="wpn-users-create__icon" />
-            New organization
-          </button>
+          <>
+            <RefreshButton label="Refresh organizations" loading={loading} onRefresh={reload} />
+            <button type="button" className="wpn-users-create" onClick={() => open()}>
+              <Icon name="plus" className="wpn-users-create__icon" />
+              New organization
+            </button>
+          </>
         }
       />
 
       {notice ? (
         <div className="wpn-users-notice" role="status">
           <span>{notice}</span>
-          <button type="button" className="wpn-icon-btn" onClick={() => setNotice(null)}>
+          <button type="button" className="wpn-icon-btn" onClick={dismissNotice}>
             <Icon name="close" />
           </button>
         </div>
@@ -211,10 +174,7 @@ export function OrganizationsTab() {
                           type="button"
                           className="wpn-users-action"
                           aria-label={`Edit ${organization.companyName}`}
-                          onClick={() => {
-                            setEditTarget(organization);
-                            setFormOpen(true);
-                          }}
+                          onClick={() => open(organization)}
                         >
                           <Icon name="edit" />
                         </button>
@@ -224,7 +184,7 @@ export function OrganizationsTab() {
                           type="button"
                           className="wpn-users-action wpn-users-action--danger"
                           aria-label={`Delete ${organization.companyName}`}
-                          onClick={() => setPendingDelete(organization)}
+                          onClick={() => askDelete(organization)}
                         >
                           <Icon name="trash" />
                         </button>
@@ -242,10 +202,8 @@ export function OrganizationsTab() {
         <OrganizationFormModal
           organization={editTarget}
           busy={busy}
-          onCancel={() => {
-            setFormOpen(false);
-            setEditTarget(null);
-          }}
+          fieldErrors={submitDetails?.fieldErrors ?? null}
+          onCancel={closeForm}
           onSubmit={submit}
         />
       ) : null}
@@ -258,7 +216,7 @@ export function OrganizationsTab() {
           confirmIcon="trash"
           destructive
           busy={busy}
-          onCancel={() => setPendingDelete(null)}
+          onCancel={cancelDelete}
           onConfirm={confirmDelete}
         />
       ) : null}

@@ -14,8 +14,7 @@ export function scrimDismissHandlers(
       pressedOnScrim.current = event.target === event.currentTarget;
     },
     onClick(event: MouseEvent<HTMLElement>) {
-      const startedAndEndedOnScrim =
-        pressedOnScrim.current && event.target === event.currentTarget;
+      const startedAndEndedOnScrim = pressedOnScrim.current && event.target === event.currentTarget;
       pressedOnScrim.current = false;
       if (startedAndEndedOnScrim) {
         onDismiss();

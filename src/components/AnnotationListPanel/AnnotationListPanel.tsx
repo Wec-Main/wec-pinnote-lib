@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useAnnotationContext } from "../../context/AnnotationContext";
+import { useAnnotationData, useAnnotationUi } from "../../context/AnnotationContext";
 import { formatRelativeTime, formatTimestamp, getInitials } from "../../utils/format";
 import { isDoneStatus, statusLabel } from "../../utils/status";
 import { Icons } from "../../assets/icons";
@@ -75,9 +75,9 @@ function CommentRow({
             )}
           </span>
           <span className="wpn-list__meta">
-            <Tooltip label={formatTimestamp(comment.createdAt)} placement="bottom">
-              <time dateTime={comment.createdAt}>{formatRelativeTime(comment.createdAt)}</time>
-            </Tooltip>
+            <time dateTime={comment.createdAt} title={formatTimestamp(comment.createdAt)}>
+              {formatRelativeTime(comment.createdAt)}
+            </time>
             {comment.updatedAt !== comment.createdAt ? (
               <>
                 <span className="wpn-list__dot" aria-hidden="true">
@@ -150,8 +150,8 @@ function AnnotationGroup({
 }
 
 export function AnnotationListPanel() {
-  const { annotations, config, selectedId, revealAnnotation, setListOpen, loading, error, retry } =
-    useAnnotationContext();
+  const { annotations, config, loading, error, retry } = useAnnotationData();
+  const { selectedId, revealAnnotation, setListOpen } = useAnnotationUi();
 
   const [filters, setFilters] = useState<CommentFilters>(DEFAULT_COMMENT_FILTERS);
   const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
@@ -382,7 +382,7 @@ export function AnnotationListPanel() {
           </button>
         </div>
       ) : null}
-      {entries.length === 0 && !loading ? (
+      {entries.length === 0 && !loading && !error ? (
         <p className="wpn-muted">
           {allEntries.length === 0
             ? "No comments on this page."
@@ -390,27 +390,29 @@ export function AnnotationListPanel() {
         </p>
       ) : null}
 
-      <ul className="wpn-list">
-        {grouped
-          ? [...groups.entries()].map(([annotationId, groupEntries]) => (
-              <AnnotationGroup
-                key={annotationId}
-                entries={groupEntries}
-                selectedId={selectedId}
-                collapsed={collapsedGroups.has(annotationId)}
-                onToggle={() => toggleGroup(annotationId)}
-                onSelect={revealAnnotation}
-              />
-            ))
-          : entries.map((entry) => (
-              <CommentRow
-                key={`${entry.annotation.id}:${entry.comment.id}`}
-                entry={entry}
-                active={selectedId === entry.annotation.id}
-                onSelect={() => revealAnnotation(entry.annotation.id)}
-              />
-            ))}
-      </ul>
+      {error ? null : (
+        <ul className="wpn-list">
+          {grouped
+            ? [...groups.entries()].map(([annotationId, groupEntries]) => (
+                <AnnotationGroup
+                  key={annotationId}
+                  entries={groupEntries}
+                  selectedId={selectedId}
+                  collapsed={collapsedGroups.has(annotationId)}
+                  onToggle={() => toggleGroup(annotationId)}
+                  onSelect={revealAnnotation}
+                />
+              ))
+            : entries.map((entry) => (
+                <CommentRow
+                  key={`${entry.annotation.id}:${entry.comment.id}`}
+                  entry={entry}
+                  active={selectedId === entry.annotation.id}
+                  onSelect={() => revealAnnotation(entry.annotation.id)}
+                />
+              ))}
+        </ul>
+      )}
 
       <div className="wpn-list-panel__brand">
         <span>Powered by</span>

@@ -40,6 +40,22 @@ export function usePersistentState<T>(
     setValue(read(key, fallback, validRef.current));
   }, [fallback, key]);
 
+  /**
+   * This state is shared by every tab on the origin, so a change made in one
+   * tab (e.g. dragging the toolbar) must be reflected in the others rather
+   * than only taking effect there on their next fresh mount.
+   */
+  useEffect(() => {
+    const onStorage = (event: StorageEvent) => {
+      if (event.key !== null && event.key !== key) {
+        return;
+      }
+      setValue(read(key, fallback, validRef.current));
+    };
+    window.addEventListener("storage", onStorage);
+    return () => window.removeEventListener("storage", onStorage);
+  }, [fallback, key]);
+
   const update = useCallback(
     (next: T) => {
       setValue(next);

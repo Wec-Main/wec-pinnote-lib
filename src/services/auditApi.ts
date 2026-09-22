@@ -4,7 +4,7 @@ import type { AuditPage, AuditQuery } from "../types/audit.types";
 
 export async function fetchAuditPage(
   apiBaseUrl: string,
-  actorId: string | undefined,
+  authToken: string | undefined,
   query: AuditQuery,
   signal?: AbortSignal,
 ): Promise<AuditPage> {
@@ -17,7 +17,7 @@ export async function fetchAuditPage(
   }
 
   const response = await fetch(url.toString(), {
-    headers: { Accept: "application/json", ...actorHeaders(actorId) },
+    headers: { Accept: "application/json", ...actorHeaders(authToken) },
     signal,
   });
 
@@ -25,14 +25,14 @@ export async function fetchAuditPage(
     const text = await response.text().catch(() => "");
     let message = `Unable to load audit history (${response.status})`;
     try {
-      const parsed = JSON.parse(text) as { message?: string };
-      message = parsed.message ?? message;
+      const parsed = JSON.parse(text) as { error?: string; message?: string };
+      message = parsed.error ?? parsed.message ?? message;
     } catch {
       if (text) {
         message = text;
       }
     }
-    throw new AnnotationApiError(message, response.status);
+    throw new AnnotationApiError(message, response.status, text || null);
   }
 
   return (await response.json()) as AuditPage;

@@ -29,9 +29,7 @@ function mapsEqual(
   return true;
 }
 
-export function useAnnotationPositions(
-  items: PositionedItem[],
-): Map<string, PinScreenPosition> {
+export function useAnnotationPositions(items: PositionedItem[]): Map<string, PinScreenPosition> {
   const [positions, setPositions] = useState<Map<string, PinScreenPosition>>(() => new Map());
   const itemsKey = useMemo(
     () => items.map((item) => `${item.id}:${item.anchor.selector}`).join("|"),
@@ -80,9 +78,7 @@ export function useAnnotationPositions(
     }
 
     const mutationObserver =
-      typeof MutationObserver === "undefined"
-        ? null
-        : new MutationObserver(schedule);
+      typeof MutationObserver === "undefined" ? null : new MutationObserver(schedule);
     mutationObserver?.observe(document.body, {
       childList: true,
       subtree: true,
@@ -97,7 +93,8 @@ export function useAnnotationPositions(
       resizeObserver?.disconnect();
       mutationObserver?.disconnect();
     };
-  }, [items, itemsKey]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [itemsKey]);
 
   return positions;
 }

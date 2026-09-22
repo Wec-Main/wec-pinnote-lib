@@ -31,7 +31,7 @@ export default defineConfig({
       },
     },
     cssCodeSplit: false,
-    sourcemap: true,
+    sourcemap: false,
     emptyOutDir: true,
   },
 });

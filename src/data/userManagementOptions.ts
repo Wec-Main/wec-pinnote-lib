@@ -15,6 +15,7 @@ export const USER_ROLE_OPTIONS: { value: UserManagementRole; label: string }[] =
 export const USER_STATUS_OPTIONS: { value: UserManagementStatus; label: string }[] = [
   { value: "active", label: "Active" },
   { value: "inactive", label: "Inactive" },
+  { value: "invited", label: "Invited" },
 ];
 
 export const USER_CATEGORY_OPTIONS: { value: UserManagementCategory; label: string }[] = [
@@ -23,11 +24,10 @@ export const USER_CATEGORY_OPTIONS: { value: UserManagementCategory; label: stri
   { value: "customer", label: "Customer" },
 ];
 
-const LEGACY_STATUS_LABELS: Record<string, string> = { invited: "Invited" };
-
-const LEGACY_ROLE_LABELS: Record<string, string> = { viewer: "Viewer" };
-
-export const USER_COUNTRY_OPTIONS: [{ value: string; label: string }, ...{ value: string; label: string }[]] = [
+export const USER_COUNTRY_OPTIONS: [
+  { value: string; label: string },
+  ...{ value: string; label: string }[],
+] = [
   { value: "IN", label: "India" },
   { value: "GB", label: "United Kingdom" },
   { value: "DE", label: "Germany" },
@@ -36,19 +36,11 @@ export const USER_COUNTRY_OPTIONS: [{ value: string; label: string }, ...{ value
 ];
 
 export function roleLabel(role: UserManagementRole): string {
-  return (
-    USER_ROLE_OPTIONS.find((option) => option.value === role)?.label ??
-    LEGACY_ROLE_LABELS[role] ??
-    role
-  );
+  return USER_ROLE_OPTIONS.find((option) => option.value === role)?.label ?? role;
 }
 
 export function userStatusLabel(status: UserManagementStatus): string {
-  return (
-    USER_STATUS_OPTIONS.find((option) => option.value === status)?.label ??
-    LEGACY_STATUS_LABELS[status] ??
-    status
-  );
+  return USER_STATUS_OPTIONS.find((option) => option.value === status)?.label ?? status;
 }
 
 export function countryLabel(code: string): string {
