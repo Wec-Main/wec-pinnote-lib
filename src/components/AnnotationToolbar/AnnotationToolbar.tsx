@@ -24,6 +24,8 @@ export function AnnotationToolbar() {
   const {
     listOpen,
     setListOpen,
+    epicFlowOpen,
+    setEpicFlowOpen,
     annotations,
     loading,
     error,
@@ -150,6 +152,10 @@ export function AnnotationToolbar() {
     setBarOpen(false);
   };
 
+  if (!barOpen && epicFlowOpen) {
+    return null;
+  }
+
   if (!barOpen) {
     const openToolbar = () => {
       if (didDrag.current) {
@@ -161,6 +167,13 @@ export function AnnotationToolbar() {
     };
     const ignoreDrag = () => {
       didDrag.current = false;
+    };
+    const openEpicFlow = () => {
+      if (didDrag.current) {
+        didDrag.current = false;
+        return;
+      }
+      setEpicFlowOpen(true);
     };
 
     return (
@@ -215,13 +228,12 @@ export function AnnotationToolbar() {
         <button
           type="button"
           className="wpn-launcher-item"
-          aria-label="Epic (coming soon)"
-          aria-disabled="true"
+          aria-label="Open EpicFlow"
           onPointerDown={onDragStart}
           onPointerMove={onDragMove}
           onPointerUp={onDragEnd}
           onPointerCancel={onDragEnd}
-          onClick={ignoreDrag}
+          onClick={openEpicFlow}
         >
           <span className="wpn-launcher-item__icon-wrap">
             <img src={Icons.epic} alt="" className="wpn-launcher-item__icon" />

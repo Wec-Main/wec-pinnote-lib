@@ -39,6 +39,8 @@ export interface AnnotationContextValue {
   setPinsVisible: (visible: boolean) => void;
   listOpen: boolean;
   setListOpen: (open: boolean) => void;
+  epicFlowOpen: boolean;
+  setEpicFlowOpen: (open: boolean) => void;
   actionError: string | null;
   clearActionError: () => void;
 }

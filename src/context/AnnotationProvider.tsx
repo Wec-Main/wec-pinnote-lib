@@ -87,12 +87,14 @@ export function AnnotationProvider({ config, children }: AnnotationProviderProps
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [draft, setDraft] = useState<DraftAnnotation | null>(null);
   const [listOpen, setListOpen] = useState(false);
+  const [epicFlowOpen, setEpicFlowOpen] = useState(false);
   const [pinsVisible, setPinsVisible] = useState(true);
 
   useEffect(() => {
     setDraft(null);
     setSelectedId(null);
     setListOpen(false);
+    setEpicFlowOpen(false);
   }, [pageKey]);
 
   useEffect(() => {
@@ -206,6 +208,8 @@ export function AnnotationProvider({ config, children }: AnnotationProviderProps
       setPinsVisible,
       listOpen,
       setListOpen,
+      epicFlowOpen,
+      setEpicFlowOpen,
       actionError: collection.actionError,
       clearActionError: collection.clearActionError,
     }),
@@ -228,6 +232,7 @@ export function AnnotationProvider({ config, children }: AnnotationProviderProps
       collection.setPageStatus,
       collection.setStatus,
       draft,
+      epicFlowOpen,
       listOpen,
       modeEnabled,
       pageKey,

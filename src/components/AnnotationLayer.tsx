@@ -3,6 +3,7 @@ import { useAnnotationContext } from "../context/AnnotationContext";
 import { useAnnotationPositions } from "../hooks/useAnnotationPosition";
 import { AnnotationComposer } from "./AnnotationComposer";
 import { AnnotationListPanel } from "./AnnotationListPanel";
+import { EpicFlowPanel } from "./EpicFlow";
 import { AnnotationOverlay } from "./AnnotationOverlay";
 import { AnnotationPin } from "./AnnotationPin";
 import { AnnotationThreadPanel } from "./AnnotationThreadPanel";
@@ -18,6 +19,7 @@ export function AnnotationLayer() {
     draft,
     pinsVisible,
     listOpen,
+    epicFlowOpen,
     actionError,
     clearActionError,
   } = useAnnotationContext();
@@ -95,6 +97,7 @@ export function AnnotationLayer() {
         />
       ) : null}
       {listOpen ? <AnnotationListPanel /> : null}
+      {epicFlowOpen ? <EpicFlowPanel /> : null}
       {actionError ? (
         <div className="wpn-toast" role="alert">
           <span>{actionError}</span>
