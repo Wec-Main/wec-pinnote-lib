@@ -220,3 +220,145 @@ Response: `204` or an empty body.
 ## Errors
 
 Non-2xx responses become `AnnotationApiError` with `status` and response body text. The backend remains responsible for authorization (403/401). The UI only shows edit/delete for comments whose `createdBy.name` matches `currentUser.name` (name-based, not id-based, since the id is not reliably populated by the backend).
+
+# EpicFlow API contract
+
+EpicFlow is a lightweight Epic → User Story workspace, scoped by `projectId` (the same project
+concept used above). An Epic has many User Stories. Deleting an Epic cascades to its User Stories.
+
+There is no separate Notes entity or endpoint. The EpicFlow UI's "Notes" panel is a read-only detail
+view of whichever Epic or User Story is currently selected — it only ever displays that item's own
+`title` and `description`, so no additional API beyond epics/user-stories is needed to power it.
+
+`createdByUser` is a client-supplied display name (same trust model as `comment.authorName` above —
+falls back to `"Anonymous"` when omitted). `createdById` is derived from the same unverified bearer
+token as annotations (`req.userId`), or `"anonymous"` if absent.
+
+## List epics
+
+```http
+GET /epics?projectId={projectId}
+```
+
+Response: `Epic[]`, most recently created first.
+
+```json
+[
+  {
+    "id": "epic-1",
+    "projectId": "project-001",
+    "title": "AI-Powered Shopping Experience",
+    "description": "Personalized product discovery using AI.",
+    "createdByUser": "Sarath",
+    "createdById": "user-1",
+    "createdAt": "2026-09-22T10:00:00.000Z"
+  }
+]
+```
+
+## Create epic
+
+```http
+POST /epics
+```
+
+```json
+{
+  "projectId": "project-001",
+  "title": "AI-Powered Shopping Experience",
+  "description": "Personalized product discovery using AI.",
+  "createdByUser": "Sarath"
+}
+```
+
+Response: `201` with the created `Epic`.
+
+## Get epic
+
+```http
+GET /epics/{epicId}
+```
+
+## Update epic
+
+```http
+PATCH /epics/{epicId}
+```
+
+```json
+{ "title": "...", "description": "..." }
+```
+
+Response: the updated `Epic`. There is no `status` field on Epic — EpicFlow intentionally has no
+epic-status concept.
+
+## Delete epic
+
+```http
+DELETE /epics/{epicId}
+```
+
+Cascades to the epic's user stories. Response: `204`.
+
+## List user stories
+
+```http
+GET /user-stories?epicId={epicId}
+```
+
+Response: `UserStory[]`, most recently created first.
+
+```json
+[
+  {
+    "id": "story-1",
+    "epicId": "epic-1",
+    "title": "As a customer, I want personalized recommendations",
+    "description": "Surface products based on browsing and purchase history.",
+    "createdByUser": "Sarath",
+    "createdById": "user-1",
+    "createdAt": "2026-09-22T10:05:00.000Z"
+  }
+]
+```
+
+## Create user story
+
+```http
+POST /user-stories
+```
+
+```json
+{
+  "epicId": "epic-1",
+  "title": "As a customer, I want personalized recommendations",
+  "description": "Surface products based on browsing and purchase history.",
+  "createdByUser": "Sarath"
+}
+```
+
+Response: `201` with the created `UserStory`. `404` if `epicId` does not exist.
+
+## Get user story
+
+```http
+GET /user-stories/{userStoryId}
+```
+
+## Update user story
+
+```http
+PATCH /user-stories/{userStoryId}
+```
+
+```json
+{ "title": "...", "description": "..." }
+```
+
+## Delete user story
+
+```http
+DELETE /user-stories/{userStoryId}
+```
+
+Response: `204`.

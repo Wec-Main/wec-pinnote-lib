@@ -51,3 +51,27 @@ CREATE TABLE page_statuses (
   updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   PRIMARY KEY (project_id, page_key)
 );
+CREATE TABLE epics (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  project_id TEXT NOT NULL,
+  title TEXT NOT NULL,
+  description TEXT NOT NULL DEFAULT '',
+  created_by_id TEXT NOT NULL,
+  created_by_name TEXT NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX epics_project_idx
+  ON epics (project_id);
+CREATE TABLE epic_user_stories (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  epic_id UUID NOT NULL REFERENCES epics (id) ON DELETE CASCADE,
+  title TEXT NOT NULL,
+  description TEXT NOT NULL DEFAULT '',
+  created_by_id TEXT NOT NULL,
+  created_by_name TEXT NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX epic_user_stories_epic_idx
+  ON epic_user_stories (epic_id);
