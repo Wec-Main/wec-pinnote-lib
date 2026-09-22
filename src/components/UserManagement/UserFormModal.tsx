@@ -10,7 +10,9 @@ import {
 import { useEscapeKey } from "../../hooks/useEscapeKey";
 import { useScrimDismiss } from "../../hooks/useScrimDismiss";
 import {
+  categoryLabel,
   roleLabel,
+  USER_CATEGORY_OPTIONS,
   USER_COUNTRY_OPTIONS,
   USER_ROLE_OPTIONS,
 } from "../../data/userManagementOptions";
@@ -22,6 +24,7 @@ import { MIN_PASSWORD_LENGTH, PasswordField } from "./PasswordField";
 import type {
   ManagedUser,
   ManagedUserDraft,
+  UserManagementCategory,
   UserManagementRole,
 } from "../../types/userManagement.types";
 
@@ -57,6 +60,7 @@ export function UserFormModal({
     return allowed.includes("contributor") ? "contributor" : (allowed[0] ?? "contributor");
   });
   const [countryCode, setCountryCode] = useState(user?.countryCode ?? USER_COUNTRY_OPTIONS[0].value);
+  const [category, setCategory] = useState<UserManagementCategory>(user?.category ?? "internal");
   const [password, setPassword] = useState("");
   const [touched, setTouched] = useState(false);
   const [projectIds, setProjectIds] = useState<string[]>(
@@ -107,6 +111,14 @@ export function UserFormModal({
       })),
     [],
   );
+  const categoryOptions = useMemo<SelectOption[]>(
+    () =>
+      USER_CATEGORY_OPTIONS.map((option) => ({
+        value: option.value,
+        label: option.label,
+      })),
+    [],
+  );
 
   const isSuperAdmin = roleId === "super_admin";
 
@@ -134,6 +146,7 @@ export function UserFormModal({
       countryCode,
       password: password || undefined,
       projectIds: isSuperAdmin ? [] : projectIds,
+      category: isSuperAdmin ? undefined : category,
     });
   };
 
@@ -272,6 +285,28 @@ export function UserFormModal({
                         ? user.projects.map((project) => project.name).join(", ")
                         : "No projects assigned"}
                     </span>
+                    <span className="wpn-password-field__hint">Your role cannot change this.</span>
+                  </>
+                )}
+              </div>
+              <div className="wpn-epicflow-modal__field">
+                <span className="wpn-epicflow-modal__label">Category</span>
+                {mayChangePrivileges ? (
+                  <>
+                    <SearchableSelect
+                      options={categoryOptions}
+                      value={category}
+                      onChange={(next) => setCategory(next as UserManagementCategory)}
+                      ariaLabel="Category"
+                      searchPlaceholder="Search categories"
+                    />
+                    <span className="wpn-password-field__hint">
+                      Classifies this user as internal staff, external partner, or customer.
+                    </span>
+                  </>
+                ) : (
+                  <>
+                    <span className="wpn-settings-readonly">{categoryLabel(category)}</span>
                     <span className="wpn-password-field__hint">Your role cannot change this.</span>
                   </>
                 )}

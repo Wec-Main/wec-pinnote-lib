@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from "react";
-import { Icons } from "../../assets/icons";
+import { Icon } from "../primitives";
 import type { Epic, EpicPriority, UserStory, UserStoryStatus } from "../../types/epicFlow.types";
 
 const TITLE_MAX = 150;
@@ -82,14 +82,7 @@ export function CreateUserStoryModal({ epic, onClose, onCreate }: CreateUserStor
             aria-label="Close create user story"
             onClick={onClose}
           >
-            <span
-              aria-hidden="true"
-              className="wpn-epicflow-panel__close-icon"
-              style={{
-                WebkitMaskImage: `url(${Icons.close})`,
-                maskImage: `url(${Icons.close})`,
-              }}
-            />
+            <Icon name="close" />
           </button>
         </div>
 

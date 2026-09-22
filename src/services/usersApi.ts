@@ -7,6 +7,7 @@ export interface UserListQuery {
   search?: string;
   roleId?: string;
   status?: string;
+  category?: string;
   limit?: number;
   offset?: number;
 }

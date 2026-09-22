@@ -195,10 +195,6 @@ export function AnnotationToolbar() {
     setBarOpen(false);
   };
 
-  if (!barOpen && epicFlowOpen) {
-    return null;
-  }
-
   if (!barOpen) {
     const openToolbar = () => {
       if (didDrag.current) {
@@ -295,8 +291,14 @@ export function AnnotationToolbar() {
             <Tooltip label="EpicFlow" placement="right">
               <button
                 type="button"
-                className="wpn-launcher-item"
+                className={[
+                  "wpn-launcher-item",
+                  epicFlowOpen ? "wpn-launcher-item--active" : "",
+                ]
+                  .filter(Boolean)
+                  .join(" ")}
                 aria-label="Open EpicFlow"
+                aria-pressed={epicFlowOpen}
                 onPointerDown={onDragStart}
                 onPointerMove={onDragMove}
                 onPointerUp={onDragEnd}

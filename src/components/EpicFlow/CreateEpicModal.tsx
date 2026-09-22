@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from "react";
-import { Icons } from "../../assets/icons";
+import { Icon } from "../primitives";
 import type { Epic, EpicPriority, EpicStatus } from "../../types/epicFlow.types";
 
 const TITLE_MAX = 100;
@@ -81,14 +81,7 @@ export function CreateEpicModal({ onClose, onCreate }: CreateEpicModalProps) {
             aria-label="Close create epic"
             onClick={onClose}
           >
-            <span
-              aria-hidden="true"
-              className="wpn-epicflow-panel__close-icon"
-              style={{
-                WebkitMaskImage: `url(${Icons.close})`,
-                maskImage: `url(${Icons.close})`,
-              }}
-            />
+            <Icon name="close" />
           </button>
         </div>
 

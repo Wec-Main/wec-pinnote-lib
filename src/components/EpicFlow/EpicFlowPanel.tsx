@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { useAnnotationContext } from "../../context/AnnotationContext";
-import { Icons } from "../../assets/icons";
+import { Icon } from "../primitives";
 import { createClientId } from "../../utils/format";
 import type { Epic, EpicNote, UserStory } from "../../types/epicFlow.types";
 import {
@@ -151,18 +151,11 @@ export function EpicFlowPanel() {
           </button>
           <button
             type="button"
-            className="wpn-icon-btn"
+            className="wpn-icon-btn wpn-icon-btn--danger"
             aria-label="Close EpicFlow"
             onClick={() => setEpicFlowOpen(false)}
           >
-            <span
-              aria-hidden="true"
-              className="wpn-epicflow-panel__close-icon"
-              style={{
-                WebkitMaskImage: `url(${Icons.close})`,
-                maskImage: `url(${Icons.close})`,
-              }}
-            />
+            <Icon name="close" />
           </button>
         </div>
       </div>

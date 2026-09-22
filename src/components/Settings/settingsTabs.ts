@@ -1,8 +1,8 @@
 import type { IconName } from "../primitives";
 import type { UserManagementRole } from "../../types/userManagement.types";
-import { canManageOrganizations } from "../../utils/permissions";
+import { canManageOrganizations, canManageTags } from "../../utils/permissions";
 
-export type SettingsTab = "users" | "organizations" | "projects" | "audit";
+export type SettingsTab = "users" | "organizations" | "projects" | "tags" | "audit";
 
 interface SettingsTabDefinition {
   id: SettingsTab;
@@ -14,9 +14,14 @@ const ALL_TABS: SettingsTabDefinition[] = [
   { id: "users", label: "Users", icon: "users" },
   { id: "organizations", label: "Organizations", icon: "building" },
   { id: "projects", label: "Projects", icon: "folder" },
+  { id: "tags", label: "Tags", icon: "epic" },
   { id: "audit", label: "Audit history", icon: "history" },
 ];
 
 export function visibleSettingsTabs(role: UserManagementRole): SettingsTabDefinition[] {
-  return canManageOrganizations(role) ? ALL_TABS : ALL_TABS.filter((tab) => tab.id === "users");
+  if (canManageOrganizations(role)) {
+    return ALL_TABS;
+  }
+  const allowed = new Set<SettingsTab>(canManageTags(role) ? ["users", "tags"] : ["users"]);
+  return ALL_TABS.filter((tab) => allowed.has(tab.id));
 }

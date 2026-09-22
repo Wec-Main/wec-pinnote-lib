@@ -1,4 +1,8 @@
-import type { UserManagementRole, UserManagementStatus } from "../types/userManagement.types";
+import type {
+  UserManagementCategory,
+  UserManagementRole,
+  UserManagementStatus,
+} from "../types/userManagement.types";
 
 export const USER_ROLE_OPTIONS: { value: UserManagementRole; label: string }[] = [
   { value: "super_admin", label: "Super admin" },
@@ -11,6 +15,12 @@ export const USER_ROLE_OPTIONS: { value: UserManagementRole; label: string }[] =
 export const USER_STATUS_OPTIONS: { value: UserManagementStatus; label: string }[] = [
   { value: "active", label: "Active" },
   { value: "inactive", label: "Inactive" },
+];
+
+export const USER_CATEGORY_OPTIONS: { value: UserManagementCategory; label: string }[] = [
+  { value: "internal", label: "Internal" },
+  { value: "external", label: "External" },
+  { value: "customer", label: "Customer" },
 ];
 
 const LEGACY_STATUS_LABELS: Record<string, string> = { invited: "Invited" };
@@ -43,4 +53,8 @@ export function userStatusLabel(status: UserManagementStatus): string {
 
 export function countryLabel(code: string): string {
   return USER_COUNTRY_OPTIONS.find((option) => option.value === code)?.label ?? code;
+}
+
+export function categoryLabel(category: UserManagementCategory): string {
+  return USER_CATEGORY_OPTIONS.find((option) => option.value === category)?.label ?? category;
 }

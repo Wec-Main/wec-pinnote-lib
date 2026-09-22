@@ -1,5 +1,5 @@
 import { useRef, useState, type ClipboardEvent, type FormEvent } from "react";
-import { Icons } from "../../assets/icons";
+import { Icon } from "../primitives";
 import type { Epic, EpicNote } from "../../types/epicFlow.types";
 
 const TITLE_MAX = 150;
@@ -139,14 +139,7 @@ export function CreateEpicNoteModal({
             aria-label="Close create epic note"
             onClick={onClose}
           >
-            <span
-              aria-hidden="true"
-              className="wpn-epicflow-panel__close-icon"
-              style={{
-                WebkitMaskImage: `url(${Icons.close})`,
-                maskImage: `url(${Icons.close})`,
-              }}
-            />
+            <Icon name="close" />
           </button>
         </div>
 

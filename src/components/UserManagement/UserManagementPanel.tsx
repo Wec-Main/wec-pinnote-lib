@@ -11,8 +11,10 @@ import {
   type SelectOption,
 } from "../primitives";
 import {
+  categoryLabel,
   countryLabel,
   roleLabel,
+  USER_CATEGORY_OPTIONS,
   USER_ROLE_OPTIONS,
   USER_STATUS_OPTIONS,
   userStatusLabel,
@@ -49,6 +51,7 @@ export function UserManagementPanel() {
   const [searchQuery, setSearchQuery] = useState("");
   const [roleFilter, setRoleFilter] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
+  const [categoryFilter, setCategoryFilter] = useState("");
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
   const [loading, setLoading] = useState(true);
@@ -82,6 +85,7 @@ export function UserManagementPanel() {
         search: searchQuery || undefined,
         roleId: roleFilter || undefined,
         status: statusFilter || undefined,
+        category: categoryFilter || undefined,
         limit: pageSize,
         offset: (page - 1) * pageSize,
       },
@@ -109,6 +113,7 @@ export function UserManagementPanel() {
     searchQuery,
     roleFilter,
     statusFilter,
+    categoryFilter,
     page,
     pageSize,
     reloadToken,
@@ -122,14 +127,19 @@ export function UserManagementPanel() {
     () => USER_STATUS_OPTIONS.map((option) => ({ value: option.value, label: option.label })),
     [],
   );
+  const categoryOptions = useMemo<SelectOption[]>(
+    () => USER_CATEGORY_OPTIONS.map((option) => ({ value: option.value, label: option.label })),
+    [],
+  );
 
-  const filtersActive = Boolean(searchQuery || roleFilter || statusFilter);
+  const filtersActive = Boolean(searchQuery || roleFilter || statusFilter || categoryFilter);
 
   const resetFilters = () => {
     setSearchInput("");
     setSearchQuery("");
     setRoleFilter("");
     setStatusFilter("");
+    setCategoryFilter("");
     setPage(1);
   };
 
@@ -290,6 +300,18 @@ export function UserManagementPanel() {
                   ariaLabel="Filter by status"
                   clearable
                 />
+                <SearchableSelect
+                  options={categoryOptions}
+                  value={categoryFilter}
+                  onChange={(next) => {
+                    setCategoryFilter(next);
+                    setPage(1);
+                  }}
+                  placeholder="All categories"
+                  searchPlaceholder="Search categories"
+                  ariaLabel="Filter by category"
+                  clearable
+                />
               </>
             )}
             <Tooltip label={loading ? "Refreshing..." : "Refresh"} placement="bottom">
@@ -353,6 +375,7 @@ export function UserManagementPanel() {
               <th scope="col">Role</th>
               <th scope="col">Project</th>
               <th scope="col">Country</th>
+              <th scope="col">Category</th>
               <th scope="col">Last active</th>
               <th scope="col">Status</th>
               <th scope="col" className="wpn-users-table__actions-head">
@@ -364,12 +387,12 @@ export function UserManagementPanel() {
             {loading && !loaded ? (
               <TableSkeleton
                 rows={Math.min(pageSize, 5)}
-                columns={["identity", "pill", "text", "text", "text", "pill", "actions"]}
+                columns={["identity", "pill", "text", "text", "text", "text", "pill", "actions"]}
                 label="Loading users..."
               />
             ) : loadError && users.length === 0 ? (
               <tr>
-                <td colSpan={7} className="wpn-users-table__empty">
+                <td colSpan={8} className="wpn-users-table__empty">
                   <span>{loadError}</span>
                   <button type="button" className="wpn-btn wpn-btn--ghost" onClick={reload}>
                     <Icon name="refresh" className="wpn-btn__icon" />
@@ -379,7 +402,7 @@ export function UserManagementPanel() {
               </tr>
             ) : users.length === 0 ? (
               <tr>
-                <td colSpan={7} className="wpn-users-table__empty">
+                <td colSpan={8} className="wpn-users-table__empty">
                   <Icon name="users" className="wpn-users-table__empty-icon" />
                   <span>No users match your search.</span>
                   {filtersActive ? (
@@ -426,6 +449,13 @@ export function UserManagementPanel() {
                   </td>
                   <td>
                     <span className="wpn-users-org__country">{countryLabel(user.countryCode)}</span>
+                  </td>
+                  <td>
+                    {user.category ? (
+                      <span className="wpn-users-org__country">{categoryLabel(user.category)}</span>
+                    ) : (
+                      <span className="wpn-users-projects__empty">N/A</span>
+                    )}
                   </td>
                   <td className="wpn-users-table__muted">
                     {user.lastActiveAt ? formatRelativeTime(user.lastActiveAt) : "Never"}

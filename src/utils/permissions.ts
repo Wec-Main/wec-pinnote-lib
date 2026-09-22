@@ -66,3 +66,7 @@ export function canChangePrivileges(
 export function canManageOrganizations(actorRole: UserManagementRole): boolean {
   return actorRole === "super_admin";
 }
+
+export function canManageTags(actorRole: UserManagementRole): boolean {
+  return actorRole === "super_admin" || actorRole === "admin";
+}

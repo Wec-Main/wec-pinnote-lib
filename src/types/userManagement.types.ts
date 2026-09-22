@@ -7,6 +7,8 @@ export type UserManagementRole =
   | "reviewer"
   | "developer";
 
+export type UserManagementCategory = "internal" | "external" | "customer";
+
 export interface ManagedUser {
   id: string;
   firstName: string;
@@ -14,6 +16,7 @@ export interface ManagedUser {
   email: string;
   phone?: string;
   roleId: UserManagementRole;
+  category?: UserManagementCategory;
   status: UserManagementStatus;
   organizationId?: string;
   countryCode: string;
@@ -36,6 +39,7 @@ export interface ManagedUserDraft {
   email: string;
   phone: string;
   roleId: UserManagementRole;
+  category?: UserManagementCategory;
   status: UserManagementStatus;
   countryCode: string;
   password?: string;
