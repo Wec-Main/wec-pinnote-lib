@@ -1710,7 +1710,63 @@ body.wpn-mode-active {
   flex: 1;
   min-height: 0;
   display: flex;
-  gap: 12px;
+  gap: 0;
+}
+
+.wpn-epicflow-pane {
+  display: flex;
+  flex-shrink: 1;
+  flex-basis: 0%;
+  min-width: 160px;
+  min-height: 0;
+}
+
+.wpn-epicflow-resize-handle {
+  flex: 0 0 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  cursor: col-resize;
+}
+
+.wpn-epicflow-resize-handle::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 50%;
+  width: 1px;
+  background: rgba(255, 255, 255, 0.1);
+  transform: translateX(-50%);
+}
+
+.wpn-epicflow-resize-handle:hover::before,
+.wpn-epicflow-resize-handle:active::before {
+  background: #c4b5fd;
+}
+
+.wpn-epicflow-resize-handle__grip {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  place-items: center;
+  width: 12px;
+  height: 22px;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.08);
+  color: rgba(255, 255, 255, 0.55);
+}
+
+.wpn-epicflow-resize-handle:hover .wpn-epicflow-resize-handle__grip,
+.wpn-epicflow-resize-handle:active .wpn-epicflow-resize-handle__grip {
+  background: rgba(196, 181, 253, 0.25);
+  color: #c4b5fd;
+}
+
+body.wpn-epicflow-resizing {
+  cursor: col-resize !important;
+  user-select: none !important;
 }
 
 .wpn-epicflow-column {
@@ -1783,6 +1839,47 @@ body.wpn-mode-active {
   cursor: not-allowed;
 }
 
+.wpn-epicflow-column__header-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex: 0 0 auto;
+}
+
+.wpn-epicflow-column__icon-btn {
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: 0;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.1);
+  color: #fff;
+  appearance: none;
+  cursor: pointer;
+}
+
+.wpn-epicflow-column__expand-icon {
+  width: 13px;
+  height: 13px;
+  display: block;
+}
+
+.wpn-epicflow-column__icon-btn:hover {
+  background: rgba(255, 255, 255, 0.18);
+}
+
+.wpn-epicflow-column__icon-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.wpn-epicflow-column__icon-btn--danger:hover {
+  background: rgba(239, 68, 68, 0.22);
+  color: #f87171;
+}
+
 .wpn-epicflow-column__body {
   flex: 1;
   min-height: 0;
@@ -1791,6 +1888,27 @@ body.wpn-mode-active {
   display: flex;
   flex-direction: column;
   gap: 8px;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.18) transparent;
+}
+
+.wpn-epicflow-column__body::-webkit-scrollbar {
+  width: 8px;
+}
+
+.wpn-epicflow-column__body::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.wpn-epicflow-column__body::-webkit-scrollbar-thumb {
+  background-color: rgba(255, 255, 255, 0.18);
+  border-radius: 999px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+
+.wpn-epicflow-column__body::-webkit-scrollbar-thumb:hover {
+  background-color: rgba(196, 181, 253, 0.45);
 }
 
 .wpn-epicflow-empty {
@@ -1811,21 +1929,25 @@ body.wpn-mode-active {
   border-radius: 8px;
   background: rgba(255, 255, 255, 0.06);
   color: #fff;
-  text-align: left;
-  cursor: pointer;
-}
-
-button.wpn-epicflow-card:hover {
-  background: rgba(255, 255, 255, 0.1);
-}
-
-.wpn-epicflow-card--static {
-  cursor: default;
 }
 
 .wpn-epicflow-card--selected {
   border-color: #c4b5fd;
   background: rgba(91, 77, 255, 0.22);
+}
+
+.wpn-epicflow-card__surface {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  width: 100%;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+  font: inherit;
 }
 
 .wpn-epicflow-card__title {
@@ -1839,45 +1961,65 @@ button.wpn-epicflow-card:hover {
   line-height: 1.4;
 }
 
+.wpn-epicflow-card__footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 2px;
+}
+
 .wpn-epicflow-card__meta {
   color: rgba(255, 255, 255, 0.72);
   font-size: 11px;
 }
 
-.wpn-epicflow-card__meta-row {
+.wpn-epicflow-card__actions {
   display: flex;
   align-items: center;
-  gap: 8px;
-  margin-top: 2px;
+  gap: 4px;
+  flex: 0 0 auto;
 }
 
-.wpn-epicflow-card__assignee {
-  color: rgba(255, 255, 255, 0.55);
-  font-size: 11px;
+.wpn-epicflow-card__action-btn {
+  width: 22px;
+  height: 22px;
+  display: grid;
+  place-items: center;
+  border: 0;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.08);
+  color: rgba(255, 255, 255, 0.7);
+  cursor: pointer;
 }
 
-.wpn-epicflow-status {
-  display: inline-flex;
-  align-items: center;
-  padding: 2px 8px;
-  border-radius: 999px;
-  font-size: 11px;
+.wpn-epicflow-card__action-btn:hover {
+  background: rgba(255, 255, 255, 0.16);
+  color: #fff;
+}
+
+.wpn-epicflow-card__action-btn--danger:hover {
+  background: rgba(239, 68, 68, 0.22);
+  color: #f87171;
+}
+
+.wpn-epicflow-detail {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px 12px;
+}
+
+.wpn-epicflow-detail__title {
+  font-size: 14px;
   font-weight: 700;
+  color: #fff;
 }
 
-.wpn-epicflow-status--todo {
-  background: rgba(255, 255, 255, 0.12);
-  color: rgba(255, 255, 255, 0.8);
-}
-
-.wpn-epicflow-status--in-progress {
-  background: rgba(217, 119, 6, 0.28);
-  color: #fbbf24;
-}
-
-.wpn-epicflow-status--done {
-  background: rgba(5, 150, 105, 0.28);
-  color: #34d399;
+.wpn-epicflow-detail__desc {
+  font-size: 12px;
+  line-height: 1.4;
+  color: rgba(255, 255, 255, 0.7);
 }
 
 .wpn-epicflow-modal-scrim {
@@ -2194,6 +2336,51 @@ button.wpn-epicflow-card:hover {
 }
 
 .wpn-epicflow-modal__footer .wpn-btn--ghost:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.wpn-epicflow-confirm {
+  display: flex;
+  flex-direction: column;
+  width: min(420px, 100%);
+  background: rgba(18, 18, 20, 0.98);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 12px;
+  box-shadow: var(--wpn-shadow);
+  color: #fff;
+  overflow: hidden;
+}
+
+.wpn-epicflow-confirm__body {
+  padding: 20px 20px 4px;
+}
+
+.wpn-epicflow-confirm__title {
+  margin: 0 0 8px;
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.wpn-epicflow-confirm__message {
+  margin: 0;
+  color: rgba(255, 255, 255, 0.65);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.wpn-epicflow-confirm__footer {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 18px 20px;
+}
+
+.wpn-epicflow-confirm__footer .wpn-btn--ghost {
+  color: #fff;
+}
+
+.wpn-epicflow-confirm__footer .wpn-btn--ghost:hover {
   background: rgba(255, 255, 255, 0.1);
 }
 

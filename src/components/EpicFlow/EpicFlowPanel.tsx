@@ -1,34 +1,145 @@
-import { useMemo, useState } from "react";
-import { useAnnotationContext } from "../../context/AnnotationContext";
-import { Icon } from "../primitives";
-import { createClientId } from "../../utils/format";
-import type { Epic, EpicNote, UserStory } from "../../types/epicFlow.types";
 import {
-  EPIC_FLOW_SEED_EPICS,
-  EPIC_FLOW_SEED_NOTES,
-  EPIC_FLOW_SEED_STORIES,
-} from "../../data/epicFlowSeedData";
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type MouseEvent as ReactMouseEvent,
+} from "react";
+import { useAnnotationContext } from "../../context/AnnotationContext";
+import { Icons } from "../../assets/icons";
+import { useEpicFlowApi } from "../../hooks/useEpicFlowApi";
+import { EpicFlowApiError } from "../../services/epicFlowApi";
+import type { Epic, UserStory } from "../../types/epicFlow.types";
 import { EpicColumn } from "./EpicColumn";
 import { UserStoryColumn } from "./UserStoryColumn";
-import { EpicNotesColumn } from "./EpicNotesColumn";
-import { CreateEpicModal } from "./CreateEpicModal";
-import { CreateUserStoryModal } from "./CreateUserStoryModal";
-import { CreateEpicNoteModal } from "./CreateEpicNoteModal";
+import { NotesPanel, type NotesPanelTarget } from "./NotesPanel";
+import { EpicFormModal } from "./EpicFormModal";
+import { UserStoryFormModal } from "./UserStoryFormModal";
+import { ConfirmDialog } from "./ConfirmDialog";
+import { ResizeHandle } from "./ResizeHandle";
+
+type EpicModalState = { mode: "create" } | { mode: "edit"; epic: Epic } | null;
+type StoryModalState = { mode: "create" } | { mode: "edit"; story: UserStory } | null;
+type PendingDelete = { kind: "epic"; epic: Epic } | { kind: "userStory"; story: UserStory } | null;
+
+const MIN_PANE_WIDTH = 160;
+const RESIZING_BODY_CLASS = "wpn-epicflow-resizing";
+
+function describeApiError(err: unknown): string {
+  return err instanceof EpicFlowApiError
+    ? `EpicFlow request failed (${err.status}). Please try again.`
+    : "Could not reach the EpicFlow API. Please try again.";
+}
 
 export function EpicFlowPanel() {
-  const { setEpicFlowOpen, activeAccount } = useAnnotationContext();
-  const [epics, setEpics] = useState<Epic[]>(EPIC_FLOW_SEED_EPICS);
-  const [allStories, setAllStories] = useState<UserStory[]>(EPIC_FLOW_SEED_STORIES);
-  const [allNotes, setAllNotes] = useState<EpicNote[]>(EPIC_FLOW_SEED_NOTES);
-  const [selectedEpicId, setSelectedEpicId] = useState<string | null>(
-    EPIC_FLOW_SEED_EPICS[0]?.id ?? null,
-  );
+  const { setEpicFlowOpen, activeAccount, config } = useAnnotationContext();
+  const api = useEpicFlowApi(config);
+  const [loading, setLoading] = useState(true);
+  const [apiError, setApiError] = useState<string | null>(null);
+  const [epics, setEpics] = useState<Epic[]>([]);
+  const [allUserStories, setAllUserStories] = useState<UserStory[]>([]);
+  const [selectedEpicId, setSelectedEpicId] = useState<string | null>(null);
+  const [selectedUserStoryId, setSelectedUserStoryId] = useState<string | null>(null);
   const [fullscreen, setFullscreen] = useState(false);
-  const [showCreateEpic, setShowCreateEpic] = useState(false);
-  const [showCreateStory, setShowCreateStory] = useState(false);
-  const [showCreateNote, setShowCreateNote] = useState(false);
   const [query, setQuery] = useState("");
+  const [epicModal, setEpicModal] = useState<EpicModalState>(null);
+  const [storyModal, setStoryModal] = useState<StoryModalState>(null);
+  const [pendingDelete, setPendingDelete] = useState<PendingDelete>(null);
+  const [notesExpanded, setNotesExpanded] = useState(false);
+  const [colWeights, setColWeights] = useState<[number, number, number]>([1, 1, 1]);
+  const paneRefA = useRef<HTMLDivElement>(null);
+  const paneRefB = useRef<HTMLDivElement>(null);
+  const paneRefC = useRef<HTMLDivElement>(null);
+  const paneRefs: [typeof paneRefA, typeof paneRefB, typeof paneRefC] = [paneRefA, paneRefB, paneRefC];
+  const dragCleanupRef = useRef<(() => void) | null>(null);
+
   const normalizedQuery = query.trim().toLowerCase();
+
+  // Dragging the handle between pane `indexA` and `indexB` (always adjacent)
+  // only trades width between those two panes (their combined width, and
+  // thus the third pane's width, stays fixed) — standard split-pane resize.
+  const onHandleMouseDown =
+    (indexA: 0 | 1, indexB: 1 | 2) => (event: ReactMouseEvent<HTMLDivElement>) => {
+      event.preventDefault();
+      const paneA = paneRefs[indexA].current;
+      const paneB = paneRefs[indexB].current;
+      if (!paneA || !paneB) {
+        return;
+      }
+      const startX = event.clientX;
+      const widthA = paneA.getBoundingClientRect().width;
+      const widthB = paneB.getBoundingClientRect().width;
+      const totalWidth = widthA + widthB;
+      const totalWeight = colWeights[indexA] + colWeights[indexB];
+      const pxPerWeight = totalWidth / totalWeight;
+
+      const handleMove = (moveEvent: MouseEvent) => {
+        let newWidthA = widthA + (moveEvent.clientX - startX);
+        newWidthA = Math.max(MIN_PANE_WIDTH, Math.min(totalWidth - MIN_PANE_WIDTH, newWidthA));
+        const newWidthB = totalWidth - newWidthA;
+        setColWeights((prev) => {
+          const next = [...prev] as [number, number, number];
+          next[indexA] = newWidthA / pxPerWeight;
+          next[indexB] = newWidthB / pxPerWeight;
+          return next;
+        });
+      };
+
+      const handleUp = () => {
+        document.body.classList.remove(RESIZING_BODY_CLASS);
+        window.removeEventListener("mousemove", handleMove);
+        window.removeEventListener("mouseup", handleUp);
+        dragCleanupRef.current = null;
+      };
+
+      document.body.classList.add(RESIZING_BODY_CLASS);
+      window.addEventListener("mousemove", handleMove);
+      window.addEventListener("mouseup", handleUp);
+      dragCleanupRef.current = handleUp;
+    };
+
+  useEffect(() => {
+    return () => {
+      dragCleanupRef.current?.();
+    };
+  }, []);
+
+  const reloadAll = useCallback(async () => {
+    const nextEpics = await api.getEpics(config.projectId);
+    const storiesByEpic = await Promise.all(
+      nextEpics.map((epic) => api.getUserStoriesByEpic(epic.id)),
+    );
+    const nextStories = storiesByEpic.flat();
+    setEpics(nextEpics);
+    setAllUserStories(nextStories);
+    return { nextEpics, nextStories };
+  }, [api, config.projectId]);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const { nextEpics } = await reloadAll();
+        if (!cancelled) {
+          setSelectedEpicId((current) => current ?? nextEpics[0]?.id ?? null);
+        }
+      } catch (err) {
+        if (!cancelled) {
+          setApiError(describeApiError(err));
+        }
+      } finally {
+        if (!cancelled) {
+          setLoading(false);
+        }
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [reloadAll]);
+
+  const displayName = () => activeAccount?.name.trim() || undefined;
 
   const filteredEpics = useMemo(() => {
     if (!normalizedQuery) {
@@ -46,69 +157,150 @@ export function EpicFlowPanel() {
     [epics, selectedEpicId],
   );
 
-  const handleCreateEpic = (data: Omit<Epic, "id">) => {
-    const epic: Epic = { ...data, id: createClientId("epic") };
-    setEpics((current) => [epic, ...current]);
-    setSelectedEpicId(epic.id);
-    setShowCreateEpic(false);
-  };
-
-  const handleCreateStory = (data: Omit<UserStory, "id" | "epicId">) => {
-    if (!selectedEpicId) {
-      return;
-    }
-    const story: UserStory = { ...data, id: createClientId("story"), epicId: selectedEpicId };
-    setAllStories((current) => [story, ...current]);
-    setShowCreateStory(false);
-  };
-
-  const handleCreateNote = (data: Omit<EpicNote, "id" | "epicId" | "createdAt" | "updatedAt">) => {
-    if (!selectedEpicId) {
-      return;
-    }
-    const now = new Date().toISOString();
-    const note: EpicNote = {
-      ...data,
-      id: createClientId("note"),
-      epicId: selectedEpicId,
-      createdAt: now,
-      updatedAt: now,
-    };
-    setAllNotes((current) => [note, ...current]);
-    setShowCreateNote(false);
-  };
-
   const storyCounts = useMemo(() => {
     const counts: Record<string, number> = {};
-    for (const story of allStories) {
+    for (const story of allUserStories) {
       counts[story.epicId] = (counts[story.epicId] ?? 0) + 1;
     }
     return counts;
-  }, [allStories]);
+  }, [allUserStories]);
 
-  const stories = useMemo(() => {
+  const storiesForSelectedEpic = useMemo(() => {
     if (!selectedEpicId) {
       return [];
     }
-    return allStories.filter((story) => story.epicId === selectedEpicId).filter(
+    return allUserStories.filter((story) => story.epicId === selectedEpicId);
+  }, [allUserStories, selectedEpicId]);
+
+  const filteredStories = useMemo(() => {
+    if (!normalizedQuery) {
+      return storiesForSelectedEpic;
+    }
+    return storiesForSelectedEpic.filter(
       (story) =>
-        !normalizedQuery ||
         story.title.toLowerCase().includes(normalizedQuery) ||
-        (story.description?.toLowerCase().includes(normalizedQuery) ?? false),
+        story.description.toLowerCase().includes(normalizedQuery),
     );
-  }, [allStories, selectedEpicId, normalizedQuery]);
+  }, [storiesForSelectedEpic, normalizedQuery]);
 
-  const notes = useMemo(() => {
-    if (!selectedEpicId) {
-      return [];
+  const selectedStory = useMemo(
+    () => allUserStories.find((story) => story.id === selectedUserStoryId) ?? null,
+    [allUserStories, selectedUserStoryId],
+  );
+
+  const notesTarget: NotesPanelTarget | null = useMemo(() => {
+    if (selectedStory) {
+      return { type: "userStory", story: selectedStory };
     }
-    return allNotes.filter((note) => note.epicId === selectedEpicId).filter(
-      (note) =>
-        !normalizedQuery ||
-        note.title.toLowerCase().includes(normalizedQuery) ||
-        note.content.toLowerCase().includes(normalizedQuery),
-    );
-  }, [allNotes, selectedEpicId, normalizedQuery]);
+    if (selectedEpic) {
+      return { type: "epic", epic: selectedEpic };
+    }
+    return null;
+  }, [selectedEpic, selectedStory]);
+
+  const selectEpic = (epicId: string) => {
+    setSelectedEpicId(epicId);
+    setSelectedUserStoryId(null);
+  };
+
+  const selectStory = (storyId: string) => {
+    setSelectedUserStoryId(storyId);
+  };
+
+  // ---- Epic actions ----
+  const handleSubmitEpic = async (data: { title: string; description: string }) => {
+    try {
+      if (epicModal?.mode === "edit") {
+        await api.updateEpic(epicModal.epic.id, data);
+      } else {
+        const created = await api.createEpic({
+          ...data,
+          projectId: config.projectId,
+          createdByUser: displayName(),
+        });
+        setSelectedEpicId(created.id);
+        setSelectedUserStoryId(null);
+      }
+      await reloadAll();
+      setEpicModal(null);
+    } catch (err) {
+      setApiError(describeApiError(err));
+    }
+  };
+
+  const confirmDeleteEpic = async (epic: Epic) => {
+    try {
+      await api.deleteEpic(epic.id);
+      if (selectedEpicId === epic.id) {
+        setSelectedEpicId(null);
+        setSelectedUserStoryId(null);
+      }
+      await reloadAll();
+      setPendingDelete(null);
+    } catch (err) {
+      setApiError(describeApiError(err));
+    }
+  };
+
+  // ---- User story actions ----
+  const handleSubmitStory = async (data: { title: string; description: string }) => {
+    try {
+      if (storyModal?.mode === "edit") {
+        await api.updateUserStory(storyModal.story.id, data);
+      } else if (selectedEpicId) {
+        const created = await api.createUserStory(selectedEpicId, {
+          ...data,
+          createdByUser: displayName(),
+        });
+        setSelectedUserStoryId(created.id);
+      }
+      await reloadAll();
+      setStoryModal(null);
+    } catch (err) {
+      setApiError(describeApiError(err));
+    }
+  };
+
+  const confirmDeleteStory = async (story: UserStory) => {
+    try {
+      await api.deleteUserStory(story.id);
+      if (selectedUserStoryId === story.id) {
+        setSelectedUserStoryId(null);
+      }
+      await reloadAll();
+      setPendingDelete(null);
+    } catch (err) {
+      setApiError(describeApiError(err));
+    }
+  };
+
+  const handleConfirmDelete = () => {
+    if (!pendingDelete) {
+      return;
+    }
+    if (pendingDelete.kind === "epic") {
+      void confirmDeleteEpic(pendingDelete.epic);
+    } else {
+      void confirmDeleteStory(pendingDelete.story);
+    }
+  };
+
+  // ---- Notes panel edit/delete (acts on whichever Epic or User Story is selected) ----
+  const handleEditFromNotes = () => {
+    if (notesTarget?.type === "epic") {
+      setEpicModal({ mode: "edit", epic: notesTarget.epic });
+    } else if (notesTarget?.type === "userStory") {
+      setStoryModal({ mode: "edit", story: notesTarget.story });
+    }
+  };
+
+  const handleDeleteFromNotes = () => {
+    if (notesTarget?.type === "epic") {
+      setPendingDelete({ kind: "epic", epic: notesTarget.epic });
+    } else if (notesTarget?.type === "userStory") {
+      setPendingDelete({ kind: "userStory", story: notesTarget.story });
+    }
+  };
 
   return (
     <div
@@ -151,11 +343,18 @@ export function EpicFlowPanel() {
           </button>
           <button
             type="button"
-            className="wpn-icon-btn wpn-icon-btn--danger"
+            className="wpn-icon-btn"
             aria-label="Close EpicFlow"
             onClick={() => setEpicFlowOpen(false)}
           >
-            <Icon name="close" />
+            <span
+              aria-hidden="true"
+              className="wpn-epicflow-panel__close-icon"
+              style={{
+                WebkitMaskImage: `url(${Icons.close})`,
+                maskImage: `url(${Icons.close})`,
+              }}
+            />
           </button>
         </div>
       </div>
@@ -164,45 +363,114 @@ export function EpicFlowPanel() {
         type="search"
         value={query}
         onChange={(event) => setQuery(event.target.value)}
-        placeholder="Search epics, stories or notes..."
+        placeholder="Search epics or user stories..."
         aria-label="Search EpicFlow"
       />
-      <div className="wpn-epicflow-panel__columns">
-        <EpicColumn
-          epics={filteredEpics}
-          selectedEpicId={selectedEpicId}
-          storyCounts={storyCounts}
-          onSelect={setSelectedEpicId}
-          onCreate={() => setShowCreateEpic(true)}
+      {loading ? (
+        <div className="wpn-epicflow-panel__columns">
+          <p className="wpn-epicflow-empty">Loading EpicFlow…</p>
+        </div>
+      ) : notesExpanded ? (
+        <div className="wpn-epicflow-panel__columns">
+          <div className="wpn-epicflow-pane" style={{ flexGrow: 1 }}>
+            <NotesPanel
+              target={notesTarget}
+              expanded
+              onToggleExpand={() => setNotesExpanded(false)}
+              onEdit={handleEditFromNotes}
+              onDelete={handleDeleteFromNotes}
+            />
+          </div>
+        </div>
+      ) : (
+        <div className="wpn-epicflow-panel__columns">
+          <div ref={paneRefs[0]} className="wpn-epicflow-pane" style={{ flexGrow: colWeights[0] }}>
+            <EpicColumn
+              epics={filteredEpics}
+              hasAnyEpics={epics.length > 0}
+              selectedEpicId={selectedEpicId}
+              storyCounts={storyCounts}
+              onSelect={selectEpic}
+              onCreate={() => setEpicModal({ mode: "create" })}
+              onEdit={(epic) => setEpicModal({ mode: "edit", epic })}
+              onDelete={(epic) => setPendingDelete({ kind: "epic", epic })}
+            />
+          </div>
+          <ResizeHandle onMouseDown={onHandleMouseDown(0, 1)} />
+          <div ref={paneRefs[1]} className="wpn-epicflow-pane" style={{ flexGrow: colWeights[1] }}>
+            <UserStoryColumn
+              stories={filteredStories}
+              hasStoriesForEpic={storiesForSelectedEpic.length > 0}
+              epicSelected={Boolean(selectedEpicId)}
+              selectedUserStoryId={selectedUserStoryId}
+              onSelect={selectStory}
+              onCreate={() => setStoryModal({ mode: "create" })}
+              onEdit={(story) => setStoryModal({ mode: "edit", story })}
+              onDelete={(story) => setPendingDelete({ kind: "userStory", story })}
+            />
+          </div>
+          <ResizeHandle onMouseDown={onHandleMouseDown(1, 2)} />
+          <div ref={paneRefs[2]} className="wpn-epicflow-pane" style={{ flexGrow: colWeights[2] }}>
+            <NotesPanel
+              target={notesTarget}
+              expanded={false}
+              onToggleExpand={() => setNotesExpanded(true)}
+              onEdit={handleEditFromNotes}
+              onDelete={handleDeleteFromNotes}
+            />
+          </div>
+        </div>
+      )}
+
+      {epicModal ? (
+        <EpicFormModal
+          mode={epicModal.mode}
+          initialEpic={epicModal.mode === "edit" ? epicModal.epic : undefined}
+          onClose={() => setEpicModal(null)}
+          onSubmit={handleSubmitEpic}
         />
-        <UserStoryColumn
-          stories={stories}
-          epicSelected={Boolean(selectedEpicId)}
-          onCreate={() => setShowCreateStory(true)}
-        />
-        <EpicNotesColumn
-          notes={notes}
-          epicSelected={Boolean(selectedEpicId)}
-          onCreate={() => setShowCreateNote(true)}
-        />
-      </div>
-      {showCreateEpic ? (
-        <CreateEpicModal onClose={() => setShowCreateEpic(false)} onCreate={handleCreateEpic} />
       ) : null}
-      {showCreateStory && selectedEpic ? (
-        <CreateUserStoryModal
+
+      {storyModal && selectedEpic ? (
+        <UserStoryFormModal
+          mode={storyModal.mode}
           epic={selectedEpic}
-          onClose={() => setShowCreateStory(false)}
-          onCreate={handleCreateStory}
+          initialStory={storyModal.mode === "edit" ? storyModal.story : undefined}
+          onClose={() => setStoryModal(null)}
+          onSubmit={handleSubmitStory}
         />
       ) : null}
-      {showCreateNote && selectedEpic ? (
-        <CreateEpicNoteModal
-          epic={selectedEpic}
-          createdBy={activeAccount?.name ?? "You"}
-          onClose={() => setShowCreateNote(false)}
-          onCreate={handleCreateNote}
+
+      {pendingDelete ? (
+        <ConfirmDialog
+          title={pendingDelete.kind === "epic" ? "Delete Epic" : "Delete User Story"}
+          message={
+            pendingDelete.kind === "epic"
+              ? `Delete "${pendingDelete.epic.title}"? This also permanently deletes its ${
+                  storyCounts[pendingDelete.epic.id] ?? 0
+                } user ${
+                  (storyCounts[pendingDelete.epic.id] ?? 0) === 1 ? "story" : "stories"
+                }. This cannot be undone.`
+              : `Delete "${pendingDelete.story.title}"? This cannot be undone.`
+          }
+          confirmLabel="Delete"
+          onCancel={() => setPendingDelete(null)}
+          onConfirm={handleConfirmDelete}
         />
+      ) : null}
+
+      {apiError ? (
+        <div className="wpn-toast" role="alert">
+          <span>{apiError}</span>
+          <button
+            type="button"
+            className="wpn-icon-btn"
+            onClick={() => setApiError(null)}
+            aria-label="Dismiss"
+          >
+            ×
+          </button>
+        </div>
       ) : null}
     </div>
   );
