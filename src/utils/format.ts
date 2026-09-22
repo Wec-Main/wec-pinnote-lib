@@ -40,8 +40,8 @@ export function formatTimestamp(iso: string): string {
   });
 }
 
-export function getInitials(name: string): string {
-  const parts = name.trim().split(/\s+/).filter(Boolean);
+export function getInitials(name: string | undefined | null): string {
+  const parts = (name ?? "").trim().split(/\s+/).filter(Boolean);
   if (parts.length === 0) {
     return "?";
   }

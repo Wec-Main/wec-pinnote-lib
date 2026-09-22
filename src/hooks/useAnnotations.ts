@@ -1,5 +1,8 @@
 import { useCallback, useEffect, useState } from "react";
 import { useAnnotationContext } from "../context/AnnotationContext";
+import { useAnnotationStream } from "./useAnnotationStream";
+import { applyStreamEvent } from "../utils/applyStreamEvent";
+import type { StreamEvent } from "../types/stream.types";
 import type {
   Annotation,
   AnnotationApiClient,
@@ -31,6 +34,7 @@ export function useAnnotationCollection(
   projectId: string,
   pageKey: string,
   currentUser: AnnotationUser,
+  streamBaseUrl?: string,
 ) {
   const [annotations, setAnnotations] = useState<Annotation[]>([]);
   const [pageStatus, setPageStatusState] = useState<PageStatus>("review");
@@ -88,15 +92,39 @@ export function useAnnotationCollection(
     setReloadToken((value) => value + 1);
   }, []);
 
+  const onStreamEvent = useCallback((event: StreamEvent) => {
+    setAnnotations((current) => {
+      const result = applyStreamEvent(current, event);
+      if (result.pageStatus) {
+        setPageStatusState(result.pageStatus);
+      }
+      return result.annotations;
+    });
+  }, []);
+
+  const connectionState = useAnnotationStream({
+    apiBaseUrl: streamBaseUrl ?? "",
+    projectId,
+    pageKey,
+    enabled: Boolean(streamBaseUrl),
+    onEvent: onStreamEvent,
+    onResync: retry,
+  });
+
   const createAnnotation = useCallback(
     async (request: CreateAnnotationRequest) => {
       const tempId = createClientId("temp");
       const now = new Date().toISOString();
+      let assignedNumber = 1;
+      setAnnotations((current) => {
+        assignedNumber = nextNumber(current);
+        return current;
+      });
       const optimistic: Annotation = {
         id: tempId,
         projectId: request.projectId,
         pageKey: request.pageKey,
-        number: nextNumber(annotations),
+        number: assignedNumber,
         anchor: request.anchor,
         status: request.status ?? "open",
         comments: [
@@ -135,7 +163,7 @@ export function useAnnotationCollection(
         throw err;
       }
     },
-    [annotations, api, currentUser],
+    [api, currentUser],
   );
 
   const addComment = useCallback(
@@ -195,7 +223,13 @@ export function useAnnotationCollection(
 
   const editComment = useCallback(
     async (annotationId: string, commentId: string, message: string) => {
-      const snapshot = annotations;
+      let previous: AnnotationComment | undefined;
+      setAnnotations((current) => {
+        previous = current
+          .find((item) => item.id === annotationId)
+          ?.comments.find((comment) => comment.id === commentId);
+        return current;
+      });
       const now = new Date().toISOString();
       setAnnotations((current) =>
         current.map((item) =>
@@ -226,17 +260,37 @@ export function useAnnotationCollection(
           ),
         );
       } catch (err) {
-        setAnnotations(snapshot);
+        if (previous) {
+          const restored = previous;
+          setAnnotations((current) =>
+            current.map((item) =>
+              item.id === annotationId
+                ? {
+                    ...item,
+                    comments: item.comments.map((comment) =>
+                      comment.id === commentId ? restored : comment,
+                    ),
+                  }
+                : item,
+            ),
+          );
+        }
         setActionError(errorMessage(err));
         throw err;
       }
     },
-    [annotations, api],
+    [api],
   );
 
   const removeComment = useCallback(
     async (annotationId: string, commentId: string) => {
-      const snapshot = annotations;
+      let removed: AnnotationComment | undefined;
+      setAnnotations((current) => {
+        removed = current
+          .find((item) => item.id === annotationId)
+          ?.comments.find((comment) => comment.id === commentId);
+        return current;
+      });
       setAnnotations((current) =>
         current.map((item) =>
           item.id === annotationId
@@ -249,12 +303,21 @@ export function useAnnotationCollection(
       try {
         await api.deleteComment(annotationId, commentId);
       } catch (err) {
-        setAnnotations(snapshot);
+        if (removed) {
+          const restored = removed;
+          setAnnotations((current) =>
+            current.map((item) =>
+              item.id === annotationId
+                ? { ...item, comments: [...item.comments, restored] }
+                : item,
+            ),
+          );
+        }
         setActionError(errorMessage(err));
         throw err;
       }
     },
-    [annotations, api],
+    [api],
   );
 
   const setPageStatus = useCallback(
@@ -277,7 +340,11 @@ export function useAnnotationCollection(
 
   const setStatus = useCallback(
     async (annotationId: string, status: AnnotationStatus) => {
-      const snapshot = annotations;
+      let previousStatus: AnnotationStatus | undefined;
+      setAnnotations((current) => {
+        previousStatus = current.find((item) => item.id === annotationId)?.status;
+        return current;
+      });
       setAnnotations((current) =>
         current.map((item) => (item.id === annotationId ? { ...item, status } : item)),
       );
@@ -289,29 +356,45 @@ export function useAnnotationCollection(
           current.map((item) => (item.id === annotationId ? updated : item)),
         );
       } catch (err) {
-        setAnnotations(snapshot);
+        if (previousStatus) {
+          const restored = previousStatus;
+          setAnnotations((current) =>
+            current.map((item) =>
+              item.id === annotationId ? { ...item, status: restored } : item,
+            ),
+          );
+        }
         setActionError(errorMessage(err));
         throw err;
       }
     },
-    [annotations, api],
+    [api],
   );
 
   const removeAnnotation = useCallback(
     async (annotationId: string) => {
-      const snapshot = annotations;
+      let removed: Annotation | undefined;
+      setAnnotations((current) => {
+        removed = current.find((item) => item.id === annotationId);
+        return current;
+      });
       setAnnotations((current) => current.filter((item) => item.id !== annotationId));
       setActionError(null);
 
       try {
         await api.deleteAnnotation(annotationId);
       } catch (err) {
-        setAnnotations(snapshot);
+        if (removed) {
+          const restored = removed;
+          setAnnotations((current) =>
+            [...current, restored].sort((a, b) => a.number - b.number),
+          );
+        }
         setActionError(errorMessage(err));
         throw err;
       }
     },
-    [annotations, api],
+    [api],
   );
 
   return {
@@ -319,6 +402,7 @@ export function useAnnotationCollection(
     pageStatus,
     loading,
     error,
+    connectionState,
     actionError,
     clearActionError: () => setActionError(null),
     retry,
@@ -349,5 +433,6 @@ export function useAnnotations() {
     setStatus: context.setStatus,
     removeAnnotation: context.removeAnnotation,
     pageKey: context.pageKey,
+    connectionState: context.connectionState,
   };
 }

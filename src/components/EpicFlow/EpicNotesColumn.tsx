@@ -1,6 +1,7 @@
 import type { EpicNote } from "../../types/epicFlow.types";
 import { formatTimestamp } from "../../utils/format";
 import { parseRichText } from "../../utils/richText";
+import { Tooltip } from "../primitives";
 
 interface EpicNotesColumnProps {
   notes: EpicNote[];
@@ -16,23 +17,25 @@ export function EpicNotesColumn({ notes, epicSelected, onCreate }: EpicNotesColu
           Epic Notes
           <span className="wpn-epicflow-column__count">{notes.length}</span>
         </span>
-        <button
-          type="button"
-          className="wpn-epicflow-column__add"
-          aria-label="Create note"
-          disabled={!epicSelected}
-          onClick={onCreate}
-        >
-          <svg viewBox="0 0 24 24" className="wpn-epicflow-column__add-icon" aria-hidden="true">
-            <path
-              fill="none"
-              stroke="currentColor"
-              strokeLinecap="round"
-              strokeWidth="2"
-              d="M12 5v14M5 12h14"
-            />
-          </svg>
-        </button>
+        <Tooltip label="Create note" placement="left">
+          <button
+            type="button"
+            className="wpn-epicflow-column__add"
+            aria-label="Create note"
+            disabled={!epicSelected}
+            onClick={onCreate}
+          >
+            <svg viewBox="0 0 24 24" className="wpn-epicflow-column__add-icon" aria-hidden="true">
+              <path
+                fill="none"
+                stroke="currentColor"
+                strokeLinecap="round"
+                strokeWidth="2"
+                d="M12 5v14M5 12h14"
+              />
+            </svg>
+          </button>
+        </Tooltip>
       </div>
       <div className="wpn-epicflow-column__body">
         {!epicSelected ? (

@@ -1,4 +1,6 @@
 import { createContext, useContext } from "react";
+import type { AuthSession, LoginOption } from "../types/auth.types";
+import type { StreamConnectionState } from "../types/stream.types";
 import type {
   Annotation,
   AnnotationAnchor,
@@ -17,11 +19,13 @@ export interface AnnotationContextValue {
   pageStatus: PageStatus;
   loading: boolean;
   error: string | null;
+  connectionState: StreamConnectionState;
   retry: () => void;
   modeEnabled: boolean;
   setModeEnabled: (enabled: boolean) => void;
   selectedId: string | null;
   selectAnnotation: (id: string | null) => void;
+  revealAnnotation: (id: string) => void;
   draft: DraftAnnotation | null;
   startDraft: (anchor: AnnotationAnchor, label: string) => void;
   updateDraftLabel: (label: string) => void;
@@ -33,14 +37,25 @@ export interface AnnotationContextValue {
   setPageStatus: (status: PageStatus) => Promise<void>;
   setStatus: (annotationId: string, status: AnnotationStatus) => Promise<void>;
   removeAnnotation: (annotationId: string) => Promise<void>;
-  authorName: string;
-  setAuthorName: (name: string) => void;
+  accounts: AuthSession[];
+  activeAccount: AuthSession | null;
+  loginOptions: LoginOption[];
+  loginOptionsLoading: boolean;
+  loginOptionsError: string | null;
+  reloadLoginOptions: () => void;
+  login: (userId: string, password: string) => Promise<void>;
+  logout: (userId: string) => void;
+  switchAccount: (userId: string) => void;
   pinsVisible: boolean;
   setPinsVisible: (visible: boolean) => void;
   listOpen: boolean;
   setListOpen: (open: boolean) => void;
   epicFlowOpen: boolean;
   setEpicFlowOpen: (open: boolean) => void;
+  userManagementOpen: boolean;
+  setUserManagementOpen: (open: boolean) => void;
+  auditHistoryOpen: boolean;
+  setAuditHistoryOpen: (open: boolean) => void;
   actionError: string | null;
   clearActionError: () => void;
 }

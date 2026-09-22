@@ -4,6 +4,7 @@ import { useAnnotationPositions } from "../hooks/useAnnotationPosition";
 import { AnnotationComposer } from "./AnnotationComposer";
 import { AnnotationListPanel } from "./AnnotationListPanel";
 import { EpicFlowPanel } from "./EpicFlow";
+import { SettingsPanel } from "./Settings";
 import { AnnotationOverlay } from "./AnnotationOverlay";
 import { AnnotationPin } from "./AnnotationPin";
 import { AnnotationThreadPanel } from "./AnnotationThreadPanel";
@@ -20,6 +21,7 @@ export function AnnotationLayer() {
     pinsVisible,
     listOpen,
     epicFlowOpen,
+    userManagementOpen,
     actionError,
     clearActionError,
   } = useAnnotationContext();
@@ -33,16 +35,20 @@ export function AnnotationLayer() {
     );
   }, [annotations, config.showPinsWhenIdle, config.showResolved, modeEnabled, pinsVisible]);
 
+  const selected = annotations.find((item) => item.id === selectedId);
+
   const positionItems = useMemo(() => {
     const items = visible.map((item) => ({ id: item.id, anchor: item.anchor }));
+    if (selected && !items.some((item) => item.id === selected.id)) {
+      items.push({ id: selected.id, anchor: selected.anchor });
+    }
     if (draft) {
       items.push({ id: draft.id, anchor: draft.anchor });
     }
     return items;
-  }, [draft, visible]);
+  }, [draft, selected, visible]);
 
   const positions = useAnnotationPositions(positionItems);
-  const selected = visible.find((item) => item.id === selectedId);
   const selectedPosition = selected ? positions.get(selected.id) : undefined;
   const draftPosition = draft
     ? (positions.get(draft.id) ?? {
@@ -98,10 +104,16 @@ export function AnnotationLayer() {
       ) : null}
       {listOpen ? <AnnotationListPanel /> : null}
       {epicFlowOpen ? <EpicFlowPanel /> : null}
+      {userManagementOpen ? <SettingsPanel /> : null}
       {actionError ? (
         <div className="wpn-toast" role="alert">
           <span>{actionError}</span>
-          <button type="button" className="wpn-icon-btn" onClick={clearActionError} aria-label="Dismiss">
+          <button
+            type="button"
+            className="wpn-icon-btn"
+            onClick={clearActionError}
+            aria-label="Dismiss"
+          >
             ×
           </button>
         </div>

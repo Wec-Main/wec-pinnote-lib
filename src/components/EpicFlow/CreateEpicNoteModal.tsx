@@ -1,6 +1,8 @@
 import { useRef, useState, type ClipboardEvent, type FormEvent } from "react";
-import { Icons } from "../../assets/icons";
 import type { Epic, EpicNote } from "../../types/epicFlow.types";
+import { Icon, Tooltip } from "../primitives";
+import { useEscapeKey } from "../../hooks/useEscapeKey";
+import { useScrimDismiss } from "../../hooks/useScrimDismiss";
 
 const TITLE_MAX = 150;
 const CONTENT_MAX = 2000;
@@ -26,6 +28,8 @@ export function CreateEpicNoteModal({
   onClose,
   onCreate,
 }: CreateEpicNoteModalProps) {
+  useEscapeKey(onClose);
+  const scrimProps = useScrimDismiss(onClose);
   const [title, setTitle] = useState("");
   const [contentHtml, setContentHtml] = useState("");
   const [contentText, setContentText] = useState("");
@@ -120,34 +124,31 @@ export function CreateEpicNoteModal({
   };
 
   return (
-    <div className="wpn-epicflow-modal-scrim" onClick={onClose}>
+    <div className="wpn-epicflow-modal-scrim" {...scrimProps}>
       <form
         className="wpn-epicflow-modal"
-        onClick={(event) => event.stopPropagation()}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="wpn-create-note-title"
         onSubmit={onSubmit}
       >
         <div className="wpn-epicflow-modal__header">
           <div>
-            <h2 className="wpn-epicflow-modal__title">Create Epic Note</h2>
+            <h2 className="wpn-epicflow-modal__title" id="wpn-create-note-title">Create Epic Note</h2>
             <p className="wpn-epicflow-modal__subtitle">
               Add a note to capture ideas, discussion points, or important context for this epic.
             </p>
           </div>
-          <button
-            type="button"
-            className="wpn-icon-btn"
-            aria-label="Close create epic note"
-            onClick={onClose}
-          >
-            <span
-              aria-hidden="true"
-              className="wpn-epicflow-panel__close-icon"
-              style={{
-                WebkitMaskImage: `url(${Icons.close})`,
-                maskImage: `url(${Icons.close})`,
-              }}
-            />
-          </button>
+          <Tooltip label="Close" placement="left">
+            <button
+              type="button"
+              className="wpn-icon-btn wpn-icon-btn--danger"
+              aria-label="Close create epic note"
+              onClick={onClose}
+            >
+              <Icon name="close" />
+            </button>
+          </Tooltip>
         </div>
 
         <div className="wpn-epicflow-modal__body">
@@ -179,33 +180,39 @@ export function CreateEpicNoteModal({
                 Note Content <span className="wpn-epicflow-modal__required">*</span>
               </span>
               <div className="wpn-epicflow-modal__format-toolbar">
-                <button
-                  type="button"
-                  className="wpn-epicflow-modal__format-btn wpn-epicflow-modal__format-btn--bold"
-                  aria-label="Bold"
-                  onMouseDown={(event) => event.preventDefault()}
-                  onClick={() => applyFormat("bold")}
-                >
-                  B
-                </button>
-                <button
-                  type="button"
-                  className="wpn-epicflow-modal__format-btn wpn-epicflow-modal__format-btn--italic"
-                  aria-label="Italic"
-                  onMouseDown={(event) => event.preventDefault()}
-                  onClick={() => applyFormat("italic")}
-                >
-                  I
-                </button>
-                <button
-                  type="button"
-                  className="wpn-epicflow-modal__format-btn wpn-epicflow-modal__format-btn--underline"
-                  aria-label="Underline"
-                  onMouseDown={(event) => event.preventDefault()}
-                  onClick={() => applyFormat("underline")}
-                >
-                  U
-                </button>
+                <Tooltip label="Bold" placement="top">
+                  <button
+                    type="button"
+                    className="wpn-epicflow-modal__format-btn wpn-epicflow-modal__format-btn--bold"
+                    aria-label="Bold"
+                    onMouseDown={(event) => event.preventDefault()}
+                    onClick={() => applyFormat("bold")}
+                  >
+                    B
+                  </button>
+                </Tooltip>
+                <Tooltip label="Italic" placement="top">
+                  <button
+                    type="button"
+                    className="wpn-epicflow-modal__format-btn wpn-epicflow-modal__format-btn--italic"
+                    aria-label="Italic"
+                    onMouseDown={(event) => event.preventDefault()}
+                    onClick={() => applyFormat("italic")}
+                  >
+                    I
+                  </button>
+                </Tooltip>
+                <Tooltip label="Underline" placement="top">
+                  <button
+                    type="button"
+                    className="wpn-epicflow-modal__format-btn wpn-epicflow-modal__format-btn--underline"
+                    aria-label="Underline"
+                    onMouseDown={(event) => event.preventDefault()}
+                    onClick={() => applyFormat("underline")}
+                  >
+                    U
+                  </button>
+                </Tooltip>
               </div>
               <div
                 ref={contentRef}
@@ -255,9 +262,11 @@ export function CreateEpicNoteModal({
 
         <div className="wpn-epicflow-modal__footer">
           <button type="button" className="wpn-btn wpn-btn--ghost" onClick={onClose}>
+            <Icon name="close" className="wpn-btn__icon" />
             Cancel
           </button>
           <button type="submit" className="wpn-btn wpn-btn--primary" disabled={!canSubmit}>
+            <Icon name="plus" className="wpn-btn__icon" />
             Create Note
           </button>
         </div>

@@ -9,6 +9,33 @@ export { createAnnotationApi } from "./services/annotationApi";
 export { AnnotationToggleButton } from "./components/AnnotationToggleButton";
 export { AnnotationListPanel } from "./components/AnnotationListPanel";
 export { AnnotationToolbar } from "./components/AnnotationToolbar";
+export { UserManagementPanel } from "./components/UserManagement";
+export { SettingsPanel } from "./components/Settings";
+export { AuditHistoryPanel } from "./components/AuditHistory";
+export { LoginDialog, ToolbarAuthControl } from "./components/Auth";
+export { createAuthApi } from "./services/authApi";
+export { useAuthSessions } from "./hooks/useAuthSessions";
+export { useAnnotationStream } from "./hooks/useAnnotationStream";
+export { applyStreamEvent } from "./utils/applyStreamEvent";
+export { fetchAuditPage } from "./services/auditApi";
+export {
+  createUser,
+  deleteUser,
+  fetchUsers,
+  resetUserPassword,
+  updateUser,
+} from "./services/usersApi";
+export {
+  createOrganization,
+  createProject,
+  deleteOrganization,
+  deleteProject,
+  fetchOrganizations,
+  fetchProject,
+  fetchProjects,
+  updateOrganization,
+  updateProject,
+} from "./services/organizationsApi";
 export { AnnotationApiError } from "./types/annotation.types";
 export type {
   Annotation,
@@ -29,3 +56,23 @@ export type {
   UpdateCommentRequest,
   UpdatePageStatusRequest,
 } from "./types/annotation.types";
+export type { AuthApiClient, AuthSession, LoginOption } from "./types/auth.types";
+export type { AuditPage, AuditQuery, AuditRecord, AuditScope } from "./types/audit.types";
+export type { CreatedUser, PasswordReset, UserListQuery, UserPage } from "./services/usersApi";
+export type {
+  Organization,
+  OrganizationDraft,
+  Project,
+  ProjectDraft,
+} from "./types/organization.types";
+export type {
+  StreamConnectionState,
+  StreamEvent,
+  StreamEventType,
+} from "./types/stream.types";
+export type {
+  ManagedUser,
+  ManagedUserDraft,
+  UserManagementRole,
+  UserManagementStatus,
+} from "./types/userManagement.types";

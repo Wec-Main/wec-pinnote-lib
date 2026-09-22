@@ -36,7 +36,8 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "demo": "npm run dev --prefix examples/demo",
-    "demo:build": "npm run build --prefix examples/demo"
+    "demo:build": "npm run build --prefix examples/demo",
+    "test": "vitest run"
   },
   "peerDependencies": {
     "react": ">=18",

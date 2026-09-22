@@ -1,6 +1,8 @@
 import { useMemo, useState } from "react";
 import { AnnotationProvider, type AnnotationUser } from "wec-pinnote-lib";
+import { DEMO_CONFIG } from "./config";
 import { createInMemoryAnnotationApi } from "./mock/inMemoryAnnotationApi";
+import { createInMemoryAuthApi } from "./mock/inMemoryAuthApi";
 import { HomePage } from "./pages/HomePage";
 import { LoginPage } from "./pages/LoginPage";
 
@@ -10,13 +12,15 @@ function currentPath(): "/login" | "/home" {
   return window.location.pathname === "/home" ? "/home" : "/login";
 }
 
-const useMockApi = import.meta.env.VITE_USE_MOCK_API === "true";
-
 export function App() {
   const [page, setPage] = useState<"/login" | "/home">(currentPath);
 
   const mockApi = useMemo(
-    () => (useMockApi ? createInMemoryAnnotationApi(() => ANONYMOUS_USER) : undefined),
+    () => (DEMO_CONFIG.useMockApi ? createInMemoryAnnotationApi(() => ANONYMOUS_USER) : undefined),
+    [],
+  );
+  const mockAuthApi = useMemo(
+    () => (DEMO_CONFIG.useMockApi ? createInMemoryAuthApi() : undefined),
     [],
   );
 
@@ -26,11 +30,12 @@ export function App() {
   };
 
   const config = {
-    apiBaseUrl: import.meta.env.VITE_ANNOTATION_API_URL ?? "http://localhost:4000/api/v1/pinnote",
-    projectId: import.meta.env.VITE_ANNOTATION_PROJECT_ID ?? "wec-lib",
+    apiBaseUrl: DEMO_CONFIG.apiBaseUrl,
+    projectId: DEMO_CONFIG.projectId,
     currentUser: ANONYMOUS_USER,
     getPageKey: () => window.location.pathname,
     ...(mockApi ? { apiClient: mockApi } : {}),
+    ...(mockAuthApi ? { authClient: mockAuthApi } : {}),
   };
 
   return (

@@ -5,6 +5,7 @@ import { AnnotationReplyComposer } from "../AnnotationReplyComposer";
 import { AnnotationStatusSelect } from "../AnnotationStatusSelect";
 import { AnnotationThread } from "../AnnotationThread";
 import { Icons } from "../../assets/icons";
+import { Icon, Tooltip } from "../primitives";
 
 interface AnnotationThreadPanelProps {
   annotationId: string;
@@ -48,14 +49,16 @@ export function AnnotationThreadPanel({
     >
       <div className="wpn-panel__header">
         <span className="wpn-panel__title">{title}</span>
-        <button
-          type="button"
-          className="wpn-icon-btn"
-          aria-label="Close thread"
-          onClick={() => selectAnnotation(null)}
-        >
-          ×
-        </button>
+        <Tooltip label="Close" placement="left">
+          <button
+            type="button"
+            className="wpn-icon-btn"
+            aria-label="Close thread"
+            onClick={() => selectAnnotation(null)}
+          >
+            ×
+          </button>
+        </Tooltip>
       </div>
       {orphaned ? (
         <div className="wpn-orphaned">Original element is not on screen. Showing fallback position.</div>
@@ -88,10 +91,12 @@ export function AnnotationThreadPanel({
                   selectAnnotation(null);
                 }}
               >
+                <Icon name="trash" className="wpn-btn__icon" />
                 Confirm delete
               </button>
             ) : (
               <button type="button" className="wpn-btn-delete" onClick={() => setConfirmDelete(true)}>
+                <Icon name="trash" className="wpn-btn__icon" />
                 Delete
               </button>
             )}

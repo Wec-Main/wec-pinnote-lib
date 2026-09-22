@@ -1,21 +1,21 @@
 import { useEffect, useState } from "react";
 import { useAnnotationContext } from "../../context/AnnotationContext";
-import { Icons } from "../../assets/icons";
+import { Icon, Tooltip } from "../primitives";
 
 export interface AnnotationToggleButtonProps {
   className?: string;
 }
 
 export function AnnotationToggleButton({ className }: AnnotationToggleButtonProps) {
-  const { modeEnabled, setModeEnabled, config, authorName } = useAnnotationContext();
-  const [nameError, setNameError] = useState(false);
-  const nameMissing = !authorName.trim();
+  const { modeEnabled, setModeEnabled, config, activeAccount } = useAnnotationContext();
+  const [loginError, setLoginError] = useState(false);
+  const loggedOut = !activeAccount;
 
   useEffect(() => {
-    if (!nameMissing) {
-      setNameError(false);
+    if (!loggedOut) {
+      setLoginError(false);
     }
-  }, [nameMissing]);
+  }, [loggedOut]);
 
   if (!config.enabled) {
     return null;
@@ -23,30 +23,41 @@ export function AnnotationToggleButton({ className }: AnnotationToggleButtonProp
 
   return (
     <>
-    <button
-      type="button"
-      className={[
-        "wpn-toggle",
-        modeEnabled ? "wpn-toggle--active" : "",
-        nameMissing ? "wpn-toggle--blocked" : "",
-        className ?? "",
-      ]
-        .filter(Boolean)
-        .join(" ")}
-      aria-pressed={modeEnabled}
-      aria-disabled={nameMissing}
-      aria-label={modeEnabled ? "Disable annotation mode" : "Enable annotation mode"}
-      onClick={() => {
-        if (nameMissing) {
-          setNameError(true);
-          return;
+      <Tooltip
+        label={
+          loggedOut
+            ? "Log in first"
+            : modeEnabled
+              ? "Stop annotating"
+              : "Annotate"
         }
-        setModeEnabled(!modeEnabled);
-      }}
-    >
-      <img src={Icons.pen} alt="" className="wpn-toggle__icon" />
-    </button>
-    {nameError ? <span className="wpn-toolbar__name-error">Enter your name</span> : null}
+        placement="bottom"
+      >
+        <button
+          type="button"
+          className={[
+            "wpn-toggle",
+            modeEnabled ? "wpn-toggle--active" : "",
+            loggedOut ? "wpn-toggle--blocked" : "",
+            className ?? "",
+          ]
+            .filter(Boolean)
+            .join(" ")}
+          aria-pressed={modeEnabled}
+          aria-disabled={loggedOut}
+          aria-label={modeEnabled ? "Disable annotation mode" : "Enable annotation mode"}
+          onClick={() => {
+            if (loggedOut) {
+              setLoginError(true);
+              return;
+            }
+            setModeEnabled(!modeEnabled);
+          }}
+        >
+          <Icon name="pen" className="wpn-toggle__icon" />
+        </button>
+      </Tooltip>
+      {loginError ? <span className="wpn-toolbar__name-error">Log in to annotate</span> : null}
     </>
   );
 }

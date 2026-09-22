@@ -1,6 +1,5 @@
 import { useMemo, useState } from "react";
 import { useAnnotationContext } from "../../context/AnnotationContext";
-import { Icons } from "../../assets/icons";
 import { createClientId } from "../../utils/format";
 import type { Epic, EpicNote, UserStory } from "../../types/epicFlow.types";
 import {
@@ -14,9 +13,10 @@ import { EpicNotesColumn } from "./EpicNotesColumn";
 import { CreateEpicModal } from "./CreateEpicModal";
 import { CreateUserStoryModal } from "./CreateUserStoryModal";
 import { CreateEpicNoteModal } from "./CreateEpicNoteModal";
+import { Icon, Tooltip } from "../primitives";
 
 export function EpicFlowPanel() {
-  const { setEpicFlowOpen, authorName } = useAnnotationContext();
+  const { setEpicFlowOpen, activeAccount } = useAnnotationContext();
   const [epics, setEpics] = useState<Epic[]>(EPIC_FLOW_SEED_EPICS);
   const [allStories, setAllStories] = useState<UserStory[]>(EPIC_FLOW_SEED_STORIES);
   const [allNotes, setAllNotes] = useState<EpicNote[]>(EPIC_FLOW_SEED_NOTES);
@@ -119,51 +119,26 @@ export function EpicFlowPanel() {
       <div className="wpn-epicflow-panel__header">
         <span className="wpn-panel__title">EpicFlow</span>
         <div className="wpn-epicflow-panel__header-actions">
-          <button
-            type="button"
-            className="wpn-icon-btn"
-            aria-label={fullscreen ? "Exit fullscreen" : "Expand EpicFlow"}
-            onClick={() => setFullscreen((current) => !current)}
-          >
-            {fullscreen ? (
-              <svg viewBox="0 0 24 24" className="wpn-epicflow-panel__header-icon" aria-hidden="true">
-                <path
-                  fill="none"
-                  stroke="currentColor"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth="1.8"
-                  d="M4 10V5h5M4 14v5h5M20 10V5h-5M20 14v5h-5"
-                />
-              </svg>
-            ) : (
-              <svg viewBox="0 0 24 24" className="wpn-epicflow-panel__header-icon" aria-hidden="true">
-                <path
-                  fill="none"
-                  stroke="currentColor"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth="1.8"
-                  d="M9 4H4v5M15 4h5v5M9 20H4v-5M15 20h5v-5"
-                />
-              </svg>
-            )}
-          </button>
-          <button
-            type="button"
-            className="wpn-icon-btn"
-            aria-label="Close EpicFlow"
-            onClick={() => setEpicFlowOpen(false)}
-          >
-            <span
-              aria-hidden="true"
-              className="wpn-epicflow-panel__close-icon"
-              style={{
-                WebkitMaskImage: `url(${Icons.close})`,
-                maskImage: `url(${Icons.close})`,
-              }}
-            />
-          </button>
+          <Tooltip label={fullscreen ? "Exit fullscreen" : "Enter fullscreen"} placement="bottom">
+            <button
+              type="button"
+              className="wpn-icon-btn"
+              aria-label={fullscreen ? "Exit fullscreen" : "Enter fullscreen"}
+              onClick={() => setFullscreen((current) => !current)}
+            >
+              <Icon name={fullscreen ? "collapse" : "expand"} />
+            </button>
+          </Tooltip>
+          <Tooltip label="Close" placement="bottom">
+            <button
+              type="button"
+              className="wpn-icon-btn wpn-icon-btn--danger"
+              aria-label="Close EpicFlow"
+              onClick={() => setEpicFlowOpen(false)}
+            >
+              <Icon name="close" />
+            </button>
+          </Tooltip>
         </div>
       </div>
       <input
@@ -206,7 +181,7 @@ export function EpicFlowPanel() {
       {showCreateNote && selectedEpic ? (
         <CreateEpicNoteModal
           epic={selectedEpic}
-          createdBy={authorName.trim() || "You"}
+          createdBy={activeAccount?.name ?? "You"}
           onClose={() => setShowCreateNote(false)}
           onCreate={handleCreateNote}
         />

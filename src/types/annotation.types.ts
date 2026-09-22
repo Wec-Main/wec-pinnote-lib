@@ -1,9 +1,6 @@
-export type AnnotationStatus =
-  | "open"
-  | "re-open"
-  | "dev-inprogress"
-  | "completed"
-  | "closed";
+import type { AuthApiClient } from "./auth.types";
+
+export type AnnotationStatus = "open" | "re-open" | "dev-inprogress" | "completed" | "closed";
 
 export type PageStatus = "review" | "approved";
 
@@ -24,6 +21,7 @@ export interface AnnotationUser {
   id: string;
   name: string;
   avatarUrl?: string;
+  role?: string;
 }
 
 export interface AnnotationAnchor {
@@ -135,6 +133,7 @@ export interface AnnotationConfig {
   showPinsWhenIdle?: boolean;
   showResolved?: boolean;
   apiClient?: AnnotationApiClient;
+  authClient?: AuthApiClient;
 }
 
 export interface ResolvedAnnotationConfig extends AnnotationConfig {

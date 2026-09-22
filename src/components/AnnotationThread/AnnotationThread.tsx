@@ -1,6 +1,7 @@
 import { useState } from "react";
 import type { Annotation, AnnotationComment, AnnotationUser } from "../../types/annotation.types";
 import { formatTimestamp, getInitials } from "../../utils/format";
+import { canDeleteComment, canEditComment } from "../../utils/commentPermissions";
 
 interface AnnotationThreadProps {
   annotation: Annotation;
@@ -27,7 +28,8 @@ function CommentItem({
   onEdit: (commentId: string, message: string) => Promise<void>;
   onDelete: (commentId: string) => Promise<void>;
 }) {
-  const canEdit = comment.createdBy.name === currentUser.name;
+  const canEdit = canEditComment(comment, currentUser);
+  const canDelete = canDeleteComment(comment, currentUser);
   const [editing, setEditing] = useState(false);
   const [value, setValue] = useState(comment.message);
   const [confirmDelete, setConfirmDelete] = useState(false);
@@ -75,21 +77,28 @@ function CommentItem({
         ) : (
           <p className="wpn-comment__message">{comment.message}</p>
         )}
-        {canEdit && !editing ? (
+        {(canEdit || canDelete) && !editing ? (
           <div className="wpn-comment__actions">
-            <button type="button" className="wpn-link wpn-link--icon" aria-label="Edit" onClick={() => setEditing(true)}>
-              <svg viewBox="0 0 24 24" className="wpn-action-icon" aria-hidden="true">
-                <path
-                  fill="none"
-                  stroke="currentColor"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth="1.8"
-                  d="M13.2 6.2 17.8 10.8M4 20l.9-4.5L14.6 6a1.5 1.5 0 0 1 2.1 0l1.3 1.3a1.5 1.5 0 0 1 0 2.1L8.5 19.1 4 20Z"
-                />
-              </svg>
-            </button>
-            {confirmDelete ? (
+            {canEdit ? (
+              <button
+                type="button"
+                className="wpn-link wpn-link--icon"
+                aria-label="Edit"
+                onClick={() => setEditing(true)}
+              >
+                <svg viewBox="0 0 24 24" className="wpn-action-icon" aria-hidden="true">
+                  <path
+                    fill="none"
+                    stroke="currentColor"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth="1.8"
+                    d="M13.2 6.2 17.8 10.8M4 20l.9-4.5L14.6 6a1.5 1.5 0 0 1 2.1 0l1.3 1.3a1.5 1.5 0 0 1 0 2.1L8.5 19.1 4 20Z"
+                  />
+                </svg>
+              </button>
+            ) : null}
+            {!canDelete ? null : confirmDelete ? (
               <>
                 <button
                   type="button"

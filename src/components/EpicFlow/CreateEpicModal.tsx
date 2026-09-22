@@ -1,6 +1,8 @@
 import { useState, type FormEvent } from "react";
-import { Icons } from "../../assets/icons";
 import type { Epic, EpicPriority, EpicStatus } from "../../types/epicFlow.types";
+import { Icon, Tooltip } from "../primitives";
+import { useEscapeKey } from "../../hooks/useEscapeKey";
+import { useScrimDismiss } from "../../hooks/useScrimDismiss";
 
 const TITLE_MAX = 100;
 const DESCRIPTION_MAX = 500;
@@ -31,6 +33,8 @@ interface CreateEpicModalProps {
 }
 
 export function CreateEpicModal({ onClose, onCreate }: CreateEpicModalProps) {
+  useEscapeKey(onClose);
+  const scrimProps = useScrimDismiss(onClose);
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [priority, setPriority] = useState<EpicPriority>("high");
@@ -62,34 +66,31 @@ export function CreateEpicModal({ onClose, onCreate }: CreateEpicModalProps) {
   };
 
   return (
-    <div className="wpn-epicflow-modal-scrim" onClick={onClose}>
+    <div className="wpn-epicflow-modal-scrim" {...scrimProps}>
       <form
         className="wpn-epicflow-modal"
-        onClick={(event) => event.stopPropagation()}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="wpn-create-epic-title"
         onSubmit={onSubmit}
       >
         <div className="wpn-epicflow-modal__header">
           <div>
-            <h2 className="wpn-epicflow-modal__title">Create Epic</h2>
+            <h2 className="wpn-epicflow-modal__title" id="wpn-create-epic-title">Create Epic</h2>
             <p className="wpn-epicflow-modal__subtitle">
               Define a high-level goal that delivers significant value.
             </p>
           </div>
-          <button
-            type="button"
-            className="wpn-icon-btn"
-            aria-label="Close create epic"
-            onClick={onClose}
-          >
-            <span
-              aria-hidden="true"
-              className="wpn-epicflow-panel__close-icon"
-              style={{
-                WebkitMaskImage: `url(${Icons.close})`,
-                maskImage: `url(${Icons.close})`,
-              }}
-            />
-          </button>
+          <Tooltip label="Close" placement="left">
+            <button
+              type="button"
+              className="wpn-icon-btn wpn-icon-btn--danger"
+              aria-label="Close create epic"
+              onClick={onClose}
+            >
+              <Icon name="close" />
+            </button>
+          </Tooltip>
         </div>
 
         <div className="wpn-epicflow-modal__body">
@@ -199,9 +200,11 @@ export function CreateEpicModal({ onClose, onCreate }: CreateEpicModalProps) {
 
         <div className="wpn-epicflow-modal__footer">
           <button type="button" className="wpn-btn wpn-btn--ghost" onClick={onClose}>
+            <Icon name="close" className="wpn-btn__icon" />
             Cancel
           </button>
           <button type="submit" className="wpn-btn wpn-btn--primary" disabled={!canSubmit}>
+            <Icon name="plus" className="wpn-btn__icon" />
             Create Epic
           </button>
         </div>

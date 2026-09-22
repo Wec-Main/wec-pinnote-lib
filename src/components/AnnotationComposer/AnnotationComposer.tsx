@@ -4,6 +4,7 @@ import { useFloatingPanel } from "../../hooks/useAnnotationPosition";
 import type { AnnotationStatus } from "../../types/annotation.types";
 import { AnnotationStatusSelect } from "../AnnotationStatusSelect";
 import { Icons } from "../../assets/icons";
+import { Icon, Tooltip } from "../primitives";
 
 interface AnnotationComposerProps {
   x: number;
@@ -107,14 +108,16 @@ export function AnnotationComposer({ x, y }: AnnotationComposerProps) {
             )}
           </button>
         </span>
-        <button
-          type="button"
-          className="wpn-icon-btn"
-          aria-label="Cancel comment"
-          onClick={cancelDraft}
-        >
-          ×
-        </button>
+        <Tooltip label="Cancel" placement="top">
+          <button
+            type="button"
+            className="wpn-icon-btn"
+            aria-label="Cancel comment"
+            onClick={cancelDraft}
+          >
+            ×
+          </button>
+        </Tooltip>
       </div>
       <form onSubmit={onSubmit}>
         <textarea
@@ -135,6 +138,7 @@ export function AnnotationComposer({ x, y }: AnnotationComposerProps) {
             <AnnotationStatusSelect value={status} onChange={setStatus} disabled={submitting} />
             <div className="wpn-panel__actions">
               <button type="button" className="wpn-btn wpn-btn--ghost" onClick={cancelDraft}>
+                <Icon name="close" className="wpn-btn__icon" />
                 Cancel
               </button>
               <button
@@ -142,6 +146,7 @@ export function AnnotationComposer({ x, y }: AnnotationComposerProps) {
                 className="wpn-btn wpn-btn--primary"
                 disabled={!message.trim() || submitting}
               >
+                <Icon name="comment" className="wpn-btn__icon" />
                 Add comment
               </button>
             </div>
