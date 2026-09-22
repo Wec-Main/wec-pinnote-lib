@@ -1,8 +1,6 @@
 import { useState, type FormEvent } from "react";
+import { Icons } from "../../assets/icons";
 import type { Epic, EpicPriority, UserStory, UserStoryStatus } from "../../types/epicFlow.types";
-import { Icon, Tooltip } from "../primitives";
-import { useEscapeKey } from "../../hooks/useEscapeKey";
-import { useScrimDismiss } from "../../hooks/useScrimDismiss";
 
 const TITLE_MAX = 150;
 const DESCRIPTION_MAX = 500;
@@ -33,8 +31,6 @@ interface CreateUserStoryModalProps {
 }
 
 export function CreateUserStoryModal({ epic, onClose, onCreate }: CreateUserStoryModalProps) {
-  useEscapeKey(onClose);
-  const scrimProps = useScrimDismiss(onClose);
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [priority, setPriority] = useState<EpicPriority>("high");
@@ -67,31 +63,34 @@ export function CreateUserStoryModal({ epic, onClose, onCreate }: CreateUserStor
   };
 
   return (
-    <div className="wpn-epicflow-modal-scrim" {...scrimProps}>
+    <div className="wpn-epicflow-modal-scrim" onClick={onClose}>
       <form
         className="wpn-epicflow-modal"
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="wpn-create-story-title"
+        onClick={(event) => event.stopPropagation()}
         onSubmit={onSubmit}
       >
         <div className="wpn-epicflow-modal__header">
           <div>
-            <h2 className="wpn-epicflow-modal__title" id="wpn-create-story-title">Create User Story</h2>
+            <h2 className="wpn-epicflow-modal__title">Create User Story</h2>
             <p className="wpn-epicflow-modal__subtitle">
               Capture a clear and concise user story for this epic.
             </p>
           </div>
-          <Tooltip label="Close" placement="left">
-            <button
-              type="button"
-              className="wpn-icon-btn wpn-icon-btn--danger"
-              aria-label="Close create user story"
-              onClick={onClose}
-            >
-              <Icon name="close" />
-            </button>
-          </Tooltip>
+          <button
+            type="button"
+            className="wpn-icon-btn"
+            aria-label="Close create user story"
+            onClick={onClose}
+          >
+            <span
+              aria-hidden="true"
+              className="wpn-epicflow-panel__close-icon"
+              style={{
+                WebkitMaskImage: `url(${Icons.close})`,
+                maskImage: `url(${Icons.close})`,
+              }}
+            />
+          </button>
         </div>
 
         <div className="wpn-epicflow-modal__body">
@@ -215,11 +214,9 @@ export function CreateUserStoryModal({ epic, onClose, onCreate }: CreateUserStor
 
         <div className="wpn-epicflow-modal__footer">
           <button type="button" className="wpn-btn wpn-btn--ghost" onClick={onClose}>
-            <Icon name="close" className="wpn-btn__icon" />
             Cancel
           </button>
           <button type="submit" className="wpn-btn wpn-btn--primary" disabled={!canSubmit}>
-            <Icon name="plus" className="wpn-btn__icon" />
             Create Story
           </button>
         </div>

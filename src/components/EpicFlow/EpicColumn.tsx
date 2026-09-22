@@ -1,5 +1,4 @@
 import type { Epic } from "../../types/epicFlow.types";
-import { Tooltip } from "../primitives";
 
 interface EpicColumnProps {
   epics: Epic[];
@@ -17,24 +16,22 @@ export function EpicColumn({ epics, selectedEpicId, storyCounts, onSelect, onCre
           Epic
           <span className="wpn-epicflow-column__count">{epics.length}</span>
         </span>
-        <Tooltip label="Create epic" placement="left">
-          <button
-            type="button"
-            className="wpn-epicflow-column__add"
-            aria-label="Create epic"
-            onClick={onCreate}
-          >
-            <svg viewBox="0 0 24 24" className="wpn-epicflow-column__add-icon" aria-hidden="true">
-              <path
-                fill="none"
-                stroke="currentColor"
-                strokeLinecap="round"
-                strokeWidth="2"
-                d="M12 5v14M5 12h14"
-              />
-            </svg>
-          </button>
-        </Tooltip>
+        <button
+          type="button"
+          className="wpn-epicflow-column__add"
+          aria-label="Create epic"
+          onClick={onCreate}
+        >
+          <svg viewBox="0 0 24 24" className="wpn-epicflow-column__add-icon" aria-hidden="true">
+            <path
+              fill="none"
+              stroke="currentColor"
+              strokeLinecap="round"
+              strokeWidth="2"
+              d="M12 5v14M5 12h14"
+            />
+          </svg>
+        </button>
       </div>
       <div className="wpn-epicflow-column__body">
         {epics.length === 0 ? (
