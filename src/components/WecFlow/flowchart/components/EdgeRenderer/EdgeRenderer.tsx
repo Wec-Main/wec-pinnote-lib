@@ -1,7 +1,7 @@
 import { memo, useCallback, useId, useState } from 'react';
 import { useFlowContext, useFlowEngine, useFlowState } from '../../hooks/FlowContext';
 import { useEdgeGeometry } from '../../hooks/useEdgeGeometry';
-import { getBezierPath } from '../../utils/edgePaths';
+import { getEdgePath } from '../../utils/edgePaths';
 import { findHandle, getHandlePosition, oppositeSide } from '../../utils/geometry';
 import { cx, shallowEqual } from '../../utils/shallow';
 import { Icon } from '../icons';
@@ -43,6 +43,7 @@ const ConnectionLine = memo(function ConnectionLine() {
   const conn = useFlowState((s) => s.connection);
   const fromNode = useFlowState((s) => (s.connection ? s.nodeLookup.get(s.connection.from.nodeId) : undefined));
   const toNode = useFlowState((s) => (s.connection?.candidate ? s.nodeLookup.get(s.connection.candidate.nodeId) : undefined));
+  const lineType = useFlowState((s) => s.defaultEdgeType);
   if (!conn || !fromNode) return null;
   const fromDef = engine.getDefinition(fromNode.type);
   const fromHandle = findHandle(fromDef, conn.from.kind, conn.from.handleId);
@@ -58,7 +59,7 @@ const ConnectionLine = memo(function ConnectionLine() {
       endSide = h.side;
     }
   }
-  const { path } = getBezierPath({ source: start, sourceSide: fromHandle.side, target: end, targetSide: endSide });
+  const { path } = getEdgePath(lineType, { source: start, sourceSide: fromHandle.side, target: end, targetSide: endSide });
   const state = conn.candidate ? (conn.valid ? styles.connValid : styles.connInvalid) : conn.reason ? styles.connInvalid : undefined;
   return (
     <g className={cx(styles.connection, state)}>
