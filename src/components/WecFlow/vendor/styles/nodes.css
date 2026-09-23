@@ -189,3 +189,18 @@
 .wec-flow-node--output .react-flow__handle-right {
   right: 8px;
 }
+
+/* Ghost outline shown under the cursor while dragging a node in from the
+   palette, so the user can see where it will land before dropping. Reuses
+   the real node's shape (wec-flow-node--{type}) so the preview matches the
+   dropped result exactly; opacity plus a soft glow mark it as a preview
+   rather than a placed node (dashing the border isn't possible on the
+   diamond/parallelogram shapes, which are clip-path fills, not borders). */
+.wec-flow-drop-preview {
+  position: absolute;
+  z-index: 10;
+  transform: translate(-50%, -50%);
+  opacity: 0.6;
+  filter: drop-shadow(0 0 6px rgba(255, 255, 255, 0.5));
+  pointer-events: none;
+}

@@ -5,6 +5,7 @@ import {
   useImperativeHandle,
   useMemo,
   useRef,
+  useState,
 } from "react";
 import type { DragEvent } from "react";
 import {
@@ -81,6 +82,11 @@ const FlowBuilderInner = forwardRef<FlowBuilderRef, FlowBuilderInnerProps>(
     const wrapperRef = useRef<HTMLDivElement>(null);
     const lastEmittedRef = useRef<FlowDefinition | null>(initialFlowForState);
     const isFirstRenderRef = useRef(true);
+    const [dragPreview, setDragPreview] = useState<{
+      type: FlowNodeType;
+      left: number;
+      top: number;
+    } | null>(null);
 
     // Controlled-mode sync: replace internal state when an externally supplied
     // `value` changes to something other than what we ourselves last emitted.
@@ -132,18 +138,45 @@ const FlowBuilderInner = forwardRef<FlowBuilderRef, FlowBuilderInnerProps>(
       [readonly, flowState],
     );
 
+    const draggedTypeRef = useRef<FlowNodeType | null>(null);
+
+    const handlePaletteDragStart = useCallback((type: FlowNodeType) => {
+      draggedTypeRef.current = type;
+    }, []);
+
+    const handlePaletteDragEnd = useCallback(() => {
+      draggedTypeRef.current = null;
+      setDragPreview(null);
+    }, []);
+
     const handleDragOver = useCallback(
       (event: DragEvent<HTMLDivElement>) => {
         if (readonly) return;
         event.preventDefault();
         event.dataTransfer.dropEffect = "move";
+        const type = draggedTypeRef.current;
+        const wrapper = wrapperRef.current;
+        if (!type || !wrapper) return;
+        const bounds = wrapper.getBoundingClientRect();
+        setDragPreview({
+          type,
+          left: event.clientX - bounds.left,
+          top: event.clientY - bounds.top,
+        });
       },
       [readonly],
     );
 
+    const handleDragLeave = useCallback((event: DragEvent<HTMLDivElement>) => {
+      if (event.currentTarget.contains(event.relatedTarget as Node | null)) return;
+      setDragPreview(null);
+    }, []);
+
     const handleDrop = useCallback(
       (event: DragEvent<HTMLDivElement>) => {
         event.preventDefault();
+        draggedTypeRef.current = null;
+        setDragPreview(null);
         if (readonly) return;
         const type = event.dataTransfer.getData(NODE_DRAG_DATA_KEY) as FlowNodeType | "";
         if (!type) return;
@@ -208,15 +241,29 @@ const FlowBuilderInner = forwardRef<FlowBuilderRef, FlowBuilderInnerProps>(
       <div className={rootClassName} style={containerStyle}>
         {showNodePalette && (
           <div className="wec-flow-builder__palette">
-            <NodePalette readonly={readonly} />
+            <NodePalette
+              readonly={readonly}
+              onNodeDragStart={handlePaletteDragStart}
+              onNodeDragEnd={handlePaletteDragEnd}
+            />
           </div>
         )}
         <div
           className="wec-flow-builder__canvas"
           ref={wrapperRef}
           onDragOver={handleDragOver}
+          onDragLeave={handleDragLeave}
           onDrop={handleDrop}
         >
+          {dragPreview && (
+            <div
+              className={`wec-flow-node wec-flow-drop-preview wec-flow-node--${dragPreview.type}`}
+              style={{ left: dragPreview.left, top: dragPreview.top }}
+              aria-hidden="true"
+            >
+              <span className="wec-flow-node__label">{DEFAULT_NODE_LABELS[dragPreview.type]}</span>
+            </div>
+          )}
           <ReactFlow
             nodes={flowState.rfNodes}
             edges={flowState.rfEdges}
@@ -231,7 +278,7 @@ const FlowBuilderInner = forwardRef<FlowBuilderRef, FlowBuilderInnerProps>(
             deleteKeyCode={null}
             fitView
             colorMode="dark"
-            attributionPosition="bottom-left"
+            proOptions={{ hideAttribution: true }}
           >
             <Background />
             {showControls && <Controls showInteractive={!readonly} />}
