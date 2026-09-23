@@ -3,33 +3,33 @@
  * to restyle the library, e.g.  .my-app { --fb-accent: #0ea5e9; }
  */
 :root {
-  --fb-font: 'Inter', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
-  --fb-bg: #f4f6fa;
-  --fb-canvas-bg: #f8fafc;
-  --fb-grid: #cfd6e1;
-  --fb-panel: #ffffff;
-  --fb-panel-muted: #f8fafc;
-  --fb-border: #e4e7ec;
-  --fb-border-strong: #d0d5dd;
-  --fb-text: #101828;
-  --fb-text-muted: #667085;
-  --fb-text-subtle: #98a2b3;
-  --fb-accent: #6366f1;
-  --fb-accent-soft: #eef2ff;
-  --fb-accent-text: #4338ca;
+  --fb-font: var(--wpn-font, 'Inter', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif);
+  --fb-bg: #000;
+  --fb-canvas-bg: #0a0a0b;
+  --fb-grid: rgba(255, 255, 255, 0.12);
+  --fb-panel: #121214;
+  --fb-panel-muted: rgba(255, 255, 255, 0.06);
+  --fb-border: rgba(255, 255, 255, 0.1);
+  --fb-border-strong: rgba(255, 255, 255, 0.18);
+  --fb-text: #fff;
+  --fb-text-muted: rgba(255, 255, 255, 0.6);
+  --fb-text-subtle: rgba(255, 255, 255, 0.4);
+  --fb-accent: #8b5cf6;
+  --fb-accent-soft: rgba(139, 92, 246, 0.18);
+  --fb-accent-text: #c4b5fd;
   --fb-danger: #ef4444;
-  --fb-danger-soft: #fef2f2;
+  --fb-danger-soft: rgba(239, 68, 68, 0.16);
   --fb-warning: #f59e0b;
-  --fb-warning-soft: #fffbeb;
+  --fb-warning-soft: rgba(245, 158, 11, 0.16);
   --fb-success: #10b981;
-  --fb-success-soft: #ecfdf5;
-  --fb-edge: #98a2b3;
-  --fb-node-bg: #ffffff;
-  --fb-node-border: #d0d5dd;
+  --fb-success-soft: rgba(16, 185, 129, 0.16);
+  --fb-edge: rgba(255, 255, 255, 0.45);
+  --fb-node-bg: #18181b;
+  --fb-node-border: rgba(255, 255, 255, 0.18);
   --fb-radius: 10px;
-  --fb-shadow-sm: 0 1px 2px rgba(16, 24, 40, 0.06);
-  --fb-shadow: 0 1px 3px rgba(16, 24, 40, 0.08), 0 4px 12px rgba(16, 24, 40, 0.06);
-  --fb-shadow-lg: 0 12px 32px rgba(16, 24, 40, 0.14);
-  --fb-hover: rgba(0, 0, 0, 0.06);
-  --fb-minimap-mask: rgba(16, 24, 40, 0.06);
+  --fb-shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --fb-shadow: 0 1px 3px rgba(0, 0, 0, 0.5), 0 4px 12px rgba(0, 0, 0, 0.4);
+  --fb-shadow-lg: 0 12px 32px rgba(0, 0, 0, 0.6);
+  --fb-hover: rgba(255, 255, 255, 0.1);
+  --fb-minimap-mask: rgba(255, 255, 255, 0.06);
 }
