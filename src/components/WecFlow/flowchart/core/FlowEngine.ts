@@ -26,6 +26,7 @@ import {
   screenToFlow,
   snapPosition,
 } from '../utils/geometry';
+import { alignRects, distributeRects, type AlignMode, type AlignmentGuide, type DistributeAxis } from '../utils/alignment';
 import { createId } from '../utils/id';
 import { checkConnection, type ConnectionCheckResult, type ConnectionValidator } from './ConnectionRules';
 import { EventEmitter } from './EventEmitter';
@@ -65,6 +66,7 @@ export interface FlowState {
   connection: ConnectionState | null;
   /** Rubber-band selection rectangle in flow coordinates. */
   selectionRect: Rect | null;
+  guides: AlignmentGuide[];
   validation: ValidationResult | null;
   issueNodeIds: ReadonlyMap<string, IssueSeverity>;
   issueEdgeIds: ReadonlyMap<string, IssueSeverity>;
@@ -146,6 +148,8 @@ export class FlowEngine {
   private interactionDepth = 0;
   private interactionStart: FlowSnapshot | null = null;
   private pendingFitView = false;
+  private clipboard: FlowSnapshot | null = null;
+  private pasteCount = 0;
 
   constructor(options: FlowEngineOptions = {}) {
     this.options = options;
@@ -173,6 +177,7 @@ export class FlowEngine {
       gridSize: options.gridSize ?? 20,
       connection: null,
       selectionRect: null,
+      guides: [],
       validation: null,
       issueNodeIds: EMPTY_MAP,
       issueEdgeIds: EMPTY_MAP,
@@ -358,25 +363,90 @@ export class FlowEngine {
 
   /** Copies nodes (and the edges between them) with an offset; selects the copies. */
   duplicateNodes(ids: string[], offset: XYPosition = { x: 40, y: 40 }): FlowNode[] {
+    return this.insertCopies(this.subgraph(ids), offset);
+  }
+
+  copySelection(): boolean {
+    const snapshot = this.subgraph([...this.getState().selectedNodeIds]);
+    if (snapshot.nodes.length === 0) return false;
+    this.clipboard = snapshot;
+    this.pasteCount = 0;
+    return true;
+  }
+
+  cutSelection(): boolean {
+    if (!this.copySelection()) return false;
+    this.deleteSelection();
+    return true;
+  }
+
+  hasClipboard(): boolean {
+    return this.clipboard !== null;
+  }
+
+  /** Pastes the clipboard, with its top-left at `at` (flow coordinates) or offset from the originals. */
+  paste(at?: XYPosition): FlowNode[] {
+    const clipboard = this.clipboard;
+    if (!clipboard) return [];
+    const bounds = getBounds(clipboard.nodes.map((n) => this.getNodeRect(n)));
+    if (!bounds) return [];
+    this.pasteCount += 1;
+    const step = 40 * this.pasteCount;
+    const offset = at ? this.snap({ x: at.x - bounds.x, y: at.y - bounds.y }) : { x: step, y: step };
+    return this.insertCopies(clipboard, offset);
+  }
+
+  alignSelection(mode: AlignMode): void {
+    const placed = this.selectedRects();
+    const bounds = getBounds(placed.map((p) => p.rect));
+    if (placed.length < 2 || !bounds) return;
+    this.setNodePositions(alignRects(placed, bounds, mode));
+  }
+
+  distributeSelection(axis: DistributeAxis): void {
+    const placed = this.selectedRects();
+    const bounds = getBounds(placed.map((p) => p.rect));
+    if (placed.length < 3 || !bounds) return;
+    this.setNodePositions(distributeRects(placed, bounds, axis));
+  }
+
+  setGuides(guides: AlignmentGuide[]): void {
+    if (guides.length === 0 && this.getState().guides.length === 0) return;
+    this.store.setState({ guides });
+  }
+
+  private selectedRects() {
     const s = this.getState();
+    return s.nodes.filter((n) => s.selectedNodeIds.has(n.id)).map((n) => ({ id: n.id, rect: this.getNodeRect(n) }));
+  }
+
+  private subgraph(ids: string[]): FlowSnapshot {
+    const s = this.getState();
+    const include = new Set(ids);
+    return {
+      nodes: s.nodes.filter((n) => include.has(n.id)),
+      edges: s.edges.filter((e) => include.has(e.source) && include.has(e.target)),
+    };
+  }
+
+  private insertCopies(source: FlowSnapshot, offset: XYPosition): FlowNode[] {
     const idMap = new Map<string, string>();
-    const copies = ids
-      .map((id) => s.nodeLookup.get(id))
-      .filter((n): n is FlowNode => !!n)
-      .map((n) => {
-        const copy: FlowNode = {
-          ...n,
-          id: createId(n.type),
-          position: { x: n.position.x + offset.x, y: n.position.y + offset.y },
-          data: { ...n.data, properties: { ...n.data.properties } },
-        };
-        idMap.set(n.id, copy.id);
-        return copy;
-      });
-    if (!copies.length) return [];
-    const edgeCopies = s.edges
-      .filter((e) => idMap.has(e.source) && idMap.has(e.target))
-      .map((e) => ({ ...e, id: createId('edge'), source: idMap.get(e.source)!, target: idMap.get(e.target)! }));
+    const copies = source.nodes.map((n) => {
+      const copy: FlowNode = {
+        ...n,
+        id: createId(n.type),
+        position: { x: n.position.x + offset.x, y: n.position.y + offset.y },
+        data: { ...n.data, properties: { ...n.data.properties } },
+      };
+      idMap.set(n.id, copy.id);
+      return copy;
+    });
+    if (copies.length === 0) return [];
+    const edgeCopies = source.edges.flatMap((e) => {
+      const sourceId = idMap.get(e.source);
+      const targetId = idMap.get(e.target);
+      return sourceId && targetId ? [{ ...e, id: createId('edge'), source: sourceId, target: targetId }] : [];
+    });
     this.beginInteraction();
     copies.forEach((node) => this.commit([...this.getNodes(), node], this.getEdges(), { type: 'addNode', node }));
     edgeCopies.forEach((edge) => this.commit(this.getNodes(), [...this.getEdges(), edge], { type: 'addEdge', edge }));
@@ -527,6 +597,10 @@ export class FlowEngine {
     const zoom = clamp(v.zoom * factor, this.minZoom, this.maxZoom);
     const k = zoom / v.zoom;
     this.setViewport({ zoom, x: p.x - (p.x - v.x) * k, y: p.y - (p.y - v.y) * k });
+  }
+
+  zoomTo(zoom: number): void {
+    this.zoomAt(zoom / this.getState().viewport.zoom);
   }
 
   zoomIn = () => this.zoomAt(1.2);

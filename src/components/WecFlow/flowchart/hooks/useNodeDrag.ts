@@ -1,7 +1,12 @@
 import { useCallback } from 'react';
-import type { XYPosition } from '../models/FlowTypes';
+import type { Rect, XYPosition } from '../models/FlowTypes';
+import { snapToAlignment } from '../utils/alignment';
+import { getBounds } from '../utils/geometry';
 import { useFlowContext } from './FlowContext';
 import { usePointerDrag } from './usePointerDrag';
+
+const GUIDE_THRESHOLD_PX = 6;
+const GUIDE_CANDIDATE_LIMIT = 200;
 
 /** Pointer-down handler that selects a node and drags it (and the rest of the selection). */
 export function useNodeDrag(nodeId: string) {
@@ -20,22 +25,38 @@ export function useNodeDrag(nodeId: string) {
       if (!engine.getState().selectedNodeIds.has(nodeId)) engine.selectNode(nodeId);
       if (engine.getState().readOnly) return;
 
+      const { selectedNodeIds, nodes } = engine.getState();
       const starts: Record<string, XYPosition> = {};
-      for (const id of engine.getState().selectedNodeIds) {
-        const n = engine.getNode(id);
-        if (n) starts[id] = n.position;
+      const others: Rect[] = [];
+      for (const n of nodes) {
+        if (selectedNodeIds.has(n.id)) starts[n.id] = n.position;
+        else if (others.length < GUIDE_CANDIDATE_LIMIT) others.push(engine.getNodeRect(n));
       }
+      const startBounds = getBounds(nodes.filter((n) => selectedNodeIds.has(n.id)).map((n) => engine.getNodeRect(n)));
+
       startDrag(e, {
         onStart: () => engine.beginInteraction(),
-        onMove: (_ev, delta) => {
-          const zoom = engine.getState().viewport.zoom;
+        onMove: (ev, delta) => {
+          const { zoom } = engine.getState().viewport;
+          let shift = { x: delta.x / zoom, y: delta.y / zoom };
+          const useGuides = !engine.getState().snapToGrid && !ev.altKey && startBounds !== null;
+          if (useGuides) {
+            const moved = { ...startBounds, x: startBounds.x + shift.x, y: startBounds.y + shift.y };
+            const snap = snapToAlignment(moved, others, GUIDE_THRESHOLD_PX / zoom);
+            shift = { x: shift.x + snap.offset.x, y: shift.y + snap.offset.y };
+            engine.setGuides(snap.guides);
+          } else {
+            engine.setGuides([]);
+          }
           const positions: Record<string, XYPosition> = {};
           for (const [id, p] of Object.entries(starts)) {
-            positions[id] = engine.snap({ x: p.x + delta.x / zoom, y: p.y + delta.y / zoom });
+            const next = { x: p.x + shift.x, y: p.y + shift.y };
+            positions[id] = useGuides ? next : engine.snap(next);
           }
           engine.setNodePositions(positions);
         },
         onEnd: (_ev, moved) => {
+          engine.setGuides([]);
           if (moved) engine.endInteraction();
         },
       });

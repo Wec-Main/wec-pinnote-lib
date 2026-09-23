@@ -17,11 +17,20 @@ const SHORTCUTS: [string, string][] = [
   ["Delete", "Delete selection"],
   ["Ctrl Z", "Undo"],
   ["Ctrl Shift Z", "Redo"],
+  ["Ctrl C", "Copy"],
+  ["Ctrl X", "Cut"],
+  ["Ctrl V", "Paste"],
   ["Ctrl D", "Duplicate"],
   ["Ctrl A", "Select all"],
   ["Shift drag", "Box select"],
+  ["Space drag", "Pan"],
   ["Wheel", "Zoom"],
+  ["F", "Fit view"],
+  ["1", "Zoom to 100%"],
   ["Arrows", "Nudge nodes"],
+  ["Alt drag", "Move without guides"],
+  ["Right click", "Context menu"],
+  ["Double click", "Add node"],
 ];
 
 const shortcutList = (
@@ -49,7 +58,17 @@ export function WecFlowPanel() {
     EMPTY_FLOW,
     isFlowJSON,
   );
+  const [, setPublishedFlow] = usePersistentState<FlowJSON>(
+    `wpn-ui:${config.projectId}:wecFlowchart:published`,
+    EMPTY_FLOW,
+    isFlowJSON,
+  );
   const [initialFlow] = useState(() => parseFlow(flow));
+
+  const publish = (next: FlowJSON) => {
+    setFlow(next);
+    setPublishedFlow(next);
+  };
 
   return (
     <div
@@ -94,7 +113,13 @@ export function WecFlowPanel() {
       </div>
 
       <div className="wpn-flow-panel__body">
-        <FlowEditor initialFlow={initialFlow} onChange={setFlow} brand={<></>} />
+        <FlowEditor
+          initialFlow={initialFlow}
+          onChange={setFlow}
+          onSave={setFlow}
+          onPublish={publish}
+          brand={<></>}
+        />
       </div>
     </div>
   );

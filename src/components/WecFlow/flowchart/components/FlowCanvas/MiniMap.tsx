@@ -64,7 +64,7 @@ export const MiniMap = memo(function MiniMap() {
   const inner = `M ${view.x} ${view.y} v ${view.height} h ${view.width} v ${-view.height} z`;
 
   return (
-    <div className={styles.minimap} onPointerDown={onPointerDown} onWheel={(e) => e.stopPropagation()}>
+    <div className={styles.minimap} onPointerDown={onPointerDown} onWheel={(e) => e.stopPropagation()} onDoubleClick={(e) => e.stopPropagation()} data-flow-overlay>
       <svg ref={svgRef} width={WIDTH} height={HEIGHT} viewBox={`${vbX} ${vbY} ${vbW} ${vbH}`}>
         {rects.map(({ id, rect, color }) => (
           <rect

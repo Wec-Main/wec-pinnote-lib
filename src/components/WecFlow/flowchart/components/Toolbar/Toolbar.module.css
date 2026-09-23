@@ -10,11 +10,15 @@
   background: var(--fb-panel);
 }
 
-.brand {
+.start {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 6px;
   min-width: 0;
+}
+
+.start .nameLabel {
+  margin-right: 2px;
 }
 
 .logo {
@@ -28,23 +32,33 @@
   background: linear-gradient(135deg, var(--fb-accent), #8b5cf6);
 }
 
+.nameLabel {
+  flex: none;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--fb-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+
 .name {
-  min-width: 0;
-  max-width: 260px;
+  flex: 0 1 300px;
+  width: 300px;
+  min-width: 140px;
   height: 32px;
   padding: 0 8px;
-  border: 1px solid transparent;
+  border: 1px solid var(--fb-border);
   border-radius: 7px;
   font: inherit;
   font-size: 13px;
   font-weight: 600;
   color: var(--fb-text);
-  background: transparent;
+  background: var(--fb-panel-muted);
   text-overflow: ellipsis;
 }
 
 .name:hover:not(:disabled) {
-  border-color: var(--fb-border);
+  border-color: var(--fb-border-strong);
 }
 
 .name:focus {
@@ -59,17 +73,18 @@
 
 .actions {
   display: flex;
+  flex: none;
   align-items: center;
   gap: 6px;
   overflow-x: auto;
 }
 
-.group {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding-right: 8px;
-  border-right: 1px solid var(--fb-border);
+.divider {
+  flex: none;
+  width: 1px;
+  height: 20px;
+  margin: 0 4px;
+  background: var(--fb-border-strong);
 }
 
 .badge {
@@ -83,10 +98,4 @@
   font-weight: 700;
   color: #fff;
   background: var(--fb-danger);
-}
-
-@media (max-width: 1100px) {
-  .group button svg + * {
-    display: none;
-  }
 }

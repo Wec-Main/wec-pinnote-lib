@@ -11,7 +11,7 @@ export { DefaultNodeContent } from './components/NodeRenderer/DefaultNodeContent
 export { EdgeRenderer, EdgeLabelRenderer } from './components/EdgeRenderer/EdgeRenderer';
 export { Sidebar, type SidebarProps } from './components/Sidebar/Sidebar';
 export { PropertiesPanel, type PropertiesPanelProps } from './components/PropertiesPanel/PropertiesPanel';
-export { Toolbar, type ToolbarProps, type NoticeKind } from './components/Toolbar/Toolbar';
+export { Toolbar, type ToolbarProps, type NoticeKind, type FlowCommitHandler } from './components/Toolbar/Toolbar';
 export { ValidationPanel } from './components/ValidationPanel/ValidationPanel';
 export { Icon, NodeIcon, type IconName } from './components/icons';
 

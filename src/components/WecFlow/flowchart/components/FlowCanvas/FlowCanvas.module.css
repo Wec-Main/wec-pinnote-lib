@@ -196,3 +196,22 @@
   fill: none;
   stroke: var(--fb-accent);
 }
+
+/* ------------------------------------------------------------ guides */
+
+.guides {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 1px;
+  height: 1px;
+  overflow: visible;
+  pointer-events: none;
+}
+
+.guides line {
+  stroke: #f472b6;
+  stroke-width: 1;
+  stroke-dasharray: 4 3;
+  vector-effect: non-scaling-stroke;
+}

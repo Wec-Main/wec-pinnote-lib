@@ -10,7 +10,7 @@ import { FlowProvider } from '../FlowProvider';
 import { Icon } from '../icons';
 import { PropertiesPanel } from '../PropertiesPanel/PropertiesPanel';
 import { Sidebar } from '../Sidebar/Sidebar';
-import { Toolbar, type NoticeKind } from '../Toolbar/Toolbar';
+import { Toolbar, type FlowCommitHandler, type NoticeKind } from '../Toolbar/Toolbar';
 import { ValidationPanel } from '../ValidationPanel/ValidationPanel';
 import styles from './FlowEditor.module.css';
 
@@ -27,6 +27,10 @@ export interface FlowEditorProps extends FlowEngineOptions {
   /** Custom brand element for the toolbar. */
   brand?: ReactNode;
   toolbarActions?: ReactNode;
+  /** Shows a Save button in the toolbar; called after the user confirms. */
+  onSave?: FlowCommitHandler;
+  /** Shows a Publish button in the toolbar; called after the user confirms. */
+  onPublish?: FlowCommitHandler;
   className?: string;
   style?: CSSProperties;
 }
@@ -47,6 +51,8 @@ function EditorLayout({
   background,
   brand,
   toolbarActions,
+  onSave,
+  onPublish,
   className,
   style,
 }: FlowEditorProps) {
@@ -85,7 +91,7 @@ function EditorLayout({
 
   return (
     <div className={cx(styles.editor, className)} style={style} onKeyDown={onKeyDown}>
-      {showToolbar && <Toolbar brand={brand} onNotify={notify} extraActions={toolbarActions} />}
+      {showToolbar && <Toolbar brand={brand} onNotify={notify} onSave={onSave} onPublish={onPublish} extraActions={toolbarActions} />}
       <div className={styles.body}>
         {showSidebar && <Sidebar />}
         <main className={styles.main}>

@@ -5,6 +5,7 @@ import { usePointerDrag } from '../../hooks/usePointerDrag';
 import { NODE_DRAG_MIME } from '../../utils/constants';
 import { rectFromPoints } from '../../utils/geometry';
 import { cx } from '../../utils/shallow';
+import { ContextMenu, type ContextMenuRequest, type ContextMenuTarget } from '../ContextMenu/ContextMenu';
 import { EdgeLabelRenderer, EdgeRenderer } from '../EdgeRenderer/EdgeRenderer';
 import { NodeRenderer } from '../NodeRenderer/NodeRenderer';
 import { Icon } from '../icons';
@@ -32,9 +33,36 @@ const ViewportLayer = memo(function ViewportLayer() {
       <EdgeRenderer />
       <EdgeLabelRenderer />
       <NodeRenderer />
+      <AlignmentGuides />
     </div>
   );
 });
+
+const AlignmentGuides = memo(function AlignmentGuides() {
+  const guides = useFlowState((s) => s.guides);
+  if (guides.length === 0) return null;
+  return (
+    <svg className={styles.guides} aria-hidden="true">
+      {guides.map((g) =>
+        g.axis === 'x' ? (
+          <line key={`x${g.position}`} x1={g.position} x2={g.position} y1={g.start - 12} y2={g.end + 12} />
+        ) : (
+          <line key={`y${g.position}`} x1={g.start - 12} x2={g.end + 12} y1={g.position} y2={g.position} />
+        ),
+      )}
+    </svg>
+  );
+});
+
+function menuTargetAt(element: EventTarget | null): ContextMenuTarget | null {
+  if (!(element instanceof Element)) return { kind: 'canvas' };
+  if (element.closest('[data-flow-overlay]')) return null;
+  const nodeId = element.closest<HTMLElement>('[data-node-id]')?.dataset.nodeId;
+  if (nodeId) return { kind: 'node', id: nodeId };
+  const edgeId = element.closest('[data-edge-id]')?.getAttribute('data-edge-id');
+  if (edgeId) return { kind: 'edge', id: edgeId };
+  return { kind: 'canvas' };
+}
 
 const SelectionBox = memo(function SelectionBox() {
   const rect = useFlowState((s) => s.selectionRect);
@@ -77,6 +105,11 @@ export function FlowCanvas({ background = 'dots', showMiniMap = true, showContro
   const readOnly = useFlowState((s) => s.readOnly);
   const [mode, setMode] = useState<CanvasMode>('pan');
   const [panning, setPanning] = useState(false);
+  const [spaceHeld, setSpaceHeld] = useState(false);
+  const [grid, setGrid] = useState<BackgroundVariant>(background);
+  const [miniMapVisible, setMiniMapVisible] = useState(showMiniMap);
+  const [menu, setMenu] = useState<ContextMenuRequest | null>(null);
+  const closeMenu = useCallback(() => setMenu(null), []);
   const startDrag = usePointerDrag();
   const onKeyDown = useKeyboardShortcuts();
 
@@ -113,7 +146,7 @@ export function FlowCanvas({ background = 'dots', showMiniMap = true, showContro
   const onPointerDown = useCallback(
     (e: React.PointerEvent) => {
       canvasRef.current?.focus({ preventScroll: true });
-      const selecting = e.button === 0 && (mode === 'select' || e.shiftKey);
+      const selecting = e.button === 0 && !spaceHeld && (mode === 'select' || e.shiftKey);
       if (selecting) {
         const additive = e.shiftKey || e.metaKey || e.ctrlKey;
         const origin = clientToFlow({ x: e.clientX, y: e.clientY });
@@ -142,8 +175,32 @@ export function FlowCanvas({ background = 'dots', showMiniMap = true, showContro
         },
       });
     },
-    [engine, canvasRef, clientToFlow, mode, startDrag],
+    [engine, canvasRef, clientToFlow, mode, spaceHeld, startDrag],
   );
+
+  const openMenu = (e: React.MouseEvent, target: ContextMenuTarget) => {
+    const client = { x: e.clientX, y: e.clientY };
+    if (target.kind === 'node' && !engine.getState().selectedNodeIds.has(target.id)) engine.selectNode(target.id);
+    if (target.kind === 'edge') engine.selectEdge(target.id);
+    setMenu({ target, screen: clientToCanvas(client), flow: clientToFlow(client) });
+  };
+
+  const onContextMenu = (e: React.MouseEvent) => {
+    e.preventDefault();
+    const target = menuTargetAt(e.target);
+    if (target) openMenu(e, target);
+  };
+
+  const onDoubleClick = (e: React.MouseEvent) => {
+    if (readOnly || menuTargetAt(e.target)?.kind !== 'canvas') return;
+    openMenu(e, { kind: 'canvas' });
+  };
+
+  const onSpaceKey = (e: React.KeyboardEvent) => {
+    if (e.key !== ' ' || e.target !== e.currentTarget) return;
+    e.preventDefault();
+    setSpaceHeld(e.type === 'keydown');
+  };
 
   const onDragOver = (e: React.DragEvent) => {
     if (readOnly || !e.dataTransfer.types.includes(NODE_DRAG_MIME)) return;
@@ -168,22 +225,38 @@ export function FlowCanvas({ background = 'dots', showMiniMap = true, showContro
   return (
     <div
       ref={canvasRef}
-      className={cx(styles.canvas, mode === 'select' && styles.modeSelect, panning && styles.panning, className)}
+      className={cx(styles.canvas, mode === 'select' && !spaceHeld && styles.modeSelect, (panning || spaceHeld) && styles.panning, className)}
       tabIndex={0}
       onPointerDown={onPointerDown}
-      onKeyDown={keyboardShortcuts ? onKeyDown : undefined}
+      onKeyDown={(e) => {
+        onSpaceKey(e);
+        if (keyboardShortcuts) onKeyDown(e);
+      }}
+      onKeyUp={onSpaceKey}
+      onBlur={() => setSpaceHeld(false)}
       onDragOver={onDragOver}
       onDrop={onDrop}
-      onContextMenu={(e) => e.preventDefault()}
+      onContextMenu={onContextMenu}
+      onDoubleClick={onDoubleClick}
     >
-      <Background variant={background} />
+      <Background variant={grid} />
       <ViewportLayer />
       <SelectionBox />
       <EmptyState />
       <ConnectionHint />
-      {showControls && <Controls mode={mode} onModeChange={setMode} />}
-      {showMiniMap && <MiniMap />}
+      {showControls && (
+        <Controls
+          mode={mode}
+          onModeChange={setMode}
+          grid={grid}
+          onGridChange={setGrid}
+          miniMapVisible={miniMapVisible}
+          onMiniMapToggle={() => setMiniMapVisible((visible) => !visible)}
+        />
+      )}
+      {miniMapVisible && <MiniMap />}
       {children}
+      {menu && <ContextMenu request={menu} onClose={closeMenu} />}
     </div>
   );
 }

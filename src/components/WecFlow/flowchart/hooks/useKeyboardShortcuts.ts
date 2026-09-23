@@ -26,6 +26,12 @@ export function useKeyboardShortcuts() {
       }
       if (key === '+' || key === '=') return engine.zoomIn();
       if (key === '-') return engine.zoomOut();
+      if (!mod && key === 'f') return engine.fitView();
+      if (!mod && key === '1') return engine.zoomTo(1);
+      if (mod && key === 'c') {
+        if (engine.copySelection()) e.preventDefault();
+        return;
+      }
       if (mod && key === 'a') {
         e.preventDefault();
         return engine.selectAll();
@@ -43,6 +49,15 @@ export function useKeyboardShortcuts() {
       if (mod && key === 'y') {
         e.preventDefault();
         return engine.redo();
+      }
+      if (mod && key === 'x') {
+        if (engine.cutSelection()) e.preventDefault();
+        return;
+      }
+      if (mod && key === 'v') {
+        e.preventDefault();
+        engine.paste();
+        return;
       }
       if (mod && key === 'd') {
         e.preventDefault();

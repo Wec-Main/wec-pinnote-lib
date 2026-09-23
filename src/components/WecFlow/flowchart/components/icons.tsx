@@ -38,6 +38,20 @@ const paths = {
   success: 'M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18z M8 12.2l2.8 2.8 5.2-5.5',
   curve: 'M4 19C4 9 20 15 20 5',
   chevron: 'M9 6l6 6-6 6',
+  cut: 'M6 7a2.5 2.5 0 1 0 0 .1z M6 17a2.5 2.5 0 1 0 0 .1z M8 8.5L20 18 M8 15.5L20 6',
+  paste: 'M9 4h6v3H9z M8 5.5H5.5V21h13V5.5H16',
+  magnet: 'M6 4v8a6 6 0 0 0 12 0V4h-4v8a2 2 0 0 1-4 0V4z M6 8h4 M14 8h4',
+  map: 'M3.5 6.5l5.5-2.5 6 2.5 5.5-2.5v13.5l-5.5 2.5-6-2.5-5.5 2.5z M9 4v13.5 M15 6.5V20',
+  alignLeft: 'M4 3v18 M8 7h11v4H8z M8 14h7v4H8z',
+  alignCenter: 'M12 3v18 M6 7h12v4H6z M8.5 14h7v4h-7z',
+  alignRight: 'M20 3v18 M5 7h11v4H5z M9 14h7v4H9z',
+  alignTop: 'M3 4h18 M7 8v11h4V8z M14 8v7h4V8z',
+  alignMiddle: 'M3 12h18 M7 6v12h4V6z M14 8.5v7h4v-7z',
+  alignBottom: 'M3 20h18 M7 5v11h4V5z M14 9v7h4V9z',
+  distributeH: 'M4 3v18 M20 3v18 M9.5 8h5v8h-5z',
+  distributeV: 'M3 4h18 M3 20h18 M8 9.5h8v5H8z',
+  save: 'M5 4h11l3 3v13H5z M8 4v5h7V4 M8 20v-6h8v6',
+  publish: 'M12 15V4 M7.5 8.5L12 4l4.5 4.5 M5 14v6h14v-6',
 } as const;
 
 export type IconName = keyof typeof paths;
