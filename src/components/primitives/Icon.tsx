@@ -19,6 +19,7 @@ export type IconName =
   | "users"
   | "pen"
   | "epic"
+  | "flow"
   | "comment"
   | "history"
   | "refresh"
@@ -113,6 +114,14 @@ const PATHS: Record<IconName, ReactElement> = {
     <>
       <path d="M4 6.5A1.5 1.5 0 0 1 5.5 5h13A1.5 1.5 0 0 1 20 6.5v11a1.5 1.5 0 0 1-1.5 1.5h-13A1.5 1.5 0 0 1 4 17.5Z" />
       <path d="M8 9.5h8M8 13h5" />
+    </>
+  ),
+  flow: (
+    <>
+      <rect x="3.5" y="4" width="6" height="4.5" rx="1" />
+      <rect x="14.5" y="4" width="6" height="4.5" rx="1" />
+      <rect x="9" y="15.5" width="6" height="4.5" rx="1" />
+      <path d="M6.5 8.5v2a2 2 0 0 0 2 2h1M17.5 8.5v2a2 2 0 0 1-2 2h-1M12 12.5v3" />
     </>
   ),
   comment: (

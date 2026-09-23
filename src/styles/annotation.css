@@ -2759,7 +2759,7 @@ body.wpn-epicflow-resizing {
   width: min(1100px, 94vw);
   height: min(720px, 88vh);
   padding: 16px;
-  background: rgba(0, 0, 0, 0.88);
+  background: rgba(18, 18, 20, 0.98);
   border: 1px solid rgba(255, 255, 255, 0.14);
   border-radius: 12px;
   box-shadow: var(--wpn-shadow);

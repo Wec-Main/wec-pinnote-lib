@@ -7,6 +7,5 @@ export const Icons = {
   wecLogo,
   pen: penIcon,
   epic: epicIcon,
-  flow: epicIcon,
   settings: settingsIcon,
 } as const;
