@@ -5,6 +5,7 @@ export type IconName =
   | "plus"
   | "edit"
   | "reset"
+  | "redo"
   | "trash"
   | "close"
   | "expand"
@@ -32,7 +33,9 @@ export type IconName =
   | "tag"
   | "building"
   | "folder"
-  | "drag";
+  | "drag"
+  | "download"
+  | "upload";
 
 const PATHS: Record<IconName, ReactElement> = {
   search: (
@@ -52,6 +55,12 @@ const PATHS: Record<IconName, ReactElement> = {
     <>
       <path d="M20 12a8 8 0 1 1-2.3-5.6" />
       <path d="M20 4v4.5h-4.5" />
+    </>
+  ),
+  redo: (
+    <>
+      <path d="M4 12a8 8 0 1 0 2.3-5.6" />
+      <path d="M4 4v4.5h4.5" />
     </>
   ),
   trash: (
@@ -195,6 +204,18 @@ const PATHS: Record<IconName, ReactElement> = {
       <circle cx="15" cy="12" r="1.4" fill="currentColor" stroke="none" />
       <circle cx="9" cy="18" r="1.4" fill="currentColor" stroke="none" />
       <circle cx="15" cy="18" r="1.4" fill="currentColor" stroke="none" />
+    </>
+  ),
+  download: (
+    <>
+      <path d="M12 3.5v11.5M8 11l4 4 4-4" />
+      <path d="M4.5 17v2.5a1 1 0 0 0 1 1h13a1 1 0 0 0 1-1V17" />
+    </>
+  ),
+  upload: (
+    <>
+      <path d="M12 15V3.5M8 7.5l4-4 4 4" />
+      <path d="M4.5 17v2.5a1 1 0 0 0 1 1h13a1 1 0 0 0 1-1V17" />
     </>
   ),
 };

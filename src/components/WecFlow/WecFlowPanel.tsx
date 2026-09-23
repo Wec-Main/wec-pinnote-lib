@@ -134,6 +134,7 @@ export function WecFlowPanel() {
           onClick={handleNewFlow}
           title="Start a new empty flow"
         >
+          <Icon name="plus" className="wpn-btn__icon" />
           New Flow
         </button>
         <button
@@ -142,6 +143,7 @@ export function WecFlowPanel() {
           onClick={() => dispatchShortcut("z")}
           title="Undo (Ctrl+Z)"
         >
+          <Icon name="reset" className="wpn-btn__icon" />
           Undo
         </button>
         <button
@@ -150,6 +152,7 @@ export function WecFlowPanel() {
           onClick={() => dispatchShortcut("z", { shiftKey: true })}
           title="Redo (Ctrl+Shift+Z)"
         >
+          <Icon name="redo" className="wpn-btn__icon" />
           Redo
         </button>
         <button
@@ -158,6 +161,7 @@ export function WecFlowPanel() {
           onClick={() => flowRef.current?.fitView()}
           title="Fit the flow to the viewport"
         >
+          <Icon name="expand" className="wpn-btn__icon" />
           Fit View
         </button>
         <button
@@ -166,6 +170,7 @@ export function WecFlowPanel() {
           onClick={handleValidate}
           title="Validate the current flow"
         >
+          <Icon name="check" className="wpn-btn__icon" />
           Validate
         </button>
         <button
@@ -174,6 +179,7 @@ export function WecFlowPanel() {
           onClick={handleExportOpen}
           title="View the flow as JSON"
         >
+          <Icon name="download" className="wpn-btn__icon" />
           Export JSON
         </button>
         <button
@@ -182,6 +188,7 @@ export function WecFlowPanel() {
           onClick={handleImportOpen}
           title="Load a flow from JSON"
         >
+          <Icon name="upload" className="wpn-btn__icon" />
           Import JSON
         </button>
         <label className="wpn-flow-panel__toggle" title="Toggle read-only mode">

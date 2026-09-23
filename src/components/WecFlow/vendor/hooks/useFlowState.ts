@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { applyNodeChanges, applyEdgeChanges, type NodeChange, type EdgeChange } from "@xyflow/react";
 import type {
   FlowDefinition,
+  FlowEdge,
   FlowNode,
   FlowNodeData,
   FlowNodeType,
@@ -40,6 +41,11 @@ export interface UseFlowStateResult {
     data: Partial<Pick<FlowNodeData, "label" | "description">>,
   ) => void;
   updateEdgeLabel: (edgeId: string, label: string) => void;
+  updateEdgeStyle: (
+    edgeId: string,
+    updates: Partial<Pick<FlowEdge, "lineStyle" | "arrow">>,
+  ) => void;
+  duplicateNode: (nodeId: string) => string | null;
   deleteElements: (nodeIds: string[], edgeIds: string[]) => void;
   deleteSelected: () => void;
   clearSelection: () => void;
@@ -179,12 +185,14 @@ export function useFlowState(initialFlow: FlowDefinition): UseFlowStateResult {
   const onConnect = useCallback<UseFlowStateResult["onConnect"]>(
     (connection) => {
       if (!connection.source || !connection.target) return;
-      const newEdge = {
+      const newEdge: FlowEdge = {
         id: generateId("edge"),
         source: connection.source,
         target: connection.target,
         sourceHandle: connection.sourceHandle ?? undefined,
         targetHandle: connection.targetHandle ?? undefined,
+        lineStyle: "solid",
+        arrow: "forward",
       };
       setRfEdges((current) => [...current, toRFEdge(newEdge)]);
       commitFlow({ ...flow, edges: [...flow.edges, newEdge] });
@@ -196,6 +204,28 @@ export function useFlowState(initialFlow: FlowDefinition): UseFlowStateResult {
     (type, position, label) => {
       const id = generateId("node");
       const newNode: FlowNode = { id, type, position, data: { label } };
+      setRfNodes((current) => [
+        ...current.map((node) => ({ ...node, selected: false })),
+        { ...toRFNode(newNode), selected: true },
+      ]);
+      setRfEdges((current) => current.map((edge) => ({ ...edge, selected: false })));
+      commitFlow({ ...flow, nodes: [...flow.nodes, newNode] });
+      return id;
+    },
+    [flow, commitFlow],
+  );
+
+  const duplicateNode = useCallback<UseFlowStateResult["duplicateNode"]>(
+    (nodeId) => {
+      const source = flow.nodes.find((node) => node.id === nodeId);
+      if (!source) return null;
+      const id = generateId("node");
+      const newNode: FlowNode = {
+        ...source,
+        id,
+        position: { x: source.position.x + 32, y: source.position.y + 32 },
+        data: { ...source.data },
+      };
       setRfNodes((current) => [
         ...current.map((node) => ({ ...node, selected: false })),
         { ...toRFNode(newNode), selected: true },
@@ -237,6 +267,23 @@ export function useFlowState(initialFlow: FlowDefinition): UseFlowStateResult {
       scheduleTextCommit(`edge:${edgeId}`, nextFlow);
     },
     [flow, scheduleTextCommit],
+  );
+
+  const updateEdgeStyle = useCallback<UseFlowStateResult["updateEdgeStyle"]>(
+    (edgeId, updates) => {
+      const nextEdges = flow.edges.map((edge) =>
+        edge.id === edgeId ? { ...edge, ...updates } : edge,
+      );
+      setRfEdges((current) =>
+        current.map((edge) => {
+          if (edge.id !== edgeId) return edge;
+          const domainEdge = nextEdges.find((e) => e.id === edgeId);
+          return domainEdge ? { ...toRFEdge(domainEdge), selected: edge.selected } : edge;
+        }),
+      );
+      commitFlow({ ...flow, edges: nextEdges });
+    },
+    [flow, commitFlow],
   );
 
   const deleteElements = useCallback<UseFlowStateResult["deleteElements"]>(
@@ -293,8 +340,10 @@ export function useFlowState(initialFlow: FlowDefinition): UseFlowStateResult {
     onEdgesChange,
     onConnect,
     addNode,
+    duplicateNode,
     updateNodeData,
     updateEdgeLabel,
+    updateEdgeStyle,
     deleteElements,
     deleteSelected,
     clearSelection,

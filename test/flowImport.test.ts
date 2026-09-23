@@ -83,6 +83,42 @@ describe("importFlow", () => {
     },
   );
 
+  it("imports an edge with lineStyle and arrow set", () => {
+    const flow: FlowDefinition = {
+      ...makeSampleFlow(),
+      edges: [{ id: "e1", source: "n1", target: "n2", lineStyle: "dashed", arrow: "both" }],
+    };
+    const json = exportFlow(flow);
+    const imported = importFlow(json);
+    expect(imported).toEqual(flow);
+  });
+
+  it("throws FlowImportError when an edge has an invalid lineStyle", () => {
+    const bad = {
+      id: "f1",
+      name: "F",
+      nodes: [
+        { id: "n1", type: "start", position: { x: 0, y: 0 }, data: { label: "Start" } },
+        { id: "n2", type: "end", position: { x: 0, y: 0 }, data: { label: "End" } },
+      ],
+      edges: [{ id: "e1", source: "n1", target: "n2", lineStyle: "wavy" }],
+    };
+    expect(() => importFlow(JSON.stringify(bad))).toThrow(FlowImportError);
+  });
+
+  it("throws FlowImportError when an edge has an invalid arrow", () => {
+    const bad = {
+      id: "f1",
+      name: "F",
+      nodes: [
+        { id: "n1", type: "start", position: { x: 0, y: 0 }, data: { label: "Start" } },
+        { id: "n2", type: "end", position: { x: 0, y: 0 }, data: { label: "End" } },
+      ],
+      edges: [{ id: "e1", source: "n1", target: "n2", arrow: "sideways" }],
+    };
+    expect(() => importFlow(JSON.stringify(bad))).toThrow(FlowImportError);
+  });
+
   it("throws FlowImportError with a message pinpointing the bad node index", () => {
     const bad = {
       id: "f1",

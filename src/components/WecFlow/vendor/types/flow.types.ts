@@ -24,6 +24,9 @@ export interface FlowNode {
   data: FlowNodeData;
 }
 
+export type FlowEdgeLineStyle = "solid" | "dashed";
+export type FlowEdgeArrow = "none" | "forward" | "both";
+
 export interface FlowEdge {
   id: string;
   source: string;
@@ -31,6 +34,8 @@ export interface FlowEdge {
   sourceHandle?: string;
   targetHandle?: string;
   label?: string;
+  lineStyle?: FlowEdgeLineStyle;
+  arrow?: FlowEdgeArrow;
 }
 
 export interface FlowDefinition {

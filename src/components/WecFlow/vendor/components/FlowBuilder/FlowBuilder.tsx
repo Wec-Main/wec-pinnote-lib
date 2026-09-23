@@ -7,7 +7,7 @@ import {
   useRef,
   useState,
 } from "react";
-import type { DragEvent } from "react";
+import type { DragEvent, MouseEvent as ReactMouseEvent } from "react";
 import {
   Background,
   Controls,
@@ -16,6 +16,8 @@ import {
   ReactFlowProvider,
   useReactFlow,
   type Connection,
+  type Node as RFNodeType,
+  type Edge as RFEdgeType,
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 
@@ -30,6 +32,7 @@ import { useFlowKeyboard } from "../../hooks/useFlowKeyboard";
 import { nodeTypes } from "../nodes";
 import { NodePalette } from "../NodePalette/NodePalette";
 import { PropertiesPanel } from "../PropertiesPanel/PropertiesPanel";
+import { ContextMenu, type ContextMenuAction } from "../ContextMenu/ContextMenu";
 import { generateId } from "../../utils/id";
 import { exportFlow } from "../../utils/flowExport";
 import { fromRFNode, fromRFEdge } from "../../utils/rfAdapters";
@@ -86,6 +89,11 @@ const FlowBuilderInner = forwardRef<FlowBuilderRef, FlowBuilderInnerProps>(
       type: FlowNodeType;
       left: number;
       top: number;
+    } | null>(null);
+    const [contextMenu, setContextMenu] = useState<{
+      left: number;
+      top: number;
+      target: { kind: "node"; id: string } | { kind: "edge"; id: string } | { kind: "pane" };
     } | null>(null);
 
     // Controlled-mode sync: replace internal state when an externally supplied
@@ -190,13 +198,132 @@ const FlowBuilderInner = forwardRef<FlowBuilderRef, FlowBuilderInnerProps>(
     );
 
     const handleUpdateEdge = useCallback(
-      (edgeId: string, updates: Partial<Pick<FlowDefinition["edges"][number], "label">>) => {
+      (
+        edgeId: string,
+        updates: Partial<Pick<FlowDefinition["edges"][number], "label" | "lineStyle" | "arrow">>,
+      ) => {
         if (updates.label !== undefined) {
           flowState.updateEdgeLabel(edgeId, updates.label);
+        }
+        if (updates.lineStyle !== undefined || updates.arrow !== undefined) {
+          flowState.updateEdgeStyle(edgeId, {
+            lineStyle: updates.lineStyle,
+            arrow: updates.arrow,
+          });
         }
       },
       [flowState],
     );
+
+    const handleDuplicateNode = useCallback(
+      (nodeId: string) => {
+        if (!readonly) flowState.duplicateNode(nodeId);
+      },
+      [readonly, flowState],
+    );
+
+    const handleDeleteNode = useCallback(
+      (nodeId: string) => {
+        if (!readonly) flowState.deleteElements([nodeId], []);
+      },
+      [readonly, flowState],
+    );
+
+    const handleDeleteEdge = useCallback(
+      (edgeId: string) => {
+        if (!readonly) flowState.deleteElements([], [edgeId]);
+      },
+      [readonly, flowState],
+    );
+
+    const contextMenuOriginRef = useRef<{ x: number; y: number } | null>(null);
+
+    const openContextMenu = useCallback(
+      (
+        event: { preventDefault: () => void; clientX: number; clientY: number },
+        target: NonNullable<typeof contextMenu>["target"],
+      ) => {
+        if (readonly) return;
+        event.preventDefault();
+        const wrapper = wrapperRef.current;
+        if (!wrapper) return;
+        const bounds = wrapper.getBoundingClientRect();
+        contextMenuOriginRef.current = { x: event.clientX, y: event.clientY };
+        setContextMenu({
+          left: event.clientX - bounds.left,
+          top: event.clientY - bounds.top,
+          target,
+        });
+      },
+      [readonly],
+    );
+
+    const handleNodeContextMenu = useCallback(
+      (event: ReactMouseEvent, node: RFNodeType) => {
+        openContextMenu(event, { kind: "node", id: node.id });
+      },
+      [openContextMenu],
+    );
+
+    const handleEdgeContextMenu = useCallback(
+      (event: ReactMouseEvent, edge: RFEdgeType) => {
+        openContextMenu(event, { kind: "edge", id: edge.id });
+      },
+      [openContextMenu],
+    );
+
+    const handlePaneContextMenu = useCallback(
+      (event: ReactMouseEvent | MouseEvent) => {
+        openContextMenu(event, { kind: "pane" });
+      },
+      [openContextMenu],
+    );
+
+    const closeContextMenu = useCallback(() => {
+      setContextMenu(null);
+    }, []);
+
+    const handleAddNodeAtMenu = useCallback(
+      (type: FlowNodeType) => {
+        const origin = contextMenuOriginRef.current;
+        if (!origin) return;
+        const position = reactFlowInstance.screenToFlowPosition(origin);
+        flowState.addNode(type, position, DEFAULT_NODE_LABELS[type]);
+      },
+      [reactFlowInstance, flowState],
+    );
+
+    const contextMenuActions = useMemo<ContextMenuAction[]>(() => {
+      if (!contextMenu) return [];
+      if (contextMenu.target.kind === "node") {
+        const nodeId = contextMenu.target.id;
+        return [
+          { key: "duplicate", label: "Duplicate node", onSelect: () => flowState.duplicateNode(nodeId) },
+          {
+            key: "delete",
+            label: "Delete node",
+            danger: true,
+            onSelect: () => flowState.deleteElements([nodeId], []),
+          },
+        ];
+      }
+      if (contextMenu.target.kind === "edge") {
+        const edgeId = contextMenu.target.id;
+        return [
+          {
+            key: "delete",
+            label: "Delete connection",
+            danger: true,
+            onSelect: () => flowState.deleteElements([], [edgeId]),
+          },
+        ];
+      }
+      return (Object.keys(DEFAULT_NODE_LABELS) as FlowNodeType[]).map((type) => ({
+        key: `add-${type}`,
+        label: `Add ${DEFAULT_NODE_LABELS[type]} node`,
+        onSelect: () => handleAddNodeAtMenu(type),
+      }));
+    }, [contextMenu, flowState, handleAddNodeAtMenu]);
 
     const handleDelete = useCallback(() => {
       if (!readonly) flowState.deleteSelected();
@@ -272,6 +399,9 @@ const FlowBuilderInner = forwardRef<FlowBuilderRef, FlowBuilderInnerProps>(
             onEdgesChange={flowState.onEdgesChange}
             onConnect={handleConnect}
             onPaneClick={flowState.clearSelection}
+            onNodeContextMenu={handleNodeContextMenu}
+            onEdgeContextMenu={handleEdgeContextMenu}
+            onPaneContextMenu={handlePaneContextMenu}
             nodesDraggable={!readonly}
             nodesConnectable={!readonly}
             elementsSelectable
@@ -284,14 +414,27 @@ const FlowBuilderInner = forwardRef<FlowBuilderRef, FlowBuilderInnerProps>(
             {showControls && <Controls showInteractive={!readonly} />}
             {showMiniMap && <MiniMap pannable zoomable />}
           </ReactFlow>
+          {contextMenu && (
+            <ContextMenu
+              left={contextMenu.left}
+              top={contextMenu.top}
+              actions={contextMenuActions}
+              onClose={closeContextMenu}
+            />
+          )}
         </div>
         {showPropertiesPanel && (
           <div className="wec-flow-builder__properties">
             <PropertiesPanel
               selectedNode={selectedNode}
               selectedEdge={selectedEdge}
+              nodes={flowState.flow.nodes}
+              edges={flowState.flow.edges}
               onUpdateNode={flowState.updateNodeData}
               onUpdateEdge={handleUpdateEdge}
+              onDuplicateNode={handleDuplicateNode}
+              onDeleteNode={handleDeleteNode}
+              onDeleteEdge={handleDeleteEdge}
               readonly={readonly}
             />
           </div>

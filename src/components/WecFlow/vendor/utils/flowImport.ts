@@ -1,6 +1,8 @@
 import type {
   FlowDefinition,
   FlowEdge,
+  FlowEdgeArrow,
+  FlowEdgeLineStyle,
   FlowNode,
   FlowNodeType,
 } from "../types/flow.types";
@@ -24,6 +26,9 @@ const FLOW_NODE_TYPES: readonly FlowNodeType[] = [
   "input",
   "output",
 ];
+
+const FLOW_EDGE_LINE_STYLES: readonly FlowEdgeLineStyle[] = ["solid", "dashed"];
+const FLOW_EDGE_ARROWS: readonly FlowEdgeArrow[] = ["none", "forward", "both"];
 
 /**
  * Parses a JSON string and validates that it has the minimal required shape
@@ -219,6 +224,24 @@ function parseFlowEdge(value: unknown, index: number): FlowEdge {
     );
   }
 
+  if (
+    value.lineStyle !== undefined &&
+    !FLOW_EDGE_LINE_STYLES.includes(value.lineStyle as FlowEdgeLineStyle)
+  ) {
+    throw new FlowImportError(
+      `Invalid flow: edges[${index}].lineStyle must be "solid" or "dashed" when provided.`
+    );
+  }
+
+  if (
+    value.arrow !== undefined &&
+    !FLOW_EDGE_ARROWS.includes(value.arrow as FlowEdgeArrow)
+  ) {
+    throw new FlowImportError(
+      `Invalid flow: edges[${index}].arrow must be "none", "forward", or "both" when provided.`
+    );
+  }
+
   const edge: FlowEdge = {
     id: value.id,
     source: value.source,
@@ -235,6 +258,14 @@ function parseFlowEdge(value: unknown, index: number): FlowEdge {
 
   if (typeof value.label === "string") {
     edge.label = value.label;
+  }
+
+  if (typeof value.lineStyle === "string") {
+    edge.lineStyle = value.lineStyle as FlowEdgeLineStyle;
+  }
+
+  if (typeof value.arrow === "string") {
+    edge.arrow = value.arrow as FlowEdgeArrow;
   }
 
   return edge;
