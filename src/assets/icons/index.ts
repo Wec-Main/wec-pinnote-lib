@@ -11,6 +11,7 @@ import wecLogo from "./wec-logo.png?inline";
 export const Icons = {
   pen: penIcon,
   epic: epicIcon,
+  flow: epicIcon,
   settings: settingsIcon,
   comment: commentIcon,
   eyeEnabled: eyeEnabledIcon,

@@ -46,6 +46,8 @@ export function AnnotationToolbar() {
     setListOpen,
     epicFlowOpen,
     setEpicFlowOpen,
+    flowOpen,
+    setFlowOpen,
     userManagementOpen,
     setUserManagementOpen,
     setAuditHistoryOpen,
@@ -218,6 +220,13 @@ export function AnnotationToolbar() {
       }
       setUserManagementOpen(true);
     };
+    const openFlow = () => {
+      if (didDrag.current) {
+        didDrag.current = false;
+        return;
+      }
+      setFlowOpen(true);
+    };
     const toggleLauncher = () => {
       if (didDrag.current) {
         didDrag.current = false;
@@ -307,6 +316,25 @@ export function AnnotationToolbar() {
               >
                 <span className="wpn-launcher-item__icon-wrap">
                   <img src={Icons.epic} alt="" className="wpn-launcher-item__icon" />
+                </span>
+              </button>
+            </Tooltip>
+            <Tooltip label="Flow" placement="right">
+              <button
+                type="button"
+                className={["wpn-launcher-item", flowOpen ? "wpn-launcher-item--active" : ""]
+                  .filter(Boolean)
+                  .join(" ")}
+                aria-label="Open Flow"
+                aria-pressed={flowOpen}
+                onPointerDown={onDragStart}
+                onPointerMove={onDragMove}
+                onPointerUp={onDragEnd}
+                onPointerCancel={onDragEnd}
+                onClick={openFlow}
+              >
+                <span className="wpn-launcher-item__icon-wrap">
+                  <img src={Icons.flow} alt="" className="wpn-launcher-item__icon" />
                 </span>
               </button>
             </Tooltip>

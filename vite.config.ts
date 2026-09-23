@@ -15,7 +15,7 @@ export default defineConfig({
       fileName: (format) => (format === "es" ? "index.es.js" : "index.js"),
     },
     rollupOptions: {
-      external: ["react", "react-dom", "react/jsx-runtime"],
+      external: ["react", "react-dom", "react/jsx-runtime", "@xyflow/react"],
       output: {
         assetFileNames: (assetInfo) => {
           if (assetInfo.name && assetInfo.name.endsWith(".css")) {
@@ -27,6 +27,7 @@ export default defineConfig({
           react: "React",
           "react-dom": "ReactDOM",
           "react/jsx-runtime": "jsxRuntime",
+          "@xyflow/react": "XYFlowReact",
         },
       },
     },

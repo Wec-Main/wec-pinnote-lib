@@ -93,6 +93,11 @@ export function AnnotationProvider({ config, children }: AnnotationProviderProps
     false,
     isBoolean,
   );
+  const [flowOpen, setFlowOpen] = usePersistentState(
+    `wpn-ui:${projectId}:flowOpen`,
+    false,
+    isBoolean,
+  );
   const [userManagementOpen, setUserManagementOpen] = usePersistentState(
     `wpn-ui:${projectId}:userManagementOpen`,
     false,
@@ -114,20 +119,33 @@ export function AnnotationProvider({ config, children }: AnnotationProviderProps
       setListOpen(open);
       if (open) {
         setEpicFlowOpen(false);
+        setFlowOpen(false);
         setUserManagementOpen(false);
       }
     },
-    [setEpicFlowOpen, setListOpen, setUserManagementOpen],
+    [setEpicFlowOpen, setFlowOpen, setListOpen, setUserManagementOpen],
   );
   const openEpicFlowExclusive = useCallback(
     (open: boolean) => {
       setEpicFlowOpen(open);
       if (open) {
         setListOpen(false);
+        setFlowOpen(false);
         setUserManagementOpen(false);
       }
     },
-    [setEpicFlowOpen, setListOpen, setUserManagementOpen],
+    [setEpicFlowOpen, setFlowOpen, setListOpen, setUserManagementOpen],
+  );
+  const openFlowExclusive = useCallback(
+    (open: boolean) => {
+      setFlowOpen(open);
+      if (open) {
+        setListOpen(false);
+        setEpicFlowOpen(false);
+        setUserManagementOpen(false);
+      }
+    },
+    [setEpicFlowOpen, setFlowOpen, setListOpen, setUserManagementOpen],
   );
   const openUserManagementExclusive = useCallback(
     (open: boolean) => {
@@ -135,9 +153,10 @@ export function AnnotationProvider({ config, children }: AnnotationProviderProps
       if (open) {
         setListOpen(false);
         setEpicFlowOpen(false);
+        setFlowOpen(false);
       }
     },
-    [setEpicFlowOpen, setListOpen, setUserManagementOpen],
+    [setEpicFlowOpen, setFlowOpen, setListOpen, setUserManagementOpen],
   );
 
   useEffect(() => {
@@ -298,6 +317,8 @@ export function AnnotationProvider({ config, children }: AnnotationProviderProps
       setListOpen: openListExclusive,
       epicFlowOpen,
       setEpicFlowOpen: openEpicFlowExclusive,
+      flowOpen,
+      setFlowOpen: openFlowExclusive,
       userManagementOpen,
       setUserManagementOpen: openUserManagementExclusive,
       auditHistoryOpen,
@@ -334,6 +355,7 @@ export function AnnotationProvider({ config, children }: AnnotationProviderProps
       collection.setStatus,
       draft,
       epicFlowOpen,
+      flowOpen,
       userManagementOpen,
       auditHistoryOpen,
       listOpen,
@@ -342,6 +364,7 @@ export function AnnotationProvider({ config, children }: AnnotationProviderProps
       pinsVisible,
       setAuditHistoryOpen,
       openEpicFlowExclusive,
+      openFlowExclusive,
       openListExclusive,
       setModeEnabled,
       setPinsVisible,

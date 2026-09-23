@@ -4,6 +4,7 @@ import { useAnnotationPositions } from "../hooks/useAnnotationPosition";
 import { AnnotationComposer } from "./AnnotationComposer";
 import { AnnotationListPanel } from "./AnnotationListPanel";
 import { EpicFlowPanel } from "./EpicFlow";
+import { WecFlowPanel } from "./WecFlow";
 import { SettingsPanel } from "./Settings";
 import { AnnotationOverlay } from "./AnnotationOverlay";
 import { AnnotationPin } from "./AnnotationPin";
@@ -21,6 +22,7 @@ export function AnnotationLayer() {
     pinsVisible,
     listOpen,
     epicFlowOpen,
+    flowOpen,
     userManagementOpen,
     actionError,
     clearActionError,
@@ -104,6 +106,7 @@ export function AnnotationLayer() {
       ) : null}
       {listOpen ? <AnnotationListPanel /> : null}
       {epicFlowOpen ? <EpicFlowPanel /> : null}
+      {flowOpen ? <WecFlowPanel /> : null}
       {userManagementOpen ? <SettingsPanel /> : null}
       {actionError ? (
         <div className="wpn-toast" role="alert">
