@@ -17,6 +17,9 @@ import { ConfirmDialog } from "./UserManagement/ConfirmDialog";
 const EpicFlowPanel = lazy(() =>
   import("./EpicFlow").then((module) => ({ default: module.EpicFlowPanel })),
 );
+const WecFlowPanel = lazy(() =>
+  import("./WecFlow").then((module) => ({ default: module.WecFlowPanel })),
+);
 const SettingsPanel = lazy(() =>
   import("./Settings").then((module) => ({ default: module.SettingsPanel })),
 );
@@ -44,6 +47,7 @@ export function AnnotationLayer() {
     tagDraft,
     listOpen,
     epicFlowOpen,
+    flowOpen,
     userManagementOpen,
     discardPrompt,
     confirmDiscard,
@@ -193,6 +197,11 @@ export function AnnotationLayer() {
       {epicFlowOpen && activeAccount ? (
         <Suspense fallback={null}>
           <EpicFlowPanel />
+        </Suspense>
+      ) : null}
+      {flowOpen && activeAccount ? (
+        <Suspense fallback={null}>
+          <WecFlowPanel />
         </Suspense>
       ) : null}
       {userManagementOpen ? (

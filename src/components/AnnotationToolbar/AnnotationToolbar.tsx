@@ -51,6 +51,8 @@ export function AnnotationToolbar() {
     setListOpen,
     epicFlowOpen,
     setEpicFlowOpen,
+    flowOpen,
+    setFlowOpen,
     userManagementOpen,
     setUserManagementOpen,
     setAuditHistoryOpen,
@@ -223,6 +225,34 @@ export function AnnotationToolbar() {
         >
           <span className="wpn-launcher-item__icon-wrap">
             <img src={Icons.epic} alt="" className="wpn-launcher-item__icon" />
+          </span>
+        </button>
+      </Tooltip>
+      <Tooltip label={loggedOut ? "Log in first" : "Flow"} placement="right">
+        <button
+          type="button"
+          className={[
+            "wpn-launcher-item",
+            flowOpen ? "wpn-launcher-item--active" : "",
+            loggedOut ? "wpn-launcher-item--blocked" : "",
+          ]
+            .filter(Boolean)
+            .join(" ")}
+          aria-label="Open Flow"
+          aria-pressed={flowOpen}
+          aria-disabled={loggedOut}
+          onPointerDown={onDragStart}
+          onPointerMove={onDragMove}
+          onPointerUp={onDragEnd}
+          onPointerCancel={onDragEnd}
+          onClick={guardedClick(() => {
+            if (!loggedOut) {
+              setFlowOpen(true);
+            }
+          })}
+        >
+          <span className="wpn-launcher-item__icon-wrap">
+            <img src={Icons.flow} alt="" className="wpn-launcher-item__icon" />
           </span>
         </button>
       </Tooltip>
