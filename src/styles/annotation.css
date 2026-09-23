@@ -2750,16 +2750,16 @@ body.wpn-epicflow-resizing {
 
 .wpn-flow-panel {
   position: fixed;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
+  top: 72px;
+  left: 16px;
+  right: 16px;
+  bottom: 72px;
+  transform: none;
   display: flex;
   flex-direction: column;
   gap: 12px;
-  width: min(1100px, 94vw);
-  height: min(720px, 88vh);
   padding: 16px;
-  background: rgba(18, 18, 20, 0.98);
+  background: rgba(0, 0, 0, 0.88);
   border: 1px solid rgba(255, 255, 255, 0.14);
   border-radius: 12px;
   box-shadow: var(--wpn-shadow);
@@ -2768,32 +2768,33 @@ body.wpn-epicflow-resizing {
   z-index: 6;
 }
 
+.wpn-flow-panel--minimized {
+  top: 50%;
+  left: 50%;
+  right: auto;
+  bottom: auto;
+  transform: translate(-50%, -50%);
+  width: min(920px, 94vw);
+  height: min(560px, 82vh);
+}
+
 .wpn-flow-panel__header {
   display: flex;
   align-items: center;
   justify-content: space-between;
 }
 
+.wpn-flow-panel__brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
 .wpn-flow-panel__header-actions {
   display: flex;
   align-items: center;
   gap: 4px;
-}
-
-.wpn-flow-panel__header-icon {
-  width: 15px;
-  height: 15px;
-  display: block;
-}
-
-.wpn-flow-panel--fullscreen {
-  top: 72px;
-  left: 16px;
-  right: 16px;
-  bottom: 72px;
-  transform: none;
-  width: auto;
-  height: auto;
 }
 
 .wpn-flow-panel .wpn-icon-btn {
@@ -2803,6 +2804,11 @@ body.wpn-epicflow-resizing {
 .wpn-flow-panel .wpn-icon-btn:hover {
   background: rgba(255, 255, 255, 0.12);
   color: #fff;
+}
+
+.wpn-flow-panel .wpn-icon-btn--danger:hover:not(:disabled) {
+  background: rgba(220, 38, 38, 0.16);
+  color: #fca5a5;
 }
 
 .wpn-flow-panel__toolbar {

@@ -1,6 +1,6 @@
 import { useCallback, useRef, useState } from "react";
 import { useAnnotationContext } from "../../context/AnnotationContext";
-import { Icon } from "../primitives";
+import { Icon, Tooltip } from "../primitives";
 import { usePersistentState } from "../../hooks/usePersistentState";
 import {
   FlowBuilder,
@@ -45,7 +45,7 @@ type JsonPanelMode = "none" | "export" | "import";
 
 export function WecFlowPanel() {
   const { setFlowOpen, config } = useAnnotationContext();
-  const [fullscreen, setFullscreen] = useState(false);
+  const [minimized, setMinimized] = useState(false);
   const [flow, setFlow] = usePersistentState<FlowDefinition>(
     `wpn-ui:${config.projectId}:wecFlow`,
     emptyFlow(),
@@ -94,51 +94,36 @@ export function WecFlowPanel() {
 
   return (
     <div
-      className={["wpn-flow-panel", fullscreen ? "wpn-flow-panel--fullscreen" : ""]
+      className={["wpn-flow-panel", minimized ? "wpn-flow-panel--minimized" : ""]
         .filter(Boolean)
         .join(" ")}
     >
       <div className="wpn-flow-panel__header">
-        <span className="wpn-panel__title">Flow</span>
+        <span className="wpn-flow-panel__brand">
+          <Icon name="flow" />
+          <span className="wpn-panel__title">Flow</span>
+        </span>
         <div className="wpn-flow-panel__header-actions">
-          <button
-            type="button"
-            className="wpn-icon-btn"
-            aria-label={fullscreen ? "Exit fullscreen" : "Expand Flow"}
-            onClick={() => setFullscreen((current) => !current)}
-          >
-            {fullscreen ? (
-              <svg viewBox="0 0 24 24" className="wpn-flow-panel__header-icon" aria-hidden="true">
-                <path
-                  fill="none"
-                  stroke="currentColor"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth="1.8"
-                  d="M4 10V5h5M4 14v5h5M20 10V5h-5M20 14v5h-5"
-                />
-              </svg>
-            ) : (
-              <svg viewBox="0 0 24 24" className="wpn-flow-panel__header-icon" aria-hidden="true">
-                <path
-                  fill="none"
-                  stroke="currentColor"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth="1.8"
-                  d="M9 4H4v5M15 4h5v5M9 20H4v-5M15 20h5v-5"
-                />
-              </svg>
-            )}
-          </button>
-          <button
-            type="button"
-            className="wpn-icon-btn"
-            aria-label="Close Flow"
-            onClick={() => setFlowOpen(false)}
-          >
-            <Icon name="close" />
-          </button>
+          <Tooltip label={minimized ? "Maximize" : "Minimize"} placement="bottom">
+            <button
+              type="button"
+              className="wpn-icon-btn"
+              aria-label={minimized ? "Maximize Flow" : "Minimize Flow"}
+              onClick={() => setMinimized((current) => !current)}
+            >
+              <Icon name={minimized ? "expand" : "windowMinimize"} />
+            </button>
+          </Tooltip>
+          <Tooltip label="Close" placement="bottom">
+            <button
+              type="button"
+              className="wpn-icon-btn wpn-icon-btn--danger"
+              aria-label="Close Flow"
+              onClick={() => setFlowOpen(false)}
+            >
+              <Icon name="close" />
+            </button>
+          </Tooltip>
         </div>
       </div>
 

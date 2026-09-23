@@ -230,6 +230,8 @@ const FlowBuilderInner = forwardRef<FlowBuilderRef, FlowBuilderInnerProps>(
             elementsSelectable
             deleteKeyCode={null}
             fitView
+            colorMode="dark"
+            attributionPosition="bottom-left"
           >
             <Background />
             {showControls && <Controls showInteractive={!readonly} />}
