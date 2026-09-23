@@ -246,6 +246,7 @@ select.input {
 
 .segmented {
   display: flex;
+  gap: 2px;
   padding: 2px;
   border: 1px solid var(--fb-border);
   border-radius: 8px;
@@ -253,17 +254,27 @@ select.input {
 }
 
 .segment {
-  flex: 1;
+  display: inline-flex;
+  flex: 1 1 0;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  min-width: 0;
   height: 28px;
-  padding: 0 6px;
+  padding: 0 4px;
   border: none;
   border-radius: 6px;
   font: inherit;
-  font-size: 12px;
+  font-size: 11.5px;
+  white-space: nowrap;
   font-weight: 500;
   color: var(--fb-text-muted);
   background: transparent;
   cursor: pointer;
+}
+
+.segment svg {
+  flex: none;
 }
 
 .segment:disabled {

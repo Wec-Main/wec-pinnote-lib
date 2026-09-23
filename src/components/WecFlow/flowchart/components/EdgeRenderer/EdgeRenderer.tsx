@@ -3,11 +3,12 @@ import { useFlowContext, useFlowEngine, useFlowState } from '../../hooks/FlowCon
 import { useEdgeGeometry } from '../../hooks/useEdgeGeometry';
 import { usePointerDrag } from '../../hooks/usePointerDrag';
 import type { EdgeEnd } from '../../core/FlowEngine';
-import type { EdgePathType, XYPosition } from '../../models/FlowTypes';
+import type { XYPosition } from '../../models/FlowTypes';
 import { getEdgePath, type StepBend } from '../../utils/edgePaths';
 import { findHandle, getHandlePosition, oppositeSide } from '../../utils/geometry';
 import { cx, shallowEqual } from '../../utils/shallow';
 import { Icon } from '../icons';
+import { lineStyleOptions } from '../lineStyles';
 import styles from './EdgeRenderer.module.css';
 
 const useEdgeIds = () => useFlowState((s) => s.edges.map((e) => e.id), shallowEqual);
@@ -129,12 +130,6 @@ export const EdgeRenderer = memo(function EdgeRenderer() {
 });
 
 // --------------------------------------------------------------- labels
-
-const lineStyleOptions: { value: EdgePathType; label: string; icon: 'curve' | 'flow' | 'grid' }[] = [
-  { value: 'bezier', label: 'Curved', icon: 'curve' },
-  { value: 'straight', label: 'Straight', icon: 'flow' },
-  { value: 'step', label: 'Step (right-angle)', icon: 'grid' },
-];
 
 /** Floating pill shown while hovering or selecting an edge, for one-click line-style switching. */
 const EdgeStyleMenu = memo(function EdgeStyleMenu({ id, x, y }: { id: string; x: number; y: number }) {

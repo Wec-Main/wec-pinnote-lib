@@ -185,7 +185,7 @@ export class FlowEngine {
       viewport: initial.viewport ?? { x: 0, y: 0, zoom: 1 },
       canvasSize: { width: 0, height: 0 },
       readOnly: options.readOnly ?? false,
-      defaultEdgeType: savedEdgeType(initial.meta) ?? options.defaultEdgeType ?? 'bezier',
+      defaultEdgeType: savedEdgeType(initial.meta) ?? options.defaultEdgeType ?? 'step',
       snapToGrid: options.snapToGrid ?? false,
       gridSize: options.gridSize ?? 20,
       connection: null,
@@ -353,14 +353,30 @@ export class FlowEngine {
   /** Moves nodes to absolute positions (snapping is the caller's choice via `snap`). */
   setNodePositions(positions: Record<string, XYPosition>): void {
     const s = this.getState();
-    let changed = false;
+    const moves = new Map<string, XYPosition>();
     const nodes = s.nodes.map((n) => {
       const p = positions[n.id];
       if (!p || (p.x === n.position.x && p.y === n.position.y)) return n;
-      changed = true;
+      moves.set(n.id, { x: p.x - n.position.x, y: p.y - n.position.y });
       return { ...n, position: p };
     });
-    if (changed) this.commit(nodes, s.edges, { type: 'moveNodes', positions });
+    if (moves.size === 0) return;
+    const edges = s.edges.map((e) => this.carryBend(e, s.nodeLookup.get(e.source), moves.get(e.source), moves.get(e.target)));
+    this.commit(nodes, edges.some((e, i) => e !== s.edges[i]) ? edges : s.edges, { type: 'moveNodes', positions });
+  }
+
+  /** Shifts a step edge's bend with its nodes when both ends move by the same offset. */
+  private carryBend(edge: FlowEdge, sourceNode: FlowNode | undefined, sourceMove: XYPosition | undefined, targetMove: XYPosition | undefined): FlowEdge {
+    if (edge.bend === undefined || !sourceNode || !sourceMove || !targetMove) return edge;
+    if (Math.abs(sourceMove.x - targetMove.x) > 0.001 || Math.abs(sourceMove.y - targetMove.y) > 0.001) return edge;
+    const axis = this.bendAxis(edge, sourceNode);
+    const shift = axis === 'y' ? sourceMove.y : sourceMove.x;
+    return shift === 0 ? edge : { ...edge, bend: edge.bend + shift };
+  }
+
+  private bendAxis(edge: FlowEdge, sourceNode: FlowNode): 'x' | 'y' {
+    const side = findHandle(this.registry.get(sourceNode.type), 'source', edge.sourceHandle)?.side;
+    return side === 'left' || side === 'right' ? 'x' : 'y';
   }
 
   removeNodes(ids: string[]): void {
@@ -458,7 +474,8 @@ export class FlowEngine {
     const edgeCopies = source.edges.flatMap((e) => {
       const sourceId = idMap.get(e.source);
       const targetId = idMap.get(e.target);
-      return sourceId && targetId ? [{ ...e, id: createId('edge'), source: sourceId, target: targetId }] : [];
+      const moved = this.carryBend(e, source.nodes.find((n) => n.id === e.source), offset, offset);
+      return sourceId && targetId ? [{ ...moved, id: createId('edge'), source: sourceId, target: targetId }] : [];
     });
     this.beginInteraction();
     copies.forEach((node) => this.commit([...this.getNodes(), node], this.getEdges(), { type: 'addNode', node }));

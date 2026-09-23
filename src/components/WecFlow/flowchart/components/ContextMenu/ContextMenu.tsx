@@ -1,10 +1,11 @@
 import { memo, useEffect, useLayoutEffect, useRef, useState, type CSSProperties } from 'react';
 import { useFlowEngine } from '../../hooks/FlowContext';
-import type { EdgePathType, XYPosition } from '../../models/FlowTypes';
+import type { XYPosition } from '../../models/FlowTypes';
 import type { FlowEngine } from '../../core/FlowEngine';
 import type { AlignMode, DistributeAxis } from '../../utils/alignment';
 import { cx } from '../../utils/shallow';
 import { Icon, NodeIcon, type IconName } from '../icons';
+import { lineStyleOptions } from '../lineStyles';
 import styles from './ContextMenu.module.css';
 
 export type ContextMenuTarget = { kind: 'canvas' } | { kind: 'node'; id: string } | { kind: 'edge'; id: string };
@@ -87,12 +88,6 @@ function nodeSections(engine: FlowEngine, readOnly: boolean): MenuSection[] {
   return sections;
 }
 
-const lineStyles: { type: EdgePathType; label: string; icon: IconName }[] = [
-  { type: 'step', label: 'Right-angle', icon: 'select' },
-  { type: 'bezier', label: 'Curved', icon: 'curve' },
-  { type: 'straight', label: 'Straight', icon: 'minus' },
-];
-
 function edgeSections(engine: FlowEngine, id: string, at: XYPosition, readOnly: boolean): MenuSection[] {
   const s = engine.getState();
   const edge = s.edgeLookup.get(id);
@@ -100,11 +95,11 @@ function edgeSections(engine: FlowEngine, id: string, at: XYPosition, readOnly: 
   const current = edge.type ?? s.defaultEdgeType;
   const style: MenuSection = {
     title: 'Line style',
-    actions: lineStyles.map((l) => ({
-      label: current === l.type ? `${l.label} (current)` : l.label,
+    actions: lineStyleOptions.map((l) => ({
+      label: current === l.value ? `${l.label} (current)` : l.label,
       icon: l.icon,
-      disabled: current === l.type,
-      run: () => engine.updateEdge(id, { type: l.type }),
+      disabled: current === l.value,
+      run: () => engine.updateEdge(id, { type: l.value }),
     })),
   };
   const edit: MenuSection = {

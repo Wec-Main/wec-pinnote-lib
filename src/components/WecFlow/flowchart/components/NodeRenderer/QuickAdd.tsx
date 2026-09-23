@@ -19,6 +19,55 @@ function outgoingSides(def: NodeTypeDefinition): HandleSide[] {
   return [...new Set(def.handles.filter((h) => h.kind === 'source').map((h) => h.side))];
 }
 
+function TypePicker({ side, onPick, onClose }: { side: HandleSide; onPick: (type: string) => void; onClose: () => void }) {
+  const engine = useFlowEngine();
+  const [query, setQuery] = useState('');
+  const q = query.trim().toLowerCase();
+  const matches = engine.registry
+    .list()
+    .filter((def) => q === '' || def.label.toLowerCase().includes(q) || (def.description ?? '').toLowerCase().includes(q));
+  const [first] = matches;
+
+  const onSearchKeyDown = (e: React.KeyboardEvent) => {
+    e.stopPropagation();
+    if (e.key === 'Escape') onClose();
+    if (e.key === 'Enter' && first) onPick(first.type);
+  };
+
+  return (
+    <div className={cx(styles.quickPicker, styles[`quickPicker-${side}`])} role="menu" onPointerDown={(e) => e.stopPropagation()}>
+      <div className={styles.quickSearch}>
+        <Icon name="search" size={12} />
+        <input
+          autoFocus
+          className={styles.quickSearchInput}
+          placeholder="Search nodes…"
+          aria-label="Search node types"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          onKeyDown={onSearchKeyDown}
+        />
+      </div>
+      {matches.map((def) => (
+        <button
+          key={def.type}
+          type="button"
+          role="menuitem"
+          className={styles.quickPickerItem}
+          style={{ '--node-color': def.color } as CSSProperties}
+          onClick={() => onPick(def.type)}
+        >
+          <span className={styles.quickPickerIcon}>
+            <NodeIcon icon={def.icon} size={12} />
+          </span>
+          {def.label}
+        </button>
+      ))}
+      {matches.length === 0 && <div className={styles.quickEmpty}>No matching nodes</div>}
+    </div>
+  );
+}
+
 /** "+" buttons around a node that add and connect a new node on that side. */
 export const QuickAdd = memo(function QuickAdd({ nodeId, definition, width, height }: { nodeId: string; definition: NodeTypeDefinition; width: number; height: number }) {
   const engine = useFlowEngine();
@@ -58,22 +107,8 @@ export const QuickAdd = memo(function QuickAdd({ nodeId, definition, width, heig
             <Icon name="plus" size={11} />
           </button>
           {openSide === side && (
-            <div ref={pickerRef} className={cx(styles.quickPicker, styles[`quickPicker-${side}`])} role="menu" onPointerDown={(e) => e.stopPropagation()}>
-              {engine.registry.list().map((def) => (
-                <button
-                  key={def.type}
-                  type="button"
-                  role="menuitem"
-                  className={styles.quickPickerItem}
-                  style={{ '--node-color': def.color } as CSSProperties}
-                  onClick={() => add(side, def.type)}
-                >
-                  <span className={styles.quickPickerIcon}>
-                    <NodeIcon icon={def.icon} size={12} />
-                  </span>
-                  {def.label}
-                </button>
-              ))}
+            <div ref={pickerRef}>
+              <TypePicker side={side} onPick={(type) => add(side, type)} onClose={() => setOpenSide(null)} />
             </div>
           )}
         </div>

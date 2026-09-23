@@ -37,6 +37,8 @@ const paths = {
   flow: 'M4 4h6v5H4z M14 15h6v5h-6z M7 9v3.5h10V15',
   success: 'M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18z M8 12.2l2.8 2.8 5.2-5.5',
   curve: 'M4 19C4 9 20 15 20 5',
+  lineStraight: 'M4 20L20 4 M4 20h.01 M20 4h.01',
+  lineStep: 'M4 19h7V5h9',
   chevron: 'M9 6l6 6-6 6',
   cut: 'M6 7a2.5 2.5 0 1 0 0 .1z M6 17a2.5 2.5 0 1 0 0 .1z M8 8.5L20 18 M8 15.5L20 6',
   paste: 'M9 4h6v3H9z M8 5.5H5.5V21h13V5.5H16',

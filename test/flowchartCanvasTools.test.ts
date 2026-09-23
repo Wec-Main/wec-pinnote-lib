@@ -106,8 +106,8 @@ describe('default line style', () => {
     const engine = new FlowEngine();
     let changes = 0;
     engine.on('change', () => changes++);
-    engine.setDefaultEdgeType('step');
-    engine.setDefaultEdgeType('step');
+    engine.setDefaultEdgeType('bezier');
+    engine.setDefaultEdgeType('bezier');
     engine.setFlowName('Onboarding');
     expect(changes).toBe(2);
   });

@@ -4,7 +4,8 @@ import { useEditSession } from '../../hooks/useEditSession';
 import type { EdgePathType } from '../../models/FlowTypes';
 import { getNodeSize } from '../../utils/geometry';
 import { cx, shallowEqual } from '../../utils/shallow';
-import { Icon, NodeIcon } from '../icons';
+import { Icon, NodeIcon, type IconName } from '../icons';
+import { lineStyleOptions } from '../lineStyles';
 import ui from '../ui/ui.module.css';
 import styles from './PropertiesPanel.module.css';
 
@@ -154,11 +155,9 @@ function NumberField({ label, value, disabled, onCommit }: { label: string; valu
 
 // ------------------------------------------------------------------- edge
 
-const edgeTypes: { value: EdgePathType | 'default'; label: string }[] = [
-  { value: 'default', label: 'Default' },
-  { value: 'bezier', label: 'Curved' },
-  { value: 'straight', label: 'Straight' },
-  { value: 'step', label: 'Step' },
+const edgeTypes: { value: EdgePathType | 'default'; label: string; icon: IconName }[] = [
+  { value: 'default', label: 'Default', icon: 'flow' },
+  ...lineStyleOptions,
 ];
 
 function EdgeProperties({ edgeId }: { edgeId: string }) {
@@ -205,7 +204,9 @@ function EdgeProperties({ edgeId }: { edgeId: string }) {
                 disabled={readOnly}
                 className={cx(ui.segment, current === t.value && ui.segmentActive)}
                 onClick={() => engine.updateEdge(edgeId, { type: t.value === 'default' ? undefined : t.value })}
+                title={t.value === 'default' ? 'Use the editor default line style' : `${t.label} line`}
               >
+                <Icon name={t.icon} size={13} />
                 {t.label}
               </button>
             ))}
@@ -297,8 +298,15 @@ function FlowOverview() {
         <div className={ui.field}>
           <span className={ui.fieldLabel}>Default line style</span>
           <div className={ui.segmented}>
-            {edgeTypes.slice(1).map((t) => (
-              <button key={t.value} type="button" className={cx(ui.segment, edgeType === t.value && ui.segmentActive)} onClick={() => engine.setDefaultEdgeType(t.value as EdgePathType)}>
+            {lineStyleOptions.map((t) => (
+              <button
+                key={t.value}
+                type="button"
+                className={cx(ui.segment, edgeType === t.value && ui.segmentActive)}
+                title={`${t.label} line`}
+                onClick={() => engine.setDefaultEdgeType(t.value)}
+              >
+                <Icon name={t.icon} size={13} />
                 {t.label}
               </button>
             ))}

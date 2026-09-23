@@ -97,3 +97,33 @@ describe('edge editing', () => {
     expect([...engine.getState().selectedNodeIds]).toEqual([added?.id]);
   });
 });
+
+describe('bend follows moved nodes', () => {
+  function bentFlow() {
+    const engine = new FlowEngine();
+    const a = engine.addNode({ type: 'process', position: { x: 0, y: 0 } });
+    const b = engine.addNode({ type: 'process', position: { x: 400, y: 300 } });
+    const edge = engine.addEdge({ source: a.id, target: b.id });
+    if (!edge) throw new Error('edge not created');
+    engine.setEdgeBend(edge.id, 150);
+    return { engine, a, b, edge };
+  }
+
+  it('shifts the bend when both ends move together', () => {
+    const { engine, a, b, edge } = bentFlow();
+    engine.setNodePositions({ [a.id]: { x: 50, y: 40 }, [b.id]: { x: 450, y: 340 } });
+    expect(engine.getEdge(edge.id)?.bend).toBe(190);
+  });
+
+  it('keeps the bend when only one end moves', () => {
+    const { engine, a, edge } = bentFlow();
+    engine.setNodePositions({ [a.id]: { x: 50, y: 40 } });
+    expect(engine.getEdge(edge.id)?.bend).toBe(150);
+  });
+
+  it('offsets the bend of duplicated connections', () => {
+    const { engine, a, b } = bentFlow();
+    engine.duplicateNodes([a.id, b.id], { x: 0, y: 500 });
+    expect(engine.getEdges().map((e) => e.bend)).toEqual([150, 650]);
+  });
+});
