@@ -1,6 +1,7 @@
-import { memo, useCallback, useId, useState } from 'react';
+import { memo, useCallback, useId, useState, useSyncExternalStore } from 'react';
 import { useFlowContext, useFlowEngine, useFlowState } from '../../hooks/FlowContext';
 import { useEdgeGeometry } from '../../hooks/useEdgeGeometry';
+import type { EdgePathType } from '../../models/FlowTypes';
 import { getEdgePath } from '../../utils/edgePaths';
 import { findHandle, getHandlePosition, oppositeSide } from '../../utils/geometry';
 import { cx, shallowEqual } from '../../utils/shallow';
@@ -8,6 +9,29 @@ import { Icon } from '../icons';
 import styles from './EdgeRenderer.module.css';
 
 const useEdgeIds = () => useFlowState((s) => s.edges.map((e) => e.id), shallowEqual);
+
+/** Local, non-persisted hover tracking shared between the SVG and HTML edge layers. */
+const hoverStore = (() => {
+  let current: string | null = null;
+  const listeners = new Set<() => void>();
+  return {
+    set(next: string | null | ((prev: string | null) => string | null)) {
+      const value = typeof next === 'function' ? next(current) : next;
+      if (current === value) return;
+      current = value;
+      listeners.forEach((l) => l());
+    },
+    subscribe(listener: () => void) {
+      listeners.add(listener);
+      return () => listeners.delete(listener);
+    },
+    getSnapshot: () => current,
+  };
+})();
+
+function useHoveredEdgeId(): string | null {
+  return useSyncExternalStore(hoverStore.subscribe, hoverStore.getSnapshot, hoverStore.getSnapshot);
+}
 
 function useEdgeSelect(id: string) {
   const { engine, canvasRef } = useFlowContext();
@@ -30,7 +54,12 @@ const EdgeItem = memo(function EdgeItem({ id, markerPrefix }: { id: string; mark
   if (!geometry) return null;
   const marker = selected ? 'selected' : issue === 'error' ? 'error' : 'default';
   return (
-    <g className={cx(styles.edge, selected && styles.selected, issue && styles[`issue-${issue}`], geometry.edge.animated && styles.animated)} data-edge-id={id}>
+    <g
+      className={cx(styles.edge, selected && styles.selected, issue && styles[`issue-${issue}`], geometry.edge.animated && styles.animated)}
+      data-edge-id={id}
+      onPointerEnter={() => hoverStore.set(id)}
+      onPointerLeave={() => hoverStore.set((current) => (current === id ? null : current))}
+    >
       <path className={styles.hit} d={geometry.path} onPointerDown={onPointerDown} />
       <path className={styles.path} d={geometry.path} markerEnd={`url(#${markerPrefix}-${marker})`} />
     </g>
@@ -92,17 +121,49 @@ export const EdgeRenderer = memo(function EdgeRenderer() {
 
 // --------------------------------------------------------------- labels
 
+const lineStyleOptions: { value: EdgePathType; label: string; icon: 'curve' | 'flow' | 'grid' }[] = [
+  { value: 'bezier', label: 'Curved', icon: 'curve' },
+  { value: 'straight', label: 'Straight', icon: 'flow' },
+  { value: 'step', label: 'Step (right-angle)', icon: 'grid' },
+];
+
+/** Floating pill shown while hovering or selecting an edge, for one-click line-style switching. */
+const EdgeStyleMenu = memo(function EdgeStyleMenu({ id, x, y }: { id: string; x: number; y: number }) {
+  const engine = useFlowEngine();
+  const readOnly = useFlowState((s) => s.readOnly);
+  const current = useFlowState((s) => s.edgeLookup.get(id)?.type ?? s.defaultEdgeType);
+  if (readOnly) return null;
+  return (
+    <div className={styles.styleMenu} style={{ transform: `translate(${x}px, ${y}px) translate(-50%, -100%)` }} onPointerDown={(e) => e.stopPropagation()}>
+      {lineStyleOptions.map((opt) => (
+        <button
+          key={opt.value}
+          type="button"
+          className={cx(styles.styleMenuItem, current === opt.value && styles.styleMenuItemActive)}
+          title={opt.label}
+          aria-label={opt.label}
+          onClick={() => engine.updateEdge(id, { type: opt.value })}
+        >
+          <Icon name={opt.icon} size={13} />
+        </button>
+      ))}
+    </div>
+  );
+});
+
 const EdgeLabel = memo(function EdgeLabel({ id }: { id: string }) {
   const engine = useFlowEngine();
   const geometry = useEdgeGeometry(id);
   const selected = useFlowState((s) => s.selectedEdgeIds.has(id));
   const readOnly = useFlowState((s) => s.readOnly);
+  const hoveredId = useHoveredEdgeId();
   const onPointerDown = useEdgeSelect(id);
   const [editing, setEditing] = useState<string | null>(null);
 
   if (!geometry) return null;
   const { edge, labelX, labelY } = geometry;
-  if (!edge.label && (!selected || readOnly) && editing === null) return null;
+  const showMenu = !readOnly && (selected || hoveredId === id);
+  if (!edge.label && (!selected || readOnly) && editing === null && !showMenu) return null;
 
   const commit = () => {
     if (editing !== null && editing !== (edge.label ?? '')) engine.updateEdge(id, { label: editing.trim() || undefined });
@@ -110,42 +171,36 @@ const EdgeLabel = memo(function EdgeLabel({ id }: { id: string }) {
   };
 
   return (
-    <div
-      className={cx(styles.label, selected && styles.labelSelected, !edge.label && styles.labelEmpty)}
-      style={{ transform: `translate(${labelX}px, ${labelY}px) translate(-50%, -50%)` }}
-      onPointerDown={onPointerDown}
-      onDoubleClick={() => !readOnly && setEditing(edge.label ?? '')}
-      title={readOnly ? undefined : 'Double-click to edit label'}
-    >
-      {editing !== null ? (
-        <input
-          autoFocus
-          className={styles.labelInput}
-          value={editing}
-          size={Math.max(4, editing.length + 1)}
-          onChange={(e) => setEditing(e.target.value)}
-          onBlur={commit}
-          onPointerDown={(e) => e.stopPropagation()}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter') commit();
-            if (e.key === 'Escape') setEditing(null);
-          }}
-        />
-      ) : (
-        <span>{edge.label || (readOnly ? '' : 'Add label')}</span>
-      )}
-      {selected && !readOnly && editing === null && (
-        <button
-          type="button"
-          className={styles.labelDelete}
-          title="Delete connection"
-          onPointerDown={(e) => e.stopPropagation()}
-          onClick={() => engine.removeEdges([id])}
+    <>
+      {showMenu && <EdgeStyleMenu id={id} x={labelX} y={labelY - 18} />}
+      {(edge.label || selected || editing !== null) && (
+        <div
+          className={cx(styles.label, selected && styles.labelSelected, !edge.label && styles.labelEmpty)}
+          style={{ transform: `translate(${labelX}px, ${labelY}px) translate(-50%, -50%)` }}
+          onPointerDown={onPointerDown}
+          onDoubleClick={() => !readOnly && setEditing(edge.label ?? '')}
+          title={readOnly ? undefined : 'Double-click to edit label'}
         >
-          <Icon name="x" size={11} />
-        </button>
+          {editing !== null ? (
+            <input
+              autoFocus
+              className={styles.labelInput}
+              value={editing}
+              size={Math.max(4, editing.length + 1)}
+              onChange={(e) => setEditing(e.target.value)}
+              onBlur={commit}
+              onPointerDown={(e) => e.stopPropagation()}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') commit();
+                if (e.key === 'Escape') setEditing(null);
+              }}
+            />
+          ) : (
+            <span>{edge.label || (readOnly ? '' : 'Add label')}</span>
+          )}
+        </div>
       )}
-    </div>
+    </>
   );
 });
 

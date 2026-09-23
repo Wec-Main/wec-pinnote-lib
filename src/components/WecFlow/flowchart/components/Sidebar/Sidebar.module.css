@@ -26,19 +26,19 @@
 }
 
 .group {
-  margin-top: 12px;
+  margin-top: 4px;
 }
 
 .group > div:first-child {
-  margin: 0 4px 8px;
+  margin: 0 4px 4px;
 }
 
 .item {
   display: flex;
   align-items: center;
   gap: 10px;
-  margin-bottom: 6px;
-  padding: 9px 10px;
+  margin-bottom: 4px;
+  padding: 8px 10px;
   border: 1px solid var(--fb-border);
   border-radius: 10px;
   background: var(--fb-panel);
@@ -79,8 +79,15 @@
   background: color-mix(in srgb, var(--node-color) 13%, var(--fb-panel));
 }
 
-.icon-pill {
+.icon-pill,
+.icon-circle,
+.icon-ellipse {
   border-radius: 50%;
+}
+
+.icon-square,
+.icon-rectangle {
+  border-radius: 2px;
 }
 
 .itemText {

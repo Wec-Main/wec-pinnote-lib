@@ -60,6 +60,7 @@ function EditorLayout({
   const onKeyDown = useKeyboardShortcuts();
   const [notices, setNotices] = useState<Notice[]>([]);
   const noticeId = useRef(0);
+  const [propertiesOpen, setPropertiesOpen] = useState(true);
 
   // Keep the engine's read-only flag in sync with the prop (when controlled).
   useEffect(() => {
@@ -106,8 +107,13 @@ function EditorLayout({
               </div>
             ))}
           </div>
+          {showProperties && !propertiesOpen && (
+            <button type="button" className={styles.reopenProperties} title="Show properties panel" aria-label="Show properties panel" onClick={() => setPropertiesOpen(true)}>
+              <Icon name="chevron" size={14} />
+            </button>
+          )}
         </main>
-        {showProperties && <PropertiesPanel />}
+        {showProperties && propertiesOpen && <PropertiesPanel onClose={() => setPropertiesOpen(false)} />}
       </div>
     </div>
   );

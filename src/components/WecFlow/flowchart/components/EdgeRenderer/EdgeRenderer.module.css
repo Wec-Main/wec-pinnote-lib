@@ -97,6 +97,45 @@
   fill: var(--fb-danger);
 }
 
+/* ------------------------------------------------------------ style menu */
+
+.styleMenu {
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 1;
+  display: flex;
+  gap: 2px;
+  padding: 3px;
+  border: 1px solid var(--fb-border);
+  border-radius: 8px;
+  background: var(--fb-panel);
+  box-shadow: var(--fb-shadow);
+  pointer-events: auto;
+}
+
+.styleMenuItem {
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border: none;
+  border-radius: 5px;
+  color: var(--fb-text-muted);
+  background: transparent;
+  cursor: pointer;
+}
+
+.styleMenuItem:hover {
+  color: var(--fb-text);
+  background: var(--fb-hover);
+}
+
+.styleMenuItemActive {
+  color: var(--fb-accent-text);
+  background: var(--fb-accent-soft);
+}
+
 /* ------------------------------------------------------------ labels */
 
 .labelLayer {
@@ -146,18 +185,4 @@
   font-style: normal;
   color: var(--fb-text);
   background: transparent;
-}
-
-.labelDelete {
-  display: grid;
-  place-items: center;
-  width: 16px;
-  height: 16px;
-  margin-right: -4px;
-  padding: 0;
-  border: none;
-  border-radius: 50%;
-  color: #fff;
-  background: var(--fb-danger);
-  cursor: pointer;
 }

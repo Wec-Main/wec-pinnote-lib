@@ -159,6 +159,20 @@
   color: var(--fb-text-subtle);
 }
 
+.labelEdit {
+  width: 100%;
+  padding: 2px 4px;
+  border: 1px solid var(--fb-accent);
+  border-radius: 5px;
+  outline: none;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--fb-text);
+  background: var(--fb-node-bg);
+  text-align: inherit;
+}
+
 .description {
   display: -webkit-box;
   overflow: hidden;
@@ -182,7 +196,17 @@
   border-radius: 50%;
   background: var(--fb-node-bg);
   cursor: crosshair;
-  transition: transform 0.1s, background 0.1s, box-shadow 0.1s;
+  opacity: 0;
+  transition: transform 0.1s, background 0.1s, box-shadow 0.1s, opacity 0.1s;
+}
+
+.node:hover .handle,
+.selected .handle,
+.handle.active,
+.handle.connectable,
+.handle.valid,
+.handle.invalid {
+  opacity: 1;
 }
 
 /* Larger invisible hit area. */
@@ -296,4 +320,32 @@
   right: -9px;
   bottom: -9px;
   cursor: nwse-resize;
+}
+
+.resize-n {
+  top: -9px;
+  left: 50%;
+  margin-left: -4.5px;
+  cursor: ns-resize;
+}
+
+.resize-s {
+  bottom: -9px;
+  left: 50%;
+  margin-left: -4.5px;
+  cursor: ns-resize;
+}
+
+.resize-e {
+  top: 50%;
+  right: -9px;
+  margin-top: -4.5px;
+  cursor: ew-resize;
+}
+
+.resize-w {
+  top: 50%;
+  left: -9px;
+  margin-top: -4.5px;
+  cursor: ew-resize;
 }

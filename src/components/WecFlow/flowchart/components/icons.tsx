@@ -40,7 +40,6 @@ const paths = {
   chevron: 'M9 6l6 6-6 6',
   cut: 'M6 7a2.5 2.5 0 1 0 0 .1z M6 17a2.5 2.5 0 1 0 0 .1z M8 8.5L20 18 M8 15.5L20 6',
   paste: 'M9 4h6v3H9z M8 5.5H5.5V21h13V5.5H16',
-  magnet: 'M6 4v8a6 6 0 0 0 12 0V4h-4v8a2 2 0 0 1-4 0V4z M6 8h4 M14 8h4',
   map: 'M3.5 6.5l5.5-2.5 6 2.5 5.5-2.5v13.5l-5.5 2.5-6-2.5-5.5 2.5z M9 4v13.5 M15 6.5V20',
   alignLeft: 'M4 3v18 M8 7h11v4H8z M8 14h7v4H8z',
   alignCenter: 'M12 3v18 M6 7h12v4H6z M8.5 14h7v4h-7z',
@@ -52,11 +51,33 @@ const paths = {
   distributeV: 'M3 4h18 M3 20h18 M8 9.5h8v5H8z',
   save: 'M5 4h11l3 3v13H5z M8 4v5h7V4 M8 20v-6h8v6',
   publish: 'M12 15V4 M7.5 8.5L12 4l4.5 4.5 M5 14v6h14v-6',
+  circleShape: 'M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18z',
+  squareShape: 'M4 4h16v16H4z',
+  rectangleShape: 'M3 6h18v12H3z',
+  roundedRectShape: 'M5 6h14a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2z',
+  textShape: 'M5 5h14 M12 5v14',
+  ellipseShape: 'M12 5c5 0 9 3.1 9 7s-4 7-9 7-9-3.1-9-7 4-7 9-7z',
+  triangleShape: 'M12 4l9 16H3z',
+  hexagonShape: 'M7 4h10l4 8-4 8H7l-4-8z',
+  cylinderShape: 'M4 6c0-1.1 3.6-2 8-2s8 .9 8 2v12c0 1.1-3.6 2-8 2s-8-.9-8-2z M4 6c0 1.1 3.6 2 8 2s8-.9 8-2',
+  cloudShape: 'M7 18a4 4 0 0 1-1-7.9 5 5 0 0 1 9.6-2A4.5 4.5 0 0 1 17 18z',
 } as const;
 
 export type IconName = keyof typeof paths;
 
-const filled = new Set<IconName>(['play', 'stop']);
+const filled = new Set<IconName>([
+  'play',
+  'stop',
+  'circleShape',
+  'squareShape',
+  'rectangleShape',
+  'roundedRectShape',
+  'ellipseShape',
+  'triangleShape',
+  'hexagonShape',
+  'cylinderShape',
+  'cloudShape',
+]);
 
 export function Icon({ name, size = 16, className }: { name: IconName; size?: number; className?: string }) {
   return (

@@ -6,38 +6,46 @@ import { getNodeSize } from '../../utils/geometry';
 import { cx } from '../../utils/shallow';
 import styles from './NodeRenderer.module.css';
 
-type Corner = 'nw' | 'ne' | 'sw' | 'se';
-const corners: Corner[] = ['nw', 'ne', 'sw', 'se'];
+type Handle = 'nw' | 'ne' | 'sw' | 'se' | 'n' | 's' | 'e' | 'w';
+const handles: Handle[] = ['nw', 'n', 'ne', 'e', 'se', 's', 'sw', 'w'];
 
-/** Corner grips shown on a selected node. */
+const west = new Set<Handle>(['nw', 'w', 'sw']);
+const east = new Set<Handle>(['ne', 'e', 'se']);
+const north = new Set<Handle>(['nw', 'n', 'ne']);
+const south = new Set<Handle>(['sw', 's', 'se']);
+
+/**
+ * Corner grips resize both dimensions at once; edge-midpoint grips (like
+ * draw.io) resize only width (E/W) or only height (N/S).
+ */
 export function ResizeHandles({ nodeId, definition }: { nodeId: string; definition: NodeTypeDefinition }) {
   const engine = useFlowEngine();
   const startDrag = usePointerDrag();
 
   const onPointerDown = useCallback(
-    (corner: Corner) => (e: React.PointerEvent) => {
+    (handle: Handle) => (e: React.PointerEvent) => {
       if (e.button !== 0) return;
       e.stopPropagation();
       const node = engine.getNode(nodeId);
       if (!node) return;
       const start = { ...node.position, ...getNodeSize(node, definition) };
       const min = definition.minSize ?? { width: 60, height: 40 };
+      const resizesWidth = west.has(handle) || east.has(handle);
+      const resizesHeight = north.has(handle) || south.has(handle);
       startDrag(e, {
         onStart: () => engine.beginInteraction(),
         onMove: (_ev, delta) => {
           const zoom = engine.getState().viewport.zoom;
           const dx = delta.x / zoom;
           const dy = delta.y / zoom;
-          const west = corner === 'nw' || corner === 'sw';
-          const north = corner === 'nw' || corner === 'ne';
-          const width = Math.max(min.width, Math.round(start.width + (west ? -dx : dx)));
-          const height = Math.max(min.height, Math.round(start.height + (north ? -dy : dy)));
+          const width = resizesWidth ? Math.max(min.width, Math.round(start.width + (west.has(handle) ? -dx : dx))) : start.width;
+          const height = resizesHeight ? Math.max(min.height, Math.round(start.height + (north.has(handle) ? -dy : dy))) : start.height;
           engine.updateNode(nodeId, {
             width,
             height,
             position: {
-              x: west ? start.x + start.width - width : start.x,
-              y: north ? start.y + start.height - height : start.y,
+              x: west.has(handle) ? start.x + start.width - width : start.x,
+              y: north.has(handle) ? start.y + start.height - height : start.y,
             },
           });
         },
@@ -52,8 +60,8 @@ export function ResizeHandles({ nodeId, definition }: { nodeId: string; definiti
   return (
     <>
       <div className={styles.resizeOutline} />
-      {corners.map((c) => (
-        <div key={c} className={cx(styles.resize, styles[`resize-${c}`])} onPointerDown={onPointerDown(c)} />
+      {handles.map((h) => (
+        <div key={h} className={cx(styles.resize, styles[`resize-${h}`])} onPointerDown={onPointerDown(h)} />
       ))}
     </>
   );

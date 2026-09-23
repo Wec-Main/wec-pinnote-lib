@@ -2,7 +2,21 @@ import type { ComponentType, ReactNode } from 'react';
 import type { Dimensions, FlowNode, HandleKind, HandleSide, NodeData, PropertyValue } from './FlowTypes';
 
 /** Visual outline drawn behind a node's content. */
-export type NodeShape = 'rounded' | 'pill' | 'diamond' | 'parallelogram' | 'rectangle' | 'subprocess';
+export type NodeShape =
+  | 'rounded'
+  | 'pill'
+  | 'diamond'
+  | 'parallelogram'
+  | 'rectangle'
+  | 'subprocess'
+  | 'circle'
+  | 'square'
+  | 'ellipse'
+  | 'triangle'
+  | 'hexagon'
+  | 'cylinder'
+  | 'cloud'
+  | 'text';
 
 /** Semantic role used by the validator (lets plugins declare their own start/end nodes). */
 export type NodeRole = 'start' | 'end' | 'default';
@@ -35,6 +49,10 @@ export interface NodeComponentProps {
   selected: boolean;
   width: number;
   height: number;
+  /** True while the node's label is open for inline editing on the canvas. */
+  editing?: boolean;
+  /** Call once inline editing should close (blur, Enter, Escape). */
+  onEditDone?: () => void;
 }
 
 export type BuiltInIcon =
@@ -49,7 +67,17 @@ export type BuiltInIcon =
   | 'mail'
   | 'database'
   | 'clock'
-  | 'subprocess';
+  | 'subprocess'
+  | 'circleShape'
+  | 'squareShape'
+  | 'rectangleShape'
+  | 'roundedRectShape'
+  | 'textShape'
+  | 'ellipseShape'
+  | 'triangleShape'
+  | 'hexagonShape'
+  | 'cylinderShape'
+  | 'cloudShape';
 
 /**
  * Everything the editor needs to know about a node type. Registering a new
@@ -100,7 +128,12 @@ export const builtInNodeTypes: NodeTypeDefinition[] = [
     defaultSize: { width: 180, height: 56 },
     minSize: { width: 120, height: 44 },
     resizable: true,
-    handles: [{ id: 'out', kind: 'source', side: 'bottom' }],
+    handles: [
+      { id: 'out', kind: 'source', side: 'bottom' },
+      { id: 'out-top', kind: 'source', side: 'top' },
+      { id: 'out-left', kind: 'source', side: 'left' },
+      { id: 'out-right', kind: 'source', side: 'right' },
+    ],
     maxIncoming: 0,
     defaultData: { label: 'Start' },
   },
@@ -153,7 +186,12 @@ export const builtInNodeTypes: NodeTypeDefinition[] = [
     defaultSize: { width: 180, height: 56 },
     minSize: { width: 120, height: 44 },
     resizable: true,
-    handles: [{ id: 'in', kind: 'target', side: 'top' }],
+    handles: [
+      { id: 'in', kind: 'target', side: 'top' },
+      { id: 'in-bottom', kind: 'target', side: 'bottom' },
+      { id: 'in-left', kind: 'target', side: 'left' },
+      { id: 'in-right', kind: 'target', side: 'right' },
+    ],
     maxOutgoing: 0,
     defaultData: { label: 'End' },
   },
@@ -173,6 +211,176 @@ export const builtInNodeTypes: NodeTypeDefinition[] = [
       { id: 'out-right', kind: 'source', side: 'right' },
     ]),
     defaultData: { label: 'Sub Process' },
+  },
+  {
+    type: 'circle',
+    label: 'Circle',
+    description: 'Generic round shape',
+    category: 'General',
+    color: '#0ea5e9',
+    icon: 'circleShape',
+    shape: 'circle',
+    defaultSize: { width: 100, height: 100 },
+    minSize: { width: 48, height: 48 },
+    resizable: true,
+    handles: inOut([
+      { id: 'in-left', kind: 'target', side: 'left' },
+      { id: 'out-right', kind: 'source', side: 'right' },
+    ]),
+    defaultData: { label: 'Circle' },
+  },
+  {
+    type: 'square',
+    label: 'Square',
+    description: 'Generic square shape',
+    category: 'General',
+    color: '#78716c',
+    icon: 'squareShape',
+    shape: 'square',
+    defaultSize: { width: 100, height: 100 },
+    minSize: { width: 48, height: 48 },
+    resizable: true,
+    handles: inOut([
+      { id: 'in-left', kind: 'target', side: 'left' },
+      { id: 'out-right', kind: 'source', side: 'right' },
+    ]),
+    defaultData: { label: 'Square' },
+  },
+  {
+    type: 'rectangle',
+    label: 'Rectangle',
+    description: 'Generic rectangle shape',
+    category: 'General',
+    color: '#64748b',
+    icon: 'rectangleShape',
+    shape: 'rectangle',
+    defaultSize: { width: 140, height: 70 },
+    minSize: { width: 48, height: 32 },
+    resizable: true,
+    handles: inOut([
+      { id: 'in-left', kind: 'target', side: 'left' },
+      { id: 'out-right', kind: 'source', side: 'right' },
+    ]),
+    defaultData: { label: 'Rectangle' },
+  },
+  {
+    type: 'roundedRectangle',
+    label: 'Rounded Rectangle',
+    description: 'Generic rounded rectangle shape',
+    category: 'General',
+    color: '#0d9488',
+    icon: 'roundedRectShape',
+    shape: 'rounded',
+    defaultSize: { width: 140, height: 70 },
+    minSize: { width: 48, height: 32 },
+    resizable: true,
+    handles: inOut([
+      { id: 'in-left', kind: 'target', side: 'left' },
+      { id: 'out-right', kind: 'source', side: 'right' },
+    ]),
+    defaultData: { label: 'Rounded Rectangle' },
+  },
+  {
+    type: 'ellipse',
+    label: 'Ellipse',
+    description: 'Generic oval shape',
+    category: 'General',
+    color: '#a855f7',
+    icon: 'ellipseShape',
+    shape: 'ellipse',
+    defaultSize: { width: 140, height: 80 },
+    minSize: { width: 48, height: 32 },
+    resizable: true,
+    handles: inOut([
+      { id: 'in-left', kind: 'target', side: 'left' },
+      { id: 'out-right', kind: 'source', side: 'right' },
+    ]),
+    defaultData: { label: 'Ellipse' },
+  },
+  {
+    type: 'triangle',
+    label: 'Triangle',
+    description: 'Generic triangle shape',
+    category: 'General',
+    color: '#eab308',
+    icon: 'triangleShape',
+    shape: 'triangle',
+    defaultSize: { width: 120, height: 100 },
+    minSize: { width: 48, height: 40 },
+    resizable: true,
+    handles: inOut([
+      { id: 'in-left', kind: 'target', side: 'left' },
+      { id: 'out-right', kind: 'source', side: 'right' },
+    ]),
+    defaultData: { label: 'Triangle' },
+  },
+  {
+    type: 'hexagon',
+    label: 'Hexagon',
+    description: 'Generic hexagon shape',
+    category: 'General',
+    color: '#f97316',
+    icon: 'hexagonShape',
+    shape: 'hexagon',
+    defaultSize: { width: 160, height: 80 },
+    minSize: { width: 60, height: 40 },
+    resizable: true,
+    handles: inOut([
+      { id: 'in-left', kind: 'target', side: 'left' },
+      { id: 'out-right', kind: 'source', side: 'right' },
+    ]),
+    defaultData: { label: 'Hexagon' },
+  },
+  {
+    type: 'cylinder',
+    label: 'Cylinder',
+    description: 'Generic data store shape',
+    category: 'General',
+    color: '#14b8a6',
+    icon: 'cylinderShape',
+    shape: 'cylinder',
+    defaultSize: { width: 120, height: 100 },
+    minSize: { width: 48, height: 48 },
+    resizable: true,
+    handles: inOut([
+      { id: 'in-left', kind: 'target', side: 'left' },
+      { id: 'out-right', kind: 'source', side: 'right' },
+    ]),
+    defaultData: { label: 'Cylinder' },
+  },
+  {
+    type: 'cloud',
+    label: 'Cloud',
+    description: 'Generic cloud shape',
+    category: 'General',
+    color: '#38bdf8',
+    icon: 'cloudShape',
+    shape: 'cloud',
+    defaultSize: { width: 160, height: 100 },
+    minSize: { width: 60, height: 40 },
+    resizable: true,
+    handles: inOut([
+      { id: 'in-left', kind: 'target', side: 'left' },
+      { id: 'out-right', kind: 'source', side: 'right' },
+    ]),
+    defaultData: { label: 'Cloud' },
+  },
+  {
+    type: 'text',
+    label: 'Text',
+    description: 'Plain text label with no outline',
+    category: 'General',
+    color: '#475569',
+    icon: 'textShape',
+    shape: 'text',
+    defaultSize: { width: 120, height: 32 },
+    minSize: { width: 32, height: 20 },
+    resizable: true,
+    handles: inOut([
+      { id: 'in-left', kind: 'target', side: 'left' },
+      { id: 'out-right', kind: 'source', side: 'right' },
+    ]),
+    defaultData: { label: 'Text' },
   },
 ];
 

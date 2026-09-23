@@ -1,10 +1,11 @@
-import { memo, type CSSProperties } from 'react';
+import { memo, useEffect, type CSSProperties } from 'react';
 import { useFlowEngine, useFlowState } from '../../hooks/FlowContext';
 import { useNodeDrag } from '../../hooks/useNodeDrag';
 import { getNodeSize } from '../../utils/geometry';
 import { cx, shallowEqual } from '../../utils/shallow';
 import { DefaultNodeContent } from './DefaultNodeContent';
 import { Handle } from './Handle';
+import { useNodeEditTarget, watchNodeCreationForInlineEdit } from './nodeEditTrigger';
 import { NodeShape } from './NodeShape';
 import { ResizeHandles } from './ResizeHandles';
 import styles from './NodeRenderer.module.css';
@@ -21,6 +22,8 @@ export const NodeItem = memo(function NodeItem({ id }: { id: string }) {
   const readOnly = useFlowState((s) => s.readOnly);
   useFlowState((s) => s.registryVersion);
   const onPointerDown = useNodeDrag(id);
+  const [editTargetId, setEditTarget] = useNodeEditTarget();
+  const editing = editTargetId === id;
 
   if (!node) return null;
   const def = engine.getDefinition(node.type);
@@ -40,10 +43,19 @@ export const NodeItem = memo(function NodeItem({ id }: { id: string }) {
       data-node-id={id}
       data-node-type={node.type}
       onPointerDown={onPointerDown}
+      onDoubleClick={() => !readOnly && setEditTarget(id)}
     >
       <NodeShape shape={def.shape} width={width} height={height} />
       <div className={styles.content}>
-        <Content node={node} definition={def} selected={selected} width={width} height={height} />
+        <Content
+          node={node}
+          definition={def}
+          selected={selected}
+          width={width}
+          height={height}
+          editing={!readOnly && editing}
+          onEditDone={() => setEditTarget(null)}
+        />
       </div>
       {!readOnly && def.handles.map((h) => <Handle key={h.id} nodeId={id} handle={h} definition={def} width={width} height={height} />)}
       {selected && !readOnly && def.resizable !== false && <ResizeHandles nodeId={id} definition={def} />}
@@ -53,7 +65,9 @@ export const NodeItem = memo(function NodeItem({ id }: { id: string }) {
 
 /** Node layer: re-renders only when nodes are added, removed or reordered. */
 export const NodeRenderer = memo(function NodeRenderer() {
+  const engine = useFlowEngine();
   const ids = useFlowState((s) => s.nodes.map((n) => n.id), shallowEqual);
+  useEffect(() => watchNodeCreationForInlineEdit(engine), [engine]);
   return (
     <div className={styles.layer}>
       {ids.map((id) => (

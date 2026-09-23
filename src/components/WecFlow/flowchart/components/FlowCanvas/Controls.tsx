@@ -23,7 +23,6 @@ const gridLabel: Record<BackgroundVariant, string> = { dots: 'Dotted grid', line
 export const Controls = memo(function Controls({ mode, onModeChange, grid, onGridChange, miniMapVisible, onMiniMapToggle }: Props) {
   const engine = useFlowEngine();
   const zoom = useFlowState((s) => Math.round(s.viewport.zoom * 100));
-  const snapToGrid = useFlowState((s) => s.snapToGrid);
   const stop = (e: React.PointerEvent) => e.stopPropagation();
   return (
     <div className={styles.controls} onPointerDown={stop} onDoubleClick={(e) => e.stopPropagation()} data-flow-overlay>
@@ -58,15 +57,6 @@ export const Controls = memo(function Controls({ mode, onModeChange, grid, onGri
           onClick={() => onGridChange(nextGrid[grid])}
         >
           <Icon name="grid" />
-        </button>
-        <button
-          type="button"
-          className={cx(styles.controlBtn, snapToGrid && styles.controlActive)}
-          title={snapToGrid ? 'Snap to grid on' : 'Snap to grid off (drag uses alignment guides)'}
-          aria-pressed={snapToGrid}
-          onClick={() => engine.setSnapToGrid(!snapToGrid)}
-        >
-          <Icon name="magnet" />
         </button>
         <button
           type="button"

@@ -10,10 +10,11 @@ import styles from './PropertiesPanel.module.css';
 
 export interface PropertiesPanelProps {
   className?: string;
+  onClose?: () => void;
 }
 
 /** Right-hand inspector: edits whatever is selected (node, edge, multi-selection or the flow itself). */
-export const PropertiesPanel = memo(function PropertiesPanel({ className }: PropertiesPanelProps) {
+export const PropertiesPanel = memo(function PropertiesPanel({ className, onClose }: PropertiesPanelProps) {
   const [nodeIds, edgeIds] = useFlowState((s) => [[...s.selectedNodeIds], [...s.selectedEdgeIds]] as const, (a, b) =>
     shallowEqual(a[0], b[0]) && shallowEqual(a[1], b[1]),
   );
@@ -24,7 +25,16 @@ export const PropertiesPanel = memo(function PropertiesPanel({ className }: Prop
   else if (onlyEdgeId !== undefined && edgeIds.length === 1 && nodeIds.length === 0) content = <EdgeProperties key={onlyEdgeId} edgeId={onlyEdgeId} />;
   else if (nodeIds.length + edgeIds.length > 1) content = <MultiSelection nodeIds={nodeIds} edgeIds={edgeIds} />;
   else content = <FlowOverview />;
-  return <aside className={cx(styles.panel, className)}>{content}</aside>;
+  return (
+    <aside className={cx(styles.panel, className)}>
+      {onClose && (
+        <button type="button" className={styles.close} aria-label="Close panel" title="Close panel" onClick={onClose}>
+          <Icon name="x" size={14} />
+        </button>
+      )}
+      {content}
+    </aside>
+  );
 });
 
 function PanelHeader({ title, subtitle, color, icon }: { title: string; subtitle?: string; color?: string; icon: React.ReactNode }) {
@@ -45,10 +55,6 @@ function NodeProperties({ nodeId }: { nodeId: string }) {
   const engine = useFlowEngine();
   const node = useFlowState((s) => s.nodeLookup.get(nodeId));
   const readOnly = useFlowState((s) => s.readOnly);
-  const [incoming, outgoing] = useFlowState(
-    (s) => [s.edges.filter((e) => e.target === nodeId).length, s.edges.filter((e) => e.source === nodeId).length] as const,
-    shallowEqual,
-  );
   const issues = useFlowState((s) => s.validation?.issues.filter((i) => i.nodeIds?.includes(nodeId)), shallowEqual);
   const session = useEditSession();
   if (!node) return null;
@@ -103,16 +109,6 @@ function NodeProperties({ nodeId }: { nodeId: string }) {
         <div className={ui.row}>
           <NumberField label="Width" value={size.width} disabled={readOnly || def.resizable === false} onCommit={(width) => engine.updateNode(nodeId, { width: Math.max(def.minSize?.width ?? 40, width) })} />
           <NumberField label="Height" value={size.height} disabled={readOnly || def.resizable === false} onCommit={(height) => engine.updateNode(nodeId, { height: Math.max(def.minSize?.height ?? 30, height) })} />
-        </div>
-        <div className={styles.meta}>
-          <span>ID</span>
-          <code>{node.id}</code>
-        </div>
-        <div className={styles.meta}>
-          <span>Connections</span>
-          <span>
-            {incoming} in · {outgoing} out
-          </span>
         </div>
       </section>
 
@@ -277,7 +273,6 @@ function FlowOverview() {
   const name = useFlowState((s) => s.flowName);
   const readOnly = useFlowState((s) => s.readOnly);
   const edgeType = useFlowState((s) => s.defaultEdgeType);
-  const snap = useFlowState((s) => s.snapToGrid);
   return (
     <>
       <PanelHeader title="Flow settings" subtitle="Select a node or connection to edit it" icon={<Icon name="flow" size={16} />} />
@@ -309,10 +304,6 @@ function FlowOverview() {
             ))}
           </div>
         </div>
-        <label className={ui.switchRow}>
-          <span>Snap to grid</span>
-          <input type="checkbox" className={ui.switch} checked={snap} onChange={(e) => engine.setSnapToGrid(e.target.checked)} />
-        </label>
       </section>
     </>
   );
