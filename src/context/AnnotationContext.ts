@@ -6,6 +6,7 @@ import type {
   AnnotationAnchor,
   AnnotationApiClient,
   AnnotationStatus,
+  CreateAnnotationRequest,
   DraftAnnotation,
   PageStatus,
   ResolvedAnnotationConfig,
@@ -25,12 +26,14 @@ export interface AnnotationDataContextValue {
   pageKey: string;
   annotations: Annotation[];
   pageStatus: PageStatus;
+  pageStatusError: string | null;
   loading: boolean;
   error: string | null;
   connectionState: StreamConnectionState;
   retry: () => void;
   actionError: string | null;
   clearActionError: () => void;
+  createAnnotation: (request: CreateAnnotationRequest) => Promise<Annotation>;
   addComment: (annotationId: string, message: string) => Promise<void>;
   editComment: (annotationId: string, commentId: string, message: string) => Promise<void>;
   removeComment: (annotationId: string, commentId: string) => Promise<void>;
@@ -94,6 +97,8 @@ export interface AnnotationUiContextValue {
 }
 
 export interface AnnotationAuthContextValue {
+  authenticated: boolean;
+  hostAuthenticated: boolean;
   accounts: AuthSession[];
   activeAccount: AuthSession | null;
   loginOptions: LoginOption[];
@@ -101,8 +106,10 @@ export interface AnnotationAuthContextValue {
   loginOptionsError: string | null;
   reloadLoginOptions: () => void;
   login: (userId: string, password: string) => Promise<void>;
-  logout: (userId: string) => void;
+  logout: (userId: string) => Promise<void>;
   switchAccount: (userId: string) => void;
+  revokeError: string | null;
+  clearRevokeError: () => void;
 }
 
 export type AnnotationContextValue = AnnotationDataContextValue &

@@ -1,22 +1,18 @@
 import type { Annotation, AnnotationComment, PageStatus } from "../types/annotation.types";
 import type { StreamEvent } from "../types/stream.types";
-
-function isNewer(incoming: string, existing: string): boolean {
-  return new Date(incoming).getTime() >= new Date(existing).getTime();
-}
+import {
+  isAnnotation,
+  isComment,
+  isNewer,
+  normalizeAnnotation,
+  upsertById,
+} from "./streamPayloadGuards";
 
 function upsertComment(
   comments: AnnotationComment[],
   incoming: AnnotationComment,
 ): AnnotationComment[] {
-  const existing = comments.find((item) => item.id === incoming.id);
-  if (!existing) {
-    return [...comments, incoming];
-  }
-  if (!isNewer(incoming.updatedAt, existing.updatedAt)) {
-    return comments;
-  }
-  return comments.map((item) => (item.id === incoming.id ? incoming : item));
+  return upsertById(comments, incoming);
 }
 
 function upsertAnnotation(annotations: Annotation[], incoming: Annotation): Annotation[] {
@@ -27,8 +23,6 @@ function upsertAnnotation(annotations: Annotation[], incoming: Annotation): Anno
   if (!isNewer(incoming.updatedAt, existing.updatedAt)) {
     return annotations;
   }
-  // Comments arrive through their own events; keep locally known ones so a
-  // stale annotation payload cannot drop a comment this client already has.
   return annotations.map((item) =>
     item.id === incoming.id ? { ...incoming, comments: item.comments } : item,
   );
@@ -49,24 +43,22 @@ export function applyStreamEvent(annotations: Annotation[], event: StreamEvent):
   switch (event.eventType) {
     case "annotation.created":
     case "annotation.updated": {
-      const { annotation } = payload as { annotation: Annotation };
-      if (!annotation) {
+      const { annotation } = payload as { annotation: unknown };
+      if (!annotation || typeof annotation !== "object") {
         return unchanged;
       }
-      if (event.eventType === "annotation.created") {
-        const existing = annotations.find((item) => item.id === annotation.id);
-        if (!existing) {
-          return {
-            annotations: [...annotations, annotation].sort((a, b) => a.number - b.number),
-            pageStatus: null,
-          };
-        }
+      const candidate = normalizeAnnotation(annotation as Record<string, unknown>);
+      if (!isAnnotation(candidate)) {
+        return unchanged;
       }
-      return { annotations: upsertAnnotation(annotations, annotation), pageStatus: null };
+      return { annotations: upsertAnnotation(annotations, candidate), pageStatus: null };
     }
 
     case "annotation.deleted": {
       const { annotationId } = payload as { annotationId: string };
+      if (!annotationId || !annotations.some((item) => item.id === annotationId)) {
+        return unchanged;
+      }
       return {
         annotations: annotations.filter((item) => item.id !== annotationId),
         pageStatus: null,
@@ -77,9 +69,9 @@ export function applyStreamEvent(annotations: Annotation[], event: StreamEvent):
     case "comment.updated": {
       const { annotationId, comment } = payload as {
         annotationId: string;
-        comment: AnnotationComment;
+        comment: unknown;
       };
-      if (!annotationId || !comment) {
+      if (!annotationId || !isComment(comment)) {
         return unchanged;
       }
       const target = annotations.find((item) => item.id === annotationId);

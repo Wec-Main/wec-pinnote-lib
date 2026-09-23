@@ -1,38 +1,24 @@
 import type { Epic, EpicFlowFormInput, UserStory } from "../types/epicFlow.types";
-import { readErrorMessage, reportUnauthorized } from "./httpClient";
+import { AnnotationApiError } from "../types/annotation.types";
+import { buildUrl, request, requestNoContent, type QueryValue } from "./httpClient";
 
-export class EpicFlowApiError extends Error {
-  readonly status: number;
-  readonly body: string | null;
-
+export class EpicFlowApiError extends AnnotationApiError {
   constructor(message: string, status: number, body: string | null = null) {
-    super(message);
+    super(message, status, body);
     this.name = "EpicFlowApiError";
-    this.status = status;
-    this.body = body;
   }
+}
+
+function createEpicFlowError(message: string, status: number, body: string | null) {
+  return new EpicFlowApiError(message, status, body);
 }
 
 interface RequestOptions {
   method: "GET" | "POST" | "PATCH" | "DELETE";
   path: string;
-  query?: Record<string, string>;
+  query?: Record<string, QueryValue>;
   body?: unknown;
   signal?: AbortSignal;
-}
-
-function joinUrl(baseUrl: string, path: string, query?: Record<string, string>): string {
-  const normalizedBase = baseUrl.replace(/\/+$/, "");
-  const url = new URL(`${normalizedBase}${path}`, "http://local.invalid");
-  if (query) {
-    for (const [key, value] of Object.entries(query)) {
-      url.searchParams.set(key, value);
-    }
-  }
-  if (/^https?:\/\//i.test(normalizedBase)) {
-    return url.toString();
-  }
-  return `${url.pathname}${url.search}`;
 }
 
 export interface EpicFlowApiConfig {
@@ -66,64 +52,54 @@ export interface EpicFlowApiClient {
   deleteUserStory(userStoryId: string, signal?: AbortSignal): Promise<void>;
 }
 
-/**
- * Talks to the EpicFlow endpoints (`/epics`, `/user-stories`) documented in
- * wec-pinnote-lib/docs/api-contract.md, on the same backend and base URL as
- * the annotations API. There is no Notes endpoint: the EpicFlow "Notes"
- * panel only ever displays the selected epic/user story's own title and
- * description, so no extra API surface is needed for it.
- */
 export function createEpicFlowApi(config: EpicFlowApiConfig): EpicFlowApiClient {
-  async function request<T>(options: RequestOptions): Promise<T> {
-    const headers: Record<string, string> = { Accept: "application/json" };
-    if (options.body !== undefined) {
-      headers["Content-Type"] = "application/json";
-    }
-
+  async function call<T>(options: RequestOptions): Promise<T> {
     const token = config.getAuthToken ? await config.getAuthToken() : undefined;
-    if (token) {
-      headers.Authorization = `Bearer ${token}`;
-    }
+    const url = buildUrl(config.apiBaseUrl, options.path, options.query);
+    return request<T>(
+      url,
+      token,
+      {
+        method: options.method,
+        body: options.body === undefined ? undefined : JSON.stringify(options.body),
+        signal: options.signal,
+      },
+      {
+        fallbackMessage: (status) => `EpicFlow API request failed (${status})`,
+        createError: createEpicFlowError,
+      },
+    );
+  }
 
-    const response = await fetch(joinUrl(config.apiBaseUrl, options.path, options.query), {
-      method: options.method,
-      headers,
-      body: options.body === undefined ? undefined : JSON.stringify(options.body),
-      signal: options.signal,
-    });
-
-    if (!response.ok) {
-      reportUnauthorized(response.status, token);
-      const { message, text } = await readErrorMessage(
-        response,
-        `EpicFlow API request failed (${response.status})`,
-      );
-      throw new EpicFlowApiError(message, response.status, text || null);
-    }
-
-    if (response.status === 204) {
-      return undefined as T;
-    }
-
-    const text = await response.text();
-    if (!text) {
-      return undefined as T;
-    }
-
-    return JSON.parse(text) as T;
+  async function callNoContent(options: RequestOptions): Promise<void> {
+    const token = config.getAuthToken ? await config.getAuthToken() : undefined;
+    const url = buildUrl(config.apiBaseUrl, options.path, options.query);
+    await requestNoContent(
+      url,
+      token,
+      {
+        method: options.method,
+        body: options.body === undefined ? undefined : JSON.stringify(options.body),
+        signal: options.signal,
+      },
+      {
+        fallbackMessage: (status) => `EpicFlow API request failed (${status})`,
+        createError: createEpicFlowError,
+      },
+    );
   }
 
   return {
     getEpics(projectId, signal) {
-      return request<Epic[]>({ method: "GET", path: "/epics", query: { projectId }, signal });
+      return call<Epic[]>({ method: "GET", path: "/epics", query: { projectId }, signal });
     },
 
     createEpic(data, signal) {
-      return request<Epic>({ method: "POST", path: "/epics", body: data, signal });
+      return call<Epic>({ method: "POST", path: "/epics", body: data, signal });
     },
 
     updateEpic(epicId, data, signal) {
-      return request<Epic>({
+      return call<Epic>({
         method: "PATCH",
         path: `/epics/${encodeURIComponent(epicId)}`,
         body: data,
@@ -132,7 +108,7 @@ export function createEpicFlowApi(config: EpicFlowApiConfig): EpicFlowApiClient 
     },
 
     deleteEpic(epicId, signal) {
-      return request<void>({
+      return callNoContent({
         method: "DELETE",
         path: `/epics/${encodeURIComponent(epicId)}`,
         signal,
@@ -140,7 +116,7 @@ export function createEpicFlowApi(config: EpicFlowApiConfig): EpicFlowApiClient 
     },
 
     getUserStoriesByEpic(epicId, signal) {
-      return request<UserStory[]>({
+      return call<UserStory[]>({
         method: "GET",
         path: "/user-stories",
         query: { epicId },
@@ -149,7 +125,7 @@ export function createEpicFlowApi(config: EpicFlowApiConfig): EpicFlowApiClient 
     },
 
     getUserStoriesByProject(projectId, signal) {
-      return request<UserStory[]>({
+      return call<UserStory[]>({
         method: "GET",
         path: "/user-stories",
         query: { projectId },
@@ -158,7 +134,7 @@ export function createEpicFlowApi(config: EpicFlowApiConfig): EpicFlowApiClient 
     },
 
     createUserStory(epicId, data, signal) {
-      return request<UserStory>({
+      return call<UserStory>({
         method: "POST",
         path: "/user-stories",
         body: { epicId, ...data },
@@ -167,7 +143,7 @@ export function createEpicFlowApi(config: EpicFlowApiConfig): EpicFlowApiClient 
     },
 
     updateUserStory(userStoryId, data, signal) {
-      return request<UserStory>({
+      return call<UserStory>({
         method: "PATCH",
         path: `/user-stories/${encodeURIComponent(userStoryId)}`,
         body: data,
@@ -176,7 +152,7 @@ export function createEpicFlowApi(config: EpicFlowApiConfig): EpicFlowApiClient 
     },
 
     deleteUserStory(userStoryId, signal) {
-      return request<void>({
+      return callNoContent({
         method: "DELETE",
         path: `/user-stories/${encodeURIComponent(userStoryId)}`,
         signal,

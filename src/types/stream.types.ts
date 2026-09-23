@@ -35,15 +35,20 @@ export interface StreamEventPayloads {
   "user_story.deleted": { userStoryId: string };
 }
 
-export interface StreamEvent {
+interface StreamEventBase {
   eventId: string;
   projectId: string;
   pageKey: string;
-  eventType: StreamEventType;
   annotationId: string | null;
   commentId: string | null;
   actorUserId: string | null;
-  payload: unknown;
   createdAt: string;
   truncated?: boolean;
 }
+
+export type StreamEvent = {
+  [K in StreamEventType]: StreamEventBase & {
+    eventType: K;
+    payload: StreamEventPayloads[K];
+  };
+}[StreamEventType];

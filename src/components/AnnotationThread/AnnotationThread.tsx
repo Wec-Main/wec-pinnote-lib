@@ -49,6 +49,64 @@ function CommentItem({
         <div className="wpn-comment__meta">
           <strong>{comment.createdBy.name}</strong>
           <time dateTime={comment.createdAt}>{formatTimestamp(comment.createdAt)}</time>
+          {(canEdit || canDelete) && !editing ? (
+            <div className="wpn-comment__actions wpn-comment__actions--inline">
+              {canEdit ? (
+                <button
+                  type="button"
+                  className="wpn-link wpn-link--icon"
+                  aria-label="Edit"
+                  onClick={() => setEditing(true)}
+                >
+                  <svg viewBox="0 0 24 24" className="wpn-action-icon" aria-hidden="true">
+                    <path
+                      fill="none"
+                      stroke="currentColor"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth="1.8"
+                      d="M13.2 6.2 17.8 10.8M4 20l.9-4.5L14.6 6a1.5 1.5 0 0 1 2.1 0l1.3 1.3a1.5 1.5 0 0 1 0 2.1L8.5 19.1 4 20Z"
+                    />
+                  </svg>
+                </button>
+              ) : null}
+              {!canDelete ? null : confirmDelete ? (
+                <>
+                  <button
+                    type="button"
+                    className="wpn-link wpn-link--chip wpn-link--danger"
+                    onClick={() => onDelete(comment.id).catch(() => undefined)}
+                  >
+                    Confirm
+                  </button>
+                  <button
+                    type="button"
+                    className="wpn-link wpn-link--chip"
+                    onClick={() => setConfirmDelete(false)}
+                  >
+                    Cancel
+                  </button>
+                </>
+              ) : (
+                <button
+                  type="button"
+                  className="wpn-link wpn-link--icon wpn-link--danger"
+                  aria-label="Delete"
+                  onClick={() => setConfirmDelete(true)}
+                >
+                  <svg viewBox="0 0 16 16" className="wpn-action-icon" aria-hidden="true">
+                    <path
+                      d="M3 4h10M6.2 4V2.8h3.6V4M5 6.2v6M8 6.2v6M11 6.2v6M4.2 4l.5 9.2h6.6L11.8 4"
+                      stroke="currentColor"
+                      strokeWidth="1.3"
+                      strokeLinecap="round"
+                      fill="none"
+                    />
+                  </svg>
+                </button>
+              )}
+            </div>
+          ) : null}
         </div>
         {editing ? (
           <div className="wpn-comment__edit">
@@ -88,64 +146,6 @@ function CommentItem({
         ) : (
           <p className="wpn-comment__message">{comment.message}</p>
         )}
-        {(canEdit || canDelete) && !editing ? (
-          <div className="wpn-comment__actions">
-            {canEdit ? (
-              <button
-                type="button"
-                className="wpn-link wpn-link--icon"
-                aria-label="Edit"
-                onClick={() => setEditing(true)}
-              >
-                <svg viewBox="0 0 24 24" className="wpn-action-icon" aria-hidden="true">
-                  <path
-                    fill="none"
-                    stroke="currentColor"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth="1.8"
-                    d="M13.2 6.2 17.8 10.8M4 20l.9-4.5L14.6 6a1.5 1.5 0 0 1 2.1 0l1.3 1.3a1.5 1.5 0 0 1 0 2.1L8.5 19.1 4 20Z"
-                  />
-                </svg>
-              </button>
-            ) : null}
-            {!canDelete ? null : confirmDelete ? (
-              <>
-                <button
-                  type="button"
-                  className="wpn-link wpn-link--chip wpn-link--danger"
-                  onClick={() => onDelete(comment.id).catch(() => undefined)}
-                >
-                  Confirm
-                </button>
-                <button
-                  type="button"
-                  className="wpn-link wpn-link--chip"
-                  onClick={() => setConfirmDelete(false)}
-                >
-                  Cancel
-                </button>
-              </>
-            ) : (
-              <button
-                type="button"
-                className="wpn-link wpn-link--icon"
-                aria-label="Delete"
-                onClick={() => setConfirmDelete(true)}
-              >
-                <svg viewBox="0 0 16 16" className="wpn-action-icon" aria-hidden="true">
-                  <path
-                    d="M3 4h10M6.2 4V2.8h3.6V4M5 6.2v6M8 6.2v6M11 6.2v6M4.2 4l.5 9.2h6.6L11.8 4"
-                    stroke="currentColor"
-                    strokeWidth="1.3"
-                    strokeLinecap="round"
-                    fill="none"
-                  />
-                </svg>
-              </button>
-            )}
-          </div>
-        ) : null}
       </div>
     </article>
   );

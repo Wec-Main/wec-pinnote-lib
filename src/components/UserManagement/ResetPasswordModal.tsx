@@ -2,7 +2,7 @@ import { useId, useRef, useState, type FormEvent } from "react";
 import { Icon, Spinner, Tooltip } from "../primitives";
 import { useEscapeKey } from "../../hooks/useEscapeKey";
 import { useScrimDismiss } from "../../hooks/useScrimDismiss";
-import { useFocusTrap } from "../Settings/useFocusTrap";
+import { useFocusTrap } from "../../hooks/useFocusTrap";
 import { MIN_PASSWORD_LENGTH, PasswordField } from "./PasswordField";
 import type { ManagedUser } from "../../types/userManagement.types";
 

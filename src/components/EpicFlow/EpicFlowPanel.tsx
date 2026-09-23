@@ -6,7 +6,11 @@ import {
   useState,
   type MouseEvent as ReactMouseEvent,
 } from "react";
-import { useAnnotationData, useAnnotationUi } from "../../context/AnnotationContext";
+import {
+  useAnnotationAuth,
+  useAnnotationData,
+  useAnnotationUi,
+} from "../../context/AnnotationContext";
 import { Icon, ListSearchBar, RefreshButton, Tooltip } from "../primitives";
 import { Icons } from "../../assets/icons";
 import { useEpicFlowApi } from "../../hooks/useEpicFlowApi";
@@ -40,6 +44,7 @@ function describeApiError(err: unknown): string {
 export function EpicFlowPanel() {
   const { config } = useAnnotationData();
   const { setEpicFlowOpen } = useAnnotationUi();
+  const { hostAuthenticated, activeAccount } = useAnnotationAuth();
   const api = useEpicFlowApi(config);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -70,6 +75,7 @@ export function EpicFlowPanel() {
   const allUserStoriesRef = useRef(allUserStories);
   const selectedEpicIdRef = useRef(selectedEpicId);
   const selectedUserStoryIdRef = useRef(selectedUserStoryId);
+  const reloadGenerationRef = useRef(0);
   epicsRef.current = epics;
   allUserStoriesRef.current = allUserStories;
   selectedEpicIdRef.current = selectedEpicId;
@@ -125,12 +131,15 @@ export function EpicFlowPanel() {
 
   const reloadAll = useCallback(
     async (signal?: AbortSignal) => {
+      const generation = ++reloadGenerationRef.current;
       const [nextEpics, nextStories] = await Promise.all([
         api.getEpics(config.projectId, signal),
         api.getUserStoriesByProject(config.projectId, signal),
       ]);
-      setEpics(nextEpics);
-      setAllUserStories(nextStories);
+      if (generation === reloadGenerationRef.current) {
+        setEpics(nextEpics);
+        setAllUserStories(nextStories);
+      }
       return { nextEpics, nextStories };
     },
     [api, config.projectId],
@@ -145,32 +154,36 @@ export function EpicFlowPanel() {
   }, [reloadAll]);
 
   const onStreamEvent = useCallback((event: StreamEvent) => {
-    const result = applyEpicFlowStreamEvent(epicsRef.current, allUserStoriesRef.current, event);
-    if (result.epics !== epicsRef.current) {
-      setEpics(result.epics);
+    setEpics((currentEpics) => {
+      const result = applyEpicFlowStreamEvent(currentEpics, allUserStoriesRef.current, event);
       if (
+        result.epics !== currentEpics &&
         selectedEpicIdRef.current &&
         !result.epics.some((epic) => epic.id === selectedEpicIdRef.current)
       ) {
         setSelectedEpicId(null);
         setSelectedUserStoryId(null);
       }
-    }
-    if (result.userStories !== allUserStoriesRef.current) {
-      setAllUserStories(result.userStories);
+      return result.epics;
+    });
+    setAllUserStories((currentUserStories) => {
+      const result = applyEpicFlowStreamEvent(epicsRef.current, currentUserStories, event);
       if (
+        result.userStories !== currentUserStories &&
         selectedUserStoryIdRef.current &&
         !result.userStories.some((story) => story.id === selectedUserStoryIdRef.current)
       ) {
         setSelectedUserStoryId(null);
       }
-    }
+      return result.userStories;
+    });
   }, []);
 
   const connectionState = useEpicFlowStream({
     apiBaseUrl: config.apiBaseUrl,
     projectId: config.projectId,
     getAuthToken: config.getAuthToken,
+    sessionKey: hostAuthenticated ? "host" : (activeAccount?.id ?? ""),
     enabled: true,
     onEvent: onStreamEvent,
     onResync: handleRefresh,

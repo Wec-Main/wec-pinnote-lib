@@ -2,7 +2,7 @@ import { useId, useRef, useState, type FormEvent } from "react";
 import { Icon, SearchableSelect, Spinner, Tooltip } from "../primitives";
 import { useEscapeKey } from "../../hooks/useEscapeKey";
 import { useScrimDismiss } from "../../hooks/useScrimDismiss";
-import { useFocusTrap } from "./useFocusTrap";
+import { useFocusTrap } from "../../hooks/useFocusTrap";
 import { Field } from "./Field";
 import { TAG_COLORS, type ProjectTag, type TagDraft, type TagStatus } from "../../types/tag.types";
 import type { Project } from "../../types/organization.types";

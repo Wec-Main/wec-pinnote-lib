@@ -3,7 +3,7 @@ import { Icon, Tooltip } from "../primitives";
 import { useEscapeKey } from "../../hooks/useEscapeKey";
 import { useScrimDismiss } from "../../hooks/useScrimDismiss";
 import { formatTimestamp } from "../../utils/format";
-import { useFocusTrap } from "./useFocusTrap";
+import { useFocusTrap } from "../../hooks/useFocusTrap";
 import type { ProjectTag } from "../../types/tag.types";
 
 interface TagDetailsModalProps {

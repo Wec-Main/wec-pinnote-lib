@@ -1,4 +1,4 @@
-import { buildUrl, request } from "./httpClient";
+import { buildUrl, request, requestNoContent } from "./httpClient";
 import type { ProjectTag, TagDraft } from "../types/tag.types";
 
 export async function fetchTags(
@@ -52,7 +52,7 @@ export function deleteTag(
   tagId: string,
   signal?: AbortSignal,
 ): Promise<void> {
-  return request<void>(buildUrl(apiBaseUrl, `/tags/${encodeURIComponent(tagId)}`), authToken, {
+  return requestNoContent(buildUrl(apiBaseUrl, `/tags/${encodeURIComponent(tagId)}`), authToken, {
     method: "DELETE",
     signal,
   });

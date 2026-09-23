@@ -3,6 +3,7 @@ import { useAnnotationAuth, useAnnotationContext } from "../../context/Annotatio
 import { Icon, Tooltip } from "../primitives";
 import { useSharedFetch } from "../../hooks/useSharedFetch";
 import { useFlowDocument } from "../../hooks/useFlowDocument";
+import { useTokenGetter } from "../../hooks/useTokenGetter";
 import { resolveDefaultFlow } from "../../services/flowApi";
 import { FlowDocumentEditor } from "./FlowDocumentEditor";
 
@@ -52,22 +53,27 @@ function errorMessage(error: unknown): string | null {
 
 export function WecFlowPanel() {
   const { setFlowOpen, config } = useAnnotationContext();
-  const { activeAccount } = useAnnotationAuth();
+  const { hostAuthenticated, activeAccount } = useAnnotationAuth();
   const [minimized, setMinimized] = useState(false);
-  const authToken = activeAccount?.token;
-  const flowKey = authToken
-    ? `default-flow:${config.apiBaseUrl}:${authToken}:${config.projectId}`
+  const getToken = useTokenGetter(config.getAuthToken);
+  const signedIn = Boolean(config.getAuthToken);
+  const sessionKey = hostAuthenticated ? "host" : (activeAccount?.id ?? "");
+  const flowKey = sessionKey
+    ? `default-flow:${config.apiBaseUrl}:${sessionKey}:${config.projectId}`
     : null;
   const {
     data: flow,
     error: flowError,
     reload: reloadFlow,
   } = useSharedFetch(flowKey, (signal) =>
-    resolveDefaultFlow(config.apiBaseUrl, authToken, config.projectId, signal),
+    getToken().then((authToken) =>
+      resolveDefaultFlow(config.apiBaseUrl, authToken, config.projectId, signal),
+    ),
   );
   const flowDocument = useFlowDocument({
     apiBaseUrl: config.apiBaseUrl,
-    authToken,
+    getAuthToken: config.getAuthToken,
+    sessionKey,
     flowId: flow?.id ?? null,
   });
 
@@ -116,7 +122,7 @@ export function WecFlowPanel() {
       <div className="wpn-flow-panel__body">
         <FlowDocumentEditor
           flowDocument={flowDocument}
-          signedIn={Boolean(authToken)}
+          signedIn={signedIn}
           resolveError={errorMessage(flowError)}
           onRetry={flowError ? reloadFlow : undefined}
         />

@@ -3,47 +3,45 @@ import { useCallback, useEffect, useRef, useState } from "react";
 interface CacheEntry<T> {
   promise: Promise<T>;
   controller: AbortController;
-  subscribers: number;
+  subscribers: Set<(entry: CacheEntry<unknown>) => void>;
   result?: { value: T } | { error: unknown };
 }
 
 const cache = new Map<string, CacheEntry<unknown>>();
 
-/**
- * A failed fetch is never stored as `result` here: a cached success is safe to
- * replay to new subscribers, but a cached failure (a 401 from a since-fixed
- * auth gate, a transient 500) would otherwise be served forever to everyone
- * who asks for this key, with no way for the app to know the underlying
- * condition has changed. Dropping the cache entry on failure means the next
- * subscriber, or the next mount of the same one, naturally retries instead.
- */
-function startFetch<T>(key: string, fetcher: (signal: AbortSignal) => Promise<T>): CacheEntry<T> {
+function evictIfSettled(key: string, entry: CacheEntry<unknown>): void {
+  if (cache.get(key) === entry && entry.subscribers.size === 0) {
+    cache.delete(key);
+  }
+}
+
+function notifySubscribers(entry: CacheEntry<unknown>): void {
+  for (const notify of entry.subscribers) {
+    notify(entry);
+  }
+}
+
+function settle(key: string, entry: CacheEntry<unknown>, result: CacheEntry<unknown>["result"]): void {
+  if (entry.controller.signal.aborted) {
+    return;
+  }
+  entry.result = result;
+  notifySubscribers(entry);
+  evictIfSettled(key, entry);
+}
+
+function startFetch<T>(key: string, fetcher: (signal: AbortSignal) => Promise<T>): CacheEntry<unknown> {
   const controller = new AbortController();
-  const entry: CacheEntry<T> = { controller, subscribers: 0, promise: Promise.resolve() as never };
-  entry.promise = fetcher(controller.signal)
-    .then((value) => {
-      entry.result = { value };
-      return value;
-    })
-    .catch((error: unknown) => {
-      if (cache.get(key) === (entry as CacheEntry<unknown>)) {
-        cache.delete(key);
-      }
-      entry.result = { error };
-      throw error;
-    });
-  cache.set(key, entry as CacheEntry<unknown>);
+  const promise = fetcher(controller.signal);
+  const entry: CacheEntry<unknown> = { controller, subscribers: new Set(), promise };
+  promise.then(
+    (value) => settle(key, entry, { value }),
+    (error: unknown) => settle(key, entry, { error }),
+  );
+  cache.set(key, entry);
   return entry;
 }
 
-/**
- * Several unrelated components (a settings table, a filter dropdown, a form
- * picker) often need the same read-only list at once. Without sharing, each
- * one fires its own request for identical data. Subscribers to the same key
- * share one in-flight request and its result; the request is only aborted
- * once the last subscriber leaves before it settles, and `reload` forces a
- * fresh fetch for everyone currently subscribed.
- */
 export function useSharedFetch<T>(
   key: string | null,
   fetcher: (signal: AbortSignal) => Promise<T>,
@@ -73,37 +71,28 @@ export function useSharedFetch<T>(
     if (!key) {
       return;
     }
-    let cancelled = false;
-    let entry = cache.get(key);
+    const joinedKey = key;
+    let entry = cache.get(joinedKey);
     if (!entry) {
-      entry = startFetch(key, fetcherRef.current) as CacheEntry<unknown>;
+      entry = startFetch(joinedKey, fetcherRef.current);
     }
-    entry.subscribers += 1;
-    applyEntry(entry);
-
-    entry.promise.then(
-      () => {
-        if (!cancelled) {
-          applyEntry(cache.get(key) ?? entry!);
-        }
-      },
-      () => {
-        if (!cancelled) {
-          applyEntry(cache.get(key) ?? entry!);
-        }
-      },
-    );
+    let owner = entry;
+    const notify = (next: CacheEntry<unknown>) => {
+      owner = next;
+      applyEntry(next);
+    };
+    owner.subscribers.add(notify);
+    applyEntry(owner);
 
     return () => {
-      cancelled = true;
-      const current = cache.get(key);
-      if (!current) {
-        return;
-      }
-      current.subscribers -= 1;
-      if (current.subscribers <= 0 && !current.result) {
-        current.controller.abort();
-        cache.delete(key);
+      owner.subscribers.delete(notify);
+      if (owner.subscribers.size === 0 && !owner.result) {
+        owner.controller.abort();
+        if (cache.get(joinedKey) === owner) {
+          cache.delete(joinedKey);
+        }
+      } else {
+        evictIfSettled(joinedKey, owner);
       }
     };
   }, [key, applyEntry]);
@@ -113,18 +102,13 @@ export function useSharedFetch<T>(
       return;
     }
     const existing = cache.get(key);
-    const subscribers = existing?.subscribers ?? 1;
+    existing?.controller.abort();
+    const entry = startFetch(key, fetcherRef.current);
     if (existing) {
-      cache.delete(key);
+      entry.subscribers = existing.subscribers;
     }
-    const entry = startFetch(key, fetcherRef.current) as CacheEntry<unknown>;
-    entry.subscribers = subscribers;
-    applyEntry(entry);
-    entry.promise.then(
-      () => applyEntry(cache.get(key) ?? entry),
-      () => applyEntry(cache.get(key) ?? entry),
-    );
-  }, [key, applyEntry]);
+    notifySubscribers(entry);
+  }, [key]);
 
   return {
     data: dataRef.current,
@@ -139,7 +123,7 @@ export function invalidateSharedFetch(key: string): void {
   if (!entry) {
     return;
   }
-  if (entry.subscribers <= 0) {
+  if (entry.subscribers.size === 0) {
     entry.controller.abort();
   }
   cache.delete(key);

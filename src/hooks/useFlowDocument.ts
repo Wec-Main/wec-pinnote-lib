@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { fetchFlowDocument, publishFlow, saveFlowDocument } from "../services/flowApi";
 import { parseFlow, type FlowJSON } from "../components/WecFlow/flowchart";
 import { AnnotationApiError } from "../types/annotation.types";
+import { useTokenGetter } from "./useTokenGetter";
 
 const AUTOSAVE_DELAY_MS = 1200;
 const CONFLICT_STATUS = 409;
@@ -12,7 +13,8 @@ export type FlowSaveState = "idle" | "pending" | "saving" | "saved" | "error";
 
 interface UseFlowDocumentOptions {
   apiBaseUrl: string;
-  authToken: string | undefined;
+  getAuthToken: (() => string | Promise<string>) | undefined;
+  sessionKey: string | null;
   flowId: string | null;
   onSaved?: (flowName: string) => void;
 }
@@ -31,6 +33,17 @@ export interface FlowDocumentState {
   reload: () => void;
 }
 
+interface SaveTarget {
+  apiBaseUrl: string;
+  flowId: string;
+  onSaved: ((flowName: string) => void) | undefined;
+}
+
+interface PendingSave {
+  target: SaveTarget;
+  flow: FlowJSON;
+}
+
 function describeError(error: unknown): string {
   if (error instanceof AnnotationApiError && error.status === CONFLICT_STATUS) {
     return CONFLICT_MESSAGE;
@@ -42,11 +55,9 @@ function isAbort(error: unknown): boolean {
   return error instanceof DOMException && error.name === "AbortError";
 }
 
-/** Loads one flow from the API and keeps it saved: edits autosave after a short pause,
- * saves run one at a time against the latest server revision, and a stale revision
- * surfaces as a conflict instead of overwriting someone else's work. */
 export function useFlowDocument(options: UseFlowDocumentOptions): FlowDocumentState {
-  const { apiBaseUrl, authToken, flowId } = options;
+  const { apiBaseUrl, flowId, sessionKey } = options;
+  const getToken = useTokenGetter(options.getAuthToken);
   const [status, setStatus] = useState<FlowDocumentStatus>("loading");
   const [document, setDocument] = useState<FlowJSON | null>(null);
   const [loadKey, setLoadKey] = useState(0);
@@ -58,22 +69,26 @@ export function useFlowDocument(options: UseFlowDocumentOptions): FlowDocumentSt
 
   const optionsRef = useRef(options);
   optionsRef.current = options;
-  const revisionRef = useRef(0);
+  const loadedFlowIdRef = useRef<string | null>(null);
+  const revisionsRef = useRef(new Map<string, number>());
   const chainRef = useRef<Promise<void>>(Promise.resolve());
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const pendingRef = useRef<FlowJSON | null>(null);
+  const pendingRef = useRef<PendingSave | null>(null);
   const lastSentRef = useRef<string | null>(null);
 
   useEffect(() => {
+    loadedFlowIdRef.current = null;
     if (!flowId) {
       setStatus("loading");
       return;
     }
     const controller = new AbortController();
     setStatus("loading");
-    fetchFlowDocument(apiBaseUrl, authToken, flowId, controller.signal)
+    getToken()
+      .then((authToken) => fetchFlowDocument(apiBaseUrl, authToken, flowId, controller.signal))
       .then((record) => {
-        revisionRef.current = record.revision;
+        revisionsRef.current.set(flowId, record.revision);
+        loadedFlowIdRef.current = flowId;
         const loaded = parseFlow(record.document);
         lastSentRef.current = JSON.stringify(loaded);
         setDocument(loaded);
@@ -91,37 +106,50 @@ export function useFlowDocument(options: UseFlowDocumentOptions): FlowDocumentSt
         setStatus("error");
       });
     return () => controller.abort();
-  }, [apiBaseUrl, authToken, flowId, reloadToken]);
+  }, [apiBaseUrl, flowId, sessionKey, reloadToken, getToken]);
 
-  const persist = useCallback((flow: FlowJSON): Promise<void> => {
+  const currentTarget = useCallback((): SaveTarget | null => {
+    const loadedFlowId = loadedFlowIdRef.current;
+    if (!loadedFlowId) {
+      return null;
+    }
+    const current = optionsRef.current;
+    return { apiBaseUrl: current.apiBaseUrl, flowId: loadedFlowId, onSaved: current.onSaved };
+  }, []);
+
+  const persist = useCallback((target: SaveTarget, flow: FlowJSON): Promise<void> => {
+    const isShown = () => loadedFlowIdRef.current === target.flowId;
     lastSentRef.current = JSON.stringify(flow);
     const run = chainRef.current.then(async () => {
-      const current = optionsRef.current;
-      if (!current.flowId) {
-        return;
+      if (isShown()) {
+        setSaveState("saving");
       }
-      setSaveState("saving");
+      const authToken = await getToken();
       const saved = await saveFlowDocument(
-        current.apiBaseUrl,
-        current.authToken,
-        current.flowId,
-        revisionRef.current,
+        target.apiBaseUrl,
+        authToken,
+        target.flowId,
+        revisionsRef.current.get(target.flowId) ?? 0,
         flow,
       );
-      revisionRef.current = saved.revision;
-      setSaveError(null);
-      setSaveState(pendingRef.current ? "pending" : "saved");
-      setSavedCount((count) => count + 1);
-      current.onSaved?.(saved.flow.name);
+      revisionsRef.current.set(target.flowId, saved.revision);
+      if (isShown()) {
+        setSaveError(null);
+        setSaveState(pendingRef.current ? "pending" : "saved");
+        setSavedCount((count) => count + 1);
+      }
+      target.onSaved?.(saved.flow.name);
     });
     chainRef.current = run.catch(() => undefined);
     return run.catch((err: unknown) => {
-      lastSentRef.current = null;
-      setSaveError(describeError(err));
-      setSaveState("error");
+      if (isShown()) {
+        lastSentRef.current = null;
+        setSaveError(describeError(err));
+        setSaveState("error");
+      }
       throw new Error(describeError(err), { cause: err });
     });
-  }, []);
+  }, [getToken]);
 
   const clearTimer = useCallback(() => {
     if (timerRef.current) {
@@ -132,17 +160,18 @@ export function useFlowDocument(options: UseFlowDocumentOptions): FlowDocumentSt
 
   const flushPending = useCallback((): Promise<void> => {
     clearTimer();
-    const flow = pendingRef.current;
+    const pending = pendingRef.current;
     pendingRef.current = null;
-    return flow ? persist(flow) : chainRef.current;
+    return pending ? persist(pending.target, pending.flow) : chainRef.current;
   }, [clearTimer, persist]);
 
   const scheduleSave = useCallback(
     (flow: FlowJSON) => {
-      if (JSON.stringify(flow) === lastSentRef.current) {
+      const target = currentTarget();
+      if (!target || JSON.stringify(flow) === lastSentRef.current) {
         return;
       }
-      pendingRef.current = flow;
+      pendingRef.current = { target, flow };
       setSaveState((state) => (state === "saving" || state === "error" ? state : "pending"));
       clearTimer();
       timerRef.current = setTimeout(() => {
@@ -150,27 +179,29 @@ export function useFlowDocument(options: UseFlowDocumentOptions): FlowDocumentSt
         flushPending().catch(() => undefined);
       }, AUTOSAVE_DELAY_MS);
     },
-    [clearTimer, flushPending],
+    [clearTimer, currentTarget, flushPending],
   );
 
   const save = useCallback(
     (flow: FlowJSON) => {
       clearTimer();
       pendingRef.current = null;
-      return persist(flow);
+      const target = currentTarget();
+      return target ? persist(target, flow) : Promise.resolve();
     },
-    [clearTimer, persist],
+    [clearTimer, currentTarget, persist],
   );
 
   const publish = useCallback(
     async (flow: FlowJSON) => {
+      const target = currentTarget();
       await save(flow);
-      const current = optionsRef.current;
-      if (current.flowId) {
-        await publishFlow(current.apiBaseUrl, current.authToken, current.flowId);
+      if (target) {
+        const authToken = await getToken();
+        await publishFlow(target.apiBaseUrl, authToken, target.flowId);
       }
     },
-    [save],
+    [currentTarget, getToken, save],
   );
 
   useEffect(() => () => void flushPending().catch(() => undefined), [flowId, flushPending]);

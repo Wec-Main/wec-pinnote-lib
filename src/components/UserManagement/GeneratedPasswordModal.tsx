@@ -2,7 +2,7 @@ import { useId, useRef } from "react";
 import { Icon, Tooltip } from "../primitives";
 import { useEscapeKey } from "../../hooks/useEscapeKey";
 import { useScrimDismiss } from "../../hooks/useScrimDismiss";
-import { useFocusTrap } from "../Settings/useFocusTrap";
+import { useFocusTrap } from "../../hooks/useFocusTrap";
 import { PasswordField } from "./PasswordField";
 
 interface GeneratedPasswordModalProps {

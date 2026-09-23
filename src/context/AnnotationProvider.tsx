@@ -24,11 +24,14 @@ import {
   type DiscardPrompt,
 } from "./AnnotationContext";
 import { resolveElement } from "../utils/elementResolver";
-import { isBoolean, usePersistentState } from "../hooks/usePersistentState";
+import { usePersistentState } from "../hooks/usePersistentState";
+import { isBoolean } from "../utils/valueGuards";
 import { useAnnotationTags } from "../hooks/useAnnotationTags";
 import { useFlowPins } from "../hooks/useFlowPins";
 import { useSharedFetch } from "../hooks/useSharedFetch";
+import { useTokenGetter } from "../hooks/useTokenGetter";
 import { fetchTags } from "../services/tagsApi";
+import { createClientId } from "../utils/format";
 import type { ProjectTag } from "../types/tag.types";
 
 const DEFAULT_Z_INDEX = 2147483000;
@@ -51,61 +54,101 @@ export interface AnnotationProviderProps {
 
 export function AnnotationProvider({ config, children }: AnnotationProviderProps) {
   const resolved = useMemo(() => resolveConfig(config), [config]);
-  const auth = useAuthSessions(resolved.apiBaseUrl, resolved.projectId, resolved.authClient);
-  const { activeAccount } = auth;
+  const {
+    accounts,
+    activeAccount,
+    loginOptions,
+    loginOptionsLoading,
+    loginOptionsError,
+    reloadLoginOptions,
+    login,
+    logout: revokeSession,
+    switchAccount,
+    revokeError,
+    clearRevokeError,
+  } = useAuthSessions(resolved.apiBaseUrl, resolved.projectId, resolved.authClient);
+  const hostAuthenticated = Boolean(resolved.getAuthToken);
+  const authenticated = hostAuthenticated || activeAccount !== null;
+  const sessionKey = hostAuthenticated ? "host" : (activeAccount?.id ?? null);
   const [loggingOutId, setLoggingOutId] = useState<string | null>(null);
-  const teardownActive = activeAccount !== null && activeAccount.id !== loggingOutId;
+  const teardownActive =
+    hostAuthenticated || (activeAccount !== null && activeAccount.id !== loggingOutId);
   const logout = useCallback(
     async (userId: string) => {
       setLoggingOutId(userId);
       try {
-        await auth.logout(userId);
+        await revokeSession(userId);
       } finally {
         setLoggingOutId((current) => (current === userId ? null : current));
       }
     },
-    [auth],
+    [revokeSession],
   );
+  const accountId = activeAccount?.id;
+  const accountName = activeAccount?.name;
+  const accountAvatarUrl = activeAccount?.avatarUrl;
   const activeUser = useMemo(() => {
-    if (!activeAccount) {
+    if (hostAuthenticated || accountId === undefined || accountName === undefined) {
       return resolved.currentUser;
     }
     return {
-      id: activeAccount.id,
-      name: activeAccount.name,
-      avatarUrl: activeAccount.avatarUrl ?? resolved.currentUser.avatarUrl,
+      id: accountId,
+      name: accountName,
+      avatarUrl: accountAvatarUrl ?? resolved.currentUser.avatarUrl,
     };
-  }, [activeAccount, resolved.currentUser]);
+  }, [accountAvatarUrl, accountId, accountName, hostAuthenticated, resolved.currentUser]);
+  const accountTokenRef = useRef(activeAccount?.token);
+  accountTokenRef.current = activeAccount?.token;
+  const readAccountToken = useCallback(() => accountTokenRef.current ?? "", []);
+  const hasAccount = activeAccount !== null;
   const activeConfig = useMemo(
     () => ({
       ...resolved,
       currentUser: activeUser,
-      getAuthToken:
-        resolved.getAuthToken ?? (activeAccount ? () => activeAccount.token : undefined),
+      getAuthToken: resolved.getAuthToken ?? (hasAccount ? readAccountToken : undefined),
     }),
-    [activeAccount, activeUser, resolved],
+    [activeUser, hasAccount, readAccountToken, resolved],
   );
   const api = useAnnotationApi(activeConfig);
   const pageKey = usePageKey(activeConfig.getPageKey);
-  const collection = useAnnotationCollection(
+  const {
+    annotations,
+    pageStatus,
+    pageStatusError,
+    loading,
+    error,
+    connectionState,
+    retry,
+    actionError,
+    clearActionError,
+    createAnnotation,
+    addComment,
+    editComment,
+    removeComment,
+    setPageStatus,
+    setStatus,
+    removeAnnotation,
+  } = useAnnotationCollection({
     api,
-    activeConfig.projectId,
+    projectId: activeConfig.projectId,
     pageKey,
-    activeUser,
-    teardownActive,
-    activeConfig.apiClient ? undefined : activeConfig.apiBaseUrl,
-    activeAccount?.token,
-  );
+    currentUser: activeUser,
+    authenticated: teardownActive,
+    apiBaseUrl: activeConfig.apiBaseUrl,
+    getAuthToken: activeConfig.getAuthToken,
+    sessionKey: sessionKey ?? "",
+    events: resolved,
+  });
 
   const [modeEnabled, setModeEnabledState] = useState(false);
   const setModeEnabled = useCallback(
     (enabled: boolean) => {
-      if (enabled && !activeAccount) {
+      if (enabled && !authenticated) {
         return;
       }
       setModeEnabledState(enabled);
     },
-    [activeAccount],
+    [authenticated],
   );
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [draft, setDraft] = useState<DraftAnnotation | null>(null);
@@ -142,74 +185,144 @@ export function AnnotationProvider({ config, children }: AnnotationProviderProps
     isBoolean,
   );
 
-  const tags = useAnnotationTags({
+  const {
+    annotationTags,
+    tagsVisible,
+    setTagsVisible,
+    tagModeEnabled,
+    setTagModeEnabled: setTagHookModeEnabled,
+    tagDraft,
+    startTagDraft,
+    cancelTagDraft,
+    submitTagDraft,
+    removeAnnotationTag,
+  } = useAnnotationTags({
     apiBaseUrl: activeConfig.apiBaseUrl,
     projectId,
     pageKey,
-    authToken: activeAccount?.token,
-    enabled: Boolean(activeAccount),
+    getAuthToken: activeConfig.getAuthToken,
+    sessionKey,
+    enabled: authenticated,
   });
 
-  const flowPins = useFlowPins({
+  const {
+    flowPins,
+    flowPinsVisible,
+    setFlowPinsVisible,
+    flowPinModeEnabled,
+    setFlowPinModeEnabled: setFlowPinHookModeEnabled,
+    flowPinDraft,
+    startFlowPinDraft,
+    cancelFlowPinDraft,
+    submitFlowPinDraft,
+    removeFlowPin,
+    syncFlowPinName,
+    selectedFlowPinId,
+    selectFlowPin,
+  } = useFlowPins({
     apiBaseUrl: activeConfig.apiBaseUrl,
     projectId,
     pageKey,
-    authToken: activeAccount?.token,
-    enabled: Boolean(activeAccount),
+    getAuthToken: activeConfig.getAuthToken,
+    sessionKey,
+    enabled: authenticated,
   });
 
-  const projectTagsToken = activeAccount?.token;
-  const projectTagsKey = projectTagsToken
-    ? `project-tags:${activeConfig.apiBaseUrl}:${projectTagsToken}:${projectId}:active`
-    : null;
-  const { data: projectTagsData } = useSharedFetch<ProjectTag[]>(projectTagsKey, (signal) =>
-    fetchTags(activeConfig.apiBaseUrl, projectTagsToken, { projectId, status: "active" }, signal),
+  const getProjectTagsToken = useTokenGetter(activeConfig.getAuthToken);
+  const projectTagsKey =
+    authenticated && sessionKey
+      ? `project-tags:${activeConfig.apiBaseUrl}:${sessionKey}:${projectId}:active`
+      : null;
+  const { data: projectTagsData, reload: reloadProjectTags } = useSharedFetch<ProjectTag[]>(
+    projectTagsKey,
+    async (signal) =>
+      fetchTags(
+        activeConfig.apiBaseUrl,
+        await getProjectTagsToken(),
+        { projectId, status: "active" },
+        signal,
+      ),
   );
   const projectTags = useMemo(() => projectTagsData ?? [], [projectTagsData]);
+  const tagDraftId = tagDraft?.id;
+
+  useEffect(() => {
+    if (tagDraftId) {
+      reloadProjectTags();
+    }
+  }, [tagDraftId, reloadProjectTags]);
 
   const setModeEnabledExclusive = useCallback(
     (enabled: boolean) => {
       if (enabled) {
-        tags.setTagModeEnabled(false);
-        tags.cancelTagDraft();
-        flowPins.setFlowPinModeEnabled(false);
+        setTagHookModeEnabled(false);
+        cancelTagDraft();
+        setFlowPinHookModeEnabled(false);
       }
       setModeEnabled(enabled);
     },
-    [flowPins, setModeEnabled, tags],
+    [cancelTagDraft, setFlowPinHookModeEnabled, setModeEnabled, setTagHookModeEnabled],
   );
+
+  const draftRef = useRef(draft);
+  draftRef.current = draft;
+  const draftMessageRef = useRef("");
+  const annotationsRef = useRef(annotations);
+  annotationsRef.current = annotations;
+  const hasUnsavedDraft = useCallback(
+    () => draftRef.current !== null && draftMessageRef.current.trim() !== "",
+    [],
+  );
+  const clearDraft = useCallback(() => {
+    draftMessageRef.current = "";
+    setDraft(null);
+  }, []);
 
   const setTagModeEnabled = useCallback(
     (enabled: boolean) => {
-      if (enabled && !activeAccount) {
+      if (enabled && !authenticated) {
         return;
       }
       if (enabled) {
         setModeEnabled(false);
-        setDraft(null);
-        flowPins.setFlowPinModeEnabled(false);
+        clearDraft();
+        setFlowPinHookModeEnabled(false);
       } else {
-        tags.cancelTagDraft();
+        cancelTagDraft();
       }
-      tags.setTagModeEnabled(enabled);
+      setTagHookModeEnabled(enabled);
     },
-    [activeAccount, flowPins, setModeEnabled, tags],
+    [
+      authenticated,
+      cancelTagDraft,
+      clearDraft,
+      setFlowPinHookModeEnabled,
+      setModeEnabled,
+      setTagHookModeEnabled,
+    ],
   );
 
   const setFlowPinModeEnabled = useCallback(
     (enabled: boolean) => {
-      if (enabled && !activeAccount) {
+      if (enabled && !authenticated) {
         return;
       }
       if (enabled) {
         setModeEnabled(false);
-        setDraft(null);
-        tags.setTagModeEnabled(false);
-        tags.cancelTagDraft();
+        clearDraft();
+        setTagHookModeEnabled(false);
+        cancelTagDraft();
       }
-      flowPins.setFlowPinModeEnabled(enabled);
+      setFlowPinHookModeEnabled(enabled);
     },
-    [activeAccount, flowPins, setModeEnabled, tags],
+    [
+      authenticated,
+      cancelTagDraft,
+      clearDraft,
+      setFlowPinHookModeEnabled,
+      setModeEnabled,
+      setTagHookModeEnabled,
+    ],
   );
 
   const openListExclusive = useCallback(
@@ -257,16 +370,21 @@ export function AnnotationProvider({ config, children }: AnnotationProviderProps
     [setEpicFlowOpen, setFlowOpen, setListOpen, setUserManagementOpen],
   );
 
+  const [portalReady, setPortalReady] = useState(false);
+  useEffect(() => {
+    setPortalReady(true);
+  }, []);
+
   const previousPageKeyRef = useRef(pageKey);
   useEffect(() => {
     if (previousPageKeyRef.current === pageKey) {
       return;
     }
     previousPageKeyRef.current = pageKey;
-    setDraft(null);
+    clearDraft();
     setSelectedId(null);
     setDiscardPrompt(null);
-  }, [pageKey]);
+  }, [clearDraft, pageKey]);
 
   useEffect(() => {
     if (!resolved.enabled) {
@@ -275,16 +393,26 @@ export function AnnotationProvider({ config, children }: AnnotationProviderProps
   }, [resolved.enabled]);
 
   useEffect(() => {
-    if (!activeAccount) {
+    if (!authenticated) {
       setModeEnabledState(false);
       setListOpen(false);
       setEpicFlowOpen(false);
+      setFlowOpen(false);
       setUserManagementOpen(false);
       setAuditHistoryOpen(false);
-      flowPins.setFlowPinModeEnabled(false);
-      flowPins.selectFlowPin(null);
+      setFlowPinHookModeEnabled(false);
+      selectFlowPin(null);
     }
-  }, [activeAccount, flowPins, setAuditHistoryOpen, setEpicFlowOpen, setListOpen, setUserManagementOpen]);
+  }, [
+    authenticated,
+    selectFlowPin,
+    setAuditHistoryOpen,
+    setEpicFlowOpen,
+    setFlowOpen,
+    setFlowPinHookModeEnabled,
+    setListOpen,
+    setUserManagementOpen,
+  ]);
 
   useEffect(() => {
     document.body.classList.toggle("wpn-mode-active", resolved.enabled && modeEnabled);
@@ -293,37 +421,32 @@ export function AnnotationProvider({ config, children }: AnnotationProviderProps
     };
   }, [modeEnabled, resolved.enabled]);
 
-  const draftRef = useRef(draft);
-  draftRef.current = draft;
-
-  const startDraft = useCallback(
-    (anchor: AnnotationAnchor, label: string) => {
-      const number =
-        collection.annotations.reduce((max, item) => Math.max(max, item.number), 0) + 1;
-      setSelectedId(null);
-      setDraft({
-        id: `draft-${number}`,
-        label,
-        anchor,
-        number,
-        message: "",
-      });
-    },
-    [collection.annotations],
-  );
-
-  const cancelDraft = useCallback(() => {
-    setDraft(null);
-    setDiscardPrompt(null);
+  const startDraft = useCallback((anchor: AnnotationAnchor, label: string) => {
+    const number =
+      annotationsRef.current.reduce((max, item) => Math.max(max, item.number), 0) + 1;
+    draftMessageRef.current = "";
+    setSelectedId(null);
+    setDraft({
+      id: createClientId("draft"),
+      label,
+      anchor,
+      number,
+      message: "",
+    });
   }, []);
 
+  const cancelDraft = useCallback(() => {
+    clearDraft();
+    setDiscardPrompt(null);
+  }, [clearDraft]);
+
   const requestCancelDraft = useCallback(() => {
-    if (draftRef.current && draftRef.current.message.trim()) {
+    if (hasUnsavedDraft()) {
       setDiscardPrompt({ kind: "draft", proceed: cancelDraft });
       return;
     }
     cancelDraft();
-  }, [cancelDraft]);
+  }, [cancelDraft, hasUnsavedDraft]);
 
   const updateDraftLabel = useCallback((label: string) => {
     const trimmed = label.trim();
@@ -342,58 +465,54 @@ export function AnnotationProvider({ config, children }: AnnotationProviderProps
   }, []);
 
   const updateDraftMessage = useCallback((message: string) => {
-    setDraft((current) => (current ? { ...current, message } : current));
+    draftMessageRef.current = message;
   }, []);
 
+  const currentUserId = activeConfig.currentUser.id;
+  const currentUserName = activeConfig.currentUser.name;
   const submitDraft = useCallback(
     async (message: string, status?: AnnotationStatus) => {
-      if (!draft) {
+      const current = draftRef.current;
+      if (!current) {
         return;
       }
-      const created = await collection.createAnnotation({
-        projectId: activeConfig.projectId,
+      const created = await createAnnotation({
+        projectId,
         pageKey,
-        anchor: draft.anchor,
+        anchor: current.anchor,
         comment: {
           message,
-          authorId: activeConfig.currentUser.id,
-          authorName: activeConfig.currentUser.name,
+          authorId: currentUserId,
+          authorName: currentUserName,
         },
         status,
       });
-      setDraft(null);
+      clearDraft();
       setSelectedId(created.id);
     },
-    [
-      activeConfig.currentUser.id,
-      activeConfig.currentUser.name,
-      activeConfig.projectId,
-      collection,
-      draft,
-      pageKey,
-    ],
+    [clearDraft, createAnnotation, currentUserId, currentUserName, pageKey, projectId],
   );
 
-  const selectAnnotation = useCallback((id: string | null) => {
-    if (draftRef.current && draftRef.current.message.trim()) {
-      setDiscardPrompt({
-        kind: "draft",
-        proceed: () => {
-          setDraft(null);
-          setSelectedId(id);
-        },
-      });
-      return;
-    }
-    setDraft(null);
-    setSelectedId(id);
-  }, []);
+  const selectAnnotation = useCallback(
+    (id: string | null) => {
+      const proceed = () => {
+        clearDraft();
+        setSelectedId(id);
+      };
+      if (hasUnsavedDraft()) {
+        setDiscardPrompt({ kind: "draft", proceed });
+        return;
+      }
+      proceed();
+    },
+    [clearDraft, hasUnsavedDraft],
+  );
 
   const revealAnnotation = useCallback(
     (id: string) => {
-      const annotation = collection.annotations.find((item) => item.id === id);
+      const annotation = annotationsRef.current.find((item) => item.id === id);
       const proceed = () => {
-        setDraft(null);
+        clearDraft();
         setPinsVisible(true);
         setSelectedId(id);
         if (!annotation) {
@@ -410,13 +529,13 @@ export function AnnotationProvider({ config, children }: AnnotationProviderProps
           behavior: "smooth",
         });
       };
-      if (draftRef.current && draftRef.current.message.trim()) {
+      if (hasUnsavedDraft()) {
         setDiscardPrompt({ kind: "draft", proceed });
         return;
       }
       proceed();
     },
-    [collection.annotations, setPinsVisible],
+    [clearDraft, hasUnsavedDraft, setPinsVisible],
   );
 
   const confirmDiscard = useCallback(() => {
@@ -434,53 +553,57 @@ export function AnnotationProvider({ config, children }: AnnotationProviderProps
       config: activeConfig,
       api,
       pageKey,
-      annotations: collection.annotations,
-      pageStatus: collection.pageStatus,
-      loading: collection.loading,
-      error: collection.error,
-      connectionState: collection.connectionState,
-      retry: collection.retry,
-      actionError: collection.actionError,
-      clearActionError: collection.clearActionError,
-      addComment: collection.addComment,
-      editComment: collection.editComment,
-      removeComment: collection.removeComment,
-      setPageStatus: collection.setPageStatus,
-      setStatus: collection.setStatus,
-      removeAnnotation: collection.removeAnnotation,
+      annotations,
+      pageStatus,
+      pageStatusError,
+      loading,
+      error,
+      connectionState,
+      retry,
+      actionError,
+      clearActionError,
+      createAnnotation,
+      addComment,
+      editComment,
+      removeComment,
+      setPageStatus,
+      setStatus,
+      removeAnnotation,
       submitDraft,
-      annotationTags: tags.annotationTags,
+      annotationTags,
       projectTags,
-      submitTagDraft: tags.submitTagDraft,
-      removeAnnotationTag: tags.removeAnnotationTag,
-      flowPins: flowPins.flowPins,
-      syncFlowPinName: flowPins.syncFlowPinName,
+      submitTagDraft,
+      removeAnnotationTag,
+      flowPins,
+      syncFlowPinName,
     }),
     [
       activeConfig,
       api,
       pageKey,
-      collection.actionError,
-      collection.addComment,
-      collection.annotations,
-      collection.clearActionError,
-      collection.editComment,
-      collection.connectionState,
-      collection.error,
-      collection.loading,
-      collection.removeAnnotation,
-      collection.removeComment,
-      collection.retry,
-      collection.pageStatus,
-      collection.setPageStatus,
-      collection.setStatus,
+      annotations,
+      pageStatus,
+      pageStatusError,
+      loading,
+      error,
+      connectionState,
+      retry,
+      actionError,
+      clearActionError,
+      createAnnotation,
+      addComment,
+      editComment,
+      removeComment,
+      setPageStatus,
+      setStatus,
+      removeAnnotation,
       submitDraft,
+      annotationTags,
       projectTags,
-      tags.annotationTags,
-      tags.submitTagDraft,
-      tags.removeAnnotationTag,
-      flowPins.flowPins,
-      flowPins.syncFlowPinName,
+      submitTagDraft,
+      removeAnnotationTag,
+      flowPins,
+      syncFlowPinName,
     ],
   );
 
@@ -502,24 +625,24 @@ export function AnnotationProvider({ config, children }: AnnotationProviderProps
       cancelDiscardPrompt,
       pinsVisible,
       setPinsVisible,
-      tagModeEnabled: tags.tagModeEnabled,
+      tagModeEnabled,
       setTagModeEnabled,
-      tagsVisible: tags.tagsVisible,
-      setTagsVisible: tags.setTagsVisible,
-      tagDraft: tags.tagDraft,
-      startTagDraft: tags.startTagDraft,
-      cancelTagDraft: tags.cancelTagDraft,
-      flowPinModeEnabled: flowPins.flowPinModeEnabled,
+      tagsVisible,
+      setTagsVisible,
+      tagDraft,
+      startTagDraft,
+      cancelTagDraft,
+      flowPinModeEnabled,
       setFlowPinModeEnabled,
-      flowPinsVisible: flowPins.flowPinsVisible,
-      setFlowPinsVisible: flowPins.setFlowPinsVisible,
-      flowPinDraft: flowPins.flowPinDraft,
-      startFlowPinDraft: flowPins.startFlowPinDraft,
-      cancelFlowPinDraft: flowPins.cancelFlowPinDraft,
-      submitFlowPinDraft: flowPins.submitFlowPinDraft,
-      removeFlowPin: flowPins.removeFlowPin,
-      selectedFlowPinId: flowPins.selectedFlowPinId,
-      selectFlowPin: flowPins.selectFlowPin,
+      flowPinsVisible,
+      setFlowPinsVisible,
+      flowPinDraft,
+      startFlowPinDraft,
+      cancelFlowPinDraft,
+      submitFlowPinDraft,
+      removeFlowPin,
+      selectedFlowPinId,
+      selectFlowPin,
       listOpen,
       setListOpen: openListExclusive,
       epicFlowOpen,
@@ -532,75 +655,83 @@ export function AnnotationProvider({ config, children }: AnnotationProviderProps
       setAuditHistoryOpen,
     }),
     [
+      modeEnabled,
+      setModeEnabledExclusive,
+      selectedId,
+      selectAnnotation,
+      revealAnnotation,
+      draft,
+      startDraft,
+      updateDraftLabel,
+      updateDraftMessage,
       cancelDraft,
       requestCancelDraft,
-      updateDraftMessage,
       discardPrompt,
       confirmDiscard,
       cancelDiscardPrompt,
-      draft,
-      epicFlowOpen,
-      flowOpen,
-      userManagementOpen,
-      auditHistoryOpen,
-      listOpen,
-      modeEnabled,
       pinsVisible,
-      setAuditHistoryOpen,
-      setFlowPinModeEnabled,
-      flowPins.flowPinModeEnabled,
-      flowPins.flowPinsVisible,
-      flowPins.setFlowPinsVisible,
-      flowPins.flowPinDraft,
-      flowPins.startFlowPinDraft,
-      flowPins.cancelFlowPinDraft,
-      flowPins.submitFlowPinDraft,
-      flowPins.removeFlowPin,
-      flowPins.selectedFlowPinId,
-      flowPins.selectFlowPin,
-      openEpicFlowExclusive,
-      openFlowExclusive,
-      openListExclusive,
       setPinsVisible,
-      openUserManagementExclusive,
-      setModeEnabledExclusive,
+      tagModeEnabled,
       setTagModeEnabled,
-      tags.tagModeEnabled,
-      tags.tagsVisible,
-      tags.setTagsVisible,
-      tags.tagDraft,
-      tags.startTagDraft,
-      tags.cancelTagDraft,
-      selectAnnotation,
-      revealAnnotation,
-      selectedId,
-      startDraft,
-      updateDraftLabel,
+      tagsVisible,
+      setTagsVisible,
+      tagDraft,
+      startTagDraft,
+      cancelTagDraft,
+      flowPinModeEnabled,
+      setFlowPinModeEnabled,
+      flowPinsVisible,
+      setFlowPinsVisible,
+      flowPinDraft,
+      startFlowPinDraft,
+      cancelFlowPinDraft,
+      submitFlowPinDraft,
+      removeFlowPin,
+      selectedFlowPinId,
+      selectFlowPin,
+      listOpen,
+      openListExclusive,
+      epicFlowOpen,
+      openEpicFlowExclusive,
+      flowOpen,
+      openFlowExclusive,
+      userManagementOpen,
+      openUserManagementExclusive,
+      auditHistoryOpen,
+      setAuditHistoryOpen,
     ],
   );
 
   const authValue = useMemo<AnnotationAuthContextValue>(
     () => ({
-      accounts: auth.accounts,
-      activeAccount: auth.activeAccount,
-      loginOptions: auth.loginOptions,
-      loginOptionsLoading: auth.loginOptionsLoading,
-      loginOptionsError: auth.loginOptionsError,
-      reloadLoginOptions: auth.reloadLoginOptions,
-      login: auth.login,
+      authenticated,
+      hostAuthenticated,
+      accounts,
+      activeAccount,
+      loginOptions,
+      loginOptionsLoading,
+      loginOptionsError,
+      reloadLoginOptions,
+      login,
       logout,
-      switchAccount: auth.switchAccount,
+      switchAccount,
+      revokeError,
+      clearRevokeError,
     }),
     [
-      auth.accounts,
-      auth.activeAccount,
-      auth.loginOptions,
-      auth.loginOptionsLoading,
-      auth.loginOptionsError,
-      auth.reloadLoginOptions,
-      auth.login,
+      authenticated,
+      hostAuthenticated,
+      accounts,
+      activeAccount,
+      loginOptions,
+      loginOptionsLoading,
+      loginOptionsError,
+      reloadLoginOptions,
+      login,
       logout,
-      auth.switchAccount,
+      switchAccount,
+      revokeError,
+      clearRevokeError,
     ],
   );
 
@@ -609,7 +740,7 @@ export function AnnotationProvider({ config, children }: AnnotationProviderProps
       <AnnotationDataContext.Provider value={dataValue}>
         <AnnotationUiContext.Provider value={uiValue}>
           {children}
-          {activeConfig.enabled
+          {portalReady && activeConfig.enabled
             ? createPortal(
                 <AnnotationErrorBoundary>
                   <AnnotationLayer />

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { isBoolean } from "../src/hooks/usePersistentState";
+import { isBoolean } from "../src/utils/valueGuards";
 
 describe("isBoolean", () => {
   it("accepts only real booleans", () => {

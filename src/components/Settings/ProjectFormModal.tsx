@@ -2,7 +2,7 @@ import { useId, useRef, useState, type FormEvent } from "react";
 import { Icon, SearchableSelect, Spinner, Tooltip } from "../primitives";
 import { useEscapeKey } from "../../hooks/useEscapeKey";
 import { useScrimDismiss } from "../../hooks/useScrimDismiss";
-import { useFocusTrap } from "./useFocusTrap";
+import { useFocusTrap } from "../../hooks/useFocusTrap";
 import { Field } from "./Field";
 import { USER_STATUS_OPTIONS } from "../../data/userManagementOptions";
 import type { Organization, Project, ProjectDraft } from "../../types/organization.types";

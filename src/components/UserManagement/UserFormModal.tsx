@@ -9,7 +9,7 @@ import {
 } from "../primitives";
 import { useEscapeKey } from "../../hooks/useEscapeKey";
 import { useScrimDismiss } from "../../hooks/useScrimDismiss";
-import { useFocusTrap } from "../Settings/useFocusTrap";
+import { useFocusTrap } from "../../hooks/useFocusTrap";
 import { Field } from "../Settings/Field";
 import {
   categoryLabel,

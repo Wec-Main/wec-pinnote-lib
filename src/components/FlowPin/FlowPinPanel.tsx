@@ -23,7 +23,7 @@ interface FlowPinPanelProps {
 
 export function FlowPinPanel({ flowPin, originX, originY }: FlowPinPanelProps) {
   const { config, syncFlowPinName, removeFlowPin, selectFlowPin } = useAnnotationContext();
-  const { activeAccount } = useAnnotationAuth();
+  const { hostAuthenticated, activeAccount } = useAnnotationAuth();
   const [minimized, setMinimized] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const [closing, setClosing] = useState(false);
@@ -65,10 +65,12 @@ export function FlowPinPanel({ flowPin, originX, originY }: FlowPinPanelProps) {
     }
   };
 
-  const authToken = activeAccount?.token;
+  const sessionKey = hostAuthenticated ? "host" : (activeAccount?.id ?? "");
+  const signedIn = Boolean(config.getAuthToken);
   const flowDocument = useFlowDocument({
     apiBaseUrl: config.apiBaseUrl,
-    authToken,
+    getAuthToken: config.getAuthToken,
+    sessionKey,
     flowId: flowPin.flowId,
     onSaved: (name) => syncFlowPinName(flowPin.id, name),
   });
@@ -142,7 +144,7 @@ export function FlowPinPanel({ flowPin, originX, originY }: FlowPinPanelProps) {
             <span>{deleteError}</span>
           </div>
         ) : null}
-        <FlowDocumentEditor flowDocument={flowDocument} signedIn={Boolean(authToken)} />
+        <FlowDocumentEditor flowDocument={flowDocument} signedIn={signedIn} />
       </div>
     </div>
   );

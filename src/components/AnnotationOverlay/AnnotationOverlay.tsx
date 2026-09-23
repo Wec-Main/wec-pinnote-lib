@@ -15,11 +15,8 @@ import {
 import { getElementLabel, isLibraryElement } from "../../utils/elementResolver";
 
 function hitElement(clientX: number, clientY: number, overlay: HTMLElement): Element | null {
-  overlay.style.pointerEvents = "none";
-  void overlay.offsetHeight;
-  const hit = document.elementFromPoint(clientX, clientY);
-  overlay.style.pointerEvents = "auto";
-  return hit;
+  const stack = document.elementsFromPoint(clientX, clientY);
+  return stack.find((element) => element !== overlay && !overlay.contains(element)) ?? null;
 }
 
 function rectsEqual(left: DOMRect | null, right: DOMRect | null): boolean {

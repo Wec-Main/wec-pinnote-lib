@@ -2,7 +2,7 @@ import { useCallback, useId, useRef, type ReactNode } from "react";
 import { Icon, Spinner, type IconName } from "../primitives";
 import { useEscapeKey } from "../../hooks/useEscapeKey";
 import { useScrimDismiss } from "../../hooks/useScrimDismiss";
-import { useFocusTrap } from "../Settings/useFocusTrap";
+import { useFocusTrap } from "../../hooks/useFocusTrap";
 
 interface ConfirmDialogProps {
   title: string;

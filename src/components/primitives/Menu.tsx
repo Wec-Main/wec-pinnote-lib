@@ -1,4 +1,5 @@
 import {
+  useEffect,
   useId,
   useRef,
   useState,
@@ -126,11 +127,24 @@ function SubmenuItem({ item, isActive, open, onHover, onOpen, onRequestClose }: 
 
 function MenuPanel({ items, placement, anchorRef, onRequestClose }: MenuPanelProps) {
   const panelRef = useRef<HTMLDivElement>(null);
+  const itemRefs = useRef(new Map<number, HTMLButtonElement>());
   const [activeIndex, setActiveIndex] = useState(() => focusableIndexes(items)[0] ?? -1);
   const [openSubmenuId, setOpenSubmenuId] = useState<string | null>(null);
   const position = useFloatingPosition(anchorRef, panelRef, true, placement);
 
   const enabledIndexes = focusableIndexes(items);
+
+  useEffect(() => {
+    itemRefs.current.get(activeIndex)?.focus();
+  }, [activeIndex]);
+
+  const registerItemRef = (index: number) => (element: HTMLButtonElement | null) => {
+    if (element) {
+      itemRefs.current.set(index, element);
+    } else {
+      itemRefs.current.delete(index);
+    }
+  };
 
   const moveActive = (direction: 1 | -1) => {
     if (enabledIndexes.length === 0) {
@@ -222,6 +236,7 @@ function MenuPanel({ items, placement, anchorRef, onRequestClose }: MenuPanelPro
           return (
             <button
               key={item.id}
+              ref={registerItemRef(index)}
               type="button"
               role="menuitemcheckbox"
               aria-checked={item.checked}
@@ -255,6 +270,7 @@ function MenuPanel({ items, placement, anchorRef, onRequestClose }: MenuPanelPro
         return (
           <button
             key={item.id}
+            ref={registerItemRef(index)}
             type="button"
             role="menuitem"
             disabled={item.disabled}
@@ -298,11 +314,7 @@ export function Menu({ menu }: MenuProps) {
   const close = () => setOpen(false);
 
   useOutsidePointerDown(rootRef, close, open);
-  useEscapeKey(() => {
-    if (open) {
-      close();
-    }
-  });
+  useEscapeKey(close, open);
 
   return (
     <div className="wpn-menu" ref={rootRef}>

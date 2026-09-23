@@ -1,6 +1,7 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useAnnotationContext } from "../../context/AnnotationContext";
+import { useEscapeKey } from "../../hooks/useEscapeKey";
 import { getInitials } from "../../utils/format";
 import { Icon, SearchableSelect, Tooltip, type SelectOption } from "../primitives";
 import { LoginDialog } from "./LoginDialog";
@@ -11,6 +12,7 @@ export function ToolbarAuthControl() {
     config,
     accounts,
     activeAccount,
+    hostAuthenticated,
     loginOptions,
     loginOptionsLoading,
     loginOptionsError,
@@ -18,12 +20,23 @@ export function ToolbarAuthControl() {
     login,
     logout,
     switchAccount,
+    revokeError,
+    clearRevokeError,
   } = useAnnotationContext();
 
   const [pendingUser, setPendingUser] = useState<LoginOption | null>(null);
   const [switcherOpen, setSwitcherOpen] = useState(false);
   const [addingAccount, setAddingAccount] = useState(false);
   const switcherRef = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const menuId = useId();
+
+  const closeSwitcher = () => {
+    setSwitcherOpen(false);
+    triggerRef.current?.focus();
+  };
+
+  useEscapeKey(closeSwitcher, switcherOpen);
 
   useEffect(() => {
     if (!switcherOpen) {
@@ -37,6 +50,12 @@ export function ToolbarAuthControl() {
     document.addEventListener("pointerdown", onPointerDown, true);
     return () => document.removeEventListener("pointerdown", onPointerDown, true);
   }, [switcherOpen]);
+
+  useEffect(() => {
+    if (!switcherOpen) {
+      clearRevokeError();
+    }
+  }, [switcherOpen, clearRevokeError]);
 
   const loggedInIds = useMemo(() => new Set(accounts.map((item) => item.id)), [accounts]);
 
@@ -85,6 +104,10 @@ export function ToolbarAuthControl() {
       )
     : null;
 
+  if (hostAuthenticated) {
+    return null;
+  }
+
   if (!activeAccount) {
     return (
       <span className="wpn-toolbar__auth">
@@ -106,10 +129,12 @@ export function ToolbarAuthControl() {
   return (
     <span className="wpn-toolbar__auth" ref={switcherRef}>
       <button
+        ref={triggerRef}
         type="button"
         className="wpn-toolbar__account"
-        aria-haspopup="menu"
+        aria-haspopup="true"
         aria-expanded={switcherOpen}
+        aria-controls={switcherOpen ? menuId : undefined}
         aria-label={`Signed in as ${activeAccount.name}`}
         onClick={() => setSwitcherOpen((open) => !open)}
       >
@@ -126,8 +151,13 @@ export function ToolbarAuthControl() {
       </button>
 
       {switcherOpen ? (
-        <div className="wpn-account-menu" role="menu">
+        <div id={menuId} className="wpn-account-menu">
           <span className="wpn-account-menu__label">Signed in</span>
+          {revokeError ? (
+            <span className="wpn-account-menu__error" role="alert">
+              {revokeError}
+            </span>
+          ) : null}
           {accounts.map((account) => (
             <div
               key={account.id}
@@ -140,7 +170,6 @@ export function ToolbarAuthControl() {
             >
               <button
                 type="button"
-                role="menuitem"
                 className="wpn-account-menu__pick"
                 onClick={() => {
                   switchAccount(account.id);
@@ -164,7 +193,7 @@ export function ToolbarAuthControl() {
                   className="wpn-account-menu__logout"
                   aria-label={`Log out ${account.name}`}
                   onClick={() => {
-                    Promise.resolve(logout(account.id)).catch(() => undefined);
+                    logout(account.id).catch(() => undefined);
                   }}
                 >
                   <Icon name="close" />

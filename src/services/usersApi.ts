@@ -1,4 +1,4 @@
-import { buildUrl, request } from "./httpClient";
+import { buildUrl, request, requestNoContent } from "./httpClient";
 import type { ManagedUser, ManagedUserDraft } from "../types/userManagement.types";
 
 export interface UserListQuery {
@@ -101,7 +101,7 @@ export function deleteUser(
   userId: string,
   signal?: AbortSignal,
 ): Promise<void> {
-  return request<void>(
+  return requestNoContent(
     buildUrl(apiBaseUrl, `/users/${encodeURIComponent(userId)}`, { projectId }),
     authToken,
     {

@@ -1,83 +1,80 @@
 import { AnnotationApiError } from "../types/annotation.types";
-import { actorHeaders } from "./actorIdentity";
+import { buildUrl, request, requestNoContent } from "./httpClient";
+import { isSession } from "../utils/authSession";
 import type { AuthApiClient, AuthSession, LoginOption } from "../types/auth.types";
 
-function joinUrl(baseUrl: string, path: string): string {
-  return `${baseUrl.replace(/\/+$/, "")}${path}`;
-}
-
-async function readError(response: Response): Promise<string> {
-  const text = await response.text().catch(() => "");
-  if (!text) {
-    return `Request failed (${response.status})`;
-  }
-  try {
-    const payload = JSON.parse(text) as { error?: string; message?: string };
-    return payload.error ?? payload.message ?? text;
-  } catch {
-    return text;
-  }
+function loginFallbackMessage(status: number): string {
+  return status === 401 ? "Incorrect password." : `Request failed (${status})`;
 }
 
 export function createAuthApi(apiBaseUrl: string): AuthApiClient {
   return {
     async listLoginOptions(projectId, signal) {
-      const query = new URLSearchParams({ projectId });
-      const response = await fetch(joinUrl(apiBaseUrl, `/auth/users?${query.toString()}`), {
-        headers: { Accept: "application/json" },
-        signal,
-      });
-      if (!response.ok) {
-        throw new AnnotationApiError(await readError(response), response.status);
+      const url = buildUrl(apiBaseUrl, "/auth/users", { projectId });
+      const payload = await request<{ users: LoginOption[] }>(
+        url,
+        undefined,
+        { signal },
+        { reportUnauthorized: false },
+      );
+      if (!Array.isArray(payload.users)) {
+        throw new AnnotationApiError("Malformed login options response", 200, null);
       }
-      const payload = (await response.json()) as { users: LoginOption[] };
       return payload.users;
     },
 
     async login(projectId, userId, password, signal) {
-      const response = await fetch(joinUrl(apiBaseUrl, "/auth/login"), {
-        method: "POST",
-        headers: { Accept: "application/json", "Content-Type": "application/json" },
-        body: JSON.stringify({ projectId, userId, password }),
-        signal,
-      });
-      if (!response.ok) {
-        throw new AnnotationApiError(
-          response.status === 401 ? "Incorrect password." : await readError(response),
-          response.status,
-        );
-      }
-      const payload = (await response.json()) as {
+      const url = buildUrl(apiBaseUrl, "/auth/login");
+      const payload = await request<{
         user: Omit<AuthSession, "token" | "refreshToken">;
         token: string;
         refreshToken: string;
-      };
-      return { ...payload.user, token: payload.token, refreshToken: payload.refreshToken };
+      }>(
+        url,
+        undefined,
+        {
+          method: "POST",
+          body: JSON.stringify({ projectId, userId, password }),
+          signal,
+        },
+        { reportUnauthorized: false, fallbackMessage: loginFallbackMessage },
+      );
+      const session = { ...payload.user, token: payload.token, refreshToken: payload.refreshToken };
+      if (!isSession(session)) {
+        throw new AnnotationApiError("Malformed login response", 200, null);
+      }
+      return session;
     },
 
     async logout(projectId, userId, signal, token) {
-      const response = await fetch(joinUrl(apiBaseUrl, "/auth/logout"), {
-        method: "POST",
-        headers: { "Content-Type": "application/json", ...actorHeaders(token) },
-        body: JSON.stringify({ projectId, userId }),
-        signal,
-      });
-      if (!response.ok) {
-        throw new AnnotationApiError(await readError(response), response.status);
-      }
+      const url = buildUrl(apiBaseUrl, "/auth/logout");
+      await requestNoContent(
+        url,
+        token,
+        {
+          method: "POST",
+          body: JSON.stringify({ projectId, userId }),
+          signal,
+        },
+        { reportUnauthorized: false },
+      );
     },
 
     async refresh(projectId, refreshToken, signal) {
-      const response = await fetch(joinUrl(apiBaseUrl, "/auth/refresh"), {
-        method: "POST",
-        headers: { Accept: "application/json", "Content-Type": "application/json" },
-        body: JSON.stringify({ projectId, refreshToken }),
-        signal,
-      });
-      if (!response.ok) {
-        throw new AnnotationApiError(await readError(response), response.status);
+      const url = buildUrl(apiBaseUrl, "/auth/refresh");
+      const payload = await request<{ token: string }>(
+        url,
+        undefined,
+        {
+          method: "POST",
+          body: JSON.stringify({ projectId, refreshToken }),
+          signal,
+        },
+        { reportUnauthorized: false },
+      );
+      if (typeof payload.token !== "string" || payload.token.length === 0) {
+        throw new AnnotationApiError("Malformed refresh response", 200, null);
       }
-      const payload = (await response.json()) as { token: string };
       return payload.token;
     },
   };

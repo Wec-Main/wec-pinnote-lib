@@ -1,4 +1,4 @@
-import { lazy, Suspense, useMemo, useRef, useState } from "react";
+import { lazy, memo, Suspense, useCallback, useMemo, useRef, useState } from "react";
 import {
   useAnnotationAuth,
   useAnnotationData,
@@ -28,6 +28,68 @@ const SettingsPanel = lazy(() =>
 function positionItemsKey(items: PositionedItem[]): string {
   return items.map((item) => `${item.id}:${item.anchor.selector}`).join("|");
 }
+
+interface TagPinListItemProps {
+  id: string;
+  name: string;
+  color: string;
+  x: number;
+  y: number;
+  resolvedTarget: boolean;
+  onRemove: (id: string) => void;
+}
+
+const TagPinListItem = memo(function TagPinListItem({
+  id,
+  name,
+  color,
+  x,
+  y,
+  resolvedTarget,
+  onRemove,
+}: TagPinListItemProps) {
+  return (
+    <TagPin
+      name={name}
+      color={color}
+      x={x}
+      y={y}
+      resolvedTarget={resolvedTarget}
+      onRemove={() => onRemove(id)}
+    />
+  );
+});
+
+interface FlowPinPinListItemProps {
+  id: string;
+  name: string;
+  x: number;
+  y: number;
+  resolvedTarget: boolean;
+  active: boolean;
+  onSelect: (id: string) => void;
+}
+
+const FlowPinPinListItem = memo(function FlowPinPinListItem({
+  id,
+  name,
+  x,
+  y,
+  resolvedTarget,
+  active,
+  onSelect,
+}: FlowPinPinListItemProps) {
+  return (
+    <FlowPinPin
+      name={name}
+      x={x}
+      y={y}
+      resolvedTarget={resolvedTarget}
+      active={active}
+      onSelect={() => onSelect(id)}
+    />
+  );
+});
 
 export function AnnotationLayer() {
   const {
@@ -59,18 +121,35 @@ export function AnnotationLayer() {
     confirmDiscard,
     cancelDiscardPrompt,
   } = useAnnotationUi();
-  const { activeAccount } = useAnnotationAuth();
+  const { authenticated } = useAnnotationAuth();
   const [tagError, setTagError] = useState<string | null>(null);
 
+  const handleRemoveTag = useCallback(
+    (id: string) => {
+      setTagError(null);
+      removeAnnotationTag(id).catch((err: unknown) => {
+        setTagError(err instanceof Error && err.message ? err.message : "Could not remove that tag");
+      });
+    },
+    [removeAnnotationTag],
+  );
+
+  const handleSelectFlowPin = useCallback(
+    (id: string) => {
+      selectFlowPin(id);
+    },
+    [selectFlowPin],
+  );
+
   const visible = useMemo(() => {
-    if (!activeAccount || !pinsVisible || (!modeEnabled && !config.showPinsWhenIdle)) {
+    if (!authenticated || !pinsVisible || (!modeEnabled && !config.showPinsWhenIdle)) {
       return [];
     }
     return annotations.filter(
       (item) => config.showResolved || (item.status !== "completed" && item.status !== "closed"),
     );
   }, [
-    activeAccount,
+    authenticated,
     annotations,
     config.showPinsWhenIdle,
     config.showResolved,
@@ -79,16 +158,16 @@ export function AnnotationLayer() {
   ]);
 
   const visibleTags = useMemo(
-    () => (activeAccount && tagsVisible ? annotationTags : []),
-    [activeAccount, annotationTags, tagsVisible],
+    () => (authenticated && tagsVisible ? annotationTags : []),
+    [authenticated, annotationTags, tagsVisible],
   );
 
   const visibleFlowPins = useMemo(
-    () => (activeAccount && flowPinsVisible ? flowPins : []),
-    [activeAccount, flowPins, flowPinsVisible],
+    () => (authenticated && flowPinsVisible ? flowPins : []),
+    [authenticated, flowPins, flowPinsVisible],
   );
 
-  const selected = activeAccount ? annotations.find((item) => item.id === selectedId) : undefined;
+  const selected = authenticated ? annotations.find((item) => item.id === selectedId) : undefined;
 
   const rawPositionItems = useMemo(() => {
     const items = visible.map((item) => ({ id: item.id, anchor: item.anchor }));
@@ -186,19 +265,15 @@ export function AnnotationLayer() {
           return null;
         }
         return (
-          <TagPin
+          <TagPinListItem
             key={tag.id}
+            id={tag.id}
             name={tag.tagName}
             color={tag.tagColor}
             x={position.x}
             y={position.y}
             resolvedTarget={position.resolved}
-            onRemove={() => {
-              setTagError(null);
-              removeAnnotationTag(tag.id).catch((err: unknown) => {
-                setTagError(err instanceof Error && err.message ? err.message : "Could not remove that tag");
-              });
-            }}
+            onRemove={handleRemoveTag}
           />
         );
       })}
@@ -211,14 +286,15 @@ export function AnnotationLayer() {
           return null;
         }
         return (
-          <FlowPinPin
+          <FlowPinPinListItem
             key={flowPin.id}
+            id={flowPin.id}
             name={flowPin.name}
             x={position.x}
             y={position.y}
             resolvedTarget={position.resolved}
             active={flowPin.id === selectedFlowPinId}
-            onSelect={() => selectFlowPin(flowPin.id)}
+            onSelect={handleSelectFlowPin}
           />
         );
       })}
@@ -260,13 +336,13 @@ export function AnnotationLayer() {
           orphaned={!selectedPosition.resolved}
         />
       ) : null}
-      {listOpen && activeAccount ? <AnnotationListPanel /> : null}
-      {epicFlowOpen && activeAccount ? (
+      {listOpen && authenticated ? <AnnotationListPanel /> : null}
+      {epicFlowOpen && authenticated ? (
         <Suspense fallback={null}>
           <EpicFlowPanel />
         </Suspense>
       ) : null}
-      {flowOpen && activeAccount ? (
+      {flowOpen && authenticated ? (
         <Suspense fallback={null}>
           <WecFlowPanel />
         </Suspense>

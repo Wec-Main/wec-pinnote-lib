@@ -11,7 +11,8 @@ import {
   type UpdateCommentRequest,
   type UpdatePageStatusRequest,
 } from "../types/annotation.types";
-import { readErrorMessage, reportUnauthorized } from "./httpClient";
+import { buildUrl, request, requestNoContent, type QueryValue } from "./httpClient";
+import { isAnnotation } from "../utils/streamPayloadGuards";
 
 const PATHS = {
   annotations: "/annotations",
@@ -22,91 +23,59 @@ const PATHS = {
     `/annotations/${encodeURIComponent(annotationId)}/comments/${encodeURIComponent(commentId)}`,
 } as const;
 
-interface RequestOptions {
-  method: "GET" | "POST" | "PATCH" | "DELETE";
-  path: string;
-  query?: Record<string, string>;
-  body?: unknown;
-  signal?: AbortSignal;
-}
-
-function joinUrl(baseUrl: string, path: string, query?: Record<string, string>): string {
-  const normalizedBase = baseUrl.replace(/\/+$/, "");
-  const url = new URL(`${normalizedBase}${path}`, "http://local.invalid");
-  if (query) {
-    for (const [key, value] of Object.entries(query)) {
-      url.searchParams.set(key, value);
-    }
-  }
-  if (/^https?:\/\//i.test(normalizedBase)) {
-    return url.toString();
-  }
-  return `${url.pathname}${url.search}`;
-}
-
 function parseListPayload(payload: unknown): Annotation[] {
-  if (Array.isArray(payload)) {
-    return payload as Annotation[];
+  const rawList = Array.isArray(payload)
+    ? payload
+    : payload && typeof payload === "object" && Array.isArray((payload as { annotations?: unknown }).annotations)
+      ? (payload as { annotations: unknown[] }).annotations
+      : null;
+
+  if (!rawList) {
+    throw new AnnotationApiError("Unexpected annotations list response", 500);
   }
-  if (payload && typeof payload === "object" && "annotations" in payload) {
-    const annotations = (payload as { annotations: unknown }).annotations;
-    if (Array.isArray(annotations)) {
-      return annotations as Annotation[];
+
+  return rawList.map((item) => {
+    if (!isAnnotation(item)) {
+      throw new AnnotationApiError("Unexpected annotation shape in list response", 500);
     }
-  }
-  throw new AnnotationApiError("Unexpected annotations list response", 500);
+    return item;
+  });
 }
 
 export function createAnnotationApi(
   config: Pick<AnnotationConfig, "apiBaseUrl" | "getAuthToken">,
 ): AnnotationApiClient {
-  async function request<T>(options: RequestOptions): Promise<T> {
-    const headers: Record<string, string> = {
-      Accept: "application/json",
-    };
-
-    if (options.body !== undefined) {
-      headers["Content-Type"] = "application/json";
-    }
-
+  async function call<T>(
+    method: "GET" | "POST" | "PATCH" | "DELETE",
+    path: string,
+    options: { query?: Record<string, QueryValue>; body?: unknown; signal?: AbortSignal } = {},
+  ): Promise<T> {
     const token = config.getAuthToken ? await config.getAuthToken() : undefined;
-    if (token) {
-      headers.Authorization = `Bearer ${token}`;
-    }
-
-    const response = await fetch(joinUrl(config.apiBaseUrl, options.path, options.query), {
-      method: options.method,
-      headers,
+    const url = buildUrl(config.apiBaseUrl, path, options.query);
+    return request<T>(url, token, {
+      method,
       body: options.body === undefined ? undefined : JSON.stringify(options.body),
       signal: options.signal,
     });
+  }
 
-    if (!response.ok) {
-      reportUnauthorized(response.status, token);
-      const { message, text } = await readErrorMessage(
-        response,
-        `Annotation API request failed (${response.status})`,
-      );
-      throw new AnnotationApiError(message, response.status, text || null);
-    }
-
-    if (response.status === 204) {
-      return undefined as T;
-    }
-
-    const text = await response.text();
-    if (!text) {
-      return undefined as T;
-    }
-
-    return JSON.parse(text) as T;
+  async function callNoContent(
+    method: "GET" | "POST" | "PATCH" | "DELETE",
+    path: string,
+    options: { query?: Record<string, QueryValue>; body?: unknown; signal?: AbortSignal } = {},
+  ): Promise<void> {
+    const token = config.getAuthToken ? await config.getAuthToken() : undefined;
+    const url = buildUrl(config.apiBaseUrl, path, options.query);
+    return requestNoContent(url, token, {
+      method,
+      body: options.body === undefined ? undefined : JSON.stringify(options.body),
+      signal: options.signal,
+    });
   }
 
   return {
     async listAnnotations({ projectId, pageKey }, signal) {
-      const payload = await request<unknown>({
-        method: "GET",
-        path: PATHS.annotations,
+      const payload = await call<unknown>("GET", PATHS.annotations, {
         query: { projectId, pageKey },
         signal,
       });
@@ -115,9 +84,7 @@ export function createAnnotationApi(
 
     async getPageStatus({ projectId, pageKey }, signal) {
       try {
-        return await request<PageStatusRecord>({
-          method: "GET",
-          path: PATHS.pageStatus,
+        return await call<PageStatusRecord>("GET", PATHS.pageStatus, {
           query: { projectId, pageKey },
           signal,
         });
@@ -135,72 +102,38 @@ export function createAnnotationApi(
     },
 
     updatePageStatus(body: UpdatePageStatusRequest, signal) {
-      return request<PageStatusRecord>({
-        method: "PATCH",
-        path: PATHS.pageStatus,
-        body,
-        signal,
-      });
+      return call<PageStatusRecord>("PATCH", PATHS.pageStatus, { body, signal });
     },
 
     getAnnotation(annotationId, signal) {
-      return request<Annotation>({
-        method: "GET",
-        path: PATHS.annotation(annotationId),
-        signal,
-      });
+      return call<Annotation>("GET", PATHS.annotation(annotationId), { signal });
     },
 
     createAnnotation(body: CreateAnnotationRequest, signal) {
-      return request<Annotation>({
-        method: "POST",
-        path: PATHS.annotations,
-        body,
-        signal,
-      });
+      return call<Annotation>("POST", PATHS.annotations, { body, signal });
     },
 
     createComment(annotationId, body: CreateCommentRequest, signal) {
-      return request<AnnotationComment>({
-        method: "POST",
-        path: PATHS.comments(annotationId),
-        body,
-        signal,
-      });
+      return call<AnnotationComment>("POST", PATHS.comments(annotationId), { body, signal });
     },
 
     updateAnnotation(annotationId, body: UpdateAnnotationRequest, signal) {
-      return request<Annotation>({
-        method: "PATCH",
-        path: PATHS.annotation(annotationId),
-        body,
-        signal,
-      });
+      return call<Annotation>("PATCH", PATHS.annotation(annotationId), { body, signal });
     },
 
     deleteAnnotation(annotationId, signal) {
-      return request<void>({
-        method: "DELETE",
-        path: PATHS.annotation(annotationId),
-        signal,
-      });
+      return callNoContent("DELETE", PATHS.annotation(annotationId), { signal });
     },
 
     updateComment(annotationId, commentId, body: UpdateCommentRequest, signal) {
-      return request<AnnotationComment>({
-        method: "PATCH",
-        path: PATHS.comment(annotationId, commentId),
+      return call<AnnotationComment>("PATCH", PATHS.comment(annotationId, commentId), {
         body,
         signal,
       });
     },
 
     deleteComment(annotationId, commentId, signal) {
-      return request<void>({
-        method: "DELETE",
-        path: PATHS.comment(annotationId, commentId),
-        signal,
-      });
+      return callNoContent("DELETE", PATHS.comment(annotationId, commentId), { signal });
     },
   };
 }

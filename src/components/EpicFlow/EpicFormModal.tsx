@@ -1,6 +1,7 @@
-import { useState, type FormEvent } from "react";
+import { useRef, useState, type FormEvent } from "react";
 import { Icon, Spinner, Tooltip } from "../primitives";
 import { useEscapeKey } from "../../hooks/useEscapeKey";
+import { useFocusTrap } from "../../hooks/useFocusTrap";
 import { useScrimDismiss } from "../../hooks/useScrimDismiss";
 import type { Epic } from "../../types/epicFlow.types";
 
@@ -25,6 +26,8 @@ export function EpicFormModal({
   const [title, setTitle] = useState(initialEpic?.title ?? "");
   const [description, setDescription] = useState(initialEpic?.description ?? "");
   const [touched, setTouched] = useState(false);
+  const dialogRef = useRef<HTMLFormElement>(null);
+  const titleInputRef = useRef<HTMLInputElement>(null);
 
   const dismiss = () => {
     if (!busy) {
@@ -33,6 +36,7 @@ export function EpicFormModal({
   };
 
   useEscapeKey(dismiss);
+  useFocusTrap(dialogRef, titleInputRef);
   const scrimProps = useScrimDismiss(dismiss);
 
   const trimmedTitle = title.trim();
@@ -53,6 +57,7 @@ export function EpicFormModal({
   return (
     <div className="wpn-epicflow-modal-scrim" {...scrimProps}>
       <form
+        ref={dialogRef}
         className="wpn-epicflow-modal"
         role="dialog"
         aria-modal="true"
@@ -90,12 +95,12 @@ export function EpicFormModal({
                 Epic title <span className="wpn-epicflow-modal__required">*</span>
               </span>
               <input
+                ref={titleInputRef}
                 className="wpn-epicflow-modal__input"
                 value={title}
                 maxLength={TITLE_MAX}
                 onChange={(event) => setTitle(event.target.value)}
                 placeholder="e.g. AI-Powered Shopping Experience"
-                autoFocus
               />
               <span className="wpn-epicflow-modal__counter">
                 {title.length}/{TITLE_MAX}

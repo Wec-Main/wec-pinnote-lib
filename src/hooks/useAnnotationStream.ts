@@ -1,10 +1,7 @@
-import { useEffect, useRef, useState } from "react";
 import type { StreamConnectionState, StreamEvent, StreamEventType } from "../types/stream.types";
-import { AnnotationApiError } from "../types/annotation.types";
-import { fetchSseTicket } from "../services/streamApi";
-import { isTokenUnexpired } from "./useAuthSessions";
+import { useSseStream, type StreamTokenGetter } from "./useSseStream";
 
-const EVENT_TYPES: StreamEventType[] = [
+const EVENT_TYPES: readonly StreamEventType[] = [
   "annotation.created",
   "annotation.updated",
   "annotation.deleted",
@@ -14,178 +11,17 @@ const EVENT_TYPES: StreamEventType[] = [
   "page-status.updated",
 ];
 
-const RESYNC_COOLDOWN_MS = 5000;
-const RECONNECT_DELAY_MS = 2000;
-const MAX_RECONNECT_DELAY_MS = 30000;
-
-function streamUrl(apiBaseUrl: string, ticket: string, lastEventId: string | undefined): string {
-  const base = apiBaseUrl.replace(/\/+$/, "");
-  const url = new URL(`${base}/events`, window.location.origin);
-  url.searchParams.set("ticket", ticket);
-  if (lastEventId) {
-    url.searchParams.set("lastEventId", lastEventId);
-  }
-  return url.toString();
-}
-
-function isAuthFailure(err: unknown): boolean {
-  return err instanceof AnnotationApiError && (err.status === 401 || err.status === 403);
-}
-
 export interface AnnotationStreamOptions {
   apiBaseUrl: string;
   projectId: string;
   pageKey: string;
-  authToken: string | undefined;
+  getAuthToken: StreamTokenGetter | undefined;
+  sessionKey: string;
   enabled: boolean;
   onEvent: (event: StreamEvent) => void;
   onResync: () => void;
 }
 
-export function useAnnotationStream({
-  apiBaseUrl,
-  projectId,
-  pageKey,
-  authToken,
-  enabled,
-  onEvent,
-  onResync,
-}: AnnotationStreamOptions): StreamConnectionState {
-  const [state, setState] = useState<StreamConnectionState>("closed");
-  const onEventRef = useRef(onEvent);
-  const onResyncRef = useRef(onResync);
-  const lastResyncRef = useRef(0);
-  onEventRef.current = onEvent;
-  onResyncRef.current = onResync;
-
-  const resync = () => {
-    const now = Date.now();
-    if (now - lastResyncRef.current < RESYNC_COOLDOWN_MS) {
-      return;
-    }
-    lastResyncRef.current = now;
-    onResyncRef.current();
-  };
-
-  useEffect(() => {
-    if (
-      !enabled ||
-      !authToken ||
-      typeof window === "undefined" ||
-      typeof EventSource === "undefined"
-    ) {
-      setState("closed");
-      return;
-    }
-
-    if (!isTokenUnexpired(authToken)) {
-      setState("unauthenticated");
-      return;
-    }
-
-    let stopped = false;
-    let source: EventSource | null = null;
-    let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
-    let reconnectDelay = RECONNECT_DELAY_MS;
-    let lastEventId: string | undefined;
-    let openedOnce = false;
-
-    const handleMessage = (event: MessageEvent<string>) => {
-      try {
-        const parsed = JSON.parse(event.data) as StreamEvent;
-        lastEventId = parsed.eventId;
-        if (parsed.truncated) {
-          resync();
-          return;
-        }
-        onEventRef.current(parsed);
-      } catch {
-        resync();
-      }
-    };
-
-    const scheduleReconnect = () => {
-      if (stopped || reconnectTimer) {
-        return;
-      }
-      setState("reconnecting");
-      reconnectTimer = setTimeout(() => {
-        reconnectTimer = null;
-        void connect();
-      }, reconnectDelay);
-      reconnectDelay = Math.min(reconnectDelay * 2, MAX_RECONNECT_DELAY_MS);
-    };
-
-    async function connect(): Promise<void> {
-      if (stopped) {
-        return;
-      }
-      setState(openedOnce ? "reconnecting" : "connecting");
-
-      let ticket: string;
-      try {
-        ticket = (await fetchSseTicket(apiBaseUrl, authToken, projectId, pageKey)).ticket;
-      } catch (err) {
-        if (stopped) {
-          return;
-        }
-        if (isAuthFailure(err)) {
-          setState("unauthenticated");
-          return;
-        }
-        scheduleReconnect();
-        return;
-      }
-      if (stopped) {
-        return;
-      }
-      reconnectDelay = RECONNECT_DELAY_MS;
-
-      source = new EventSource(streamUrl(apiBaseUrl, ticket, lastEventId));
-      let openedThisAttempt = false;
-
-      source.addEventListener("open", () => {
-        openedThisAttempt = true;
-        setState("open");
-        if (openedOnce) {
-          resync();
-        }
-        openedOnce = true;
-      });
-
-      source.addEventListener("error", () => {
-        if (stopped) {
-          return;
-        }
-        source?.close();
-        source = null;
-        if (!openedThisAttempt) {
-          setState("unauthenticated");
-          return;
-        }
-        scheduleReconnect();
-      });
-
-      source.addEventListener("replay-failed", () => {
-        resync();
-      });
-
-      for (const type of EVENT_TYPES) {
-        source.addEventListener(type, handleMessage as EventListener);
-      }
-    }
-
-    void connect();
-
-    return () => {
-      stopped = true;
-      if (reconnectTimer) {
-        clearTimeout(reconnectTimer);
-      }
-      source?.close();
-      setState("closed");
-    };
-  }, [apiBaseUrl, authToken, enabled, pageKey, projectId]);
-
-  return state;
+export function useAnnotationStream(options: AnnotationStreamOptions): StreamConnectionState {
+  return useSseStream({ ...options, eventTypes: EVENT_TYPES });
 }

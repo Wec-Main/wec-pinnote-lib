@@ -1,6 +1,6 @@
 import { useEffect, useId, useRef, type ReactNode, type RefObject } from "react";
 import { useEscapeKey } from "../../hooks/useEscapeKey";
-import { useModalFocus } from "../../hooks/useModalFocus";
+import { useFocusTrap } from "../../hooks/useFocusTrap";
 import { useScrimDismiss } from "../../hooks/useScrimDismiss";
 import { Icon } from "./Icon";
 import { Tooltip } from "./Tooltip";
@@ -37,7 +37,7 @@ export function ModalShell({
   const scrimHandlers = useScrimDismiss(onClose);
 
   useEscapeKey(onClose);
-  useModalFocus(dialogRef, initialFocusRef);
+  useFocusTrap(dialogRef, initialFocusRef);
 
   useEffect(() => {
     if (!hostRootSelector) {

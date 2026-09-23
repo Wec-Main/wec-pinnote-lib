@@ -4,60 +4,36 @@ import { UNAUTHORIZED_EVENT, type UnauthorizedDetail } from "../services/httpCli
 import { useSharedFetch } from "./useSharedFetch";
 import { AnnotationApiError } from "../types/annotation.types";
 import type { AuthApiClient, AuthSession, LoginOption } from "../types/auth.types";
+import { isSession, tokenExpiry } from "../utils/authSession";
 
 export interface StoredAuth {
   accounts: AuthSession[];
   activeId: string | null;
 }
 
+interface RenewalTimer {
+  token: string;
+  timer: ReturnType<typeof setTimeout>;
+}
+
 const EMPTY: StoredAuth = { accounts: [], activeId: null };
-const RENEWAL_LEAD_MS = 5 * 60 * 1000;
+const RENEWAL_FRACTION = 0.8;
+const MIN_RENEWAL_DELAY_MS = 30 * 1000;
+const RETRY_BASE_DELAY_MS = 5 * 1000;
+const MAX_RETRY_DELAY_MS = 5 * 60 * 1000;
+const MAX_TIMEOUT_MS = 2_147_483_647;
 
 function storageKey(projectId: string): string {
   return `wpn-auth:${projectId}`;
 }
 
-export function tokenExpiry(token: string): number | undefined {
-  const segments = token.split(".");
-  if (segments.length !== 3) {
-    return undefined;
-  }
-  const payloadSegment = segments[1];
-  if (!payloadSegment) {
-    return undefined;
-  }
-  try {
-    const normalized = payloadSegment.replace(/-/g, "+").replace(/_/g, "/");
-    const padded = normalized.padEnd(normalized.length + ((4 - (normalized.length % 4)) % 4), "=");
-    const json = atob(padded);
-    const payload = JSON.parse(json) as Record<string, unknown>;
-    return typeof payload.exp === "number" ? payload.exp : undefined;
-  } catch {
-    return undefined;
-  }
+function renewalDelay(exp: number): number {
+  const remaining = exp * 1000 - Date.now();
+  return Math.max(MIN_RENEWAL_DELAY_MS, remaining * RENEWAL_FRACTION);
 }
 
-export function isTokenUnexpired(token: string): boolean {
-  const exp = tokenExpiry(token);
-  return exp !== undefined && exp > Date.now() / 1000;
-}
-
-export function isSession(value: unknown): value is AuthSession {
-  if (!value || typeof value !== "object") {
-    return false;
-  }
-  const candidate = value as Partial<AuthSession>;
-  return (
-    typeof candidate.id === "string" &&
-    candidate.id.length > 0 &&
-    typeof candidate.name === "string" &&
-    typeof candidate.roleId === "string" &&
-    typeof candidate.token === "string" &&
-    candidate.token.length > 0 &&
-    typeof candidate.refreshToken === "string" &&
-    candidate.refreshToken.length > 0 &&
-    isTokenUnexpired(candidate.token)
-  );
+function retryDelay(attempt: number): number {
+  return Math.min(MAX_RETRY_DELAY_MS, RETRY_BASE_DELAY_MS * 2 ** (attempt - 1));
 }
 
 function isUnauthorized(error: unknown): boolean {
@@ -100,6 +76,12 @@ function writeStored(projectId: string, value: StoredAuth): void {
   }
 }
 
+function revokeErrorMessage(error: unknown): string {
+  return error instanceof Error && error.message.length > 0
+    ? error.message
+    : "Unable to sign out on the server.";
+}
+
 export interface AuthSessionsValue {
   accounts: AuthSession[];
   activeAccount: AuthSession | null;
@@ -110,6 +92,8 @@ export interface AuthSessionsValue {
   login: (userId: string, password: string) => Promise<void>;
   logout: (userId: string) => Promise<void>;
   switchAccount: (userId: string) => void;
+  revokeError: string | null;
+  clearRevokeError: () => void;
 }
 
 export function useAuthSessions(
@@ -118,11 +102,18 @@ export function useAuthSessions(
   client?: AuthApiClient,
 ): AuthSessionsValue {
   const authApi = useMemo(() => client ?? createAuthApi(apiBaseUrl), [client, apiBaseUrl]);
-  const [stored, setStored] = useState<StoredAuth>(() => readStored(projectId));
+  const [stored, setStored] = useState<StoredAuth>(EMPTY);
+  const storedRef = useRef<StoredAuth>(EMPTY);
+  const [revokeError, setRevokeError] = useState<string | null>(null);
+
+  const load = useCallback((next: StoredAuth) => {
+    storedRef.current = next;
+    setStored(next);
+  }, []);
 
   useEffect(() => {
-    setStored(readStored(projectId));
-  }, [projectId]);
+    load(readStored(projectId));
+  }, [projectId, load]);
 
   useEffect(() => {
     const watched = storageKey(projectId);
@@ -131,19 +122,23 @@ export function useAuthSessions(
       if (changed !== null && changed !== watched) {
         return;
       }
-      setStored(readStored(projectId));
+      load(readStored(projectId));
     };
     window.addEventListener("storage", onStorage);
     return () => window.removeEventListener("storage", onStorage);
-  }, [projectId]);
+  }, [projectId, load]);
 
   const persist = useCallback(
     (update: (current: StoredAuth) => StoredAuth) => {
-      const next = update(readStored(projectId));
+      const current = storedRef.current;
+      const next = update(current);
+      if (next === current) {
+        return;
+      }
+      load(next);
       writeStored(projectId, next);
-      setStored(next);
     },
-    [projectId],
+    [projectId, load],
   );
 
   const removeAccount = useCallback(
@@ -160,15 +155,38 @@ export function useAuthSessions(
   );
 
   const renewingRef = useRef<Set<string>>(new Set());
+  const timersRef = useRef<Map<string, RenewalTimer>>(new Map());
+  const failuresRef = useRef<Map<string, number>>(new Map());
+  const issuedRef = useRef<Map<string, string>>(new Map());
+  const renewRef = useRef<(accountId: string) => Promise<void>>(() => Promise.resolve());
+
+  const armRenewal = useCallback((accountId: string, token: string, delay: number) => {
+    const timers = timersRef.current;
+    const existing = timers.get(accountId);
+    if (existing) {
+      clearTimeout(existing.timer);
+    }
+    const timer = setTimeout(
+      () => {
+        timers.delete(accountId);
+        void renewRef.current(accountId);
+      },
+      Math.min(delay, MAX_TIMEOUT_MS),
+    );
+    timers.set(accountId, { token, timer });
+  }, []);
 
   const renewAccount = useCallback(
-    async (accountId: string, refreshToken: string) => {
-      if (renewingRef.current.has(accountId)) {
+    async (accountId: string) => {
+      const account = storedRef.current.accounts.find((item) => item.id === accountId);
+      if (!account || renewingRef.current.has(accountId)) {
         return;
       }
       renewingRef.current.add(accountId);
       try {
-        const token = await authApi.refresh(projectId, refreshToken);
+        const token = await authApi.refresh(projectId, account.refreshToken);
+        failuresRef.current.delete(accountId);
+        issuedRef.current.set(accountId, token);
         persist((current) => ({
           ...current,
           accounts: current.accounts.map((item) =>
@@ -178,67 +196,72 @@ export function useAuthSessions(
       } catch (err) {
         if (isUnauthorized(err)) {
           removeAccount(accountId);
+          return;
         }
+        const attempt = (failuresRef.current.get(accountId) ?? 0) + 1;
+        failuresRef.current.set(accountId, attempt);
+        armRenewal(accountId, account.token, retryDelay(attempt));
       } finally {
         renewingRef.current.delete(accountId);
       }
     },
-    [authApi, projectId, persist, removeAccount],
+    [authApi, projectId, persist, removeAccount, armRenewal],
   );
+
+  useEffect(() => {
+    renewRef.current = renewAccount;
+  }, [renewAccount]);
 
   useEffect(() => {
     const onUnauthorized = (event: Event) => {
       const { token } = (event as CustomEvent<UnauthorizedDetail>).detail;
-      const account = readStored(projectId).accounts.find((item) => item.token === token);
-      if (account) {
-        void renewAccount(account.id, account.refreshToken);
+      const account = storedRef.current.accounts.find((item) => item.token === token);
+      if (!account || issuedRef.current.get(account.id) === token) {
+        return;
       }
+      void renewAccount(account.id);
     };
     window.addEventListener(UNAUTHORIZED_EVENT, onUnauthorized);
     return () => window.removeEventListener(UNAUTHORIZED_EVENT, onUnauthorized);
-  }, [projectId, renewAccount]);
-
-  const timersRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
+  }, [renewAccount]);
 
   useEffect(() => {
     const timers = timersRef.current;
+    const failures = failuresRef.current;
+    const issued = issuedRef.current;
     return () => {
-      for (const timer of timers.values()) {
-        clearTimeout(timer);
+      for (const entry of timers.values()) {
+        clearTimeout(entry.timer);
       }
       timers.clear();
+      failures.clear();
+      issued.clear();
     };
   }, [projectId]);
 
   useEffect(() => {
     const timers = timersRef.current;
     const liveIds = new Set(stored.accounts.map((account) => account.id));
-    for (const [id, timer] of timers) {
+    for (const [id, entry] of timers) {
       if (!liveIds.has(id)) {
-        clearTimeout(timer);
+        clearTimeout(entry.timer);
         timers.delete(id);
+        failuresRef.current.delete(id);
+        issuedRef.current.delete(id);
       }
     }
 
     for (const account of stored.accounts) {
-      if (timers.has(account.id)) {
+      if (timers.get(account.id)?.token === account.token) {
         continue;
       }
       const exp = tokenExpiry(account.token);
       if (exp === undefined) {
         continue;
       }
-      const fireAt = exp * 1000 - RENEWAL_LEAD_MS;
-      const delay = Math.max(0, fireAt - Date.now());
-      const accountId = account.id;
-      const refreshToken = account.refreshToken;
-      const timer = setTimeout(() => {
-        timersRef.current.delete(accountId);
-        void renewAccount(accountId, refreshToken);
-      }, delay);
-      timers.set(account.id, timer);
+      armRenewal(account.id, account.token, renewalDelay(exp));
     }
-  }, [stored.accounts, renewAccount]);
+  }, [stored.accounts, armRenewal]);
 
   const loginOptionsKey = `auth-users:${apiBaseUrl}:${projectId}`;
   const {
@@ -305,17 +328,23 @@ export function useAuthSessions(
 
   const logout = useCallback(
     async (userId: string) => {
-      const account = readStored(projectId).accounts.find((item) => item.id === userId);
+      const account = storedRef.current.accounts.find((item) => item.id === userId);
+      setRevokeError(null);
       try {
         if (account) {
           await revokeServerSession(account);
         }
+      } catch (err) {
+        setRevokeError(revokeErrorMessage(err));
+        throw err;
       } finally {
         removeAccount(userId);
       }
     },
-    [projectId, removeAccount, revokeServerSession],
+    [removeAccount, revokeServerSession],
   );
+
+  const clearRevokeError = useCallback(() => setRevokeError(null), []);
 
   const switchAccount = useCallback(
     (userId: string) => {
@@ -333,15 +362,32 @@ export function useAuthSessions(
     [stored.accounts, stored.activeId],
   );
 
-  return {
-    accounts: stored.accounts,
-    activeAccount,
-    loginOptions,
-    loginOptionsLoading,
-    loginOptionsError,
-    reloadLoginOptions,
-    login,
-    logout,
-    switchAccount,
-  };
+  return useMemo(
+    () => ({
+      accounts: stored.accounts,
+      activeAccount,
+      loginOptions,
+      loginOptionsLoading,
+      loginOptionsError,
+      reloadLoginOptions,
+      login,
+      logout,
+      switchAccount,
+      revokeError,
+      clearRevokeError,
+    }),
+    [
+      stored.accounts,
+      activeAccount,
+      loginOptions,
+      loginOptionsLoading,
+      loginOptionsError,
+      reloadLoginOptions,
+      login,
+      logout,
+      switchAccount,
+      revokeError,
+      clearRevokeError,
+    ],
+  );
 }

@@ -1,7 +1,7 @@
 import { useRef, useState, type FormEvent } from "react";
 import { useAnnotationData, useAnnotationUi } from "../../context/AnnotationContext";
 import { useFloatingPanel } from "../../hooks/useAnnotationPosition";
-import type { AnnotationStatus } from "../../types/annotation.types";
+import type { AnnotationStatus, DraftAnnotation } from "../../types/annotation.types";
 import { AnnotationStatusSelect } from "../AnnotationStatusSelect";
 import { Icons } from "../../assets/icons";
 import { Tooltip } from "../primitives";
@@ -11,21 +11,33 @@ interface AnnotationComposerProps {
   y: number;
 }
 
+interface DraftComposerProps extends AnnotationComposerProps {
+  draft: DraftAnnotation;
+}
+
 export function AnnotationComposer({ x, y }: AnnotationComposerProps) {
-  const { draft, requestCancelDraft, updateDraftLabel, updateDraftMessage } = useAnnotationUi();
+  const { draft } = useAnnotationUi();
+  if (!draft) {
+    return null;
+  }
+  return <DraftComposer key={draft.id} draft={draft} x={x} y={y} />;
+}
+
+function DraftComposer({ draft, x, y }: DraftComposerProps) {
+  const { requestCancelDraft, updateDraftLabel, updateDraftMessage } = useAnnotationUi();
   const { submitDraft } = useAnnotationData();
   const panelRef = useRef<HTMLDivElement>(null);
-  const placement = useFloatingPanel(Boolean(draft), x, y, panelRef);
+  const placement = useFloatingPanel(true, x, y, panelRef);
+  const [message, setMessage] = useState(draft.message);
   const [status, setStatus] = useState<AnnotationStatus>("open");
   const [submitting, setSubmitting] = useState(false);
   const [editingLabel, setEditingLabel] = useState(false);
   const [labelValue, setLabelValue] = useState("");
 
-  if (!draft) {
-    return null;
-  }
-
-  const message = draft.message;
+  const changeMessage = (next: string) => {
+    setMessage(next);
+    updateDraftMessage(next);
+  };
 
   const onSubmit = async (event: FormEvent) => {
     event.preventDefault();
@@ -125,7 +137,7 @@ export function AnnotationComposer({ x, y }: AnnotationComposerProps) {
         <textarea
           className="wpn-input"
           value={message}
-          onChange={(event) => updateDraftMessage(event.target.value)}
+          onChange={(event) => changeMessage(event.target.value)}
           placeholder="Add your comment..."
           aria-label="Comment"
           rows={3}

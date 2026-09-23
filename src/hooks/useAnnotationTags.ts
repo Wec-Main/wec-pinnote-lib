@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   createAnnotationTag,
   deleteAnnotationTag,
@@ -9,17 +9,22 @@ import {
 import type { AnnotationTag, DraftTagPin } from "../types/annotationTag.types";
 import type { AnnotationAnchor } from "../types/annotation.types";
 import { createClientId } from "../utils/format";
+import { useTokenGetter } from "./useTokenGetter";
+
+const LOAD_ERROR_MESSAGE = "Could not load tags for this page";
 
 interface UseAnnotationTagsOptions {
   apiBaseUrl: string;
   projectId: string;
   pageKey: string;
-  authToken: string | undefined;
+  getAuthToken: (() => string | Promise<string>) | undefined;
+  sessionKey: string | null;
   enabled: boolean;
 }
 
 export interface AnnotationTagsState {
   annotationTags: AnnotationTag[];
+  annotationTagsError: string | null;
   tagsVisible: boolean;
   setTagsVisible: (visible: boolean) => void;
   tagModeEnabled: boolean;
@@ -33,12 +38,22 @@ export interface AnnotationTagsState {
 }
 
 export function useAnnotationTags(options: UseAnnotationTagsOptions): AnnotationTagsState {
-  const { apiBaseUrl, projectId, pageKey, authToken, enabled } = options;
+  const { apiBaseUrl, projectId, pageKey, getAuthToken, sessionKey, enabled } = options;
+  const getToken = useTokenGetter(getAuthToken);
   const [annotationTags, setAnnotationTags] = useState<AnnotationTag[]>([]);
+  const [annotationTagsError, setAnnotationTagsError] = useState<string | null>(null);
   const [tagsVisible, setTagsVisibleState] = useState(true);
   const [tagModeEnabled, setTagModeEnabled] = useState(false);
   const [tagDraft, setTagDraft] = useState<DraftTagPin | null>(null);
   const [reloadToken, setReloadToken] = useState(0);
+  const tagsVisibleRef = useRef(tagsVisible);
+  tagsVisibleRef.current = tagsVisible;
+
+  useEffect(() => {
+    setAnnotationTags([]);
+    setAnnotationTagsError(null);
+    setTagDraft(null);
+  }, [projectId, pageKey, sessionKey]);
 
   useEffect(() => {
     if (!enabled) {
@@ -46,32 +61,47 @@ export function useAnnotationTags(options: UseAnnotationTagsOptions): Annotation
       return;
     }
     const controller = new AbortController();
-    fetchAnnotationTags(apiBaseUrl, authToken, projectId, pageKey, controller.signal)
-      .then(setAnnotationTags)
-      .catch(() => undefined);
+    getToken()
+      .then((token) =>
+        fetchAnnotationTags(apiBaseUrl, token, projectId, pageKey, controller.signal),
+      )
+      .then((loaded) => {
+        setAnnotationTags(loaded);
+        setAnnotationTagsError(null);
+      })
+      .catch(() => {
+        if (!controller.signal.aborted) {
+          setAnnotationTagsError(LOAD_ERROR_MESSAGE);
+        }
+      });
     return () => controller.abort();
-  }, [apiBaseUrl, authToken, projectId, pageKey, enabled, reloadToken]);
+  }, [apiBaseUrl, getToken, sessionKey, projectId, pageKey, enabled, reloadToken]);
 
   useEffect(() => {
     if (!enabled) {
       return;
     }
     const controller = new AbortController();
-    fetchPreferences(apiBaseUrl, authToken, projectId, controller.signal)
+    getToken()
+      .then((token) => fetchPreferences(apiBaseUrl, token, projectId, controller.signal))
       .then((preferences) => setTagsVisibleState(preferences.tagsVisible))
       .catch(() => undefined);
     return () => controller.abort();
-  }, [apiBaseUrl, authToken, projectId, enabled]);
+  }, [apiBaseUrl, getToken, sessionKey, projectId, enabled]);
 
   const reloadAnnotationTags = useCallback(() => setReloadToken((token) => token + 1), []);
 
-  /** Applied locally first so the toggle stays responsive; the server is the record of it. */
   const setTagsVisible = useCallback(
     (visible: boolean) => {
+      const previous = tagsVisibleRef.current;
       setTagsVisibleState(visible);
-      saveTagsVisible(apiBaseUrl, authToken, projectId, visible).catch(() => undefined);
+      getToken()
+        .then((token) => saveTagsVisible(apiBaseUrl, token, projectId, visible))
+        .catch(() =>
+          setTagsVisibleState((current) => (current === visible ? previous : current)),
+        );
     },
-    [apiBaseUrl, authToken, projectId],
+    [apiBaseUrl, getToken, projectId],
   );
 
   const startTagDraft = useCallback((anchor: AnnotationAnchor, label: string) => {
@@ -85,7 +115,7 @@ export function useAnnotationTags(options: UseAnnotationTagsOptions): Annotation
       if (!tagDraft) {
         return;
       }
-      const created = await createAnnotationTag(apiBaseUrl, authToken, {
+      const created = await createAnnotationTag(apiBaseUrl, await getToken(), {
         projectId,
         pageKey,
         tagId,
@@ -94,28 +124,44 @@ export function useAnnotationTags(options: UseAnnotationTagsOptions): Annotation
       setAnnotationTags((current) => [created, ...current]);
       setTagDraft(null);
     },
-    [apiBaseUrl, authToken, projectId, pageKey, tagDraft],
+    [apiBaseUrl, getToken, projectId, pageKey, tagDraft],
   );
 
   const removeAnnotationTag = useCallback(
     async (annotationTagId: string) => {
-      await deleteAnnotationTag(apiBaseUrl, authToken, annotationTagId);
+      await deleteAnnotationTag(apiBaseUrl, await getToken(), annotationTagId);
       setAnnotationTags((current) => current.filter((item) => item.id !== annotationTagId));
     },
-    [apiBaseUrl, authToken],
+    [apiBaseUrl, getToken],
   );
 
-  return {
-    annotationTags,
-    tagsVisible,
-    setTagsVisible,
-    tagModeEnabled,
-    setTagModeEnabled,
-    tagDraft,
-    startTagDraft,
-    cancelTagDraft,
-    submitTagDraft,
-    removeAnnotationTag,
-    reloadAnnotationTags,
-  };
+  return useMemo(
+    () => ({
+      annotationTags,
+      annotationTagsError,
+      tagsVisible,
+      setTagsVisible,
+      tagModeEnabled,
+      setTagModeEnabled,
+      tagDraft,
+      startTagDraft,
+      cancelTagDraft,
+      submitTagDraft,
+      removeAnnotationTag,
+      reloadAnnotationTags,
+    }),
+    [
+      annotationTags,
+      annotationTagsError,
+      tagsVisible,
+      setTagsVisible,
+      tagModeEnabled,
+      tagDraft,
+      startTagDraft,
+      cancelTagDraft,
+      submitTagDraft,
+      removeAnnotationTag,
+      reloadAnnotationTags,
+    ],
+  );
 }

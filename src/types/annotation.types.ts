@@ -1,4 +1,5 @@
 import type { AuthApiClient } from "./auth.types";
+import type { StreamConnectionState } from "./stream.types";
 
 export type AnnotationStatus = "open" | "re-open" | "dev-inprogress" | "completed" | "closed";
 
@@ -121,7 +122,17 @@ export interface AnnotationApiClient {
   deleteComment(annotationId: string, commentId: string, signal?: AbortSignal): Promise<void>;
 }
 
-export interface AnnotationConfig {
+export interface AnnotationEventCallbacks {
+  onAnnotationCreate?: (annotation: Annotation) => void;
+  onAnnotationUpdate?: (annotation: Annotation) => void;
+  onAnnotationDelete?: (annotationId: string) => void;
+  onCommentAdd?: (annotationId: string, comment: AnnotationComment) => void;
+  onStatusChange?: (annotationId: string, status: AnnotationStatus) => void;
+  onError?: (error: Error) => void;
+  onConnectionStateChange?: (state: StreamConnectionState) => void;
+}
+
+export interface AnnotationConfig extends AnnotationEventCallbacks {
   apiBaseUrl: string;
   projectId: string;
   currentUser: AnnotationUser;

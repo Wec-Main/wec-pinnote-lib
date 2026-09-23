@@ -53,11 +53,7 @@ export function ColorPicker({
   const close = () => setOpen(false);
 
   useOutsidePointerDown(rootRef, close, open);
-  useEscapeKey(() => {
-    if (open) {
-      close();
-    }
-  });
+  useEscapeKey(close, open);
 
   const openPicker = () => {
     setHexDraft(value ?? "");

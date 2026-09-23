@@ -1,17 +1,16 @@
 import { useEffect, useRef } from "react";
 
-/**
- * Every open dialog listens on document, so a shared stack decides which one
- * Escape closes. Without it a confirmation layered over a form would dismiss
- * both and discard the form's input.
- */
 const escapeStack: symbol[] = [];
 
-export function useEscapeKey(onEscape: () => void): void {
+export function useEscapeKey(onEscape: () => void, active = true): void {
   const handlerRef = useRef(onEscape);
   handlerRef.current = onEscape;
 
   useEffect(() => {
+    if (!active) {
+      return;
+    }
+
     const token = Symbol("escape-layer");
     escapeStack.push(token);
 
@@ -34,5 +33,5 @@ export function useEscapeKey(onEscape: () => void): void {
         escapeStack.splice(index, 1);
       }
     };
-  }, []);
+  }, [active]);
 }

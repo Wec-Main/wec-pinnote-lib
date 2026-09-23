@@ -1,4 +1,4 @@
-import { buildUrl, request } from "./httpClient";
+import { buildUrl, request, requestNoContent } from "./httpClient";
 import type {
   AnnotationTag,
   CreateAnnotationTagInput,
@@ -39,7 +39,7 @@ export function deleteAnnotationTag(
   annotationTagId: string,
   signal?: AbortSignal,
 ): Promise<void> {
-  return request<void>(
+  return requestNoContent(
     buildUrl(apiBaseUrl, `/annotation-tags/${encodeURIComponent(annotationTagId)}`),
     authToken,
     { method: "DELETE", signal },

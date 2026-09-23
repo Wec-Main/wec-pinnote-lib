@@ -1,4 +1,4 @@
-import { buildUrl, request } from "./httpClient";
+import { buildUrl, request, requestNoContent } from "./httpClient";
 import type { AnnotationAnchor } from "../types/annotation.types";
 import type {
   FlowDocumentRecord,
@@ -100,7 +100,7 @@ export function deleteFlowPin(
   authToken: string | undefined,
   flowPinId: string,
 ): Promise<void> {
-  return request<void>(
+  return requestNoContent(
     buildUrl(apiBaseUrl, `/flow-pins/${encodeURIComponent(flowPinId)}`),
     authToken,
     { method: "DELETE" },

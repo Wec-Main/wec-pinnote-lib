@@ -111,7 +111,23 @@ If `getAuthToken` is provided, every API request sends:
 Authorization: Bearer <token>
 ```
 
-Tokens are requested per call and are not stored by the library.
+Tokens are requested per call.
+
+### Host-authenticated mode
+
+Passing `getAuthToken` puts the library in host-authenticated mode: annotations, tags, flow pins,
+project tags, EpicFlow and the real-time streams all use the token it returns, the toggle button
+and annotation mode are enabled immediately, and the library's built-in `ToolbarAuthControl` /
+`LoginDialog` sign-in UI is hidden. Omit `getAuthToken` to use the library's own login flow instead,
+backed by `useAuthSessions`.
+
+### Built-in login and token storage
+
+When the host does not supply `getAuthToken`, `ToolbarAuthControl` and `LoginDialog` handle sign-in
+themselves. The resulting access token and refresh token are stored in `localStorage`, keyed by
+`projectId`, on the host application's own origin. Anyone who can run script on that origin (for
+example through an XSS vulnerability elsewhere in the host app) can read those tokens. Prefer
+`getAuthToken` with tokens the host already manages securely if this risk is not acceptable.
 
 ## Page identification
 
@@ -161,19 +177,46 @@ import {
 } from "wec-pinnote-lib";
 ```
 
-`useAnnotations()` returns the current page annotations, loading/error/retry, and mutation helpers.
+`useAnnotations()` returns the current page annotations, loading/error/retry, mutation helpers
+(including `createAnnotation`), and separate error state for actions and page status:
+`actionError`/`clearActionError` surface a failed mutation, and `pageStatusError` surfaces a failed
+page-status fetch without forcing the status into "review".
+
+For narrower re-renders than `useAnnotationContext` (which combines everything), use the split
+context hooks: `useAnnotationData` (annotations, mutations, tags, flow pins), `useAnnotationUi`
+(mode, drafts, panel visibility) and `useAnnotationAuth` (accounts, login/logout, host-auth state).
+
+### Event callbacks
+
+`AnnotationConfig` accepts optional callbacks, invoked as the corresponding events happen:
+`onAnnotationCreate`, `onAnnotationUpdate`, `onAnnotationDelete`, `onCommentAdd`, `onStatusChange`,
+`onError` and `onConnectionStateChange`.
 
 Optional panels, mounted the same way as `AnnotationToggleButton`:
 
 - `UserManagementPanel`, `SettingsPanel`, `AuditHistoryPanel` — admin surfaces for user, project/organization/tag and audit-log management.
-- `LoginDialog`, `ToolbarAuthControl` — the built-in sign-in flow, used when the host app has no auth UI of its own.
+- `LoginDialog`, `ToolbarAuthControl` — the built-in sign-in flow, used when the host app has no auth UI of its own; hidden automatically in host-authenticated mode.
 
 Real-time updates:
 
-- `useAnnotationStream` / `applyStreamEvent` — live annotation, comment and page-status updates.
-- `useEpicFlowStream` / `applyEpicFlowStreamEvent` — live epic and user-story updates for the EpicFlow board.
+- `useAnnotationStream` / `applyStreamEvent` — live annotation, comment and page-status updates. Takes `getAuthToken` and `sessionKey` (not a raw token) so the stream reconnects on session changes without losing its place.
+- `useEpicFlowStream` / `applyEpicFlowStreamEvent` — live epic and user-story updates for the EpicFlow board. Also takes `sessionKey`.
+- `createEpicFlowApi` / `useEpicFlowApi` / `EpicFlowApiClient` / `EpicFlowApiError` — the EpicFlow REST client, exposed for hosts that call it directly.
 
-Every exported type (`Annotation`, `AuthSession`, `ManagedUser`, `Organization`, `ProjectTag`, `AuditRecord`, and their request/response shapes) is available from the package root and discoverable through editor autocomplete; this README does not duplicate the type signatures.
+Every exported type (`Annotation`, `AuthSession`, `ManagedUser`, `Organization`, `ProjectTag`, `AuditRecord`, `AnnotationContextValue` and its `Data`/`Ui`/`Auth` slices, `AuthSessionsValue`, `Epic`, `UserStory`, and their request/response shapes) is available from the package root and discoverable through editor autocomplete; this README does not duplicate the type signatures.
+
+## SSR and Next.js
+
+`AnnotationProvider` is safe to render on the server: it does not read `window` during render or in
+a `useState` initializer, and it only portals its overlay into `document.body` after mounting on the
+client. The compiled output (`dist/index.js` and `dist/index.es.js`) starts with a `"use client"`
+directive, so it can be imported directly from a Next.js App Router client component:
+
+```tsx
+"use client";
+
+import { AnnotationProvider } from "wec-pinnote-lib";
+```
 
 ## API contract
 

@@ -1,6 +1,11 @@
 export { AnnotationProvider } from "./context/AnnotationProvider";
 export type { AnnotationProviderProps } from "./context/AnnotationProvider";
-export { useAnnotationContext } from "./context/AnnotationContext";
+export {
+  useAnnotationContext,
+  useAnnotationData,
+  useAnnotationUi,
+  useAnnotationAuth,
+} from "./context/AnnotationContext";
 export { useAnnotations } from "./hooks/useAnnotations";
 export { useAnnotationMode } from "./hooks/useAnnotationMode";
 export { useAnnotationApi } from "./hooks/useAnnotationApi";
@@ -16,9 +21,17 @@ export { LoginDialog, ToolbarAuthControl } from "./components/Auth";
 export { createAuthApi } from "./services/authApi";
 export { useAuthSessions } from "./hooks/useAuthSessions";
 export { useAnnotationStream } from "./hooks/useAnnotationStream";
+export type { AnnotationStreamOptions } from "./hooks/useAnnotationStream";
 export { applyStreamEvent } from "./utils/applyStreamEvent";
+export type { StreamApplication } from "./utils/applyStreamEvent";
 export { useEpicFlowStream } from "./hooks/useEpicFlowStream";
+export type { EpicFlowStreamOptions } from "./hooks/useEpicFlowStream";
 export { applyEpicFlowStreamEvent } from "./utils/applyEpicFlowStreamEvent";
+export type { EpicFlowStreamApplication } from "./utils/applyEpicFlowStreamEvent";
+export { createEpicFlowApi, EpicFlowApiError } from "./services/epicFlowApi";
+export type { EpicFlowApiClient } from "./services/epicFlowApi";
+export { useEpicFlowApi } from "./hooks/useEpicFlowApi";
+export type { Epic, UserStory } from "./types/epicFlow.types";
 export { fetchAuditPage } from "./services/auditApi";
 export {
   createUser,
@@ -45,6 +58,7 @@ export type {
   AnnotationApiClient,
   AnnotationComment,
   AnnotationConfig,
+  AnnotationEventCallbacks,
   AnnotationListResponse,
   AnnotationStatus,
   AnnotationUser,
@@ -58,7 +72,14 @@ export type {
   UpdateCommentRequest,
   UpdatePageStatusRequest,
 } from "./types/annotation.types";
+export type {
+  AnnotationContextValue,
+  AnnotationDataContextValue,
+  AnnotationUiContextValue,
+  AnnotationAuthContextValue,
+} from "./context/AnnotationContext";
 export type { AuthApiClient, AuthSession, LoginOption } from "./types/auth.types";
+export type { AuthSessionsValue } from "./hooks/useAuthSessions";
 export type { AuditPage, AuditQuery, AuditRecord, AuditScope } from "./types/audit.types";
 export type { CreatedUser, PasswordReset, UserListQuery, UserPage } from "./services/usersApi";
 export type {
@@ -67,7 +88,12 @@ export type {
   Project,
   ProjectDraft,
 } from "./types/organization.types";
-export type { StreamConnectionState, StreamEvent, StreamEventType } from "./types/stream.types";
+export type {
+  StreamConnectionState,
+  StreamEvent,
+  StreamEventPayloads,
+  StreamEventType,
+} from "./types/stream.types";
 export type {
   ManagedUser,
   ManagedUserDraft,
@@ -80,7 +106,8 @@ export type {
   DraftTagPin,
   UserPreferences,
 } from "./types/annotationTag.types";
-export type { ProjectTag, TagDraft, TagStatus } from "./types/tag.types";
+export { TAG_COLORS } from "./types/tag.types";
+export type { ProjectTag, TagColor, TagDraft, TagStatus } from "./types/tag.types";
 export {
   createAnnotationTag,
   deleteAnnotationTag,
@@ -88,3 +115,4 @@ export {
   fetchPreferences,
   saveTagsVisible,
 } from "./services/annotationTagsApi";
+export { createTag, deleteTag, fetchTags, updateTag } from "./services/tagsApi";

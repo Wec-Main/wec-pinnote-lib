@@ -1,6 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { isBoolean, isNumber } from "../utils/valueGuards";
+
+export { isBoolean, isNumber };
 
 function read<T>(key: string, fallback: T, isValid: (value: unknown) => value is T): T {
+  if (typeof window === "undefined") {
+    return fallback;
+  }
   try {
     const raw = window.localStorage.getItem(key);
     if (raw === null) {
@@ -17,7 +23,7 @@ function write(key: string, value: unknown): void {
   try {
     window.localStorage.setItem(key, JSON.stringify(value));
   } catch {
-    // Ignore storage failures (private browsing, disabled storage, quota).
+    return;
   }
 }
 
@@ -29,22 +35,12 @@ export function usePersistentState<T>(
   const validRef = useRef(isValid);
   validRef.current = isValid;
 
-  const [value, setValue] = useState<T>(() => read(key, fallback, isValid));
-  const keyRef = useRef(key);
+  const [value, setValue] = useState<T>(fallback);
 
   useEffect(() => {
-    if (keyRef.current === key) {
-      return;
-    }
-    keyRef.current = key;
     setValue(read(key, fallback, validRef.current));
   }, [fallback, key]);
 
-  /**
-   * This state is shared by every tab on the origin, so a change made in one
-   * tab (e.g. dragging the toolbar) must be reflected in the others rather
-   * than only taking effect there on their next fresh mount.
-   */
   useEffect(() => {
     const onStorage = (event: StorageEvent) => {
       if (event.key !== null && event.key !== key) {
@@ -58,19 +54,16 @@ export function usePersistentState<T>(
 
   const update = useCallback(
     (next: T) => {
-      setValue(next);
-      write(key, next);
+      setValue((current) => {
+        if (current === next) {
+          return current;
+        }
+        write(key, next);
+        return next;
+      });
     },
     [key],
   );
 
   return [value, update];
-}
-
-export function isBoolean(value: unknown): value is boolean {
-  return typeof value === "boolean";
-}
-
-export function isNumber(value: unknown): value is number {
-  return typeof value === "number" && Number.isFinite(value);
 }

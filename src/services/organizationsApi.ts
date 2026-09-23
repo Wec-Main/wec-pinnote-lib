@@ -1,4 +1,4 @@
-import { buildUrl, request } from "./httpClient";
+import { buildUrl, request, requestNoContent } from "./httpClient";
 import type {
   Organization,
   OrganizationDraft,
@@ -52,7 +52,7 @@ export function deleteOrganization(
   organizationId: string,
   signal?: AbortSignal,
 ): Promise<void> {
-  return request<void>(
+  return requestNoContent(
     buildUrl(apiBaseUrl, `/organizations/${encodeURIComponent(organizationId)}`),
     authToken,
     { method: "DELETE", signal },
@@ -125,7 +125,7 @@ export function deleteProject(
   projectId: string,
   signal?: AbortSignal,
 ): Promise<void> {
-  return request<void>(
+  return requestNoContent(
     buildUrl(apiBaseUrl, `/projects/${encodeURIComponent(projectId)}`),
     authToken,
     {

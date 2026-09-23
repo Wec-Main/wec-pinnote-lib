@@ -1,7 +1,19 @@
 import { AnnotationApiError } from "../types/annotation.types";
-import { actorHeaders } from "./actorIdentity";
-import { readErrorMessage, reportUnauthorized } from "./httpClient";
+import { buildUrl, request } from "./httpClient";
 import type { AuditPage, AuditQuery } from "../types/audit.types";
+
+function isAuditPage(payload: unknown): payload is AuditPage {
+  if (!payload || typeof payload !== "object") {
+    return false;
+  }
+  const page = payload as Record<string, unknown>;
+  return (
+    Array.isArray(page.entries) &&
+    typeof page.total === "number" &&
+    typeof page.limit === "number" &&
+    typeof page.offset === "number"
+  );
+}
 
 export async function fetchAuditPage(
   apiBaseUrl: string,
@@ -9,27 +21,14 @@ export async function fetchAuditPage(
   query: AuditQuery,
   signal?: AbortSignal,
 ): Promise<AuditPage> {
-  const base = apiBaseUrl.replace(/\/+$/, "");
-  const url = new URL(`${base}/audit`, window.location.origin);
-  for (const [key, value] of Object.entries(query)) {
-    if (value !== undefined && value !== "") {
-      url.searchParams.set(key, String(value));
-    }
+  const payload = await request<unknown>(
+    buildUrl(apiBaseUrl, "/audit", { ...query }),
+    authToken,
+    { signal },
+    { fallbackMessage: (status) => `Unable to load audit history (${status})` },
+  );
+  if (!isAuditPage(payload)) {
+    throw new AnnotationApiError("Unexpected audit history response", 500, JSON.stringify(payload));
   }
-
-  const response = await fetch(url.toString(), {
-    headers: { Accept: "application/json", ...actorHeaders(authToken) },
-    signal,
-  });
-
-  if (!response.ok) {
-    reportUnauthorized(response.status, authToken);
-    const { message, text } = await readErrorMessage(
-      response,
-      `Unable to load audit history (${response.status})`,
-    );
-    throw new AnnotationApiError(message, response.status, text || null);
-  }
-
-  return (await response.json()) as AuditPage;
+  return payload;
 }

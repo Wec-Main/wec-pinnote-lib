@@ -1,10 +1,11 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useAnnotationData, useAnnotationUi } from "../../context/AnnotationContext";
 import { formatRelativeTime, formatTimestamp, getInitials } from "../../utils/format";
 import { isDoneStatus, statusLabel } from "../../utils/status";
 import { Icons } from "../../assets/icons";
 import { Icon, SearchableSelect, Tooltip } from "../primitives";
-import { isBoolean, isNumber, usePersistentState } from "../../hooks/usePersistentState";
+import { usePersistentState } from "../../hooks/usePersistentState";
+import { isBoolean, isNumber } from "../../utils/valueGuards";
 import {
   DEFAULT_COMMENT_FILTERS,
   RESOLUTION_OPTIONS,
@@ -30,16 +31,17 @@ function clampPanelWidth(value: number): number {
   return Math.max(PANEL_MIN_WIDTH, Math.min(ceiling, Math.round(value)));
 }
 
-function CommentRow({
+const CommentRow = memo(function CommentRow({
   entry,
   active,
   onSelect,
 }: {
   entry: CommentEntry;
   active: boolean;
-  onSelect: () => void;
+  onSelect: (annotationId: string) => void;
 }) {
   const { comment, annotation } = entry;
+  const handleSelect = useCallback(() => onSelect(annotation.id), [onSelect, annotation.id]);
 
   return (
     <li>
@@ -52,7 +54,7 @@ function CommentRow({
         ]
           .filter(Boolean)
           .join(" ")}
-        onClick={onSelect}
+        onClick={handleSelect}
       >
         {comment.createdBy.avatarUrl ? (
           <img className="wpn-avatar" src={comment.createdBy.avatarUrl} alt="" />
@@ -92,9 +94,9 @@ function CommentRow({
       </button>
     </li>
   );
-}
+});
 
-function AnnotationGroup({
+const AnnotationGroup = memo(function AnnotationGroup({
   entries,
   selectedId,
   collapsed,
@@ -140,23 +142,26 @@ function AnnotationGroup({
               key={entry.comment.id}
               entry={entry}
               active={selectedId === entry.annotation.id}
-              onSelect={() => onSelect(entry.annotation.id)}
+              onSelect={onSelect}
             />
           ))}
         </ul>
       )}
     </li>
   );
-}
+});
 
 export function AnnotationListPanel() {
   const { annotations, config, loading, error, retry } = useAnnotationData();
   const { selectedId, revealAnnotation, setListOpen } = useAnnotationUi();
 
-  const openAnnotation = (annotationId: string) => {
-    revealAnnotation(annotationId);
-    setListOpen(false);
-  };
+  const openAnnotation = useCallback(
+    (annotationId: string) => {
+      revealAnnotation(annotationId);
+      setListOpen(false);
+    },
+    [revealAnnotation, setListOpen],
+  );
 
   const [filters, setFilters] = useState<CommentFilters>(DEFAULT_COMMENT_FILTERS);
   const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
@@ -170,11 +175,13 @@ export function AnnotationListPanel() {
     false,
     isBoolean,
   );
-  const [width, setWidth] = usePersistentState(
+  const [persistedWidth, setPersistedWidth] = usePersistentState(
     `wpn-ui:${config.projectId}:commentsWidth`,
     PANEL_DEFAULT_WIDTH,
     isNumber,
   );
+  const [liveWidth, setLiveWidth] = useState<number | null>(null);
+  const width = liveWidth ?? persistedWidth;
   const widthRef = useRef(width);
   widthRef.current = width;
   const [resizing, setResizing] = useState(false);
@@ -189,17 +196,19 @@ export function AnnotationListPanel() {
       const onMove = (move: PointerEvent) => {
         const next = clampPanelWidth(startWidth + (startX - move.clientX));
         widthRef.current = next;
-        setWidth(next);
+        setLiveWidth(next);
       };
       const onUp = () => {
         setResizing(false);
+        setPersistedWidth(widthRef.current);
+        setLiveWidth(null);
         window.removeEventListener("pointermove", onMove);
         window.removeEventListener("pointerup", onUp);
       };
       window.addEventListener("pointermove", onMove);
       window.addEventListener("pointerup", onUp);
     },
-    [setWidth],
+    [setPersistedWidth],
   );
 
   useEffect(() => {
@@ -413,7 +422,7 @@ export function AnnotationListPanel() {
                   key={`${entry.annotation.id}:${entry.comment.id}`}
                   entry={entry}
                   active={selectedId === entry.annotation.id}
-                  onSelect={() => openAnnotation(entry.annotation.id)}
+                  onSelect={openAnnotation}
                 />
               ))}
         </ul>

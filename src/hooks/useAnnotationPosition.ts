@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type RefObject } from "react";
+import { useEffect, useMemo, useRef, useState, type RefObject } from "react";
 import type { AnnotationAnchor } from "../types/annotation.types";
 import { resolveElement } from "../utils/elementResolver";
 import {
@@ -14,11 +14,24 @@ export interface PositionedItem {
 }
 
 const MUTATION_DEBOUNCE_MS = 120;
+const MUTATION_MAX_WAIT_MS = 400;
+const LIBRARY_ROOT_SELECTOR = ".wpn-root";
 
-function collectObservationTargets(items: PositionedItem[]): Element[] {
-  const targets: Element[] = [];
+function isLibraryElement(node: Node): boolean {
+  return node instanceof Element && node.closest(LIBRARY_ROOT_SELECTOR) !== null;
+}
+
+function resolveTargets(items: PositionedItem[]): Map<string, Element | null> {
+  const resolved = new Map<string, Element | null>();
   for (const item of items) {
-    const element = resolveElement(item.anchor);
+    resolved.set(item.id, resolveElement(item.anchor));
+  }
+  return resolved;
+}
+
+function collectObservationTargets(resolved: Map<string, Element | null>): Element[] {
+  const targets: Element[] = [];
+  for (const element of resolved.values()) {
     if (!element) {
       continue;
     }
@@ -48,23 +61,43 @@ function mapsEqual(
   return true;
 }
 
+function anchorKey(anchor: AnnotationAnchor): string {
+  return [
+    anchor.selector,
+    anchor.elementIdentifier,
+    anchor.relativeX,
+    anchor.relativeY,
+    anchor.fallbackX,
+    anchor.fallbackY,
+    anchor.viewportWidth,
+    anchor.viewportHeight,
+  ].join(":");
+}
+
 export function useAnnotationPositions(items: PositionedItem[]): Map<string, PinScreenPosition> {
   const [positions, setPositions] = useState<Map<string, PinScreenPosition>>(() => new Map());
+  const itemsRef = useRef(items);
+  itemsRef.current = items;
   const itemsKey = useMemo(
-    () => items.map((item) => `${item.id}:${item.anchor.selector}`).join("|"),
+    () => items.map((item) => `${item.id}:${anchorKey(item.anchor)}`).join("|"),
     [items],
   );
 
   useEffect(() => {
+    const items = itemsRef.current;
     let frame = 0;
     let scheduled = false;
     let debounceTimer = 0;
+    let maxWaitTimer = 0;
+    const resolved = resolveTargets(items);
 
     const compute = () => {
       scheduled = false;
+      window.clearTimeout(maxWaitTimer);
+      maxWaitTimer = 0;
       const next = new Map<string, PinScreenPosition>();
       for (const item of items) {
-        next.set(item.id, computePinPosition(item.anchor, resolveElement(item.anchor)));
+        next.set(item.id, computePinPosition(item.anchor, resolved.get(item.id) ?? null));
       }
       setPositions((current) => (mapsEqual(current, next) ? current : next));
     };
@@ -80,6 +113,9 @@ export function useAnnotationPositions(items: PositionedItem[]): Map<string, Pin
     const scheduleDebounced = () => {
       window.clearTimeout(debounceTimer);
       debounceTimer = window.setTimeout(schedule, MUTATION_DEBOUNCE_MS);
+      if (!maxWaitTimer) {
+        maxWaitTimer = window.setTimeout(schedule, MUTATION_MAX_WAIT_MS);
+      }
     };
 
     schedule();
@@ -90,13 +126,20 @@ export function useAnnotationPositions(items: PositionedItem[]): Map<string, Pin
       typeof ResizeObserver === "undefined" ? null : new ResizeObserver(schedule);
     resizeObserver?.observe(document.documentElement);
 
-    const observationTargets = collectObservationTargets(items);
+    const observationTargets = collectObservationTargets(resolved);
     for (const target of observationTargets) {
       resizeObserver?.observe(target);
     }
 
     const mutationObserver =
-      typeof MutationObserver === "undefined" ? null : new MutationObserver(scheduleDebounced);
+      typeof MutationObserver === "undefined"
+        ? null
+        : new MutationObserver((mutations) => {
+            const relevant = mutations.some((mutation) => !isLibraryElement(mutation.target));
+            if (relevant) {
+              scheduleDebounced();
+            }
+          });
     for (const target of observationTargets) {
       mutationObserver?.observe(target, {
         childList: true,
@@ -109,12 +152,12 @@ export function useAnnotationPositions(items: PositionedItem[]): Map<string, Pin
     return () => {
       window.cancelAnimationFrame(frame);
       window.clearTimeout(debounceTimer);
+      window.clearTimeout(maxWaitTimer);
       window.removeEventListener("resize", schedule);
       window.removeEventListener("scroll", schedule, true);
       resizeObserver?.disconnect();
       mutationObserver?.disconnect();
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [itemsKey]);
 
   return positions;
@@ -127,6 +170,15 @@ export function useFloatingPanel(
   panelRef: RefObject<HTMLElement | null>,
 ): { left: number; top: number; side: string } {
   const [placement, setPlacement] = useState({ left: 0, top: 0, side: "right" });
+  const anchorXRef = useRef(anchorX);
+  const anchorYRef = useRef(anchorY);
+  const scheduleRef = useRef<(() => void) | null>(null);
+  anchorXRef.current = anchorX;
+  anchorYRef.current = anchorY;
+
+  useEffect(() => {
+    scheduleRef.current?.();
+  }, [anchorX, anchorY]);
 
   useEffect(() => {
     if (!open) {
@@ -140,7 +192,12 @@ export function useFloatingPanel(
       if (!panel) {
         return;
       }
-      const next = placePanel(anchorX, anchorY, panel.offsetWidth, panel.offsetHeight);
+      const next = placePanel(
+        anchorXRef.current,
+        anchorYRef.current,
+        panel.offsetWidth,
+        panel.offsetHeight,
+      );
       setPlacement((current) =>
         current.left === next.left && current.top === next.top && current.side === next.side
           ? current
@@ -152,6 +209,7 @@ export function useFloatingPanel(
       window.cancelAnimationFrame(frame);
       frame = window.requestAnimationFrame(update);
     };
+    scheduleRef.current = schedule;
 
     schedule();
     window.addEventListener("resize", schedule);
@@ -163,12 +221,13 @@ export function useFloatingPanel(
     }
 
     return () => {
+      scheduleRef.current = null;
       window.cancelAnimationFrame(frame);
       window.removeEventListener("resize", schedule);
       window.removeEventListener("scroll", schedule, true);
       observer?.disconnect();
     };
-  }, [anchorX, anchorY, open, panelRef]);
+  }, [open, panelRef]);
 
   return placement;
 }
