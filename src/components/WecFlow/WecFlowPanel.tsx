@@ -115,6 +115,7 @@ export function WecFlowPanel() {
       <div className="wpn-flow-panel__body">
         <FlowEditor
           initialFlow={initialFlow}
+          defaultEdgeType="step"
           onChange={setFlow}
           onSave={setFlow}
           onPublish={publish}

@@ -132,6 +132,13 @@ const EMPTY_MAP: ReadonlyMap<string, IssueSeverity> = new Map();
 /** Screen-space radius (px) in which a dragged connection snaps to a handle. */
 const CONNECT_RADIUS = 28;
 
+const isEdgePathType = (value: unknown): value is EdgePathType => value === 'bezier' || value === 'straight' || value === 'step';
+
+function savedEdgeType(meta: FlowJSON['meta']): EdgePathType | undefined {
+  const value = meta?.edgeType;
+  return isEdgePathType(value) ? value : undefined;
+}
+
 /**
  * Framework-agnostic flow state engine. All business logic (mutations,
  * history, selection, viewport math, connection rules, validation) lives here;
@@ -172,7 +179,7 @@ export class FlowEngine {
       viewport: initial.viewport ?? { x: 0, y: 0, zoom: 1 },
       canvasSize: { width: 0, height: 0 },
       readOnly: options.readOnly ?? false,
-      defaultEdgeType: options.defaultEdgeType ?? 'bezier',
+      defaultEdgeType: savedEdgeType(initial.meta) ?? options.defaultEdgeType ?? 'bezier',
       snapToGrid: options.snapToGrid ?? false,
       gridSize: options.gridSize ?? 20,
       connection: null,
@@ -757,6 +764,7 @@ export class FlowEngine {
       issueNodeIds: EMPTY_MAP,
       issueEdgeIds: EMPTY_MAP,
       flowName: flow.meta?.name ?? this.getState().flowName,
+      defaultEdgeType: savedEdgeType(flow.meta) ?? this.getState().defaultEdgeType,
     });
     if (flow.viewport) this.setViewport(flow.viewport);
     else this.fitView();
@@ -773,11 +781,12 @@ export class FlowEngine {
 
   toJSON(): FlowJSON {
     const s = this.getState();
-    return { version: FLOW_JSON_VERSION, nodes: s.nodes, edges: s.edges, viewport: s.viewport, meta: { name: s.flowName } };
+    return { version: FLOW_JSON_VERSION, nodes: s.nodes, edges: s.edges, viewport: s.viewport, meta: { name: s.flowName, edgeType: s.defaultEdgeType } };
   }
 
   setFlowName(name: string): void {
     this.store.setState({ flowName: name });
+    this.events.emit('change', this.getSnapshot());
   }
 
   // ----------------------------------------------------------- validation
@@ -805,7 +814,9 @@ export class FlowEngine {
   }
 
   setDefaultEdgeType(type: EdgePathType): void {
+    if (this.getState().defaultEdgeType === type) return;
     this.store.setState({ defaultEdgeType: type });
+    this.events.emit('change', this.getSnapshot());
   }
 
   setSnapToGrid(snapToGrid: boolean): void {

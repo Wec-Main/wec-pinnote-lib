@@ -87,3 +87,28 @@ describe('snapToAlignment', () => {
     expect(snap).toEqual({ offset: { x: 0, y: 0 }, guides: [] });
   });
 });
+
+describe('default line style', () => {
+  it('is written to meta and restored when the flow is loaded again', () => {
+    const engine = new FlowEngine({ defaultEdgeType: 'bezier' });
+    engine.setDefaultEdgeType('step');
+    const saved = engine.toJSON();
+    expect(saved.meta?.edgeType).toBe('step');
+    expect(new FlowEngine({ initialFlow: saved, defaultEdgeType: 'bezier' }).getState().defaultEdgeType).toBe('step');
+  });
+
+  it('falls back to the configured default when meta has no valid line style', () => {
+    const engine = new FlowEngine({ initialFlow: { nodes: [], edges: [], meta: { edgeType: 'zigzag' } }, defaultEdgeType: 'step' });
+    expect(engine.getState().defaultEdgeType).toBe('step');
+  });
+
+  it('emits a change so the new line style and flow name get saved', () => {
+    const engine = new FlowEngine();
+    let changes = 0;
+    engine.on('change', () => changes++);
+    engine.setDefaultEdgeType('step');
+    engine.setDefaultEdgeType('step');
+    engine.setFlowName('Onboarding');
+    expect(changes).toBe(2);
+  });
+});
