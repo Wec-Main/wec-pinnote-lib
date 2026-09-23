@@ -1,23 +1,33 @@
 import type { ReactNode } from "react";
-import { Handle, Position } from "@xyflow/react";
 import type { Node, NodeProps } from "@xyflow/react";
 import type { FlowNodeData, FlowNodeType } from "../../types/flow.types";
-import { NodeShell } from "./NodeShell";
+import { FourSidedHandles, NodeShell } from "./NodeShell";
+import { useNodeLabelEditing } from "./useNodeLabelEditing";
 
 /**
- * End node: terminal point of a flow. Has incoming (target) handles on all
- * four sides and intentionally no outgoing (source) handle.
+ * End node: terminal point of a flow, connectable from/to any side like the
+ * other shapes (see FourSidedHandles).
  */
 export function EndNode({
+  id,
   data,
   selected,
+  width,
+  height,
 }: NodeProps<Node<FlowNodeData, FlowNodeType>>): ReactNode {
+  const editing = useNodeLabelEditing(id);
   return (
-    <NodeShell variant="end" label={data.label} selected={selected}>
-      <Handle type="target" position={Position.Top} id="top" className="wec-flow-node__handle" />
-      <Handle type="target" position={Position.Right} id="right" className="wec-flow-node__handle" />
-      <Handle type="target" position={Position.Bottom} id="bottom" className="wec-flow-node__handle" />
-      <Handle type="target" position={Position.Left} id="left" className="wec-flow-node__handle" />
+    <NodeShell
+      variant="end"
+      label={data.label}
+      style={data.style}
+      selected={selected}
+      nodeId={id}
+      width={width}
+      height={height}
+      {...editing}
+    >
+      <FourSidedHandles />
     </NodeShell>
   );
 }

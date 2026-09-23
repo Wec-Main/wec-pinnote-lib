@@ -13,6 +13,7 @@ export type IconName =
   | "minimize"
   | "windowMinimize"
   | "chevronDown"
+  | "chevronUp"
   | "chevronLeft"
   | "chevronRight"
   | "check"
@@ -35,7 +36,12 @@ export type IconName =
   | "folder"
   | "drag"
   | "download"
-  | "upload";
+  | "upload"
+  | "zoomIn"
+  | "zoomOut"
+  | "layers"
+  | "lock"
+  | "lockOpen";
 
 const PATHS: Record<IconName, ReactElement> = {
   search: (
@@ -94,6 +100,7 @@ const PATHS: Record<IconName, ReactElement> = {
     </>
   ),
   chevronDown: <path d="m5 9 7 7 7-7" />,
+  chevronUp: <path d="m5 15 7-7 7 7" />,
   chevronLeft: <path d="m14 5-7 7 7 7" />,
   chevronRight: <path d="m10 5 7 7-7 7" />,
   check: <path d="m5 12.5 4.5 4.5L19 7" />,
@@ -216,6 +223,39 @@ const PATHS: Record<IconName, ReactElement> = {
     <>
       <path d="M12 15V3.5M8 7.5l4-4 4 4" />
       <path d="M4.5 17v2.5a1 1 0 0 0 1 1h13a1 1 0 0 0 1-1V17" />
+    </>
+  ),
+  zoomIn: (
+    <>
+      <circle cx="11" cy="11" r="6.5" />
+      <path d="m16 16 4.5 4.5" />
+      <path d="M8.2 11h5.6M11 8.2v5.6" />
+    </>
+  ),
+  zoomOut: (
+    <>
+      <circle cx="11" cy="11" r="6.5" />
+      <path d="m16 16 4.5 4.5" />
+      <path d="M8.2 11h5.6" />
+    </>
+  ),
+  layers: (
+    <>
+      <path d="m12 3.5 8.5 4.9L12 13.3 3.5 8.4Z" />
+      <path d="m3.5 12.6 8.5 4.9 8.5-4.9" />
+      <path d="m3.5 16.8 8.5 4.9 8.5-4.9" />
+    </>
+  ),
+  lock: (
+    <>
+      <rect x="5" y="11" width="14" height="9.5" rx="2" />
+      <path d="M8 11V7.5a4 4 0 0 1 8 0V11" />
+    </>
+  ),
+  lockOpen: (
+    <>
+      <rect x="5" y="11" width="14" height="9.5" rx="2" />
+      <path d="M8 11V7.5a4 4 0 0 1 7.6-1.8" />
     </>
   ),
 };

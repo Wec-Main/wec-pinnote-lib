@@ -10,6 +10,7 @@ import { ProcessNode } from "./ProcessNode";
 import { DecisionNode } from "./DecisionNode";
 import { InputNode } from "./InputNode";
 import { OutputNode } from "./OutputNode";
+import { createBasicShapeNode } from "./BasicShapeNode";
 
 export { StartNode } from "./StartNode";
 export { EndNode } from "./EndNode";
@@ -17,6 +18,8 @@ export { ProcessNode } from "./ProcessNode";
 export { DecisionNode } from "./DecisionNode";
 export { InputNode } from "./InputNode";
 export { OutputNode } from "./OutputNode";
+export { createBasicShapeNode } from "./BasicShapeNode";
+export type { BasicShapeVariant } from "./BasicShapeNode";
 
 /**
  * Map of FlowNodeType -> component, keyed and checked against the shared
@@ -29,6 +32,21 @@ const typedNodeTypes: Record<FlowNodeType, NodeTypes[string]> = {
   decision: DecisionNode,
   input: InputNode,
   output: OutputNode,
+  rectangle: createBasicShapeNode("rectangle"),
+  roundedRectangle: createBasicShapeNode("roundedRectangle"),
+  ellipse: createBasicShapeNode("ellipse"),
+  diamond: createBasicShapeNode("diamond"),
+  parallelogram: createBasicShapeNode("parallelogram"),
+  triangle: createBasicShapeNode("triangle"),
+  hexagon: createBasicShapeNode("hexagon"),
+  cylinder: createBasicShapeNode("cylinder"),
+  cloud: createBasicShapeNode("cloud"),
+  document: createBasicShapeNode("document"),
+  text: createBasicShapeNode("text"),
+  container: createBasicShapeNode("container"),
+  actor: createBasicShapeNode("actor"),
+  package: createBasicShapeNode("package"),
+  note: createBasicShapeNode("note"),
 };
 
 export const nodeTypes: NodeTypes = typedNodeTypes;

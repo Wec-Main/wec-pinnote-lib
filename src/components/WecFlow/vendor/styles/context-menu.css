@@ -14,7 +14,9 @@
 }
 
 .wec-flow-context-menu__item {
-  display: block;
+  display: flex;
+  align-items: center;
+  gap: 8px;
   width: 100%;
   padding: 7px 10px;
   border: 0;
@@ -31,10 +33,43 @@
   background-color: rgba(255, 255, 255, 0.1);
 }
 
+.wec-flow-context-menu__item:disabled {
+  color: rgba(255, 255, 255, 0.35);
+  cursor: not-allowed;
+}
+
+.wec-flow-context-menu__item:disabled:hover {
+  background-color: transparent;
+}
+
 .wec-flow-context-menu__item--danger {
   color: #fca5a5;
 }
 
 .wec-flow-context-menu__item--danger:hover {
   background-color: rgba(220, 38, 38, 0.16);
+}
+
+.wec-flow-context-menu__icon {
+  flex: none;
+  width: 14px;
+  height: 14px;
+}
+
+.wec-flow-context-menu__caret {
+  flex: none;
+  width: 12px;
+  height: 12px;
+  margin-left: auto;
+}
+
+.wec-flow-context-menu__item-wrap {
+  position: relative;
+}
+
+.wec-flow-context-menu--submenu {
+  position: absolute;
+  top: 0;
+  left: 100%;
+  z-index: 51;
 }

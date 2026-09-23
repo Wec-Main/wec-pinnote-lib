@@ -1,4 +1,6 @@
+import { useRef } from "react";
 import { useComboboxList, type ComboboxOption } from "../../hooks/useComboboxList";
+import { useFloatingPosition } from "../../hooks/useFloatingPosition";
 import { Icon } from "./Icon";
 
 export type SelectOption = ComboboxOption;
@@ -14,6 +16,7 @@ interface SearchableSelectProps {
   clearable?: boolean;
   size?: "md" | "sm";
   id?: string;
+  floating?: boolean;
 }
 
 export function SearchableSelect({
@@ -27,6 +30,7 @@ export function SearchableSelect({
   clearable = false,
   size = "md",
   id,
+  floating = false,
 }: SearchableSelectProps) {
   const {
     open,
@@ -44,6 +48,9 @@ export function SearchableSelect({
     onInputChange,
     onRootKeyDown,
   } = useComboboxList({ options, activeValue: value });
+
+  const menuRef = useRef<HTMLDivElement>(null);
+  const floatingPosition = useFloatingPosition(rootRef, menuRef, floating && open, "bottom-start");
 
   const selected = options.find((option) => option.value === value) ?? null;
 
@@ -106,7 +113,19 @@ export function SearchableSelect({
       ) : null}
 
       {open ? (
-        <div className="wpn-select__menu">
+        <div
+          ref={menuRef}
+          className={["wpn-select__menu", floating ? "wpn-select__menu--floating" : ""]
+            .filter(Boolean)
+            .join(" ")}
+          style={
+            floating
+              ? floatingPosition
+                ? { top: floatingPosition.top, left: floatingPosition.left }
+                : { visibility: "hidden" }
+              : undefined
+          }
+        >
           <ul className="wpn-select__list" role="listbox" id={listboxId} aria-label={ariaLabel}>
             {filtered.length === 0 ? (
               <li className="wpn-select__empty">{emptyMessage}</li>

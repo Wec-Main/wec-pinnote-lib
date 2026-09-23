@@ -1,0 +1,70 @@
+.wec-flow-rulers {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 5;
+}
+
+.wec-flow-rulers__corner {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 20px;
+  height: 20px;
+  background-color: var(--wec-flow-surface, rgba(18, 18, 20, 0.9));
+  border-right: 1px solid var(--wec-flow-border-soft, rgba(255, 255, 255, 0.12));
+  border-bottom: 1px solid var(--wec-flow-border-soft, rgba(255, 255, 255, 0.12));
+}
+
+.wec-flow-rulers__horizontal {
+  position: absolute;
+  top: 0;
+  right: 0;
+  height: 20px;
+  background-color: var(--wec-flow-surface, rgba(18, 18, 20, 0.9));
+  border-bottom: 1px solid var(--wec-flow-border-soft, rgba(255, 255, 255, 0.12));
+  overflow: hidden;
+}
+
+.wec-flow-rulers__vertical {
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  width: 20px;
+  background-color: var(--wec-flow-surface, rgba(18, 18, 20, 0.9));
+  border-right: 1px solid var(--wec-flow-border-soft, rgba(255, 255, 255, 0.12));
+  overflow: hidden;
+}
+
+.wec-flow-rulers__tick-h {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  border-left: 1px solid var(--wec-flow-border, rgba(255, 255, 255, 0.2));
+}
+
+.wec-flow-rulers__tick-h span {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  font-size: 9px;
+  color: var(--wec-flow-text, #fff);
+  opacity: 0.6;
+}
+
+.wec-flow-rulers__tick-v {
+  position: absolute;
+  left: 0;
+  right: 0;
+  border-top: 1px solid var(--wec-flow-border, rgba(255, 255, 255, 0.2));
+}
+
+.wec-flow-rulers__tick-v span {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  font-size: 9px;
+  color: var(--wec-flow-text, #fff);
+  opacity: 0.6;
+  writing-mode: vertical-rl;
+}

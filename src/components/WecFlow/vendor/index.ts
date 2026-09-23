@@ -1,4 +1,6 @@
 export { FlowBuilder } from "./components/FlowBuilder/FlowBuilder";
+export { MenuBar } from "./components/MenuBar/MenuBar";
+export type { MenuBarProps } from "./components/MenuBar/MenuBar";
 
 export type {
   FlowBuilderProps,

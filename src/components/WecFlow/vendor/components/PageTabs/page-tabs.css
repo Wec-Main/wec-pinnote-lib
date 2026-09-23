@@ -1,0 +1,96 @@
+.wec-flow-page-tabs {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 4px 8px;
+  border-top: 1px solid var(--wec-flow-border-soft, rgba(255, 255, 255, 0.12));
+  background-color: var(--wec-flow-surface, rgba(18, 18, 20, 0.98));
+  overflow-x: auto;
+  min-width: 0;
+  box-sizing: border-box;
+  height: 36px;
+  flex: none;
+}
+
+.wec-flow-page-tabs__tab {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 8px;
+  border-radius: 6px;
+  cursor: pointer;
+  color: var(--wec-flow-text, #fff);
+  white-space: nowrap;
+  font-size: 12px;
+}
+
+.wec-flow-page-tabs__tab:hover {
+  background-color: rgba(255, 255, 255, 0.08);
+}
+
+.wec-flow-page-tabs__tab--active {
+  background-color: rgba(255, 255, 255, 0.16);
+}
+
+.wec-flow-page-tabs__label {
+  max-width: 140px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.wec-flow-page-tabs__rename-input {
+  width: 120px;
+  background: transparent;
+  border: 1px solid var(--wec-flow-border, rgba(255, 255, 255, 0.14));
+  border-radius: 4px;
+  color: inherit;
+  font-size: 12px;
+  padding: 2px 4px;
+}
+
+.wec-flow-page-tabs__actions {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.wec-flow-page-tabs__action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border: none;
+  background: transparent;
+  color: inherit;
+  opacity: 0.7;
+  cursor: pointer;
+  border-radius: 4px;
+}
+
+.wec-flow-page-tabs__action:hover {
+  opacity: 1;
+  background-color: rgba(255, 255, 255, 0.12);
+}
+
+.wec-flow-page-tabs__action--danger:hover {
+  color: var(--wpn-danger, #ef4444);
+}
+
+.wec-flow-page-tabs__add {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  margin-left: 4px;
+  border: 1px dashed var(--wec-flow-border, rgba(255, 255, 255, 0.14));
+  border-radius: 6px;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+}
+
+.wec-flow-page-tabs__add:hover {
+  background-color: rgba(255, 255, 255, 0.08);
+}

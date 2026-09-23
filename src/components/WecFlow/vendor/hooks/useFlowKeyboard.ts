@@ -5,9 +5,21 @@ export interface UseFlowKeyboardOptions {
   onUndo: () => void;
   onRedo: () => void;
   onEscape: () => void;
+  onDuplicate?: () => void;
+  onNudge?: (dx: number, dy: number) => void;
   /** When false, the hook does nothing (no listeners attached / handlers never fire). Default true. */
   enabled?: boolean;
 }
+
+const NUDGE_STEP = 1;
+const NUDGE_STEP_LARGE = 10;
+
+const ARROW_KEY_DELTAS: Record<string, { dx: number; dy: number }> = {
+  ArrowUp: { dx: 0, dy: -1 },
+  ArrowDown: { dx: 0, dy: 1 },
+  ArrowLeft: { dx: -1, dy: 0 },
+  ArrowRight: { dx: 1, dy: 0 },
+};
 
 function isEditableTarget(target: EventTarget | null): boolean {
   if (!(target instanceof HTMLElement)) {
@@ -36,10 +48,14 @@ export function useFlowKeyboard(options: UseFlowKeyboardOptions): void {
     }
 
     const handleKeyDown = (event: KeyboardEvent): void => {
-      const { onDelete, onUndo, onRedo, onEscape } = optionsRef.current;
+      const { onDelete, onUndo, onRedo, onEscape, onDuplicate, onNudge } = optionsRef.current;
       const editing = isEditableTarget(document.activeElement);
 
       if (event.key === "Escape") {
+        if (editing) {
+          (document.activeElement as HTMLElement).blur();
+          return;
+        }
         onEscape();
         return;
       }
@@ -55,11 +71,26 @@ export function useFlowKeyboard(options: UseFlowKeyboardOptions): void {
       }
 
       const isModifier = event.ctrlKey || event.metaKey;
+
+      const arrowDelta = ARROW_KEY_DELTAS[event.key];
+      if (arrowDelta && !isModifier && onNudge) {
+        event.preventDefault();
+        const step = event.shiftKey ? NUDGE_STEP_LARGE : NUDGE_STEP;
+        onNudge(arrowDelta.dx * step, arrowDelta.dy * step);
+        return;
+      }
+
       if (!isModifier) {
         return;
       }
 
       const key = event.key.toLowerCase();
+
+      if (key === "d" && onDuplicate) {
+        event.preventDefault();
+        onDuplicate();
+        return;
+      }
 
       if (key === "z" && event.shiftKey) {
         event.preventDefault();

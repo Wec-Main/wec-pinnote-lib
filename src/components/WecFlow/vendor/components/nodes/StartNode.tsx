@@ -1,23 +1,33 @@
 import type { ReactNode } from "react";
-import { Handle, Position } from "@xyflow/react";
 import type { Node, NodeProps } from "@xyflow/react";
 import type { FlowNodeData, FlowNodeType } from "../../types/flow.types";
-import { NodeShell } from "./NodeShell";
+import { FourSidedHandles, NodeShell } from "./NodeShell";
+import { useNodeLabelEditing } from "./useNodeLabelEditing";
 
 /**
- * Start node: entry point of a flow. Has outgoing (source) handles on all
- * four sides and intentionally no incoming (target) handle.
+ * Start node: entry point of a flow, connectable from/to any side like the
+ * other shapes (see FourSidedHandles).
  */
 export function StartNode({
+  id,
   data,
   selected,
+  width,
+  height,
 }: NodeProps<Node<FlowNodeData, FlowNodeType>>): ReactNode {
+  const editing = useNodeLabelEditing(id);
   return (
-    <NodeShell variant="start" label={data.label} selected={selected}>
-      <Handle type="source" position={Position.Top} id="top" className="wec-flow-node__handle" />
-      <Handle type="source" position={Position.Right} id="right" className="wec-flow-node__handle" />
-      <Handle type="source" position={Position.Bottom} id="bottom" className="wec-flow-node__handle" />
-      <Handle type="source" position={Position.Left} id="left" className="wec-flow-node__handle" />
+    <NodeShell
+      variant="start"
+      label={data.label}
+      style={data.style}
+      selected={selected}
+      nodeId={id}
+      width={width}
+      height={height}
+      {...editing}
+    >
+      <FourSidedHandles />
     </NodeShell>
   );
 }

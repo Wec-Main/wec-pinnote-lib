@@ -1,9 +1,10 @@
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useAnnotationContext } from "../../context/AnnotationContext";
 import { Icon, Tooltip } from "../primitives";
 import { usePersistentState } from "../../hooks/usePersistentState";
 import {
   FlowBuilder,
+  MenuBar,
   exportFlow,
   importFlow,
   validateFlow,
@@ -18,27 +19,23 @@ function isFlowDefinition(value: unknown): value is FlowDefinition {
     return false;
   }
   const candidate = value as Record<string, unknown>;
+  if (typeof candidate.id !== "string" || typeof candidate.name !== "string") {
+    return false;
+  }
   return (
-    typeof candidate.id === "string" &&
-    typeof candidate.name === "string" &&
-    Array.isArray(candidate.nodes) &&
-    Array.isArray(candidate.edges)
+    Array.isArray(candidate.pages) ||
+    (Array.isArray(candidate.nodes) && Array.isArray(candidate.edges))
   );
 }
 
 function emptyFlow(): FlowDefinition {
-  return { id: "flow", name: "Untitled Flow", nodes: [], edges: [] };
-}
-
-function dispatchShortcut(key: string, options: { shiftKey?: boolean } = {}) {
-  window.dispatchEvent(
-    new KeyboardEvent("keydown", {
-      key,
-      ctrlKey: true,
-      shiftKey: options.shiftKey ?? false,
-      bubbles: true,
-    }),
-  );
+  const pageId = "page-1";
+  return {
+    id: "flow",
+    name: "Untitled Flow",
+    pages: [{ id: pageId, name: "Page 1", nodes: [], edges: [] }],
+    activePageId: pageId,
+  };
 }
 
 type JsonPanelMode = "none" | "export" | "import";
@@ -51,17 +48,58 @@ export function WecFlowPanel() {
     emptyFlow(),
     isFlowDefinition,
   );
+
+  useEffect(() => {
+    if (Array.isArray(flow.pages)) return;
+    setFlow(importFlow(JSON.stringify(flow)));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const flowRef = useRef<FlowBuilderRef>(null);
   const [readonly, setReadonly] = useState(false);
   const [jsonPanelMode, setJsonPanelMode] = useState<JsonPanelMode>("none");
   const [importText, setImportText] = useState("");
   const [importError, setImportError] = useState<string | null>(null);
   const [validation, setValidation] = useState<FlowValidationResult | null>(null);
+  const [gridVisible, setGridVisible] = useState(true);
+  const [rulersVisible, setRulersVisible] = useState(false);
+  const [outlineVisible, setOutlineVisible] = useState(false);
+  const [isFullscreen, setIsFullscreen] = useState(false);
+  const [, forceMenuBarUpdate] = useState(0);
+
+  const handleFlowChange = useCallback(
+    (next: FlowDefinition) => {
+      setFlow(next);
+      forceMenuBarUpdate((tick) => tick + 1);
+    },
+    [setFlow],
+  );
+
+  const handleToggleGrid = useCallback((visible: boolean) => {
+    setGridVisible(visible);
+    flowRef.current?.setGridVisible(visible);
+  }, []);
+
+  const handleToggleRulers = useCallback((visible: boolean) => {
+    setRulersVisible(visible);
+    flowRef.current?.setRulersVisible(visible);
+  }, []);
+
+  const handleToggleOutline = useCallback((visible: boolean) => {
+    setOutlineVisible(visible);
+    flowRef.current?.setOutlineVisible(visible);
+  }, []);
+
+  const handleToggleFullscreen = useCallback(() => {
+    flowRef.current?.toggleFullscreen();
+    setIsFullscreen(flowRef.current?.isFullscreen() ?? false);
+  }, []);
 
   const handleNewFlow = useCallback(() => {
     setFlow(emptyFlow());
     setValidation(null);
     setJsonPanelMode("none");
+    forceMenuBarUpdate((tick) => tick + 1);
   }, [setFlow]);
 
   const handleValidate = useCallback(() => {
@@ -100,8 +138,10 @@ export function WecFlowPanel() {
     >
       <div className="wpn-flow-panel__header">
         <span className="wpn-flow-panel__brand">
-          <Icon name="flow" />
-          <span className="wpn-panel__title">Flow</span>
+          <span className="wpn-flow-panel__brand-icon">
+            <Icon name="flow" />
+          </span>
+          <span className="wpn-panel__title">{flow.name || "Untitled Flow"}</span>
         </span>
         <div className="wpn-flow-panel__header-actions">
           <Tooltip label={minimized ? "Maximize" : "Minimize"} placement="bottom">
@@ -127,79 +167,23 @@ export function WecFlowPanel() {
         </div>
       </div>
 
-      <div className="wpn-flow-panel__toolbar" role="toolbar" aria-label="Flow editor toolbar">
-        <button
-          type="button"
-          className="wpn-btn wpn-btn--ghost"
-          onClick={handleNewFlow}
-          title="Start a new empty flow"
-        >
-          <Icon name="plus" className="wpn-btn__icon" />
-          New Flow
-        </button>
-        <button
-          type="button"
-          className="wpn-btn wpn-btn--ghost"
-          onClick={() => dispatchShortcut("z")}
-          title="Undo (Ctrl+Z)"
-        >
-          <Icon name="reset" className="wpn-btn__icon" />
-          Undo
-        </button>
-        <button
-          type="button"
-          className="wpn-btn wpn-btn--ghost"
-          onClick={() => dispatchShortcut("z", { shiftKey: true })}
-          title="Redo (Ctrl+Shift+Z)"
-        >
-          <Icon name="redo" className="wpn-btn__icon" />
-          Redo
-        </button>
-        <button
-          type="button"
-          className="wpn-btn wpn-btn--ghost"
-          onClick={() => flowRef.current?.fitView()}
-          title="Fit the flow to the viewport"
-        >
-          <Icon name="expand" className="wpn-btn__icon" />
-          Fit View
-        </button>
-        <button
-          type="button"
-          className="wpn-btn wpn-btn--ghost"
-          onClick={handleValidate}
-          title="Validate the current flow"
-        >
-          <Icon name="check" className="wpn-btn__icon" />
-          Validate
-        </button>
-        <button
-          type="button"
-          className="wpn-btn wpn-btn--ghost"
-          onClick={handleExportOpen}
-          title="View the flow as JSON"
-        >
-          <Icon name="download" className="wpn-btn__icon" />
-          Export JSON
-        </button>
-        <button
-          type="button"
-          className="wpn-btn wpn-btn--ghost"
-          onClick={handleImportOpen}
-          title="Load a flow from JSON"
-        >
-          <Icon name="upload" className="wpn-btn__icon" />
-          Import JSON
-        </button>
-        <label className="wpn-flow-panel__toggle" title="Toggle read-only mode">
-          <input
-            type="checkbox"
-            checked={readonly}
-            onChange={(event) => setReadonly(event.target.checked)}
-          />
-          Read-only
-        </label>
-      </div>
+      <MenuBar
+        flowRef={flowRef}
+        readonly={readonly}
+        gridVisible={gridVisible}
+        onToggleGrid={handleToggleGrid}
+        rulersVisible={rulersVisible}
+        onToggleRulers={handleToggleRulers}
+        outlineVisible={outlineVisible}
+        onToggleOutline={handleToggleOutline}
+        isFullscreen={isFullscreen}
+        onToggleFullscreen={handleToggleFullscreen}
+        onNewFlow={handleNewFlow}
+        onExportOpen={handleExportOpen}
+        onImportOpen={handleImportOpen}
+        onValidate={handleValidate}
+        onToggleReadonly={setReadonly}
+      />
 
       {validation ? (
         <div
@@ -223,7 +207,7 @@ export function WecFlowPanel() {
             onClick={() => setValidation(null)}
             aria-label="Dismiss"
           >
-            ×
+            <Icon name="close" />
           </button>
         </div>
       ) : null}
@@ -238,7 +222,7 @@ export function WecFlowPanel() {
               onClick={() => setJsonPanelMode("none")}
               aria-label="Close"
             >
-              ×
+              <Icon name="close" />
             </button>
           </div>
           <textarea
@@ -260,7 +244,7 @@ export function WecFlowPanel() {
               onClick={() => setJsonPanelMode("none")}
               aria-label="Close"
             >
-              ×
+              <Icon name="close" />
             </button>
           </div>
           <textarea
@@ -279,8 +263,8 @@ export function WecFlowPanel() {
       <div className="wpn-flow-panel__body">
         <FlowBuilder
           ref={flowRef}
-          value={flow}
-          onChange={setFlow}
+          value={Array.isArray(flow.pages) ? flow : importFlow(JSON.stringify(flow))}
+          onChange={handleFlowChange}
           readonly={readonly}
           showMiniMap
           height="100%"

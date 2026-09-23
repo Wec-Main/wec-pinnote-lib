@@ -58,6 +58,27 @@
   font-weight: 700;
 }
 
+.wec-flow-palette__search {
+  padding: 10px 12px 0;
+  flex: 0 0 auto;
+}
+
+.wec-flow-palette__search-input {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 6px 10px;
+  border-radius: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background-color: rgba(255, 255, 255, 0.05);
+  color: #fff;
+  font-size: 12px;
+}
+
+.wec-flow-palette__search-input:focus-visible {
+  outline: 2px solid #4a90d9;
+  outline-offset: 1px;
+}
+
 .wec-flow-palette__body {
   flex: 1;
   min-height: 0;
@@ -71,10 +92,67 @@
   color: rgba(255, 255, 255, 0.5);
 }
 
+.wec-flow-palette__note--category {
+  margin: 0 0 10px 0;
+  padding-left: 2px;
+}
+
+.wec-flow-palette__category {
+  margin-bottom: 12px;
+}
+
+.wec-flow-palette__category-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  padding: 4px 2px;
+  border: 0;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.75);
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  cursor: pointer;
+}
+
+.wec-flow-palette__category-caret {
+  flex: none;
+  width: 0;
+  height: 0;
+  border-left: 4px solid transparent;
+  border-right: 4px solid transparent;
+  border-top: 5px solid currentColor;
+  transition: transform 0.15s ease;
+}
+
+.wec-flow-palette__category-caret--collapsed {
+  transform: rotate(-90deg);
+}
+
+.wec-flow-palette__category-label {
+  flex: 1;
+  text-align: left;
+}
+
+.wec-flow-palette__category-count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.1);
+  font-size: 10px;
+}
+
 .wec-flow-palette__list {
   display: flex;
   flex-direction: column;
   gap: 6px;
+  margin-top: 6px;
 }
 
 .wec-flow-palette__item {
@@ -167,24 +245,176 @@
   transform: skewX(18deg);
 }
 
-/* Accent colors match the corresponding canvas node's accent (nodes.css). */
+/* Accent colors match the corresponding canvas node's accent (nodes.css),
+   both sourced from the shared --wec-flow-accent-* variables. */
 .wec-flow-palette__shape--start {
-  color: #16a34a;
+  color: var(--wec-flow-accent-start, #16a34a);
 }
 .wec-flow-palette__shape--end {
-  color: #dc2626;
+  color: var(--wec-flow-accent-end, #dc2626);
 }
 .wec-flow-palette__shape--process {
-  color: #64748b;
+  color: var(--wec-flow-accent-process, #64748b);
 }
 .wec-flow-palette__shape--decision {
-  color: #d97706;
+  color: var(--wec-flow-accent-decision, #d97706);
 }
 .wec-flow-palette__shape--input {
-  color: #0891b2;
+  color: var(--wec-flow-accent-input, #0891b2);
 }
 .wec-flow-palette__shape--output {
-  color: #7c3aed;
+  color: var(--wec-flow-accent-output, #7c3aed);
+}
+
+/* Basic Shapes swatches. */
+.wec-flow-palette__shape--rectangle::before {
+  width: 20px;
+  height: 14px;
+  border-radius: 1px;
+}
+
+.wec-flow-palette__shape--roundedRectangle::before {
+  width: 20px;
+  height: 14px;
+  border-radius: 5px;
+}
+
+.wec-flow-palette__shape--ellipse::before {
+  width: 20px;
+  height: 14px;
+  border-radius: 50%;
+}
+
+.wec-flow-palette__shape--diamond::before {
+  width: 14px;
+  height: 14px;
+  transform: rotate(45deg);
+}
+
+.wec-flow-palette__shape--parallelogram::before {
+  width: 20px;
+  height: 14px;
+  transform: skewX(-14deg);
+}
+
+.wec-flow-palette__shape--triangle::before {
+  width: 0;
+  height: 0;
+  border: none;
+  border-left: 9px solid transparent;
+  border-right: 9px solid transparent;
+  border-bottom: 15px solid currentColor;
+}
+
+.wec-flow-palette__shape--hexagon::before {
+  width: 20px;
+  height: 14px;
+  border: none;
+  background: currentColor;
+  clip-path: polygon(25% 0%, 75% 0%, 100% 50%, 75% 100%, 25% 100%, 0% 50%);
+}
+
+.wec-flow-palette__shape--cylinder::before {
+  width: 16px;
+  height: 15px;
+  border-radius: 50% 50% 2px 2px / 30% 30% 2px 2px;
+}
+
+.wec-flow-palette__shape--cloud::before {
+  width: 20px;
+  height: 13px;
+  border-radius: 45% 45% 45% 45% / 60% 60% 40% 40%;
+}
+
+.wec-flow-palette__shape--document::before {
+  width: 18px;
+  height: 14px;
+  border: none;
+  background: currentColor;
+  clip-path: polygon(0% 0%, 100% 0%, 100% 82%, 50% 100%, 0% 82%);
+}
+
+.wec-flow-palette__shape--text::before {
+  width: 16px;
+  height: 12px;
+  border: none;
+  border-bottom: 2px solid currentColor;
+}
+
+.wec-flow-palette__shape--container::before {
+  width: 20px;
+  height: 15px;
+  border-style: dashed;
+  border-radius: 2px;
+}
+
+.wec-flow-palette__shape--actor::before {
+  width: 12px;
+  height: 16px;
+  border: none;
+  border-radius: 50%;
+  background: currentColor;
+  clip-path: polygon(30% 0%, 70% 0%, 70% 30%, 100% 45%, 100% 55%, 65% 40%, 65% 100%, 35% 100%, 35% 40%, 0% 55%, 0% 45%, 30% 30%);
+}
+
+.wec-flow-palette__shape--package::before {
+  width: 20px;
+  height: 14px;
+  border: none;
+  background: currentColor;
+  clip-path: polygon(0% 20%, 40% 20%, 40% 0%, 100% 0%, 100% 100%, 0% 100%);
+}
+
+.wec-flow-palette__shape--note::before {
+  width: 18px;
+  height: 15px;
+  border: none;
+  background: currentColor;
+  clip-path: polygon(0% 0%, 75% 0%, 100% 25%, 100% 100%, 0% 100%);
+}
+
+.wec-flow-palette__shape--rectangle,
+.wec-flow-palette__shape--roundedRectangle {
+  color: var(--wec-flow-accent-rectangle, #64748b);
+}
+.wec-flow-palette__shape--ellipse {
+  color: var(--wec-flow-accent-ellipse, #0ea5e9);
+}
+.wec-flow-palette__shape--diamond {
+  color: var(--wec-flow-accent-diamond, #d97706);
+}
+.wec-flow-palette__shape--parallelogram {
+  color: var(--wec-flow-accent-parallelogram, #0891b2);
+}
+.wec-flow-palette__shape--triangle {
+  color: var(--wec-flow-accent-triangle, #ca8a04);
+}
+.wec-flow-palette__shape--hexagon {
+  color: var(--wec-flow-accent-hexagon, #059669);
+}
+.wec-flow-palette__shape--cylinder {
+  color: var(--wec-flow-accent-cylinder, #6366f1);
+}
+.wec-flow-palette__shape--cloud {
+  color: var(--wec-flow-accent-cloud, #38bdf8);
+}
+.wec-flow-palette__shape--document {
+  color: var(--wec-flow-accent-document, #14b8a6);
+}
+.wec-flow-palette__shape--text {
+  color: rgba(255, 255, 255, 0.7);
+}
+.wec-flow-palette__shape--container {
+  color: var(--wec-flow-accent-container, rgba(255, 255, 255, 0.4));
+}
+.wec-flow-palette__shape--actor {
+  color: var(--wec-flow-accent-actor, #eab308);
+}
+.wec-flow-palette__shape--package {
+  color: var(--wec-flow-accent-package, #0d9488);
+}
+.wec-flow-palette__shape--note {
+  color: var(--wec-flow-accent-note, #a855f7);
 }
 
 .wec-flow-palette__label {

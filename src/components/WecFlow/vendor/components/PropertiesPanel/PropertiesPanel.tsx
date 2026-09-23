@@ -1,29 +1,71 @@
 import * as React from "react";
+import { useState } from "react";
+import { ColorPicker, Icon, Tabs, type TabDefinition } from "../../../../primitives";
 import "../../styles/properties.css";
 import type {
+  FlowAlignEdge,
+  FlowAxis,
   FlowEdge,
-  FlowEdgeArrow,
-  FlowEdgeLineStyle,
   FlowNode,
   FlowNodeData,
+  FlowNodeStyle,
+  FlowPage,
+  FlowPageGridSettings,
+  RichText,
 } from "../../types/flow.types";
+import { plainTextToRichText, richTextToPlainText } from "../../utils/richText";
+import { StyleTab } from "./StyleTab";
+import { ArrangeTab } from "./ArrangeTab";
+import { TextTab } from "./TextTab";
 
 export interface PropertiesPanelProps {
   selectedNode: FlowNode | null;
   selectedEdge: FlowEdge | null;
+  selectedNodes: FlowNode[];
+  selectedEdges: FlowEdge[];
   nodes: FlowNode[];
   edges: FlowEdge[];
+  activePage: FlowPage;
+  onUpdatePageSettings: (
+    pageId: string,
+    updates: Partial<Pick<FlowPage, "background">> & { gridSettings?: Partial<FlowPageGridSettings> },
+  ) => void;
   onUpdateNode: (
     nodeId: string,
     data: Partial<Pick<FlowNodeData, "label" | "description">>,
   ) => void;
   onUpdateEdge: (
     edgeId: string,
-    updates: Partial<Pick<FlowEdge, "label" | "lineStyle" | "arrow">>,
+    updates: Partial<Pick<FlowEdge, "label" | "lineStyle" | "arrow" | "arrowStart" | "arrowEnd">>,
   ) => void;
+  onUpdateNodeLabel: (nodeId: string, label: RichText) => void;
+  onUpdateEdgeLabel: (edgeId: string, label: RichText) => void;
+  onUpdateNodeStyleSelection: (updates: Partial<FlowNodeStyle>) => void;
+  onUpdateEdgeStyleSelection: (
+    updates: Partial<
+      Pick<
+        FlowEdge,
+        | "lineStyle"
+        | "arrowStart"
+        | "arrowEnd"
+        | "arrowStartShape"
+        | "arrowEndShape"
+        | "stroke"
+        | "strokeWidth"
+        | "routing"
+      >
+    >,
+  ) => void;
+  onUpdateNodePosition: (nodeId: string, x: number, y: number) => void;
+  onUpdateNodeSize: (nodeId: string, width: number, height: number) => void;
+  onAlignSelected: (edge: FlowAlignEdge) => void;
+  onDistributeSelected: (axis: FlowAxis) => void;
+  onRotateSelected: (degrees: number) => void;
+  onFlipSelected: (axis: FlowAxis) => void;
   onDuplicateNode: (nodeId: string) => void;
   onDeleteNode: (nodeId: string) => void;
   onDeleteEdge: (edgeId: string) => void;
+  onCollapse?: () => void;
   readonly?: boolean;
   className?: string;
 }
@@ -33,29 +75,60 @@ function formatNodeTypeLabel(nodeType: FlowNode["type"]): string {
 }
 
 function nodeLabelById(nodes: FlowNode[], nodeId: string): string {
-  return nodes.find((node) => node.id === nodeId)?.data.label ?? nodeId;
+  const label = nodes.find((node) => node.id === nodeId)?.data.label;
+  return label ? richTextToPlainText(label) : nodeId;
 }
 
-function countConnectedEdges(edges: FlowEdge[], nodeId: string): number {
-  return edges.filter((edge) => edge.source === nodeId || edge.target === nodeId).length;
-}
+const TAB_DEFINITIONS: TabDefinition[] = [
+  { id: "style", label: "Style" },
+  { id: "text", label: "Text" },
+  { id: "arrange", label: "Arrange" },
+];
 
 export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
   selectedNode,
   selectedEdge,
+  selectedNodes,
+  selectedEdges,
   nodes,
-  edges,
+  activePage,
+  onUpdatePageSettings,
   onUpdateNode,
   onUpdateEdge,
+  onUpdateNodeLabel,
+  onUpdateEdgeLabel,
+  onUpdateNodeStyleSelection,
+  onUpdateEdgeStyleSelection,
+  onUpdateNodePosition,
+  onUpdateNodeSize,
+  onAlignSelected,
+  onDistributeSelected,
+  onRotateSelected,
+  onFlipSelected,
   onDuplicateNode,
   onDeleteNode,
   onDeleteEdge,
+  onCollapse,
   readonly = false,
   className,
 }) => {
+  const [activeTabId, setActiveTabId] = useState<string>("style");
+
   const rootClassName = className
     ? `wec-flow-properties ${className}`
     : "wec-flow-properties";
+
+  const collapseButton = onCollapse ? (
+    <button
+      type="button"
+      className="wec-flow-properties__collapse"
+      onClick={onCollapse}
+      aria-label="Collapse properties panel"
+      title="Collapse panel"
+    >
+      <Icon name="close" />
+    </button>
+  ) : null;
 
   const handleNodeLabelChange = (
     event: React.ChangeEvent<HTMLInputElement>,
@@ -63,7 +136,7 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
     if (!selectedNode) {
       return;
     }
-    onUpdateNode(selectedNode.id, { label: event.target.value });
+    onUpdateNode(selectedNode.id, { label: plainTextToRichText(event.target.value) });
   };
 
   const handleNodeDescriptionChange = (
@@ -81,214 +154,296 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
     if (!selectedEdge) {
       return;
     }
-    onUpdateEdge(selectedEdge.id, { label: event.target.value });
+    onUpdateEdge(selectedEdge.id, { label: plainTextToRichText(event.target.value) });
   };
 
-  const handleEdgeLineStyleChange = (
-    event: React.ChangeEvent<HTMLSelectElement>,
-  ): void => {
-    if (!selectedEdge) {
-      return;
-    }
-    onUpdateEdge(selectedEdge.id, { lineStyle: event.target.value as FlowEdgeLineStyle });
-  };
-
-  const handleEdgeArrowChange = (
-    event: React.ChangeEvent<HTMLSelectElement>,
-  ): void => {
-    if (!selectedEdge) {
-      return;
-    }
-    onUpdateEdge(selectedEdge.id, { arrow: event.target.value as FlowEdgeArrow });
-  };
-
-  if (selectedNode) {
-    const labelInputId = `wec-flow-properties__node-label-${selectedNode.id}`;
-    const descriptionInputId = `wec-flow-properties__node-description-${selectedNode.id}`;
-    const connectedEdgeCount = countConnectedEdges(edges, selectedNode.id);
+  if (selectedNodes.length > 0 || selectedEdges.length > 0) {
+    const multi = selectedNodes.length + selectedEdges.length > 1;
+    const labelInputId = selectedNode ? `wec-flow-properties__node-label-${selectedNode.id}` : "";
+    const descriptionInputId = selectedNode
+      ? `wec-flow-properties__node-description-${selectedNode.id}`
+      : "";
+    const edgeLabelInputId = selectedEdge
+      ? `wec-flow-properties__edge-label-${selectedEdge.id}`
+      : "";
 
     return (
       <div className={rootClassName}>
         <div className="wec-flow-properties__header">
-          <h2 className="wec-flow-properties__title">Node Properties</h2>
-          <p className="wec-flow-properties__subtitle">
-            {formatNodeTypeLabel(selectedNode.type)}
-          </p>
+          <div className="wec-flow-properties__header-text">
+            <h2 className="wec-flow-properties__title">
+              {multi
+                ? `${selectedNodes.length + selectedEdges.length} Selected`
+                : selectedNode
+                  ? "Node Properties"
+                  : "Connection Properties"}
+            </h2>
+            {!multi && selectedNode && (
+              <p className="wec-flow-properties__subtitle">{formatNodeTypeLabel(selectedNode.type)}</p>
+            )}
+            {!multi && selectedEdge && (
+              <p className="wec-flow-properties__subtitle">
+                {nodeLabelById(nodes, selectedEdge.source)} &rarr; {nodeLabelById(nodes, selectedEdge.target)}
+              </p>
+            )}
+          </div>
+          {collapseButton}
         </div>
-        <dl className="wec-flow-properties__meta">
-          <div className="wec-flow-properties__meta-row">
-            <dt>ID</dt>
-            <dd title={selectedNode.id}>{selectedNode.id}</dd>
-          </div>
-          <div className="wec-flow-properties__meta-row">
-            <dt>Position</dt>
-            <dd>
-              x: {Math.round(selectedNode.position.x)}, y: {Math.round(selectedNode.position.y)}
-            </dd>
-          </div>
-          <div className="wec-flow-properties__meta-row">
-            <dt>Connections</dt>
-            <dd>{connectedEdgeCount}</dd>
-          </div>
-        </dl>
-        <form
-          className="wec-flow-properties__form"
-          onSubmit={(event) => event.preventDefault()}
-        >
-          <div className="wec-flow-properties__field">
-            <label
-              className="wec-flow-properties__label"
-              htmlFor={labelInputId}
+
+        {!multi && selectedNode && (
+          <>
+            <form
+              className="wec-flow-properties__form"
+              onSubmit={(event) => event.preventDefault()}
             >
-              Label
-            </label>
-            <input
-              id={labelInputId}
-              type="text"
-              className="wec-flow-properties__input"
-              value={selectedNode.data.label}
-              onChange={handleNodeLabelChange}
-              disabled={readonly}
-            />
-          </div>
-          <div className="wec-flow-properties__field">
-            <label
-              className="wec-flow-properties__label"
-              htmlFor={descriptionInputId}
+              <div className="wec-flow-properties__field">
+                <label className="wec-flow-properties__label" htmlFor={labelInputId}>
+                  Label
+                </label>
+                <input
+                  id={labelInputId}
+                  type="text"
+                  className="wec-flow-properties__input"
+                  value={richTextToPlainText(selectedNode.data.label)}
+                  onChange={handleNodeLabelChange}
+                  disabled={readonly}
+                />
+              </div>
+              <div className="wec-flow-properties__field">
+                <label className="wec-flow-properties__label" htmlFor={descriptionInputId}>
+                  Description
+                </label>
+                <textarea
+                  id={descriptionInputId}
+                  className="wec-flow-properties__textarea"
+                  value={selectedNode.data.description ?? ""}
+                  onChange={handleNodeDescriptionChange}
+                  disabled={readonly}
+                  rows={4}
+                />
+              </div>
+            </form>
+          </>
+        )}
+
+        {!multi && selectedEdge && (
+          <>
+            <form
+              className="wec-flow-properties__form"
+              onSubmit={(event) => event.preventDefault()}
             >
-              Description
-            </label>
-            <textarea
-              id={descriptionInputId}
-              className="wec-flow-properties__textarea"
-              value={selectedNode.data.description ?? ""}
-              onChange={handleNodeDescriptionChange}
-              disabled={readonly}
-              rows={4}
+              <div className="wec-flow-properties__field">
+                <label className="wec-flow-properties__label" htmlFor={edgeLabelInputId}>
+                  Label
+                </label>
+                <input
+                  id={edgeLabelInputId}
+                  type="text"
+                  className="wec-flow-properties__input"
+                  value={selectedEdge.label ? richTextToPlainText(selectedEdge.label) : ""}
+                  onChange={handleEdgeLabelChange}
+                  disabled={readonly}
+                />
+              </div>
+            </form>
+          </>
+        )}
+
+        <Tabs tabs={TAB_DEFINITIONS} activeTabId={activeTabId} onChange={setActiveTabId} ariaLabel="Properties" />
+
+        <div className="wec-flow-properties__tab-panel">
+          {activeTabId === "style" && (
+            <StyleTab
+              selectedNodes={selectedNodes}
+              selectedEdges={selectedEdges}
+              onUpdateNodeStyle={onUpdateNodeStyleSelection}
+              onUpdateEdgeStyle={(updates) =>
+                onUpdateEdgeStyleSelection({
+                  lineStyle: updates.lineStyle,
+                  arrowStart: updates.arrowStart,
+                  arrowEnd: updates.arrowEnd,
+                  arrowStartShape: updates.arrowStartShape,
+                  arrowEndShape: updates.arrowEndShape,
+                  stroke: updates.stroke,
+                  strokeWidth: updates.strokeWidth,
+                  routing: updates.routing,
+                })
+              }
+              readonly={readonly}
             />
-          </div>
-        </form>
-        {!readonly && (
+          )}
+          {activeTabId === "text" && (
+            <TextTab
+              selectedNode={selectedNode}
+              selectedEdge={selectedEdge}
+              onUpdateNodeLabel={onUpdateNodeLabel}
+              onUpdateEdgeLabel={onUpdateEdgeLabel}
+              readonly={readonly}
+            />
+          )}
+          {activeTabId === "arrange" && (
+            <ArrangeTab
+              selectedNodes={selectedNodes}
+              onUpdatePosition={onUpdateNodePosition}
+              onUpdateSize={onUpdateNodeSize}
+              onAlign={onAlignSelected}
+              onDistribute={onDistributeSelected}
+              onRotate={onRotateSelected}
+              onFlip={onFlipSelected}
+              readonly={readonly}
+            />
+          )}
+        </div>
+
+        {!readonly && !multi && (
           <div className="wec-flow-properties__actions">
-            <button
-              type="button"
-              className="wec-flow-properties__action"
-              onClick={() => onDuplicateNode(selectedNode.id)}
-            >
-              Duplicate
-            </button>
-            <button
-              type="button"
-              className="wec-flow-properties__action wec-flow-properties__action--danger"
-              onClick={() => onDeleteNode(selectedNode.id)}
-            >
-              Delete
-            </button>
+            {selectedNode && (
+              <>
+                <button
+                  type="button"
+                  className="wec-flow-properties__action"
+                  onClick={() => onDuplicateNode(selectedNode.id)}
+                >
+                  Duplicate
+                </button>
+                <button
+                  type="button"
+                  className="wec-flow-properties__action wec-flow-properties__action--danger"
+                  onClick={() => onDeleteNode(selectedNode.id)}
+                >
+                  Delete
+                </button>
+              </>
+            )}
+            {selectedEdge && (
+              <button
+                type="button"
+                className="wec-flow-properties__action wec-flow-properties__action--danger"
+                onClick={() => onDeleteEdge(selectedEdge.id)}
+              >
+                Delete
+              </button>
+            )}
           </div>
+        )}
+
+        {!multi && (selectedNode || selectedEdge) && (
+          <dl className="wec-flow-properties__meta">
+            {selectedNode && (
+              <>
+                <div className="wec-flow-properties__meta-row">
+                  <dt>ID</dt>
+                  <dd title={selectedNode.id}>{selectedNode.id}</dd>
+                </div>
+                <div className="wec-flow-properties__meta-row">
+                  <dt>Position</dt>
+                  <dd>
+                    x: {Math.round(selectedNode.position.x)}, y: {Math.round(selectedNode.position.y)}
+                  </dd>
+                </div>
+                {selectedNode.width !== undefined && selectedNode.height !== undefined && (
+                  <div className="wec-flow-properties__meta-row">
+                    <dt>Size</dt>
+                    <dd>
+                      {Math.round(selectedNode.width)} &times; {Math.round(selectedNode.height)}
+                    </dd>
+                  </div>
+                )}
+              </>
+            )}
+            {selectedEdge && (
+              <div className="wec-flow-properties__meta-row">
+                <dt>ID</dt>
+                <dd title={selectedEdge.id}>{selectedEdge.id}</dd>
+              </div>
+            )}
+          </dl>
         )}
       </div>
     );
   }
 
-  if (selectedEdge) {
-    const labelInputId = `wec-flow-properties__edge-label-${selectedEdge.id}`;
-    const lineStyleId = `wec-flow-properties__edge-line-style-${selectedEdge.id}`;
-    const arrowId = `wec-flow-properties__edge-arrow-${selectedEdge.id}`;
-
-    return (
-      <div className={rootClassName}>
-        <div className="wec-flow-properties__header">
-          <h2 className="wec-flow-properties__title">
-            Connection Properties
-          </h2>
-          <p className="wec-flow-properties__subtitle">
-            {nodeLabelById(nodes, selectedEdge.source)} &rarr; {nodeLabelById(nodes, selectedEdge.target)}
-          </p>
-        </div>
-        <dl className="wec-flow-properties__meta">
-          <div className="wec-flow-properties__meta-row">
-            <dt>ID</dt>
-            <dd title={selectedEdge.id}>{selectedEdge.id}</dd>
-          </div>
-        </dl>
-        <form
-          className="wec-flow-properties__form"
-          onSubmit={(event) => event.preventDefault()}
-        >
-          <div className="wec-flow-properties__field">
-            <label
-              className="wec-flow-properties__label"
-              htmlFor={labelInputId}
-            >
-              Label
-            </label>
-            <input
-              id={labelInputId}
-              type="text"
-              className="wec-flow-properties__input"
-              value={selectedEdge.label ?? ""}
-              onChange={handleEdgeLabelChange}
-              disabled={readonly}
-            />
-          </div>
-          <div className="wec-flow-properties__field">
-            <label
-              className="wec-flow-properties__label"
-              htmlFor={lineStyleId}
-            >
-              Line style
-            </label>
-            <select
-              id={lineStyleId}
-              className="wec-flow-properties__input"
-              value={selectedEdge.lineStyle ?? "solid"}
-              onChange={handleEdgeLineStyleChange}
-              disabled={readonly}
-            >
-              <option value="solid">Solid</option>
-              <option value="dashed">Dashed</option>
-            </select>
-          </div>
-          <div className="wec-flow-properties__field">
-            <label
-              className="wec-flow-properties__label"
-              htmlFor={arrowId}
-            >
-              Arrow direction
-            </label>
-            <select
-              id={arrowId}
-              className="wec-flow-properties__input"
-              value={selectedEdge.arrow ?? "forward"}
-              onChange={handleEdgeArrowChange}
-              disabled={readonly}
-            >
-              <option value="none">None</option>
-              <option value="forward">One-way</option>
-              <option value="both">Two-way</option>
-            </select>
-          </div>
-        </form>
-        {!readonly && (
-          <div className="wec-flow-properties__actions">
-            <button
-              type="button"
-              className="wec-flow-properties__action wec-flow-properties__action--danger"
-              onClick={() => onDeleteEdge(selectedEdge.id)}
-            >
-              Delete
-            </button>
-          </div>
-        )}
-      </div>
-    );
-  }
+  const gridSettings = activePage.gridSettings ?? {};
 
   return (
     <div className={rootClassName}>
-      <div className="wec-flow-properties__empty">
-        Select a node or connection to edit its properties.
+      <div className="wec-flow-properties__header">
+        <div className="wec-flow-properties__header-text">
+          <h2 className="wec-flow-properties__title">Page Properties</h2>
+          <p className="wec-flow-properties__subtitle">{activePage.name}</p>
+        </div>
+        {collapseButton}
       </div>
+      <form className="wec-flow-properties__form" onSubmit={(event) => event.preventDefault()}>
+        <div className="wec-flow-properties__field">
+          <label className="wec-flow-properties__label" htmlFor="wec-flow-properties__page-background">
+            Background
+          </label>
+          <ColorPicker
+            value={activePage.background ?? null}
+            onChange={(value) =>
+              onUpdatePageSettings(activePage.id, { background: value ?? undefined })
+            }
+            allowNone
+            noneLabel="Default"
+            ariaLabel="Page background color"
+            showValue
+          />
+        </div>
+        <div className="wec-flow-properties__field">
+          <label className="wec-flow-properties__label">
+            <input
+              type="checkbox"
+              checked={gridSettings.enabled ?? true}
+              disabled={readonly}
+              onChange={(event) =>
+                onUpdatePageSettings(activePage.id, {
+                  gridSettings: { enabled: event.target.checked },
+                })
+              }
+            />
+            Show grid
+          </label>
+        </div>
+        <div className="wec-flow-properties__field">
+          <label className="wec-flow-properties__label" htmlFor="wec-flow-properties__page-grid-size">
+            Grid size (px)
+          </label>
+          <input
+            id="wec-flow-properties__page-grid-size"
+            type="number"
+            min={4}
+            max={200}
+            step={1}
+            className="wec-flow-properties__input"
+            value={gridSettings.size ?? 16}
+            disabled={readonly}
+            onChange={(event) => {
+              const parsed = Number(event.target.value);
+              onUpdatePageSettings(activePage.id, {
+                gridSettings: {
+                  size: Number.isNaN(parsed) ? 4 : Math.min(200, Math.max(4, parsed)),
+                },
+              });
+            }}
+          />
+        </div>
+        <div className="wec-flow-properties__field">
+          <label className="wec-flow-properties__label">
+            <input
+              type="checkbox"
+              checked={gridSettings.snap ?? false}
+              disabled={readonly}
+              onChange={(event) =>
+                onUpdatePageSettings(activePage.id, {
+                  gridSettings: { snap: event.target.checked },
+                })
+              }
+            />
+            Snap to grid
+          </label>
+        </div>
+      </form>
     </div>
   );
 };
