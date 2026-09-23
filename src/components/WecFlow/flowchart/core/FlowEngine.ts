@@ -8,6 +8,7 @@ import {
   type FlowNode,
   type FlowSnapshot,
   type HandleKind,
+  type HandleSide,
   type NodeData,
   type PropertyValue,
   type Rect,
@@ -18,6 +19,7 @@ import { NodeTypeRegistry, builtInNodeTypes, type NodeTypeDefinition } from '../
 import {
   clamp,
   findHandle,
+  oppositeSide,
   getBounds,
   getHandlePosition,
   getNodeRect,
@@ -48,7 +50,11 @@ export interface ConnectionState {
   candidate: HandleRef | null;
   valid: boolean;
   reason?: string;
+  /** Edge whose dragged end is being moved; the connection then updates it instead of adding one. */
+  reconnecting?: string;
 }
+
+export type EdgeEnd = 'source' | 'target';
 
 export interface FlowState {
   nodes: FlowNode[];
@@ -509,6 +515,91 @@ export class FlowEngine {
     this.commit(s.nodes, s.edges.filter((e) => !remove.has(e.id)), { type: 'removeEdges', ids });
   }
 
+  /** Moves the middle segment of a step edge; `undefined` restores the automatic route. */
+  setEdgeBend(id: string, bend: number | undefined): void {
+    const s = this.getState();
+    const current = s.edgeLookup.get(id);
+    if (!current || current.bend === bend) return;
+    const { bend: _previous, ...rest } = current;
+    const edge: FlowEdge = bend === undefined ? rest : { ...rest, bend };
+    this.commit(s.nodes, s.edges.map((e) => (e.id === id ? edge : e)), { type: 'updateEdge', edge });
+  }
+
+  /** Swaps an edge's direction when the reversed connection is allowed. */
+  reverseEdge(id: string): boolean {
+    const s = this.getState();
+    const edge = s.edgeLookup.get(id);
+    const sourceNode = edge && s.nodeLookup.get(edge.source);
+    const targetNode = edge && s.nodeLookup.get(edge.target);
+    if (!edge || !sourceNode || !targetNode) return false;
+    const oldSourceSide = findHandle(this.registry.get(sourceNode.type), 'source', edge.sourceHandle)?.side;
+    const oldTargetSide = findHandle(this.registry.get(targetNode.type), 'target', edge.targetHandle)?.side;
+    const connection: Connection = {
+      source: targetNode.id,
+      target: sourceNode.id,
+      sourceHandle: this.handleOnSide(targetNode, 'source', oldTargetSide),
+      targetHandle: this.handleOnSide(sourceNode, 'target', oldSourceSide),
+    };
+    if (!this.canConnect(connection, id).valid) return false;
+    const { bend: _bend, ...rest } = edge;
+    const reversed: FlowEdge = { ...rest, ...connection };
+    this.commit(s.nodes, s.edges.map((e) => (e.id === id ? reversed : e)), { type: 'updateEdge', edge: reversed });
+    return true;
+  }
+
+  /** Splits an edge with a new node placed at `at` (or halfway between the two ends). */
+  insertNodeOnEdge(edgeId: string, type: string, at?: XYPosition): FlowNode | null {
+    const s = this.getState();
+    const edge = s.edgeLookup.get(edgeId);
+    const sourceNode = edge && s.nodeLookup.get(edge.source);
+    const targetNode = edge && s.nodeLookup.get(edge.target);
+    if (!edge || !sourceNode || !targetNode) return null;
+    const def = this.registry.get(type);
+    const a = this.getNodeRect(sourceNode);
+    const b = this.getNodeRect(targetNode);
+    const center = at ?? { x: (a.x + a.width / 2 + b.x + b.width / 2) / 2, y: (a.y + a.height / 2 + b.y + b.height / 2) / 2 };
+    this.beginInteraction();
+    this.removeEdges([edgeId]);
+    const node = this.addNode({ type, position: this.snap({ x: center.x - def.defaultSize.width / 2, y: center.y - def.defaultSize.height / 2 }) });
+    const first = this.addEdge({ source: edge.source, sourceHandle: edge.sourceHandle, target: node.id }, { type: edge.type, label: edge.label, animated: edge.animated });
+    const second = this.addEdge({ source: node.id, target: edge.target, targetHandle: edge.targetHandle }, { type: edge.type, animated: edge.animated });
+    this.endInteraction();
+    if (!first && !second) {
+      this.undo();
+      return null;
+    }
+    this.selectNode(node.id);
+    return node;
+  }
+
+  /** Adds a node of `type` next to `fromId` on the given side and connects the two. */
+  addConnectedNode(fromId: string, side: HandleSide, type: string, gap = 80): FlowNode | null {
+    const from = this.getNode(fromId);
+    if (!from || this.getState().readOnly) return null;
+    const sourceHandle = this.registry.get(from.type).handles.find((h) => h.kind === 'source' && h.side === side);
+    if (!sourceHandle) return null;
+    const def = this.registry.get(type);
+    const rect = this.getNodeRect(from);
+    const { width, height } = def.defaultSize;
+    const placement: Record<HandleSide, XYPosition> = {
+      bottom: { x: rect.x + rect.width / 2 - width / 2, y: rect.y + rect.height + gap },
+      top: { x: rect.x + rect.width / 2 - width / 2, y: rect.y - gap - height },
+      right: { x: rect.x + rect.width + gap, y: rect.y + rect.height / 2 - height / 2 },
+      left: { x: rect.x - gap - width, y: rect.y + rect.height / 2 - height / 2 },
+    };
+    this.beginInteraction();
+    const node = this.addNode({ type, position: this.snap(placement[side]) });
+    this.addEdge({ source: from.id, sourceHandle: sourceHandle.id, target: node.id, targetHandle: this.handleOnSide(node, 'target', oppositeSide[side]) });
+    this.endInteraction();
+    this.selectNode(node.id);
+    return node;
+  }
+
+  private handleOnSide(node: FlowNode, kind: HandleKind, side: HandleSide | undefined): string | undefined {
+    const handles = this.registry.get(node.type).handles.filter((h) => h.kind === kind);
+    return (handles.find((h) => h.side === side) ?? handles[0])?.id;
+  }
+
   /** Deletes all selected nodes and edges as a single undo step. */
   deleteSelection(): void {
     const { selectedNodeIds, selectedEdgeIds } = this.getState();
@@ -668,6 +759,17 @@ export class FlowEngine {
     this.store.setState({ connection: { from, pointer, candidate: null, valid: false } });
   }
 
+  /** Starts dragging one end of an existing edge; the other end stays attached. */
+  startReconnect(edgeId: string, end: EdgeEnd, pointer: XYPosition): void {
+    const edge = this.getEdge(edgeId);
+    if (!edge || this.getState().readOnly) return;
+    const from =
+      end === 'target'
+        ? { nodeId: edge.source, handleId: edge.sourceHandle ?? '', kind: 'source' as const }
+        : { nodeId: edge.target, handleId: edge.targetHandle ?? '', kind: 'target' as const };
+    this.store.setState({ connection: { from, pointer, candidate: null, valid: false, reconnecting: edgeId } });
+  }
+
   private connectionFor(from: HandleRef & { kind: HandleKind }, to: HandleRef): Connection {
     return from.kind === 'source'
       ? { source: from.nodeId, sourceHandle: from.handleId, target: to.nodeId, targetHandle: to.handleId }
@@ -708,7 +810,7 @@ export class FlowEngine {
     const options = def.handles
       .filter((h) => h.kind === wanted)
       .map((h) => ({ h, p: getHandlePosition(hovered!, def, h) }))
-      .filter(({ h }) => this.canConnect(this.connectionFor(conn.from, { nodeId: hovered!.id, handleId: h.id })).valid)
+      .filter(({ h }) => this.canConnect(this.connectionFor(conn.from, { nodeId: hovered!.id, handleId: h.id }), conn.reconnecting).valid)
       .sort((a, b) => Math.hypot(a.p.x - pointer.x, a.p.y - pointer.y) - Math.hypot(b.p.x - pointer.x, b.p.y - pointer.y));
     const [closest] = options;
     return { nodeId: hovered.id, handleId: closest ? closest.h.id : '' };
@@ -724,7 +826,7 @@ export class FlowEngine {
       if (candidate.handleId === '') {
         reason = 'No compatible handle on this node';
       } else {
-        const result = this.canConnect(this.connectionFor(conn.from, candidate));
+        const result = this.canConnect(this.connectionFor(conn.from, candidate), conn.reconnecting);
         valid = result.valid;
         reason = result.reason;
       }
@@ -737,7 +839,15 @@ export class FlowEngine {
     const conn = this.getState().connection;
     this.store.setState({ connection: null });
     if (!conn?.candidate || !conn.valid) return null;
-    return this.addEdge(this.connectionFor(conn.from, conn.candidate));
+    const connection = this.connectionFor(conn.from, conn.candidate);
+    if (!conn.reconnecting) return this.addEdge(connection);
+    const edge = this.getEdge(conn.reconnecting);
+    if (!edge) return null;
+    const { bend: _bend, ...rest } = edge;
+    const updated: FlowEdge = { ...rest, ...connection };
+    const s = this.getState();
+    this.commit(s.nodes, s.edges.map((e) => (e.id === edge.id ? updated : e)), { type: 'updateEdge', edge: updated });
+    return updated;
   }
 
   cancelConnection(): void {

@@ -68,6 +68,7 @@ function parseEdge(raw: unknown, index: number): FlowEdge {
   if (typeof raw.targetHandle === 'string') edge.targetHandle = raw.targetHandle;
   if (typeof raw.label === 'string') edge.label = raw.label;
   if (raw.type === 'bezier' || raw.type === 'straight' || raw.type === 'step') edge.type = raw.type;
+  if (isFiniteNumber(raw.bend)) edge.bend = raw.bend;
   if (typeof raw.animated === 'boolean') edge.animated = raw.animated;
   if (isObject(raw.data)) edge.data = raw.data;
   return edge;

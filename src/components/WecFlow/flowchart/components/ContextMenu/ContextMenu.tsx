@@ -1,6 +1,6 @@
 import { memo, useEffect, useLayoutEffect, useRef, useState, type CSSProperties } from 'react';
 import { useFlowEngine } from '../../hooks/FlowContext';
-import type { XYPosition } from '../../models/FlowTypes';
+import type { EdgePathType, XYPosition } from '../../models/FlowTypes';
 import type { FlowEngine } from '../../core/FlowEngine';
 import type { AlignMode, DistributeAxis } from '../../utils/alignment';
 import { cx } from '../../utils/shallow';
@@ -28,6 +28,7 @@ interface MenuSection {
   title?: string;
   actions: MenuAction[];
   addNodesAt?: XYPosition;
+  insertOnEdge?: { edgeId: string; at: XYPosition };
 }
 
 const MENU_MARGIN = 8;
@@ -86,19 +87,46 @@ function nodeSections(engine: FlowEngine, readOnly: boolean): MenuSection[] {
   return sections;
 }
 
-function edgeSections(engine: FlowEngine, id: string, readOnly: boolean): MenuSection[] {
-  if (readOnly) return [];
-  return [{ actions: [{ label: 'Delete connection', icon: 'trash', shortcut: 'Del', danger: true, run: () => engine.removeEdges([id]) }] }];
+const lineStyles: { type: EdgePathType; label: string; icon: IconName }[] = [
+  { type: 'step', label: 'Right-angle', icon: 'select' },
+  { type: 'bezier', label: 'Curved', icon: 'curve' },
+  { type: 'straight', label: 'Straight', icon: 'minus' },
+];
+
+function edgeSections(engine: FlowEngine, id: string, at: XYPosition, readOnly: boolean): MenuSection[] {
+  const s = engine.getState();
+  const edge = s.edgeLookup.get(id);
+  if (readOnly || !edge) return [];
+  const current = edge.type ?? s.defaultEdgeType;
+  const style: MenuSection = {
+    title: 'Line style',
+    actions: lineStyles.map((l) => ({
+      label: current === l.type ? `${l.label} (current)` : l.label,
+      icon: l.icon,
+      disabled: current === l.type,
+      run: () => engine.updateEdge(id, { type: l.type }),
+    })),
+  };
+  const edit: MenuSection = {
+    actions: [
+      { label: 'Reverse direction', icon: 'redo', run: () => engine.reverseEdge(id) },
+      { label: edge.animated ? 'Stop animation' : 'Animate flow', icon: 'flow', run: () => engine.updateEdge(id, { animated: !edge.animated }) },
+      ...(edge.bend === undefined ? [] : [{ label: 'Reset route', icon: 'fit' as const, run: () => engine.setEdgeBend(id, undefined) }]),
+    ],
+  };
+  const insert: MenuSection = { title: 'Insert node here', actions: [], insertOnEdge: { edgeId: id, at } };
+  const remove: MenuSection = { actions: [{ label: 'Delete connection', icon: 'trash', shortcut: 'Del', danger: true, run: () => engine.removeEdges([id]) }] };
+  return [style, edit, insert, remove];
 }
 
 function sectionsFor(engine: FlowEngine, request: ContextMenuRequest): MenuSection[] {
   const readOnly = engine.getState().readOnly;
   if (request.target.kind === 'node') return nodeSections(engine, readOnly);
-  if (request.target.kind === 'edge') return edgeSections(engine, request.target.id, readOnly);
+  if (request.target.kind === 'edge') return edgeSections(engine, request.target.id, request.flow, readOnly);
   return canvasSections(engine, request.flow, readOnly);
 }
 
-function AddNodeList({ engine, at, onDone }: { engine: FlowEngine; at: XYPosition; onDone: () => void }) {
+function NodeTypeList({ engine, onPick }: { engine: FlowEngine; onPick: (type: string) => void }) {
   return (
     <>
       {engine.registry.list().map((def) => (
@@ -108,14 +136,7 @@ function AddNodeList({ engine, at, onDone }: { engine: FlowEngine; at: XYPositio
           role="menuitem"
           className={styles.item}
           style={{ '--node-color': def.color } as CSSProperties}
-          onClick={() => {
-            const node = engine.addNode({
-              type: def.type,
-              position: engine.snap({ x: at.x - def.defaultSize.width / 2, y: at.y - def.defaultSize.height / 2 }),
-            });
-            engine.selectNode(node.id);
-            onDone();
-          }}
+          onClick={() => onPick(def.type)}
         >
           <span className={styles.nodeIcon}>
             <NodeIcon icon={def.icon} size={13} />
@@ -127,11 +148,25 @@ function AddNodeList({ engine, at, onDone }: { engine: FlowEngine; at: XYPositio
   );
 }
 
+function addNodeAt(engine: FlowEngine, type: string, at: XYPosition | undefined, done: () => void) {
+  if (!at) return;
+  const def = engine.getDefinition(type);
+  const node = engine.addNode({ type, position: engine.snap({ x: at.x - def.defaultSize.width / 2, y: at.y - def.defaultSize.height / 2 }) });
+  engine.selectNode(node.id);
+  done();
+}
+
+function insertOnEdge(engine: FlowEngine, type: string, target: MenuSection['insertOnEdge'], done: () => void) {
+  if (!target) return;
+  engine.insertNodeOnEdge(target.edgeId, type, target.at);
+  done();
+}
+
 export const ContextMenu = memo(function ContextMenu({ request, onClose }: { request: ContextMenuRequest; onClose: () => void }) {
   const engine = useFlowEngine();
   const ref = useRef<HTMLDivElement>(null);
   const [position, setPosition] = useState(request.screen);
-  const sections = sectionsFor(engine, request).filter((s) => s.actions.length > 0 || s.addNodesAt);
+  const sections = sectionsFor(engine, request).filter((s) => s.actions.length > 0 || s.addNodesAt || s.insertOnEdge);
 
   useLayoutEffect(() => {
     const menu = ref.current;
@@ -174,7 +209,8 @@ export const ContextMenu = memo(function ContextMenu({ request, onClose }: { req
       {sections.map((section, index) => (
         <div key={section.title ?? index} className={styles.section}>
           {section.title && <div className={styles.title}>{section.title}</div>}
-          {section.addNodesAt && <AddNodeList engine={engine} at={section.addNodesAt} onDone={onClose} />}
+          {section.addNodesAt && <NodeTypeList engine={engine} onPick={(type) => addNodeAt(engine, type, section.addNodesAt, onClose)} />}
+          {section.insertOnEdge && <NodeTypeList engine={engine} onPick={(type) => insertOnEdge(engine, type, section.insertOnEdge, onClose)} />}
           {section.actions.map((action) => (
             <button
               key={action.label}

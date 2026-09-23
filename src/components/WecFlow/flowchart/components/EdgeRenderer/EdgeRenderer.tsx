@@ -1,8 +1,10 @@
 import { memo, useCallback, useId, useState, useSyncExternalStore } from 'react';
 import { useFlowContext, useFlowEngine, useFlowState } from '../../hooks/FlowContext';
 import { useEdgeGeometry } from '../../hooks/useEdgeGeometry';
-import type { EdgePathType } from '../../models/FlowTypes';
-import { getEdgePath } from '../../utils/edgePaths';
+import { usePointerDrag } from '../../hooks/usePointerDrag';
+import type { EdgeEnd } from '../../core/FlowEngine';
+import type { EdgePathType, XYPosition } from '../../models/FlowTypes';
+import { getEdgePath, type StepBend } from '../../utils/edgePaths';
 import { findHandle, getHandlePosition, oppositeSide } from '../../utils/geometry';
 import { cx, shallowEqual } from '../../utils/shallow';
 import { Icon } from '../icons';
@@ -50,12 +52,19 @@ const EdgeItem = memo(function EdgeItem({ id, markerPrefix }: { id: string; mark
   const geometry = useEdgeGeometry(id);
   const selected = useFlowState((s) => s.selectedEdgeIds.has(id));
   const issue = useFlowState((s) => s.issueEdgeIds.get(id));
+  const reconnecting = useFlowState((s) => s.connection?.reconnecting === id);
   const onPointerDown = useEdgeSelect(id);
   if (!geometry) return null;
   const marker = selected ? 'selected' : issue === 'error' ? 'error' : 'default';
   return (
     <g
-      className={cx(styles.edge, selected && styles.selected, issue && styles[`issue-${issue}`], geometry.edge.animated && styles.animated)}
+      className={cx(
+        styles.edge,
+        selected && styles.selected,
+        issue && styles[`issue-${issue}`],
+        geometry.edge.animated && styles.animated,
+        reconnecting && styles.reconnecting,
+      )}
       data-edge-id={id}
       onPointerEnter={() => hoverStore.set(id)}
       onPointerLeave={() => hoverStore.set((current) => (current === id ? null : current))}
@@ -211,6 +220,105 @@ export const EdgeLabelRenderer = memo(function EdgeLabelRenderer() {
     <div className={styles.labelLayer}>
       {ids.map((id) => (
         <EdgeLabel key={id} id={id} />
+      ))}
+    </div>
+  );
+});
+
+// ------------------------------------------------------------- controls
+
+const LABEL_CLEARANCE = 56;
+
+function bendHandlePoint({ axis, handle, span }: StepBend, label: XYPosition): XYPosition {
+  const along = axis === 'y' ? 'x' : 'y';
+  const across = axis === 'y' ? 'y' : 'x';
+  if (Math.abs(handle[across] - label[across]) > 14 || Math.abs(handle[along] - label[along]) >= LABEL_CLEARANCE) return handle;
+  const [min, max] = span;
+  const before = label[along] - LABEL_CLEARANCE;
+  const after = label[along] + LABEL_CLEARANCE;
+  const position = max - after >= before - min ? Math.min(after, max) : Math.max(before, min);
+  return { ...handle, [along]: position };
+}
+
+const EdgeControls = memo(function EdgeControls({ id }: { id: string }) {
+  const { engine, clientToFlow } = useFlowContext();
+  const geometry = useEdgeGeometry(id);
+  const readOnly = useFlowState((s) => s.readOnly);
+  const reconnecting = useFlowState((s) => s.connection?.reconnecting === id);
+  const startDrag = usePointerDrag();
+  if (!geometry || readOnly) return null;
+  const { bend } = geometry;
+  const pointerFlow = (e: { clientX: number; clientY: number }) => clientToFlow({ x: e.clientX, y: e.clientY });
+
+  const onBendPointerDown = (e: React.PointerEvent) => {
+    if (e.button !== 0 || !bend) return;
+    e.stopPropagation();
+    e.preventDefault();
+    engine.beginInteraction();
+    startDrag(e, {
+      threshold: 0,
+      onMove: (ev) => {
+        const p = pointerFlow(ev);
+        engine.setEdgeBend(id, Math.round(bend.axis === 'y' ? p.y : p.x));
+      },
+      onEnd: () => engine.endInteraction(),
+    });
+  };
+
+  const onEndPointerDown = (end: EdgeEnd) => (e: React.PointerEvent) => {
+    if (e.button !== 0) return;
+    e.stopPropagation();
+    e.preventDefault();
+    engine.startReconnect(id, end, pointerFlow(e));
+    startDrag(e, {
+      threshold: 0,
+      onMove: (ev) => engine.updateConnection(pointerFlow(ev)),
+      onEnd: () => engine.endConnection(),
+    });
+  };
+
+  const ends: [EdgeEnd, XYPosition][] = [
+    ['source', geometry.source],
+    ['target', geometry.target],
+  ];
+  const bendPoint = bend && bendHandlePoint(bend, { x: geometry.labelX, y: geometry.labelY });
+
+  return (
+    <>
+      {bend && bendPoint && !reconnecting && (
+        <div
+          className={cx(styles.bendHandle, styles[`bend-${bend.axis}`], geometry.edge.bend !== undefined && styles.bendMoved)}
+          style={{ transform: `translate(${bendPoint.x}px, ${bendPoint.y}px) translate(-50%, -50%)` }}
+          title="Drag to move this segment. Double-click to reset the route."
+          onPointerDown={onBendPointerDown}
+          onDoubleClick={(e) => {
+            e.stopPropagation();
+            engine.setEdgeBend(id, undefined);
+          }}
+        />
+      )}
+      {!reconnecting &&
+        ends.map(([end, p]) => (
+          <div
+            key={end}
+            className={styles.endHandle}
+            style={{ transform: `translate(${p.x}px, ${p.y}px) translate(-50%, -50%)` }}
+            title={end === 'source' ? 'Drag to reconnect the start of this connection' : 'Drag to reconnect the end of this connection'}
+            onPointerDown={onEndPointerDown(end)}
+          />
+        ))}
+    </>
+  );
+});
+
+/** Interactive handles for selected edges: step bend and endpoint reconnection. Rendered above nodes. */
+export const EdgeControlsLayer = memo(function EdgeControlsLayer() {
+  const ids = useFlowState((s) => [...s.selectedEdgeIds], shallowEqual);
+  if (ids.length === 0) return null;
+  return (
+    <div className={styles.controlsLayer} data-flow-overlay>
+      {ids.map((id) => (
+        <EdgeControls key={id} id={id} />
       ))}
     </div>
   );

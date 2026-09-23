@@ -62,6 +62,8 @@ export interface FlowEdge {
   label?: string;
   /** Path style; falls back to the editor's default edge type. */
   type?: EdgePathType;
+  /** Position of the adjustable middle segment of a step route (x or y, depending on the source side). */
+  bend?: number;
   animated?: boolean;
   /** Extension point for plugins; never interpreted by the core. */
   data?: Record<string, unknown>;

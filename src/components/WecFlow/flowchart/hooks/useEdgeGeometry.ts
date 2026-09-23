@@ -33,7 +33,7 @@ export function useEdgeGeometry(edgeId: string): EdgeGeometry | null {
     if (!sh || !th) return null;
     const source = getHandlePosition(sourceNode, sDef, sh);
     const target = getHandlePosition(targetNode, tDef, th);
-    const path = getEdgePath(edge.type ?? defaultType, { source, sourceSide: sh.side, target, targetSide: th.side });
+    const path = getEdgePath(edge.type ?? defaultType, { source, sourceSide: sh.side, target, targetSide: th.side, bend: edge.bend });
     return { ...path, edge, source, target, sourceSide: sh.side, targetSide: th.side };
   }, [engine, edge, sourceNode, targetNode, defaultType]);
 }

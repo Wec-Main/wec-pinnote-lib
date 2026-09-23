@@ -6,6 +6,17 @@ export interface EdgePathInput {
   sourceSide: HandleSide;
   target: XYPosition;
   targetSide: HandleSide;
+  bend?: number;
+}
+
+export type BendAxis = 'x' | 'y';
+
+export interface StepBend {
+  axis: BendAxis;
+  value: number;
+  handle: XYPosition;
+  /** Extent of the bend segment along its own direction. */
+  span: [number, number];
 }
 
 export interface EdgePath {
@@ -14,6 +25,7 @@ export interface EdgePath {
   /** Point where the label is placed. */
   labelX: number;
   labelY: number;
+  bend?: StepBend;
 }
 
 const r = (n: number) => Math.round(n * 100) / 100;
@@ -45,24 +57,36 @@ export function getBezierPath({ source, sourceSide, target, targetSide }: EdgePa
 
 const isVertical = (side: HandleSide) => side === 'top' || side === 'bottom';
 
-/** Computes the corner points of an orthogonal (step) route. */
-export function getStepPoints({ source, sourceSide, target, targetSide }: EdgePathInput, gap = 24): XYPosition[] {
+function stepAnchors({ source, sourceSide, target, targetSide }: EdgePathInput, gap: number) {
   const sv = sideVector[sourceSide];
   const tv = sideVector[targetSide];
-  const p1 = { x: source.x + sv.x * gap, y: source.y + sv.y * gap };
-  const p2 = { x: target.x + tv.x * gap, y: target.y + tv.y * gap };
-  let middle: XYPosition[];
-  if (isVertical(sourceSide) && isVertical(targetSide)) {
-    const midY = (p1.y + p2.y) / 2;
-    middle = [{ x: p1.x, y: midY }, { x: p2.x, y: midY }];
-  } else if (!isVertical(sourceSide) && !isVertical(targetSide)) {
-    const midX = (p1.x + p2.x) / 2;
-    middle = [{ x: midX, y: p1.y }, { x: midX, y: p2.y }];
-  } else if (isVertical(sourceSide)) {
-    middle = [{ x: p1.x, y: p2.y }];
-  } else {
-    middle = [{ x: p2.x, y: p1.y }];
+  return {
+    p1: { x: source.x + sv.x * gap, y: source.y + sv.y * gap },
+    p2: { x: target.x + tv.x * gap, y: target.y + tv.y * gap },
+  };
+}
+
+/** The draggable middle segment of a step route: its axis, position and handle point. */
+export function getStepBend(input: EdgePathInput, gap = 24): StepBend {
+  const { p1, p2 } = stepAnchors(input, gap);
+  const targetVertical = isVertical(input.targetSide);
+  if (isVertical(input.sourceSide)) {
+    const value = input.bend ?? (targetVertical ? (p1.y + p2.y) / 2 : p2.y);
+    return { axis: 'y', value, handle: { x: (p1.x + p2.x) / 2, y: value }, span: [Math.min(p1.x, p2.x), Math.max(p1.x, p2.x)] };
   }
+  const value = input.bend ?? (targetVertical ? p2.x : (p1.x + p2.x) / 2);
+  return { axis: 'x', value, handle: { x: value, y: (p1.y + p2.y) / 2 }, span: [Math.min(p1.y, p2.y), Math.max(p1.y, p2.y)] };
+}
+
+/** Computes the corner points of an orthogonal (step) route. */
+export function getStepPoints(input: EdgePathInput, gap = 24): XYPosition[] {
+  const { source, target } = input;
+  const { p1, p2 } = stepAnchors(input, gap);
+  const bend = getStepBend(input, gap);
+  const middle =
+    bend.axis === 'y'
+      ? [{ x: p1.x, y: bend.value }, { x: p2.x, y: bend.value }]
+      : [{ x: bend.value, y: p1.y }, { x: bend.value, y: p2.y }];
   const points = [source, p1, ...middle, p2, target];
   // Drop duplicate and collinear points so corners can be rounded cleanly.
   const cleaned: XYPosition[] = [];
@@ -123,7 +147,7 @@ export function getStepPath(input: EdgePathInput, radius = 10): EdgePath {
   }
   d += ` L ${r(from.x)},${r(from.y)}`;
   const label = midpointAlong(segments, first);
-  return { path: d, labelX: label.x, labelY: label.y };
+  return { path: d, labelX: label.x, labelY: label.y, bend: getStepBend(input) };
 }
 
 export function getEdgePath(type: EdgePathType, input: EdgePathInput): EdgePath {

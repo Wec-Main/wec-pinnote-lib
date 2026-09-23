@@ -6,7 +6,7 @@ import { NODE_DRAG_MIME } from '../../utils/constants';
 import { rectFromPoints } from '../../utils/geometry';
 import { cx } from '../../utils/shallow';
 import { ContextMenu, type ContextMenuRequest, type ContextMenuTarget } from '../ContextMenu/ContextMenu';
-import { EdgeLabelRenderer, EdgeRenderer } from '../EdgeRenderer/EdgeRenderer';
+import { EdgeControlsLayer, EdgeLabelRenderer, EdgeRenderer } from '../EdgeRenderer/EdgeRenderer';
 import { NodeRenderer } from '../NodeRenderer/NodeRenderer';
 import { Icon } from '../icons';
 import { Background, type BackgroundVariant } from './Background';
@@ -33,6 +33,7 @@ const ViewportLayer = memo(function ViewportLayer() {
       <EdgeRenderer />
       <EdgeLabelRenderer />
       <NodeRenderer />
+      <EdgeControlsLayer />
       <AlignmentGuides />
     </div>
   );

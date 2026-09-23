@@ -349,3 +349,112 @@
   margin-top: -4.5px;
   cursor: ew-resize;
 }
+
+/* ------------------------------------------------------------ quick add */
+
+.quickAdd {
+  position: absolute;
+  z-index: 4;
+  transform: translate(-50%, -50%);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.12s;
+}
+
+.node:hover .quickAdd,
+.selected .quickAdd,
+.quickAddOpen {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.quickAddButton {
+  display: grid;
+  place-items: center;
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  border: 1px solid var(--fb-border-strong);
+  border-radius: 50%;
+  color: var(--fb-text-muted);
+  background: var(--fb-panel);
+  box-shadow: var(--fb-shadow-sm);
+  cursor: pointer;
+}
+
+.quickAddButton:hover,
+.quickAddOpen .quickAddButton {
+  border-color: var(--fb-accent);
+  color: #fff;
+  background: var(--fb-accent);
+}
+
+.quickPicker {
+  position: absolute;
+  z-index: 10;
+  display: flex;
+  flex-direction: column;
+  min-width: 150px;
+  padding: 4px;
+  border: 1px solid var(--fb-border-strong);
+  border-radius: 9px;
+  background: var(--fb-panel);
+  box-shadow: var(--fb-shadow-lg);
+  cursor: default;
+}
+
+.quickPicker-bottom {
+  top: 24px;
+  left: 50%;
+  transform: translateX(-50%);
+}
+
+.quickPicker-top {
+  bottom: 24px;
+  left: 50%;
+  transform: translateX(-50%);
+}
+
+.quickPicker-right {
+  top: 50%;
+  left: 24px;
+  transform: translateY(-50%);
+}
+
+.quickPicker-left {
+  top: 50%;
+  right: 24px;
+  transform: translateY(-50%);
+}
+
+.quickPickerItem {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 28px;
+  padding: 0 8px;
+  border: none;
+  border-radius: 6px;
+  font: inherit;
+  font-size: 12px;
+  color: var(--fb-text);
+  text-align: left;
+  white-space: nowrap;
+  background: transparent;
+  cursor: pointer;
+}
+
+.quickPickerItem:hover {
+  background: var(--fb-hover);
+}
+
+.quickPickerIcon {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 5px;
+  color: var(--node-color);
+  background: color-mix(in srgb, var(--node-color) 16%, transparent);
+}

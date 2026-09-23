@@ -7,6 +7,7 @@ import { DefaultNodeContent } from './DefaultNodeContent';
 import { Handle } from './Handle';
 import { useNodeEditTarget, watchNodeCreationForInlineEdit } from './nodeEditTrigger';
 import { NodeShape } from './NodeShape';
+import { QuickAdd } from './QuickAdd';
 import { ResizeHandles } from './ResizeHandles';
 import styles from './NodeRenderer.module.css';
 
@@ -59,6 +60,7 @@ export const NodeItem = memo(function NodeItem({ id }: { id: string }) {
       </div>
       {!readOnly && def.handles.map((h) => <Handle key={h.id} nodeId={id} handle={h} definition={def} width={width} height={height} />)}
       {selected && !readOnly && def.resizable !== false && <ResizeHandles nodeId={id} definition={def} />}
+      {!readOnly && !editing && <QuickAdd nodeId={id} definition={def} width={width} height={height} />}
     </div>
   );
 });

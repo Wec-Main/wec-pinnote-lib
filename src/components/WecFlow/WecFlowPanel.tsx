@@ -31,6 +31,8 @@ const SHORTCUTS: [string, string][] = [
   ["Alt drag", "Move without guides"],
   ["Right click", "Context menu"],
   ["Double click", "Add node"],
+  ["Shift click +", "Add connected Process"],
+  ["Double click bend", "Reset route"],
 ];
 
 const shortcutList = (
