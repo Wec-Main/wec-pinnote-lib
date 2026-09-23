@@ -15,13 +15,7 @@ export default defineConfig({
       fileName: (format) => (format === "es" ? "index.es.js" : "index.js"),
     },
     rollupOptions: {
-      external: [
-        "react",
-        "react-dom",
-        "react/jsx-runtime",
-        "@xyflow/react",
-        "@xyflow/react/dist/style.css",
-      ],
+      external: ["react", "react-dom", "react/jsx-runtime"],
       output: {
         assetFileNames: (assetInfo) => {
           if (assetInfo.name && assetInfo.name.endsWith(".css")) {
@@ -33,7 +27,6 @@ export default defineConfig({
           react: "React",
           "react-dom": "ReactDOM",
           "react/jsx-runtime": "jsxRuntime",
-          "@xyflow/react": "XYFlowReact",
         },
         manualChunks: (id) => {
           if (id.includes("/src/components/Settings/")) {

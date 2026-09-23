@@ -1,0 +1,470 @@
+import { memo, useState, type CSSProperties } from 'react';
+import { useFlowEngine, useFlowState } from '../../hooks/FlowContext';
+import { useEditSession } from '../../hooks/useEditSession';
+import type { EdgePathType, PropertyValue } from '../../models/FlowTypes';
+import type { PropertyField } from '../../models/NodeTypes';
+import { getNodeSize } from '../../utils/geometry';
+import { cx, shallowEqual } from '../../utils/shallow';
+import { Icon, NodeIcon } from '../icons';
+import ui from '../ui/ui.module.css';
+import styles from './PropertiesPanel.module.css';
+
+export interface PropertiesPanelProps {
+  className?: string;
+}
+
+/** Right-hand inspector: edits whatever is selected (node, edge, multi-selection or the flow itself). */
+export const PropertiesPanel = memo(function PropertiesPanel({ className }: PropertiesPanelProps) {
+  const [nodeIds, edgeIds] = useFlowState((s) => [[...s.selectedNodeIds], [...s.selectedEdgeIds]] as const, (a, b) =>
+    shallowEqual(a[0], b[0]) && shallowEqual(a[1], b[1]),
+  );
+  let content;
+  if (nodeIds.length === 1 && edgeIds.length === 0) content = <NodeProperties key={nodeIds[0]} nodeId={nodeIds[0]!} />;
+  else if (edgeIds.length === 1 && nodeIds.length === 0) content = <EdgeProperties key={edgeIds[0]} edgeId={edgeIds[0]!} />;
+  else if (nodeIds.length + edgeIds.length > 1) content = <MultiSelection nodeIds={nodeIds} edgeIds={edgeIds} />;
+  else content = <FlowOverview />;
+  return <aside className={cx(styles.panel, className)}>{content}</aside>;
+});
+
+function PanelHeader({ title, subtitle, color, icon }: { title: string; subtitle?: string; color?: string; icon: React.ReactNode }) {
+  return (
+    <div className={styles.header} style={color ? ({ '--node-color': color } as CSSProperties) : undefined}>
+      <span className={styles.headerIcon}>{icon}</span>
+      <div className={styles.headerText}>
+        <div className={styles.headerTitle}>{title}</div>
+        {subtitle && <div className={styles.headerSubtitle}>{subtitle}</div>}
+      </div>
+    </div>
+  );
+}
+
+// ------------------------------------------------------------------- node
+
+function NodeProperties({ nodeId }: { nodeId: string }) {
+  const engine = useFlowEngine();
+  const node = useFlowState((s) => s.nodeLookup.get(nodeId));
+  const readOnly = useFlowState((s) => s.readOnly);
+  const [incoming, outgoing] = useFlowState(
+    (s) => [s.edges.filter((e) => e.target === nodeId).length, s.edges.filter((e) => e.source === nodeId).length] as const,
+    shallowEqual,
+  );
+  const issues = useFlowState((s) => s.validation?.issues.filter((i) => i.nodeIds?.includes(nodeId)), shallowEqual);
+  const session = useEditSession();
+  if (!node) return null;
+  const def = engine.getDefinition(node.type);
+  const size = getNodeSize(node, def);
+  const schema = def.propertySchema ?? [];
+  const schemaKeys = new Set(schema.map((f) => f.key));
+  const custom = Object.entries(node.data.properties).filter(([k]) => !schemaKeys.has(k));
+
+  return (
+    <>
+      <PanelHeader title={def.label} subtitle={def.description} color={def.color} icon={<NodeIcon icon={def.icon} size={16} />} />
+
+      {!!issues?.length && (
+        <div className={styles.issues}>
+          {issues.map((i) => (
+            <div key={i.id} className={cx(styles.issue, styles[i.severity])}>
+              <Icon name="alert" size={13} /> {i.message}
+            </div>
+          ))}
+        </div>
+      )}
+
+      <section className={ui.section}>
+        <h3 className={ui.sectionTitle}>General</h3>
+        <label className={ui.field}>
+          <span className={ui.fieldLabel}>Label</span>
+          <input
+            className={ui.input}
+            value={node.data.label}
+            disabled={readOnly}
+            onChange={(e) => engine.updateNodeData(nodeId, { label: e.target.value })}
+            {...session}
+          />
+        </label>
+        <label className={ui.field}>
+          <span className={ui.fieldLabel}>Description</span>
+          <textarea
+            className={ui.input}
+            value={node.data.description ?? ''}
+            placeholder="What does this step do?"
+            disabled={readOnly}
+            onChange={(e) => engine.updateNodeData(nodeId, { description: e.target.value })}
+            {...session}
+          />
+        </label>
+      </section>
+
+      {schema.length > 0 && (
+        <section className={ui.section}>
+          <h3 className={ui.sectionTitle}>{def.label} settings</h3>
+          {schema.map((field) => (
+            <SchemaField
+              key={field.key}
+              field={field}
+              value={node.data.properties[field.key] ?? null}
+              disabled={readOnly}
+              session={session}
+              onChange={(v) => engine.setNodeProperty(nodeId, field.key, v)}
+            />
+          ))}
+        </section>
+      )}
+
+      <section className={ui.section}>
+        <h3 className={ui.sectionTitle}>Custom properties</h3>
+        {custom.length === 0 && <p className={cx(ui.muted, styles.noProps)}>No custom properties yet.</p>}
+        {custom.map(([key, value]) => (
+          <div key={key} className={styles.propRow}>
+            <span className={styles.propKey} title={key}>
+              {key}
+            </span>
+            <input
+              className={ui.input}
+              value={value === null ? '' : String(value)}
+              disabled={readOnly}
+              onChange={(e) => engine.setNodeProperty(nodeId, key, e.target.value)}
+              {...session}
+            />
+            {!readOnly && (
+              <button type="button" className={cx(ui.btn, ui.btnGhost, ui.iconBtn)} title={`Remove "${key}"`} onClick={() => engine.removeNodeProperty(nodeId, key)}>
+                <Icon name="trash" size={14} />
+              </button>
+            )}
+          </div>
+        ))}
+        {!readOnly && <AddProperty existing={Object.keys(node.data.properties)} onAdd={(k, v) => engine.setNodeProperty(nodeId, k, v)} />}
+      </section>
+
+      <section className={ui.section}>
+        <h3 className={ui.sectionTitle}>Layout</h3>
+        <div className={ui.row}>
+          <NumberField label="X" value={node.position.x} disabled={readOnly} onCommit={(x) => engine.updateNode(nodeId, { position: { ...node.position, x } })} />
+          <NumberField label="Y" value={node.position.y} disabled={readOnly} onCommit={(y) => engine.updateNode(nodeId, { position: { ...node.position, y } })} />
+        </div>
+        <div className={ui.row}>
+          <NumberField label="Width" value={size.width} disabled={readOnly || def.resizable === false} onCommit={(width) => engine.updateNode(nodeId, { width: Math.max(def.minSize?.width ?? 40, width) })} />
+          <NumberField label="Height" value={size.height} disabled={readOnly || def.resizable === false} onCommit={(height) => engine.updateNode(nodeId, { height: Math.max(def.minSize?.height ?? 30, height) })} />
+        </div>
+        <div className={styles.meta}>
+          <span>ID</span>
+          <code>{node.id}</code>
+        </div>
+        <div className={styles.meta}>
+          <span>Connections</span>
+          <span>
+            {incoming} in · {outgoing} out
+          </span>
+        </div>
+      </section>
+
+      {!readOnly && (
+        <section className={cx(ui.section, styles.actions)}>
+          <button type="button" className={ui.btn} onClick={() => engine.duplicateNodes([nodeId])}>
+            <Icon name="copy" size={14} /> Duplicate
+          </button>
+          <button type="button" className={cx(ui.btn, ui.btnDanger)} onClick={() => engine.removeNodes([nodeId])}>
+            <Icon name="trash" size={14} /> Delete node
+          </button>
+        </section>
+      )}
+    </>
+  );
+}
+
+/** Numeric input that commits on blur / Enter, so intermediate keystrokes aren't clamped. */
+function NumberField({ label, value, disabled, onCommit }: { label: string; value: number; disabled?: boolean; onCommit: (value: number) => void }) {
+  const [draft, setDraft] = useState<string | null>(null);
+  const commit = () => {
+    if (draft !== null && draft.trim() !== '' && Number.isFinite(Number(draft))) onCommit(Number(draft));
+    setDraft(null);
+  };
+  return (
+    <label className={ui.field}>
+      <span className={ui.fieldLabel}>{label}</span>
+      <input
+        className={ui.input}
+        type="number"
+        value={draft ?? String(Math.round(value))}
+        disabled={disabled}
+        onChange={(e) => setDraft(e.target.value)}
+        onBlur={commit}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter') commit();
+          if (e.key === 'Escape') setDraft(null);
+        }}
+      />
+    </label>
+  );
+}
+
+interface SchemaFieldProps {
+  field: PropertyField;
+  value: PropertyValue;
+  disabled: boolean;
+  session: ReturnType<typeof useEditSession>;
+  onChange: (value: PropertyValue) => void;
+}
+
+function SchemaField({ field, value, disabled, session, onChange }: SchemaFieldProps) {
+  if (field.type === 'boolean') {
+    return (
+      <label className={ui.switchRow}>
+        <span>{field.label}</span>
+        <input type="checkbox" className={ui.switch} checked={value === true} disabled={disabled} onChange={(e) => onChange(e.target.checked)} />
+      </label>
+    );
+  }
+  let input;
+  if (field.type === 'select') {
+    input = (
+      <select className={ui.input} value={value === null ? '' : String(value)} disabled={disabled} onChange={(e) => onChange(e.target.value)}>
+        {value === null && <option value="">Select…</option>}
+        {field.options?.map((o) => (
+          <option key={o} value={o}>
+            {o}
+          </option>
+        ))}
+      </select>
+    );
+  } else if (field.type === 'textarea') {
+    input = <textarea className={ui.input} value={value === null ? '' : String(value)} placeholder={field.placeholder} disabled={disabled} onChange={(e) => onChange(e.target.value)} {...session} />;
+  } else if (field.type === 'number') {
+    input = (
+      <input
+        className={ui.input}
+        type="number"
+        value={value === null ? '' : String(value)}
+        placeholder={field.placeholder}
+        disabled={disabled}
+        onChange={(e) => onChange(e.target.value === '' ? null : Number(e.target.value))}
+        {...session}
+      />
+    );
+  } else {
+    input = <input className={ui.input} value={value === null ? '' : String(value)} placeholder={field.placeholder} disabled={disabled} onChange={(e) => onChange(e.target.value)} {...session} />;
+  }
+  return (
+    <label className={ui.field}>
+      <span className={ui.fieldLabel}>{field.label}</span>
+      {input}
+    </label>
+  );
+}
+
+function AddProperty({ existing, onAdd }: { existing: string[]; onAdd: (key: string, value: string) => void }) {
+  const [key, setKey] = useState('');
+  const [value, setValue] = useState('');
+  const k = key.trim();
+  const duplicate = existing.includes(k);
+  const submit = () => {
+    if (!k || duplicate) return;
+    onAdd(k, value);
+    setKey('');
+    setValue('');
+  };
+  return (
+    <form
+      className={styles.addProp}
+      onSubmit={(e) => {
+        e.preventDefault();
+        submit();
+      }}
+    >
+      <input className={ui.input} placeholder="Key" value={key} onChange={(e) => setKey(e.target.value)} aria-invalid={duplicate} />
+      <input className={ui.input} placeholder="Value" value={value} onChange={(e) => setValue(e.target.value)} />
+      <button type="submit" className={cx(ui.btn, ui.iconBtn)} disabled={!k || duplicate} title={duplicate ? 'Key already exists' : 'Add property'}>
+        <Icon name="plus" size={14} />
+      </button>
+    </form>
+  );
+}
+
+// ------------------------------------------------------------------- edge
+
+const edgeTypes: { value: EdgePathType | 'default'; label: string }[] = [
+  { value: 'default', label: 'Default' },
+  { value: 'bezier', label: 'Curved' },
+  { value: 'straight', label: 'Straight' },
+  { value: 'step', label: 'Step' },
+];
+
+function EdgeProperties({ edgeId }: { edgeId: string }) {
+  const engine = useFlowEngine();
+  const edge = useFlowState((s) => s.edgeLookup.get(edgeId));
+  const source = useFlowState((s) => (edge ? s.nodeLookup.get(edge.source) : undefined));
+  const target = useFlowState((s) => (edge ? s.nodeLookup.get(edge.target) : undefined));
+  const readOnly = useFlowState((s) => s.readOnly);
+  const issues = useFlowState((s) => s.validation?.issues.filter((i) => i.edgeIds?.includes(edgeId)), shallowEqual);
+  const session = useEditSession();
+  if (!edge) return null;
+  const current = edge.type ?? 'default';
+  return (
+    <>
+      <PanelHeader title="Connection" subtitle={`${source?.data.label ?? edge.source} → ${target?.data.label ?? edge.target}`} icon={<Icon name="curve" size={16} />} />
+      {!!issues?.length && (
+        <div className={styles.issues}>
+          {issues.map((i) => (
+            <div key={i.id} className={cx(styles.issue, styles[i.severity])}>
+              <Icon name="alert" size={13} /> {i.message}
+            </div>
+          ))}
+        </div>
+      )}
+      <section className={ui.section}>
+        <label className={ui.field}>
+          <span className={ui.fieldLabel}>Label</span>
+          <input
+            className={ui.input}
+            value={edge.label ?? ''}
+            placeholder="e.g. Yes / No"
+            disabled={readOnly}
+            onChange={(e) => engine.updateEdge(edgeId, { label: e.target.value || undefined })}
+            {...session}
+          />
+        </label>
+        <div className={ui.field}>
+          <span className={ui.fieldLabel}>Line style</span>
+          <div className={ui.segmented}>
+            {edgeTypes.map((t) => (
+              <button
+                key={t.value}
+                type="button"
+                disabled={readOnly}
+                className={cx(ui.segment, current === t.value && ui.segmentActive)}
+                onClick={() => engine.updateEdge(edgeId, { type: t.value === 'default' ? undefined : t.value })}
+              >
+                {t.label}
+              </button>
+            ))}
+          </div>
+        </div>
+        <label className={ui.switchRow}>
+          <span>Animated</span>
+          <input type="checkbox" className={ui.switch} checked={!!edge.animated} disabled={readOnly} onChange={(e) => engine.updateEdge(edgeId, { animated: e.target.checked })} />
+        </label>
+      </section>
+      <section className={ui.section}>
+        <h3 className={ui.sectionTitle}>Endpoints</h3>
+        <button type="button" className={styles.endpoint} onClick={() => source && engine.selectNode(source.id)}>
+          <span>From</span>
+          <strong>{source?.data.label ?? `Missing node (${edge.source})`}</strong>
+          <code>{edge.sourceHandle}</code>
+        </button>
+        <button type="button" className={styles.endpoint} onClick={() => target && engine.selectNode(target.id)}>
+          <span>To</span>
+          <strong>{target?.data.label ?? `Missing node (${edge.target})`}</strong>
+          <code>{edge.targetHandle}</code>
+        </button>
+      </section>
+      {!readOnly && (
+        <section className={cx(ui.section, styles.actions)}>
+          <button type="button" className={cx(ui.btn, ui.btnDanger, ui.block)} onClick={() => engine.removeEdges([edgeId])}>
+            <Icon name="trash" size={14} /> Delete connection
+          </button>
+        </section>
+      )}
+    </>
+  );
+}
+
+// -------------------------------------------------------- multi / overview
+
+function MultiSelection({ nodeIds, edgeIds }: { nodeIds: readonly string[]; edgeIds: readonly string[] }) {
+  const engine = useFlowEngine();
+  const readOnly = useFlowState((s) => s.readOnly);
+  return (
+    <>
+      <PanelHeader title="Multiple selection" subtitle={`${nodeIds.length} nodes · ${edgeIds.length} connections`} icon={<Icon name="select" size={16} />} />
+      <section className={ui.section}>
+        <p className={ui.muted}>Drag any selected node to move the whole group. Hold Shift and click to add or remove items.</p>
+      </section>
+      {!readOnly && (
+        <section className={cx(ui.section, styles.actions)}>
+          {nodeIds.length > 0 && (
+            <button type="button" className={ui.btn} onClick={() => engine.duplicateNodes([...nodeIds])}>
+              <Icon name="copy" size={14} /> Duplicate
+            </button>
+          )}
+          <button type="button" className={cx(ui.btn, ui.btnDanger)} onClick={() => engine.deleteSelection()}>
+            <Icon name="trash" size={14} /> Delete selected
+          </button>
+        </section>
+      )}
+    </>
+  );
+}
+
+function FlowOverview() {
+  const engine = useFlowEngine();
+  const [nodeCount, edgeCount] = useFlowState((s) => [s.nodes.length, s.edges.length] as const, shallowEqual);
+  const name = useFlowState((s) => s.flowName);
+  const readOnly = useFlowState((s) => s.readOnly);
+  const edgeType = useFlowState((s) => s.defaultEdgeType);
+  const snap = useFlowState((s) => s.snapToGrid);
+  return (
+    <>
+      <PanelHeader title="Flow settings" subtitle="Select a node or connection to edit it" icon={<Icon name="flow" size={16} />} />
+      <section className={ui.section}>
+        <label className={ui.field}>
+          <span className={ui.fieldLabel}>Flow name</span>
+          <input className={ui.input} value={name} disabled={readOnly} onChange={(e) => engine.setFlowName(e.target.value)} />
+        </label>
+        <div className={styles.stats}>
+          <div>
+            <strong>{nodeCount}</strong>
+            <span>Nodes</span>
+          </div>
+          <div>
+            <strong>{edgeCount}</strong>
+            <span>Connections</span>
+          </div>
+        </div>
+      </section>
+      <section className={ui.section}>
+        <h3 className={ui.sectionTitle}>Editor</h3>
+        <div className={ui.field}>
+          <span className={ui.fieldLabel}>Default line style</span>
+          <div className={ui.segmented}>
+            {edgeTypes.slice(1).map((t) => (
+              <button key={t.value} type="button" className={cx(ui.segment, edgeType === t.value && ui.segmentActive)} onClick={() => engine.setDefaultEdgeType(t.value as EdgePathType)}>
+                {t.label}
+              </button>
+            ))}
+          </div>
+        </div>
+        <label className={ui.switchRow}>
+          <span>Snap to grid</span>
+          <input type="checkbox" className={ui.switch} checked={snap} onChange={(e) => engine.setSnapToGrid(e.target.checked)} />
+        </label>
+      </section>
+      <section className={ui.section}>
+        <h3 className={ui.sectionTitle}>Shortcuts</h3>
+        <dl className={styles.shortcuts}>
+          {[
+            ['Delete', 'Delete selection'],
+            ['Ctrl Z', 'Undo'],
+            ['Ctrl Shift Z', 'Redo'],
+            ['Ctrl D', 'Duplicate'],
+            ['Ctrl A', 'Select all'],
+            ['Shift drag', 'Box select'],
+            ['Wheel', 'Zoom'],
+            ['Arrows', 'Nudge nodes'],
+          ].map(([k = "", v]) => (
+            <div key={k}>
+              <dt>
+                {k.split(' ').map((part) => (
+                  <kbd key={part} className={ui.kbd}>
+                    {part}
+                  </kbd>
+                ))}
+              </dt>
+              <dd>{v}</dd>
+            </div>
+          ))}
+        </dl>
+      </section>
+    </>
+  );
+}

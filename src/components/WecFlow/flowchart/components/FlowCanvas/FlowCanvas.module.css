@@ -1,0 +1,198 @@
+.canvas {
+  position: relative;
+  overflow: hidden;
+  width: 100%;
+  height: 100%;
+  min-height: 200px;
+  outline: none;
+  background: var(--fb-canvas-bg);
+  font-family: var(--fb-font);
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+}
+
+.panning {
+  cursor: grabbing;
+}
+
+.modeSelect {
+  cursor: crosshair;
+}
+
+.background {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+
+.background circle {
+  fill: var(--fb-grid);
+}
+
+.background path {
+  fill: none;
+  stroke: color-mix(in srgb, var(--fb-grid) 55%, transparent);
+  stroke-width: 1;
+}
+
+.viewport {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 0;
+  height: 0;
+  transform-origin: 0 0;
+}
+
+.selectionBox {
+  position: absolute;
+  border: 1px solid var(--fb-accent);
+  border-radius: 3px;
+  background: color-mix(in srgb, var(--fb-accent) 8%, transparent);
+  pointer-events: none;
+}
+
+/* ------------------------------------------------------------ overlays */
+
+.empty {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  max-width: 300px;
+  text-align: center;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+}
+
+.emptyIcon {
+  display: grid;
+  place-items: center;
+  width: 56px;
+  height: 56px;
+  margin-bottom: 14px;
+  border: 1px dashed var(--fb-border-strong);
+  border-radius: 14px;
+  color: var(--fb-accent);
+  background: var(--fb-panel);
+}
+
+.emptyTitle {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--fb-text);
+}
+
+.emptyText {
+  margin-top: 6px;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--fb-text-muted);
+}
+
+.hint {
+  position: absolute;
+  top: 14px;
+  left: 50%;
+  padding: 6px 12px;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 500;
+  color: #fff;
+  background: rgba(16, 24, 40, 0.88);
+  transform: translateX(-50%);
+  pointer-events: none;
+}
+
+/* ------------------------------------------------------------ controls */
+
+.controls {
+  position: absolute;
+  bottom: 16px;
+  left: 16px;
+  z-index: 5;
+  display: flex;
+  gap: 8px;
+  cursor: default;
+}
+
+.controlGroup {
+  display: flex;
+  overflow: hidden;
+  border: 1px solid var(--fb-border);
+  border-radius: 8px;
+  background: var(--fb-panel);
+  box-shadow: var(--fb-shadow);
+}
+
+.controlBtn,
+.zoomValue {
+  display: grid;
+  place-items: center;
+  height: 32px;
+  min-width: 32px;
+  padding: 0 8px;
+  border: none;
+  font: inherit;
+  color: var(--fb-text-muted);
+  background: transparent;
+  cursor: pointer;
+}
+
+.controlBtn + .controlBtn,
+.controlBtn + .zoomValue,
+.zoomValue + .controlBtn {
+  border-left: 1px solid var(--fb-border);
+}
+
+.controlBtn:hover,
+.zoomValue:hover {
+  color: var(--fb-text);
+  background: var(--fb-panel-muted);
+}
+
+.controlActive,
+.controlActive:hover {
+  color: var(--fb-accent-text);
+  background: var(--fb-accent-soft);
+}
+
+.zoomValue {
+  min-width: 52px;
+  font-size: 12px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ------------------------------------------------------------ minimap */
+
+.minimap {
+  position: absolute;
+  right: 16px;
+  bottom: 16px;
+  z-index: 5;
+  overflow: hidden;
+  border: 1px solid var(--fb-border);
+  border-radius: 10px;
+  background: var(--fb-panel);
+  box-shadow: var(--fb-shadow);
+  cursor: pointer;
+}
+
+.minimap svg {
+  display: block;
+}
+
+.minimapMask {
+  fill: var(--fb-minimap-mask);
+}
+
+.minimapView {
+  fill: none;
+  stroke: var(--fb-accent);
+}

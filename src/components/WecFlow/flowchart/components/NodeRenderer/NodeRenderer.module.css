@@ -1,0 +1,295 @@
+.layer {
+  position: absolute;
+  top: 0;
+  left: 0;
+}
+
+.node {
+  position: absolute;
+  top: 0;
+  left: 0;
+  cursor: grab;
+  user-select: none;
+  touch-action: none;
+  font-family: var(--fb-font);
+}
+
+.node:active {
+  cursor: grabbing;
+}
+
+.readOnly,
+.readOnly:active {
+  cursor: pointer;
+}
+
+.selected {
+  z-index: 2;
+}
+
+/* ------------------------------------------------------------ outline */
+
+.shape {
+  position: absolute;
+  inset: 0;
+  overflow: visible;
+  filter: drop-shadow(0 1px 1.5px rgba(16, 24, 40, 0.07)) drop-shadow(0 4px 10px rgba(16, 24, 40, 0.05));
+}
+
+.shape > * {
+  fill: var(--fb-node-bg);
+  stroke: var(--fb-node-border);
+  stroke-width: 1.5;
+  transition: stroke 0.12s, fill 0.12s;
+}
+
+.shape-pill .shape > *,
+.shape-diamond .shape > * {
+  fill: color-mix(in srgb, var(--node-color) 8%, var(--fb-node-bg));
+  stroke: color-mix(in srgb, var(--node-color) 45%, var(--fb-node-bg));
+}
+
+.node:hover .shape > * {
+  stroke: color-mix(in srgb, var(--node-color) 70%, var(--fb-node-border));
+}
+
+.selected .shape > *,
+.selected:hover .shape > * {
+  stroke: var(--fb-accent);
+  stroke-width: 2;
+}
+
+.issue-warning .shape > * {
+  stroke: var(--fb-warning);
+  stroke-width: 2;
+}
+
+.issue-error .shape > * {
+  stroke: var(--fb-danger);
+  stroke-width: 2;
+}
+
+/* ------------------------------------------------------------ content */
+
+.content {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  overflow: hidden;
+}
+
+.body {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-width: 0;
+  padding: 10px 14px;
+}
+
+.shape-parallelogram .body {
+  padding: 10px 30px;
+}
+
+.bodyCentered {
+  justify-content: center;
+  text-align: center;
+  gap: 8px;
+}
+
+.bodyDiamond {
+  flex-direction: column;
+  gap: 4px;
+  padding: 0 22%;
+}
+
+.badge {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  color: var(--node-color);
+  background: color-mix(in srgb, var(--node-color) 14%, var(--fb-node-bg));
+}
+
+.badgeSmall {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  color: #fff;
+  background: var(--node-color);
+}
+
+.text {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.bodyCentered .text {
+  flex: 0 1 auto;
+}
+
+.label {
+  overflow: hidden;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.3;
+  color: var(--fb-text);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.bodyDiamond .label {
+  display: -webkit-box;
+  font-size: 12px;
+  white-space: normal;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+
+.placeholder {
+  font-weight: 500;
+  color: var(--fb-text-subtle);
+}
+
+.description {
+  display: -webkit-box;
+  overflow: hidden;
+  margin-top: 2px;
+  font-size: 11.5px;
+  line-height: 1.35;
+  color: var(--fb-text-muted);
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+
+/* ------------------------------------------------------------ handles */
+
+.handle {
+  position: absolute;
+  z-index: 3;
+  width: 11px;
+  height: 11px;
+  margin: -5.5px 0 0 -5.5px;
+  border: 2px solid var(--node-color);
+  border-radius: 50%;
+  background: var(--fb-node-bg);
+  cursor: crosshair;
+  transition: transform 0.1s, background 0.1s, box-shadow 0.1s;
+}
+
+/* Larger invisible hit area. */
+.handle::before {
+  content: '';
+  position: absolute;
+  inset: -7px;
+  border-radius: 50%;
+}
+
+.source {
+  background: color-mix(in srgb, var(--node-color) 25%, var(--fb-node-bg));
+}
+
+.handle:hover,
+.active {
+  transform: scale(1.35);
+  background: var(--node-color);
+}
+
+.connectable {
+  border-color: var(--fb-accent);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--fb-accent) 22%, transparent);
+}
+
+.valid {
+  transform: scale(1.45);
+  border-color: var(--fb-success);
+  background: var(--fb-success);
+  box-shadow: 0 0 0 5px color-mix(in srgb, var(--fb-success) 25%, transparent);
+}
+
+.invalid {
+  transform: scale(1.3);
+  border-color: var(--fb-danger);
+  background: var(--fb-danger);
+}
+
+.handleLabel {
+  position: absolute;
+  padding: 0 4px;
+  border-radius: 4px;
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 15px;
+  color: var(--node-color);
+  background: var(--fb-node-bg);
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+.side-bottom .handleLabel {
+  top: 8px;
+  left: 10px;
+}
+
+.side-top .handleLabel {
+  bottom: 8px;
+  left: 10px;
+}
+
+.side-right .handleLabel {
+  bottom: 9px;
+  left: 6px;
+}
+
+.side-left .handleLabel {
+  right: 6px;
+  bottom: 9px;
+}
+
+/* ------------------------------------------------------------ resizing */
+
+.resizeOutline {
+  position: absolute;
+  inset: -5px;
+  border: 1px dashed color-mix(in srgb, var(--fb-accent) 55%, transparent);
+  border-radius: 6px;
+  pointer-events: none;
+}
+
+.resize {
+  position: absolute;
+  z-index: 4;
+  width: 9px;
+  height: 9px;
+  border: 1.5px solid var(--fb-accent);
+  border-radius: 2px;
+  background: var(--fb-node-bg);
+}
+
+.resize-nw {
+  top: -9px;
+  left: -9px;
+  cursor: nwse-resize;
+}
+
+.resize-ne {
+  top: -9px;
+  right: -9px;
+  cursor: nesw-resize;
+}
+
+.resize-sw {
+  bottom: -9px;
+  left: -9px;
+  cursor: nesw-resize;
+}
+
+.resize-se {
+  right: -9px;
+  bottom: -9px;
+  cursor: nwse-resize;
+}

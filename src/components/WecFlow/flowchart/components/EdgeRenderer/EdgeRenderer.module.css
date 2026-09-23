@@ -1,0 +1,163 @@
+.layer {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 1px;
+  height: 1px;
+  overflow: visible;
+  pointer-events: none;
+}
+
+.edge {
+  cursor: pointer;
+}
+
+.hit {
+  fill: none;
+  stroke: transparent;
+  stroke-width: 16;
+  pointer-events: stroke;
+}
+
+.path {
+  fill: none;
+  stroke: var(--fb-edge);
+  stroke-width: 1.75;
+  pointer-events: none;
+  transition: stroke 0.12s;
+}
+
+.edge:hover .path {
+  stroke: color-mix(in srgb, var(--fb-accent) 60%, var(--fb-edge));
+}
+
+.selected .path,
+.selected:hover .path {
+  stroke: var(--fb-accent);
+  stroke-width: 2.25;
+}
+
+.issue-error .path {
+  stroke: var(--fb-danger);
+  stroke-dasharray: 5 4;
+}
+
+.issue-warning .path {
+  stroke: var(--fb-warning);
+}
+
+.animated .path {
+  stroke-dasharray: 6 5;
+  animation: dash 0.6s linear infinite;
+}
+
+@keyframes dash {
+  to {
+    stroke-dashoffset: -11;
+  }
+}
+
+.marker-default path {
+  fill: var(--fb-edge);
+}
+
+.marker-selected path {
+  fill: var(--fb-accent);
+}
+
+.marker-error path {
+  fill: var(--fb-danger);
+}
+
+.connection path {
+  fill: none;
+  stroke: var(--fb-accent);
+  stroke-width: 2;
+  stroke-dasharray: 6 4;
+}
+
+.connection circle {
+  fill: var(--fb-accent);
+}
+
+.connValid path {
+  stroke: var(--fb-success);
+  stroke-dasharray: none;
+}
+
+.connValid circle {
+  fill: var(--fb-success);
+}
+
+.connInvalid path {
+  stroke: var(--fb-danger);
+}
+
+.connInvalid circle {
+  fill: var(--fb-danger);
+}
+
+/* ------------------------------------------------------------ labels */
+
+.labelLayer {
+  position: absolute;
+  top: 0;
+  left: 0;
+}
+
+.label {
+  position: absolute;
+  top: 0;
+  left: 0;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border: 1px solid var(--fb-border);
+  border-radius: 999px;
+  font-family: var(--fb-font);
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 16px;
+  color: var(--fb-text-muted);
+  background: var(--fb-panel);
+  box-shadow: var(--fb-shadow-sm);
+  white-space: nowrap;
+  cursor: pointer;
+  user-select: none;
+}
+
+.labelSelected {
+  border-color: var(--fb-accent);
+  color: var(--fb-accent-text);
+}
+
+.labelEmpty {
+  font-weight: 500;
+  font-style: italic;
+  color: var(--fb-text-subtle);
+}
+
+.labelInput {
+  padding: 0;
+  border: none;
+  outline: none;
+  font: inherit;
+  font-style: normal;
+  color: var(--fb-text);
+  background: transparent;
+}
+
+.labelDelete {
+  display: grid;
+  place-items: center;
+  width: 16px;
+  height: 16px;
+  margin-right: -4px;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  color: #fff;
+  background: var(--fb-danger);
+  cursor: pointer;
+}
