@@ -20,6 +20,7 @@
   --wpn-muted: #64748b;
   --wpn-border: #e2e8f0;
   --wpn-danger: #dc2626;
+  --wpn-focus-ring: #0f172a;
   --wpn-shadow: 0 18px 50px rgba(15, 23, 42, 0.14);
   --wpn-shadow-sm: 0 8px 24px rgba(15, 23, 42, 0.1);
   --wpn-font:
@@ -46,7 +47,7 @@
 }
 
 .wpn-root :focus-visible {
-  outline: 2px solid var(--wpn-accent-strong);
+  outline: 2px solid var(--wpn-focus-ring);
   outline-offset: 2px;
   border-radius: inherit;
 }
@@ -2682,7 +2683,7 @@ body.wpn-epicflow-resizing {
 
 .wpn-select__trigger--open {
   border-color: #fff;
-  box-shadow: 0 0 0 3px var(--wpn-accent-strong, #4338ca);
+  box-shadow: 0 0 0 3px var(--wpn-focus-ring, #0f172a);
 }
 
 .wpn-select__search-input--trigger {
@@ -2775,6 +2776,9 @@ body.wpn-epicflow-resizing {
   background: transparent;
   color: #fff;
   font-size: 12px;
+}
+
+.wpn-select__search-input:focus-visible {
   outline: none;
 }
 
@@ -4296,6 +4300,16 @@ body.wpn-epicflow-resizing {
 .wpn-toolbar__live--reconnecting {
   background: rgba(251, 191, 36, 0.18);
   color: #fcd34d;
+}
+
+.wpn-toolbar__live--unauthenticated {
+  background: rgba(248, 113, 113, 0.18);
+  color: #f87171;
+}
+
+.wpn-toolbar__live--unauthenticated .wpn-toolbar__live-dot {
+  animation: none;
+  opacity: 1;
 }
 
 .wpn-toolbar__live-dot {

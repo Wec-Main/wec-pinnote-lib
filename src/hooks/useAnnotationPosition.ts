@@ -13,6 +13,25 @@ export interface PositionedItem {
   anchor: AnnotationAnchor;
 }
 
+const MUTATION_DEBOUNCE_MS = 120;
+
+function collectObservationTargets(items: PositionedItem[]): Element[] {
+  const targets: Element[] = [];
+  for (const item of items) {
+    const element = resolveElement(item.anchor);
+    if (!element) {
+      continue;
+    }
+    targets.push(element);
+    let ancestor = element.parentElement;
+    while (ancestor) {
+      targets.push(ancestor);
+      ancestor = ancestor.parentElement;
+    }
+  }
+  return targets;
+}
+
 function mapsEqual(
   left: Map<string, PinScreenPosition>,
   right: Map<string, PinScreenPosition>,
@@ -39,6 +58,7 @@ export function useAnnotationPositions(items: PositionedItem[]): Map<string, Pin
   useEffect(() => {
     let frame = 0;
     let scheduled = false;
+    let debounceTimer = 0;
 
     const compute = () => {
       scheduled = false;
@@ -57,6 +77,11 @@ export function useAnnotationPositions(items: PositionedItem[]): Map<string, Pin
       frame = window.requestAnimationFrame(compute);
     };
 
+    const scheduleDebounced = () => {
+      window.clearTimeout(debounceTimer);
+      debounceTimer = window.setTimeout(schedule, MUTATION_DEBOUNCE_MS);
+    };
+
     schedule();
     window.addEventListener("resize", schedule);
     window.addEventListener("scroll", schedule, { capture: true, passive: true });
@@ -65,29 +90,25 @@ export function useAnnotationPositions(items: PositionedItem[]): Map<string, Pin
       typeof ResizeObserver === "undefined" ? null : new ResizeObserver(schedule);
     resizeObserver?.observe(document.documentElement);
 
-    for (const item of items) {
-      const element = resolveElement(item.anchor);
-      if (element) {
-        resizeObserver?.observe(element);
-        let ancestor = element.parentElement;
-        while (ancestor) {
-          resizeObserver?.observe(ancestor);
-          ancestor = ancestor.parentElement;
-        }
-      }
+    const observationTargets = collectObservationTargets(items);
+    for (const target of observationTargets) {
+      resizeObserver?.observe(target);
     }
 
     const mutationObserver =
-      typeof MutationObserver === "undefined" ? null : new MutationObserver(schedule);
-    mutationObserver?.observe(document.body, {
-      childList: true,
-      subtree: true,
-      attributes: true,
-      attributeFilter: ["style", "class", "hidden"],
-    });
+      typeof MutationObserver === "undefined" ? null : new MutationObserver(scheduleDebounced);
+    for (const target of observationTargets) {
+      mutationObserver?.observe(target, {
+        childList: true,
+        subtree: true,
+        attributes: true,
+        attributeFilter: ["style", "class", "hidden"],
+      });
+    }
 
     return () => {
       window.cancelAnimationFrame(frame);
+      window.clearTimeout(debounceTimer);
       window.removeEventListener("resize", schedule);
       window.removeEventListener("scroll", schedule, true);
       resizeObserver?.disconnect();

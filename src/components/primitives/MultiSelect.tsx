@@ -38,6 +38,7 @@ export function MultiSelect({
     optionId,
     activeDescendant,
     openMenu,
+    closeMenu,
     onInputChange,
     onRootKeyDown,
   } = useComboboxList({ options, activeValue: null });
@@ -75,6 +76,13 @@ export function MultiSelect({
         className={["wpn-select__trigger", open ? "wpn-select__trigger--open" : ""]
           .filter(Boolean)
           .join(" ")}
+        onClick={() => {
+          if (open) {
+            closeMenu();
+          } else {
+            openMenu();
+          }
+        }}
       >
         <input
           ref={inputRef}
@@ -90,11 +98,6 @@ export function MultiSelect({
           aria-activedescendant={activeDescendant}
           aria-autocomplete="list"
           onFocus={() => {
-            if (!open) {
-              openMenu();
-            }
-          }}
-          onClick={() => {
             if (!open) {
               openMenu();
             }

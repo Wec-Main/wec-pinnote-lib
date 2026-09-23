@@ -10,8 +10,11 @@ import { useAnnotationData, useAnnotationUi } from "../../context/AnnotationCont
 import { Icon, ListSearchBar, RefreshButton, Tooltip } from "../primitives";
 import { Icons } from "../../assets/icons";
 import { useEpicFlowApi } from "../../hooks/useEpicFlowApi";
+import { useEpicFlowStream } from "../../hooks/useEpicFlowStream";
 import { EpicFlowApiError } from "../../services/epicFlowApi";
+import { applyEpicFlowStreamEvent } from "../../utils/applyEpicFlowStreamEvent";
 import type { Epic, UserStory } from "../../types/epicFlow.types";
+import type { StreamEvent } from "../../types/stream.types";
 import { EpicColumn } from "./EpicColumn";
 import { UserStoryColumn } from "./UserStoryColumn";
 import { NotesPanel, type NotesPanelTarget } from "./NotesPanel";
@@ -63,12 +66,17 @@ export function EpicFlowPanel() {
     paneRefC,
   ];
   const dragCleanupRef = useRef<(() => void) | null>(null);
+  const epicsRef = useRef(epics);
+  const allUserStoriesRef = useRef(allUserStories);
+  const selectedEpicIdRef = useRef(selectedEpicId);
+  const selectedUserStoryIdRef = useRef(selectedUserStoryId);
+  epicsRef.current = epics;
+  allUserStoriesRef.current = allUserStories;
+  selectedEpicIdRef.current = selectedEpicId;
+  selectedUserStoryIdRef.current = selectedUserStoryId;
 
   const normalizedQuery = query.trim().toLowerCase();
 
-  // Dragging the handle between pane `indexA` and `indexB` (always adjacent)
-  // only trades width between those two panes (their combined width, and
-  // thus the third pane's width, stays fixed) — standard split-pane resize.
   const onHandleMouseDown =
     (indexA: 0 | 1, indexB: 1 | 2) => (event: ReactMouseEvent<HTMLDivElement>) => {
       event.preventDefault();
@@ -135,6 +143,38 @@ export function EpicFlowPanel() {
       .catch((err: unknown) => setApiError(describeApiError(err)))
       .finally(() => setRefreshing(false));
   }, [reloadAll]);
+
+  const onStreamEvent = useCallback((event: StreamEvent) => {
+    const result = applyEpicFlowStreamEvent(epicsRef.current, allUserStoriesRef.current, event);
+    if (result.epics !== epicsRef.current) {
+      setEpics(result.epics);
+      if (
+        selectedEpicIdRef.current &&
+        !result.epics.some((epic) => epic.id === selectedEpicIdRef.current)
+      ) {
+        setSelectedEpicId(null);
+        setSelectedUserStoryId(null);
+      }
+    }
+    if (result.userStories !== allUserStoriesRef.current) {
+      setAllUserStories(result.userStories);
+      if (
+        selectedUserStoryIdRef.current &&
+        !result.userStories.some((story) => story.id === selectedUserStoryIdRef.current)
+      ) {
+        setSelectedUserStoryId(null);
+      }
+    }
+  }, []);
+
+  const connectionState = useEpicFlowStream({
+    apiBaseUrl: config.apiBaseUrl,
+    projectId: config.projectId,
+    getAuthToken: config.getAuthToken,
+    enabled: true,
+    onEvent: onStreamEvent,
+    onResync: handleRefresh,
+  });
 
   useEffect(() => {
     const controller = new AbortController();
@@ -224,7 +264,6 @@ export function EpicFlowPanel() {
     setSelectedUserStoryId(storyId);
   };
 
-  // ---- Epic actions ----
   const handleSubmitEpic = async (data: { title: string; description: string }) => {
     setBusy(true);
     try {
@@ -261,7 +300,6 @@ export function EpicFlowPanel() {
     }
   };
 
-  // ---- User story actions ----
   const handleSubmitStory = async (data: { title: string; description: string }) => {
     setBusy(true);
     try {
@@ -307,7 +345,6 @@ export function EpicFlowPanel() {
     }
   };
 
-  // ---- Notes panel edit/delete (acts on whichever Epic or User Story is selected) ----
   const handleEditFromNotes = () => {
     if (notesTarget?.type === "epic") {
       setEpicModal({ mode: "edit", epic: notesTarget.epic });
@@ -336,6 +373,27 @@ export function EpicFlowPanel() {
           <span className="wpn-panel__title">EpicFlow</span>
         </span>
         <div className="wpn-epicflow-panel__header-actions">
+          {connectionState === "reconnecting" ? (
+            <Tooltip label="Reconnecting to live updates" placement="bottom">
+              <span
+                className="wpn-toolbar__live wpn-toolbar__live--reconnecting"
+                role="status"
+                aria-label="Reconnecting to live updates"
+              >
+                <span className="wpn-toolbar__live-dot" />
+              </span>
+            </Tooltip>
+          ) : connectionState === "unauthenticated" ? (
+            <Tooltip label="Live updates paused, sign in again" placement="bottom">
+              <span
+                className="wpn-toolbar__live wpn-toolbar__live--unauthenticated"
+                role="status"
+                aria-label="Live updates paused, sign in again"
+              >
+                <span className="wpn-toolbar__live-dot" />
+              </span>
+            </Tooltip>
+          ) : null}
           <Tooltip label={minimized ? "Maximize" : "Minimize"} placement="bottom">
             <button
               type="button"
@@ -393,6 +451,7 @@ export function EpicFlowPanel() {
               hasAnyEpics={epics.length > 0}
               selectedEpicId={selectedEpicId}
               storyCounts={storyCounts}
+              currentUser={config.currentUser}
               onSelect={selectEpic}
               onCreate={() => setEpicModal({ mode: "create" })}
               onEdit={(epic) => setEpicModal({ mode: "edit", epic })}
@@ -406,6 +465,7 @@ export function EpicFlowPanel() {
               hasStoriesForEpic={storiesForSelectedEpic.length > 0}
               epicSelected={Boolean(selectedEpicId)}
               selectedUserStoryId={selectedUserStoryId}
+              currentUser={config.currentUser}
               onSelect={selectStory}
               onCreate={() => setStoryModal({ mode: "create" })}
               onEdit={(story) => setStoryModal({ mode: "edit", story })}

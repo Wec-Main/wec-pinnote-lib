@@ -1,13 +1,16 @@
 import { Icon, Tooltip } from "../primitives";
 import { AuthorBadge } from "./AuthorBadge";
 import type { Epic } from "../../types/epicFlow.types";
+import type { AnnotationUser } from "../../types/annotation.types";
 import { formatTimestamp } from "../../utils/format";
+import { canDeleteBoardItem } from "../../utils/boardPermissions";
 
 interface EpicColumnProps {
   epics: Epic[];
   hasAnyEpics: boolean;
   selectedEpicId: string | null;
   storyCounts: Record<string, number>;
+  currentUser: AnnotationUser;
   onSelect: (epicId: string) => void;
   onCreate: () => void;
   onEdit: (epic: Epic) => void;
@@ -19,6 +22,7 @@ export function EpicColumn({
   hasAnyEpics,
   selectedEpicId,
   storyCounts,
+  currentUser,
   onSelect,
   onCreate,
   onEdit,
@@ -107,19 +111,21 @@ export function EpicColumn({
                       <Icon name="edit" />
                     </button>
                   </Tooltip>
-                  <Tooltip label="Delete epic" placement="bottom">
-                    <button
-                      type="button"
-                      className="wpn-epicflow-card__action-btn wpn-epicflow-card__action-btn--danger"
-                      aria-label="Delete epic"
-                      onClick={(event) => {
-                        event.stopPropagation();
-                        onDelete(epic);
-                      }}
-                    >
-                      <Icon name="trash" />
-                    </button>
-                  </Tooltip>
+                  {canDeleteBoardItem(epic.createdById, currentUser) ? (
+                    <Tooltip label="Delete epic" placement="bottom">
+                      <button
+                        type="button"
+                        className="wpn-epicflow-card__action-btn wpn-epicflow-card__action-btn--danger"
+                        aria-label="Delete epic"
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          onDelete(epic);
+                        }}
+                      >
+                        <Icon name="trash" />
+                      </button>
+                    </Tooltip>
+                  ) : null}
                 </div>
               </div>
             </div>

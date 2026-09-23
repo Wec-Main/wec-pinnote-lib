@@ -52,6 +52,19 @@ export function AnnotationProvider({ config, children }: AnnotationProviderProps
   const resolved = useMemo(() => resolveConfig(config), [config]);
   const auth = useAuthSessions(resolved.apiBaseUrl, resolved.projectId, resolved.authClient);
   const { activeAccount } = auth;
+  const [loggingOutId, setLoggingOutId] = useState<string | null>(null);
+  const teardownActive = activeAccount !== null && activeAccount.id !== loggingOutId;
+  const logout = useCallback(
+    async (userId: string) => {
+      setLoggingOutId(userId);
+      try {
+        await auth.logout(userId);
+      } finally {
+        setLoggingOutId((current) => (current === userId ? null : current));
+      }
+    },
+    [auth],
+  );
   const activeUser = useMemo(() => {
     if (!activeAccount) {
       return resolved.currentUser;
@@ -78,7 +91,7 @@ export function AnnotationProvider({ config, children }: AnnotationProviderProps
     activeConfig.projectId,
     pageKey,
     activeUser,
-    Boolean(activeAccount),
+    teardownActive,
     activeConfig.apiClient ? undefined : activeConfig.apiBaseUrl,
     activeAccount?.token,
   );
@@ -131,7 +144,6 @@ export function AnnotationProvider({ config, children }: AnnotationProviderProps
     enabled: Boolean(activeAccount),
   });
 
-  // The tags a pin can be given are the project's own, managed in settings.
   const projectTagsToken = activeAccount?.token;
   const projectTagsKey = projectTagsToken
     ? `project-tags:${activeConfig.apiBaseUrl}:${projectTagsToken}:${projectId}:active`
@@ -141,7 +153,6 @@ export function AnnotationProvider({ config, children }: AnnotationProviderProps
   );
   const projectTags = useMemo(() => projectTagsData ?? [], [projectTagsData]);
 
-  // The two placement modes share one overlay, so only one can be active.
   const setModeEnabledExclusive = useCallback(
     (enabled: boolean) => {
       if (enabled) {
@@ -217,9 +228,6 @@ export function AnnotationProvider({ config, children }: AnnotationProviderProps
     }
   }, [resolved.enabled]);
 
-  // Every panel behind these flags needs a signed-in actor, and the flags are
-  // persisted, so a stale one would otherwise reopen its panel for a logged-out
-  // visitor on the next load.
   useEffect(() => {
     if (!activeAccount) {
       setModeEnabledState(false);
@@ -502,7 +510,7 @@ export function AnnotationProvider({ config, children }: AnnotationProviderProps
       loginOptionsError: auth.loginOptionsError,
       reloadLoginOptions: auth.reloadLoginOptions,
       login: auth.login,
-      logout: auth.logout,
+      logout,
       switchAccount: auth.switchAccount,
     }),
     [
@@ -513,7 +521,7 @@ export function AnnotationProvider({ config, children }: AnnotationProviderProps
       auth.loginOptionsError,
       auth.reloadLoginOptions,
       auth.login,
-      auth.logout,
+      logout,
       auth.switchAccount,
     ],
   );

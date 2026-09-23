@@ -1,1 +1,0 @@
-export { AnnotationResolvedIndicator } from "./AnnotationResolvedIndicator";

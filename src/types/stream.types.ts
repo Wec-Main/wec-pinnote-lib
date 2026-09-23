@@ -1,4 +1,5 @@
 import type { Annotation, AnnotationComment, PageStatusRecord } from "./annotation.types";
+import type { Epic, UserStory } from "./epicFlow.types";
 
 export type StreamEventType =
   | "annotation.created"
@@ -7,9 +8,16 @@ export type StreamEventType =
   | "comment.created"
   | "comment.updated"
   | "comment.deleted"
-  | "page-status.updated";
+  | "page-status.updated"
+  | "epic.created"
+  | "epic.updated"
+  | "epic.deleted"
+  | "user_story.created"
+  | "user_story.updated"
+  | "user_story.deleted";
 
-export type StreamConnectionState = "connecting" | "open" | "reconnecting" | "closed";
+export type StreamConnectionState =
+  "connecting" | "open" | "reconnecting" | "closed" | "unauthenticated";
 
 export interface StreamEventPayloads {
   "annotation.created": { annotation: Annotation };
@@ -19,6 +27,12 @@ export interface StreamEventPayloads {
   "comment.updated": { annotationId: string; comment: AnnotationComment };
   "comment.deleted": { annotationId: string; commentId: string };
   "page-status.updated": { pageStatus: PageStatusRecord };
+  "epic.created": { epic: Epic };
+  "epic.updated": { epic: Epic };
+  "epic.deleted": { epicId: string };
+  "user_story.created": { userStory: UserStory };
+  "user_story.updated": { userStory: UserStory };
+  "user_story.deleted": { userStoryId: string };
 }
 
 export interface StreamEvent {

@@ -569,6 +569,16 @@ export function AnnotationToolbar() {
                   <span className="wpn-toolbar__live-dot" />
                 </span>
               </Tooltip>
+            ) : connectionState === "unauthenticated" ? (
+              <Tooltip label="Live updates paused, sign in again" placement="bottom">
+                <span
+                  className="wpn-toolbar__live wpn-toolbar__live--unauthenticated"
+                  role="status"
+                  aria-label="Live updates paused, sign in again"
+                >
+                  <span className="wpn-toolbar__live-dot" />
+                </span>
+              </Tooltip>
             ) : null}
             <span className="wpn-toolbar__divider" aria-hidden="true" />
             <Tooltip label="Close toolbar" placement="bottom">

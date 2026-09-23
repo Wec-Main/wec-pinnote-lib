@@ -1,13 +1,16 @@
 import { Icon, Tooltip } from "../primitives";
 import { AuthorBadge } from "./AuthorBadge";
 import type { UserStory } from "../../types/epicFlow.types";
+import type { AnnotationUser } from "../../types/annotation.types";
 import { formatTimestamp } from "../../utils/format";
+import { canDeleteBoardItem } from "../../utils/boardPermissions";
 
 interface UserStoryColumnProps {
   stories: UserStory[];
   hasStoriesForEpic: boolean;
   epicSelected: boolean;
   selectedUserStoryId: string | null;
+  currentUser: AnnotationUser;
   onSelect: (storyId: string) => void;
   onCreate: () => void;
   onEdit: (story: UserStory) => void;
@@ -19,6 +22,7 @@ export function UserStoryColumn({
   hasStoriesForEpic,
   epicSelected,
   selectedUserStoryId,
+  currentUser,
   onSelect,
   onCreate,
   onEdit,
@@ -102,19 +106,21 @@ export function UserStoryColumn({
                       <Icon name="edit" />
                     </button>
                   </Tooltip>
-                  <Tooltip label="Delete user story" placement="bottom">
-                    <button
-                      type="button"
-                      className="wpn-epicflow-card__action-btn wpn-epicflow-card__action-btn--danger"
-                      aria-label="Delete user story"
-                      onClick={(event) => {
-                        event.stopPropagation();
-                        onDelete(story);
-                      }}
-                    >
-                      <Icon name="trash" />
-                    </button>
-                  </Tooltip>
+                  {canDeleteBoardItem(story.createdById, currentUser) ? (
+                    <Tooltip label="Delete user story" placement="bottom">
+                      <button
+                        type="button"
+                        className="wpn-epicflow-card__action-btn wpn-epicflow-card__action-btn--danger"
+                        aria-label="Delete user story"
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          onDelete(story);
+                        }}
+                      >
+                        <Icon name="trash" />
+                      </button>
+                    </Tooltip>
+                  ) : null}
                 </div>
               </div>
             </div>

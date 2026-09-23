@@ -1,12 +1,29 @@
 import { describe, expect, it } from "vitest";
-import { isSession, normalizeStoredAuth } from "../src/hooks/useAuthSessions";
+import { isSession, isTokenUnexpired, normalizeStoredAuth } from "../src/hooks/useAuthSessions";
+
+function encodeSegment(payload: unknown): string {
+  const json = JSON.stringify(payload);
+  return Buffer.from(json)
+    .toString("base64")
+    .replace(/\+/g, "-")
+    .replace(/\//g, "_")
+    .replace(/=+$/, "");
+}
+
+function makeToken(payload: unknown): string {
+  return `header.${encodeSegment(payload)}.signature`;
+}
+
+const validToken = makeToken({ exp: Math.floor(Date.now() / 1000) + 3600 });
+const expiredToken = makeToken({ exp: Math.floor(Date.now() / 1000) - 3600 });
 
 const session = {
   id: "u1",
   name: "Ada Lovelace",
   email: "ada@wec.ai",
   roleId: "contributor" as const,
-  token: "signed.jwt.token",
+  token: validToken,
+  refreshToken: makeToken({ sub: "u1", tokenVersion: 0, typ: "refresh" }),
 };
 
 describe("isSession", () => {
@@ -25,10 +42,38 @@ describe("isSession", () => {
   });
 
   it("rejects a session with no signed bearer token", () => {
-    // A pre-fix stored session (or a forged one) carries no server-issued
-    // token; trusting it would send every request unauthenticated.
     expect(isSession({ id: "u1", name: "Ada Lovelace", roleId: "contributor" })).toBe(false);
     expect(isSession({ ...session, token: "" })).toBe(false);
+  });
+
+  it("rejects a session whose token is not a well-formed JWT", () => {
+    expect(isSession({ ...session, token: "not-a-jwt-at-all" })).toBe(false);
+  });
+
+  it("rejects a session whose token has expired", () => {
+    expect(isSession({ ...session, token: expiredToken })).toBe(false);
+  });
+
+  it("rejects a session whose token payload is not valid base64url JSON", () => {
+    expect(isSession({ ...session, token: "header.not-valid-base64url!!.signature" })).toBe(false);
+  });
+});
+
+describe("isTokenUnexpired", () => {
+  it("rejects a forged non-JWT token string", () => {
+    expect(isTokenUnexpired("random-forged-string")).toBe(false);
+  });
+
+  it("rejects an expired token", () => {
+    expect(isTokenUnexpired(expiredToken)).toBe(false);
+  });
+
+  it("rejects a token with a malformed payload segment", () => {
+    expect(isTokenUnexpired("header.not-valid-base64url!!.signature")).toBe(false);
+  });
+
+  it("accepts a token with a future exp claim", () => {
+    expect(isTokenUnexpired(validToken)).toBe(true);
   });
 });
 
@@ -59,8 +104,6 @@ describe("normalizeStoredAuth", () => {
   });
 
   it("never reports an active id that names no stored account", () => {
-    // Otherwise the UI believes it is signed in while activeAccount resolves to
-    // null, leaving the toolbar in a state no interaction can clear.
     expect(normalizeStoredAuth({ accounts: [session], activeId: "u-removed" }).activeId).toBe("u1");
   });
 

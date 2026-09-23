@@ -62,6 +62,13 @@ export function SearchableSelect({
         className={["wpn-select__trigger", open ? "wpn-select__trigger--open" : ""]
           .filter(Boolean)
           .join(" ")}
+        onClick={() => {
+          if (open) {
+            setOpen(false);
+          } else {
+            openMenu();
+          }
+        }}
       >
         <input
           ref={inputRef}
@@ -77,11 +84,6 @@ export function SearchableSelect({
           aria-activedescendant={activeDescendant}
           aria-autocomplete="list"
           onFocus={() => {
-            if (!open) {
-              openMenu();
-            }
-          }}
-          onClick={() => {
             if (!open) {
               openMenu();
             }

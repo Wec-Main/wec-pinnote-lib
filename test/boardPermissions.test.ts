@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { canDeleteComment, canEditComment } from "../src/utils/commentPermissions";
+import { canDeleteComment, canEditComment } from "../src/utils/boardPermissions";
 import type { AnnotationComment, AnnotationUser } from "../src/types/annotation.types";
 
 function comment(authorId: string, authorName = "Ada Lovelace"): AnnotationComment {

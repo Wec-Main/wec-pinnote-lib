@@ -47,7 +47,6 @@ export function ToolbarAuthControl() {
         .map((option) => ({
           value: option.id,
           label: option.name,
-          description: option.email,
         })),
     [loginOptions, loggedInIds],
   );

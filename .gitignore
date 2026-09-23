@@ -1,7 +1,6 @@
 node_modules
 dist
-examples/demo/dist
-examples/demo/.env
+examples/
 *.local
 .DS_Store
 .vscode

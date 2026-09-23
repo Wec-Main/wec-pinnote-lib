@@ -59,7 +59,7 @@ export default defineConfig({
 });
 ```
 
-This is how the sibling `wec-pinnote-consumer` project (under the same `wec-lib` parent folder) is wired up — see it for a full working example.
+`examples/demo` in this repository is wired up this way — see it for a full working example.
 
 ## Configuration
 
@@ -148,17 +148,32 @@ For the most stable anchors, add:
 
 ## Public API
 
+Core annotation overlay:
+
 ```ts
 import {
   AnnotationProvider,
   AnnotationToggleButton,
   AnnotationListPanel,
+  AnnotationToolbar,
   useAnnotations,
   useAnnotationMode,
 } from "wec-pinnote-lib";
 ```
 
 `useAnnotations()` returns the current page annotations, loading/error/retry, and mutation helpers.
+
+Optional panels, mounted the same way as `AnnotationToggleButton`:
+
+- `UserManagementPanel`, `SettingsPanel`, `AuditHistoryPanel` — admin surfaces for user, project/organization/tag and audit-log management.
+- `LoginDialog`, `ToolbarAuthControl` — the built-in sign-in flow, used when the host app has no auth UI of its own.
+
+Real-time updates:
+
+- `useAnnotationStream` / `applyStreamEvent` — live annotation, comment and page-status updates.
+- `useEpicFlowStream` / `applyEpicFlowStreamEvent` — live epic and user-story updates for the EpicFlow board.
+
+Every exported type (`Annotation`, `AuthSession`, `ManagedUser`, `Organization`, `ProjectTag`, `AuditRecord`, and their request/response shapes) is available from the package root and discoverable through editor autocomplete; this README does not duplicate the type signatures.
 
 ## API contract
 

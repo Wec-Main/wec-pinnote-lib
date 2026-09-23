@@ -6,6 +6,7 @@ import { AnnotationStatusSelect } from "../AnnotationStatusSelect";
 import { AnnotationThread } from "../AnnotationThread";
 import { Icons } from "../../assets/icons";
 import { Icon, Tooltip } from "../primitives";
+import { canDeleteAnnotation } from "../../utils/boardPermissions";
 
 interface AnnotationThreadPanelProps {
   annotationId: string;
@@ -42,6 +43,7 @@ export function AnnotationThreadPanel({
   }
 
   const title = annotation.anchor.elementIdentifier.replace(/[-_]/g, " ");
+  const canDelete = canDeleteAnnotation(annotation, config.currentUser);
 
   const requestClose = () => {
     if (hasUnsavedEdit) {
@@ -118,37 +120,39 @@ export function AnnotationThreadPanel({
               value={annotation.status}
               onChange={(status) => setStatus(annotation.id, status)}
             />
-            {confirmDelete ? (
-              <>
-                <button
-                  type="button"
-                  className="wpn-btn wpn-btn--ghost"
-                  onClick={() => setConfirmDelete(false)}
-                >
-                  Cancel
-                </button>
+            {canDelete ? (
+              confirmDelete ? (
+                <>
+                  <button
+                    type="button"
+                    className="wpn-btn wpn-btn--ghost"
+                    onClick={() => setConfirmDelete(false)}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    className="wpn-btn-delete"
+                    onClick={async () => {
+                      await removeAnnotation(annotation.id);
+                      selectAnnotation(null);
+                    }}
+                  >
+                    <Icon name="trash" className="wpn-btn__icon" />
+                    Confirm delete
+                  </button>
+                </>
+              ) : (
                 <button
                   type="button"
                   className="wpn-btn-delete"
-                  onClick={async () => {
-                    await removeAnnotation(annotation.id);
-                    selectAnnotation(null);
-                  }}
+                  onClick={() => setConfirmDelete(true)}
                 >
                   <Icon name="trash" className="wpn-btn__icon" />
-                  Confirm delete
+                  Delete
                 </button>
-              </>
-            ) : (
-              <button
-                type="button"
-                className="wpn-btn-delete"
-                onClick={() => setConfirmDelete(true)}
-              >
-                <Icon name="trash" className="wpn-btn__icon" />
-                Delete
-              </button>
-            )}
+              )
+            ) : null}
           </div>
         </div>
       </div>

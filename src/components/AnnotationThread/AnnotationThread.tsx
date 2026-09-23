@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import type { Annotation, AnnotationComment, AnnotationUser } from "../../types/annotation.types";
 import { formatTimestamp, getInitials } from "../../utils/format";
-import { canDeleteComment, canEditComment } from "../../utils/commentPermissions";
+import { canDeleteComment, canEditComment } from "../../utils/boardPermissions";
 
 interface AnnotationThreadProps {
   annotation: Annotation;

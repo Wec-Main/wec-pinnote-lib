@@ -17,6 +17,8 @@ export { createAuthApi } from "./services/authApi";
 export { useAuthSessions } from "./hooks/useAuthSessions";
 export { useAnnotationStream } from "./hooks/useAnnotationStream";
 export { applyStreamEvent } from "./utils/applyStreamEvent";
+export { useEpicFlowStream } from "./hooks/useEpicFlowStream";
+export { applyEpicFlowStreamEvent } from "./utils/applyEpicFlowStreamEvent";
 export { fetchAuditPage } from "./services/auditApi";
 export {
   createUser,

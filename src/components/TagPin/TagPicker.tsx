@@ -40,7 +40,9 @@ export function TagPicker({ x, y }: TagPickerProps) {
     onRootKeyDown,
   } = useComboboxList({ options, activeValue: selectedTagId });
 
-  const selectedTag = selectedTagId ? (options.find((o) => o.value === selectedTagId) ?? null) : null;
+  const selectedTag = selectedTagId
+    ? (options.find((o) => o.value === selectedTagId) ?? null)
+    : null;
 
   const commit = (option: ComboboxOption) => {
     setSelectedTagId(option.value);
@@ -81,6 +83,16 @@ export function TagPicker({ x, y }: TagPickerProps) {
           className={["wpn-select__trigger", open ? "wpn-select__trigger--open" : ""]
             .filter(Boolean)
             .join(" ")}
+          onClick={() => {
+            if (busy) {
+              return;
+            }
+            if (open) {
+              closeMenu();
+            } else {
+              openMenu();
+            }
+          }}
         >
           <input
             ref={inputRef}
@@ -96,11 +108,6 @@ export function TagPicker({ x, y }: TagPickerProps) {
             aria-autocomplete="list"
             disabled={busy}
             onFocus={() => {
-              if (!open) {
-                openMenu();
-              }
-            }}
-            onClick={() => {
               if (!open) {
                 openMenu();
               }

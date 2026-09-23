@@ -1,6 +1,7 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createAuthApi } from "../services/authApi";
 import { useSharedFetch } from "./useSharedFetch";
+import { AnnotationApiError } from "../types/annotation.types";
 import type { AuthApiClient, AuthSession, LoginOption } from "../types/auth.types";
 
 export interface StoredAuth {
@@ -9,9 +10,35 @@ export interface StoredAuth {
 }
 
 const EMPTY: StoredAuth = { accounts: [], activeId: null };
+const RENEWAL_LEAD_MS = 5 * 60 * 1000;
 
 function storageKey(projectId: string): string {
   return `wpn-auth:${projectId}`;
+}
+
+export function tokenExpiry(token: string): number | undefined {
+  const segments = token.split(".");
+  if (segments.length !== 3) {
+    return undefined;
+  }
+  const payloadSegment = segments[1];
+  if (!payloadSegment) {
+    return undefined;
+  }
+  try {
+    const normalized = payloadSegment.replace(/-/g, "+").replace(/_/g, "/");
+    const padded = normalized.padEnd(normalized.length + ((4 - (normalized.length % 4)) % 4), "=");
+    const json = atob(padded);
+    const payload = JSON.parse(json) as Record<string, unknown>;
+    return typeof payload.exp === "number" ? payload.exp : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+export function isTokenUnexpired(token: string): boolean {
+  const exp = tokenExpiry(token);
+  return exp !== undefined && exp > Date.now() / 1000;
 }
 
 export function isSession(value: unknown): value is AuthSession {
@@ -25,25 +52,26 @@ export function isSession(value: unknown): value is AuthSession {
     typeof candidate.name === "string" &&
     typeof candidate.roleId === "string" &&
     typeof candidate.token === "string" &&
-    candidate.token.length > 0
+    candidate.token.length > 0 &&
+    typeof candidate.refreshToken === "string" &&
+    candidate.refreshToken.length > 0 &&
+    isTokenUnexpired(candidate.token)
   );
 }
 
-/**
- * Storage is user-writable and survives across releases, so an entry that no
- * longer matches the session shape is discarded rather than trusted. An activeId
- * pointing at no account would leave the UI signed in with nobody.
- */
+function resolveActiveId(accounts: AuthSession[], activeId: string | null): string | null {
+  return accounts.some((account) => account.id === activeId) ? activeId : (accounts[0]?.id ?? null);
+}
+
 export function normalizeStoredAuth(parsed: Partial<StoredAuth> | null): StoredAuth {
   if (!parsed || !Array.isArray(parsed.accounts)) {
     return EMPTY;
   }
   const accounts = parsed.accounts.filter(isSession);
-  const activeId =
-    typeof parsed.activeId === "string" &&
-    accounts.some((account) => account.id === parsed.activeId)
-      ? parsed.activeId
-      : (accounts[0]?.id ?? null);
+  const activeId = resolveActiveId(
+    accounts,
+    typeof parsed.activeId === "string" ? parsed.activeId : null,
+  );
   return { accounts, activeId };
 }
 
@@ -63,7 +91,7 @@ function writeStored(projectId: string, value: StoredAuth): void {
   try {
     window.localStorage.setItem(storageKey(projectId), JSON.stringify(value));
   } catch {
-    // Ignore storage failures (private browsing, disabled storage, etc.).
+    return;
   }
 }
 
@@ -75,7 +103,7 @@ export interface AuthSessionsValue {
   loginOptionsError: string | null;
   reloadLoginOptions: () => void;
   login: (userId: string, password: string) => Promise<void>;
-  logout: (userId: string) => void;
+  logout: (userId: string) => Promise<void>;
   switchAccount: (userId: string) => void;
 }
 
@@ -91,11 +119,6 @@ export function useAuthSessions(
     setStored(readStored(projectId));
   }, [projectId]);
 
-  /**
-   * Sessions live in storage shared by every tab on the origin, so signing out
-   * in one tab must not leave the others holding an account the user believes
-   * they closed.
-   */
   useEffect(() => {
     const watched = storageKey(projectId);
     const onStorage = (event: StorageEvent) => {
@@ -109,12 +132,6 @@ export function useAuthSessions(
     return () => window.removeEventListener("storage", onStorage);
   }, [projectId]);
 
-  /**
-   * Storage is shared by every tab, so a write here can race a write another
-   * tab made moments ago. Computing `next` from React's in-memory `current`
-   * would silently clobber that other tab's change; reading storage fresh
-   * right before writing keeps a concurrent update from being lost.
-   */
   const persist = useCallback(
     (update: (current: StoredAuth) => StoredAuth) => {
       const next = update(readStored(projectId));
@@ -123,6 +140,73 @@ export function useAuthSessions(
     },
     [projectId],
   );
+
+  const removeAccount = useCallback(
+    (userId: string) => {
+      persist((current) => {
+        const accounts = current.accounts.filter((item) => item.id !== userId);
+        return {
+          accounts,
+          activeId: current.activeId === userId ? (accounts[0]?.id ?? null) : current.activeId,
+        };
+      });
+    },
+    [persist],
+  );
+
+  const timersRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
+
+  useEffect(() => {
+    const timers = timersRef.current;
+    return () => {
+      for (const timer of timers.values()) {
+        clearTimeout(timer);
+      }
+      timers.clear();
+    };
+  }, [projectId]);
+
+  useEffect(() => {
+    const timers = timersRef.current;
+    const liveIds = new Set(stored.accounts.map((account) => account.id));
+    for (const [id, timer] of timers) {
+      if (!liveIds.has(id)) {
+        clearTimeout(timer);
+        timers.delete(id);
+      }
+    }
+
+    for (const account of stored.accounts) {
+      if (timers.has(account.id)) {
+        continue;
+      }
+      const exp = tokenExpiry(account.token);
+      if (exp === undefined) {
+        continue;
+      }
+      const fireAt = exp * 1000 - RENEWAL_LEAD_MS;
+      const delay = Math.max(0, fireAt - Date.now());
+      const accountId = account.id;
+      const refreshToken = account.refreshToken;
+      const timer = setTimeout(async () => {
+        timersRef.current.delete(accountId);
+        try {
+          const token = await authApi.refresh(projectId, refreshToken);
+          persist((current) => ({
+            ...current,
+            accounts: current.accounts.map((item) =>
+              item.id === accountId ? { ...item, token } : item,
+            ),
+          }));
+        } catch (err) {
+          if (err instanceof AnnotationApiError && err.status === 401) {
+            removeAccount(accountId);
+          }
+        }
+      }, delay);
+      timers.set(account.id, timer);
+    }
+  }, [stored.accounts, authApi, projectId, persist, removeAccount]);
 
   const loginOptionsKey = `auth-users:${apiBaseUrl}:${projectId}`;
   const {
@@ -140,12 +224,6 @@ export function useAuthSessions(
       : "Unable to load users."
     : null;
 
-  /**
-   * A stored session outlives the account it names: a user deleted or
-   * deactivated server-side would otherwise stay signed in here while every
-   * request they make fails. The login list is the authoritative roster, so any
-   * session missing from it is dropped once the list has actually loaded.
-   */
   useEffect(() => {
     if (loginOptionsLoading || loginOptionsError || loginOptions.length === 0) {
       return;
@@ -156,12 +234,7 @@ export function useAuthSessions(
       if (accounts.length === current.accounts.length) {
         return current;
       }
-      return {
-        accounts,
-        activeId: accounts.some((account) => account.id === current.activeId)
-          ? current.activeId
-          : (accounts[0]?.id ?? null),
-      };
+      return { accounts, activeId: resolveActiveId(accounts, current.activeId) };
     });
   }, [loginOptions, loginOptionsError, loginOptionsLoading, persist]);
 
@@ -177,17 +250,19 @@ export function useAuthSessions(
   );
 
   const logout = useCallback(
-    (userId: string) => {
-      void authApi.logout(projectId, userId);
-      persist((current) => {
-        const accounts = current.accounts.filter((item) => item.id !== userId);
-        return {
-          accounts,
-          activeId: current.activeId === userId ? (accounts[0]?.id ?? null) : current.activeId,
-        };
-      });
+    async (userId: string) => {
+      let logoutError: unknown;
+      try {
+        await authApi.logout(projectId, userId);
+      } catch (err) {
+        logoutError = err;
+      }
+      removeAccount(userId);
+      if (logoutError) {
+        throw logoutError;
+      }
     },
-    [authApi, projectId, persist],
+    [authApi, projectId, removeAccount],
   );
 
   const switchAccount = useCallback(

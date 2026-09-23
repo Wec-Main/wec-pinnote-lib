@@ -82,11 +82,9 @@ export function UserFormModal({
   const organizationId = activeAccount?.organizationId;
 
   const projectsKey = `projects:${apiBaseUrl}:${authToken ?? ""}:${organizationId ?? ""}`;
-  const {
-    data: projectsData,
-    error: projectsFetchError,
-  } = useSharedFetch<Project[]>(projectsKey, (signal) =>
-    fetchProjects(apiBaseUrl, authToken, organizationId, signal),
+  const { data: projectsData, error: projectsFetchError } = useSharedFetch<Project[]>(
+    projectsKey,
+    (signal) => fetchProjects(apiBaseUrl, authToken, organizationId, signal),
   );
   const projects = useMemo(() => projectsData ?? [], [projectsData]);
   const projectsError = projectsFetchError

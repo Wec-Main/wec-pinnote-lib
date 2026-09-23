@@ -1,4 +1,4 @@
-import { useMemo, useRef } from "react";
+import { lazy, Suspense, useMemo, useRef } from "react";
 import {
   useAnnotationAuth,
   useAnnotationData,
@@ -7,14 +7,19 @@ import {
 import { useAnnotationPositions, type PositionedItem } from "../hooks/useAnnotationPosition";
 import { AnnotationComposer } from "./AnnotationComposer";
 import { AnnotationListPanel } from "./AnnotationListPanel";
-import { EpicFlowPanel } from "./EpicFlow";
-import { SettingsPanel } from "./Settings";
 import { AnnotationOverlay } from "./AnnotationOverlay";
 import { AnnotationPin } from "./AnnotationPin";
 import { AnnotationThreadPanel } from "./AnnotationThreadPanel";
 import { AnnotationToolbar } from "./AnnotationToolbar";
 import { TagPicker, TagPin } from "./TagPin";
 import { ConfirmDialog } from "./UserManagement/ConfirmDialog";
+
+const EpicFlowPanel = lazy(() =>
+  import("./EpicFlow").then((module) => ({ default: module.EpicFlowPanel })),
+);
+const SettingsPanel = lazy(() =>
+  import("./Settings").then((module) => ({ default: module.SettingsPanel })),
+);
 
 function positionItemsKey(items: PositionedItem[]): string {
   return items.map((item) => `${item.id}:${item.anchor.selector}`).join("|");
@@ -46,7 +51,6 @@ export function AnnotationLayer() {
   } = useAnnotationUi();
   const { activeAccount } = useAnnotationAuth();
 
-  // Pins expose comment content, so they stay hidden until someone is signed in.
   const visible = useMemo(() => {
     if (!activeAccount || !pinsVisible || (!modeEnabled && !config.showPinsWhenIdle)) {
       return [];
@@ -87,11 +91,6 @@ export function AnnotationLayer() {
     return items;
   }, [draft, selected, tagDraft, visible, visibleTags]);
 
-  // useAnnotationPositions tears down and rebuilds its resize/mutation
-  // observers whenever the `items` array identity changes, so a stable key of
-  // the position-relevant fields (id + selector) keeps that identity across
-  // renders where no anchor actually moved (e.g. every SSE-driven annotations
-  // replacement that only touches unrelated fields like comments or status).
   const nextItemsKey = positionItemsKey(rawPositionItems);
   const positionItemsRef = useRef(rawPositionItems);
   const previousKeyRef = useRef(nextItemsKey);
@@ -191,8 +190,16 @@ export function AnnotationLayer() {
         />
       ) : null}
       {listOpen && activeAccount ? <AnnotationListPanel /> : null}
-      {epicFlowOpen && activeAccount ? <EpicFlowPanel /> : null}
-      {userManagementOpen ? <SettingsPanel /> : null}
+      {epicFlowOpen && activeAccount ? (
+        <Suspense fallback={null}>
+          <EpicFlowPanel />
+        </Suspense>
+      ) : null}
+      {userManagementOpen ? (
+        <Suspense fallback={null}>
+          <SettingsPanel />
+        </Suspense>
+      ) : null}
       {discardPrompt ? (
         <ConfirmDialog
           title="Discard comment?"

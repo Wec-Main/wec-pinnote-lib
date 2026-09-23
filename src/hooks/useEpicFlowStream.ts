@@ -4,14 +4,15 @@ import { AnnotationApiError } from "../types/annotation.types";
 import { fetchSseTicket } from "../services/streamApi";
 import { isTokenUnexpired } from "./useAuthSessions";
 
+const EPICFLOW_PAGE_KEY = "__epicflow__";
+
 const EVENT_TYPES: StreamEventType[] = [
-  "annotation.created",
-  "annotation.updated",
-  "annotation.deleted",
-  "comment.created",
-  "comment.updated",
-  "comment.deleted",
-  "page-status.updated",
+  "epic.created",
+  "epic.updated",
+  "epic.deleted",
+  "user_story.created",
+  "user_story.updated",
+  "user_story.deleted",
 ];
 
 const RESYNC_COOLDOWN_MS = 5000;
@@ -32,31 +33,31 @@ function isAuthFailure(err: unknown): boolean {
   return err instanceof AnnotationApiError && (err.status === 401 || err.status === 403);
 }
 
-export interface AnnotationStreamOptions {
+export interface EpicFlowStreamOptions {
   apiBaseUrl: string;
   projectId: string;
-  pageKey: string;
-  authToken: string | undefined;
+  getAuthToken: (() => string | Promise<string>) | undefined;
   enabled: boolean;
   onEvent: (event: StreamEvent) => void;
   onResync: () => void;
 }
 
-export function useAnnotationStream({
+export function useEpicFlowStream({
   apiBaseUrl,
   projectId,
-  pageKey,
-  authToken,
+  getAuthToken,
   enabled,
   onEvent,
   onResync,
-}: AnnotationStreamOptions): StreamConnectionState {
+}: EpicFlowStreamOptions): StreamConnectionState {
   const [state, setState] = useState<StreamConnectionState>("closed");
   const onEventRef = useRef(onEvent);
   const onResyncRef = useRef(onResync);
+  const getAuthTokenRef = useRef(getAuthToken);
   const lastResyncRef = useRef(0);
   onEventRef.current = onEvent;
   onResyncRef.current = onResync;
+  getAuthTokenRef.current = getAuthToken;
 
   const resync = () => {
     const now = Date.now();
@@ -68,18 +69,8 @@ export function useAnnotationStream({
   };
 
   useEffect(() => {
-    if (
-      !enabled ||
-      !authToken ||
-      typeof window === "undefined" ||
-      typeof EventSource === "undefined"
-    ) {
+    if (!enabled || typeof window === "undefined" || typeof EventSource === "undefined") {
       setState("closed");
-      return;
-    }
-
-    if (!isTokenUnexpired(authToken)) {
-      setState("unauthenticated");
       return;
     }
 
@@ -122,9 +113,19 @@ export function useAnnotationStream({
       }
       setState(openedOnce ? "reconnecting" : "connecting");
 
+      const resolvedToken = await getAuthTokenRef.current?.();
+      if (stopped) {
+        return;
+      }
+      if (!resolvedToken || !isTokenUnexpired(resolvedToken)) {
+        setState("unauthenticated");
+        return;
+      }
+
       let ticket: string;
       try {
-        ticket = (await fetchSseTicket(apiBaseUrl, authToken, projectId, pageKey)).ticket;
+        ticket = (await fetchSseTicket(apiBaseUrl, resolvedToken, projectId, EPICFLOW_PAGE_KEY))
+          .ticket;
       } catch (err) {
         if (stopped) {
           return;
@@ -185,7 +186,7 @@ export function useAnnotationStream({
       source?.close();
       setState("closed");
     };
-  }, [apiBaseUrl, authToken, enabled, pageKey, projectId]);
+  }, [apiBaseUrl, enabled, projectId]);
 
   return state;
 }

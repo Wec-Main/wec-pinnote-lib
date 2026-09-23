@@ -88,8 +88,8 @@ export function ProjectsTab() {
 
   const organizationName = useCallback(
     (organizationId: string) =>
-      organizationList.find((organization) => organization.id === organizationId)
-        ?.companyName ?? organizationId,
+      organizationList.find((organization) => organization.id === organizationId)?.companyName ??
+      organizationId,
     [organizationList],
   );
 

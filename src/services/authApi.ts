@@ -47,19 +47,37 @@ export function createAuthApi(apiBaseUrl: string): AuthApiClient {
         );
       }
       const payload = (await response.json()) as {
-        user: Omit<AuthSession, "token">;
+        user: Omit<AuthSession, "token" | "refreshToken">;
         token: string;
+        refreshToken: string;
       };
-      return { ...payload.user, token: payload.token };
+      return { ...payload.user, token: payload.token, refreshToken: payload.refreshToken };
     },
 
     async logout(projectId, userId, signal) {
-      await fetch(joinUrl(apiBaseUrl, "/auth/logout"), {
+      const response = await fetch(joinUrl(apiBaseUrl, "/auth/logout"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ projectId, userId }),
         signal,
-      }).catch(() => undefined);
+      });
+      if (!response.ok) {
+        throw new AnnotationApiError(await readError(response), response.status);
+      }
+    },
+
+    async refresh(projectId, refreshToken, signal) {
+      const response = await fetch(joinUrl(apiBaseUrl, "/auth/refresh"), {
+        method: "POST",
+        headers: { Accept: "application/json", "Content-Type": "application/json" },
+        body: JSON.stringify({ projectId, refreshToken }),
+        signal,
+      });
+      if (!response.ok) {
+        throw new AnnotationApiError(await readError(response), response.status);
+      }
+      const payload = (await response.json()) as { token: string };
+      return payload.token;
     },
   };
 }

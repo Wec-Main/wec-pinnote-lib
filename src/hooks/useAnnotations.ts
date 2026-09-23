@@ -19,6 +19,13 @@ function nextNumber(annotations: Annotation[]): number {
   return annotations.reduce((max, item) => Math.max(max, item.number), 0) + 1;
 }
 
+class StaleAccountError extends Error {
+  constructor() {
+    super("Account switched before the request resolved");
+    this.name = "StaleAccountError";
+  }
+}
+
 function errorMessage(error: unknown): string {
   if (error instanceof AnnotationApiError) {
     return error.message;
@@ -45,14 +52,16 @@ export function useAnnotationCollection(
   const [actionError, setActionError] = useState<string | null>(null);
   const [reloadToken, setReloadToken] = useState(0);
   const annotationsRef = useRef(annotations);
+  const currentUserRef = useRef(currentUser);
 
   useEffect(() => {
     annotationsRef.current = annotations;
   }, [annotations]);
 
-  // Both endpoints require a signed-in actor. Requesting them while logged out
-  // returns 401 and paints an error the visitor cannot act on, so the load waits
-  // for an account and clears itself when one signs out.
+  useEffect(() => {
+    currentUserRef.current = currentUser;
+  }, [currentUser]);
+
   useEffect(() => {
     const controller = new AbortController();
     let ignore = false;
@@ -111,6 +120,17 @@ export function useAnnotationCollection(
     setReloadToken((value) => value + 1);
   }, []);
 
+  const writeControllerRef = useRef<AbortController | null>(null);
+  const writeAccountIdRef = useRef(currentUser.id);
+
+  useEffect(() => {
+    if (writeAccountIdRef.current !== currentUser.id) {
+      writeAccountIdRef.current = currentUser.id;
+      writeControllerRef.current?.abort();
+      writeControllerRef.current = null;
+    }
+  }, [currentUser.id]);
+
   const onStreamEvent = useCallback((event: StreamEvent) => {
     const result = applyStreamEvent(annotationsRef.current, event);
     if (result.annotations !== annotationsRef.current) {
@@ -136,6 +156,7 @@ export function useAnnotationCollection(
       const tempId = createClientId("temp");
       const now = new Date().toISOString();
       const assignedNumber = nextNumber(annotationsRef.current);
+      const requestingUser = currentUserRef.current;
       const optimistic: Annotation = {
         id: tempId,
         projectId: request.projectId,
@@ -147,12 +168,12 @@ export function useAnnotationCollection(
           {
             id: createClientId("comment"),
             message: request.comment.message,
-            createdBy: currentUser,
+            createdBy: requestingUser,
             createdAt: now,
             updatedAt: now,
           },
         ],
-        createdBy: currentUser,
+        createdBy: requestingUser,
         createdAt: now,
         updatedAt: now,
       };
@@ -160,13 +181,21 @@ export function useAnnotationCollection(
       setAnnotations((current) => [...current, optimistic]);
       setActionError(null);
 
+      writeControllerRef.current?.abort();
+      const controller = new AbortController();
+      writeControllerRef.current = controller;
+
       try {
-        const created = await api.createAnnotation(request);
+        const created = await api.createAnnotation(request, controller.signal);
+        if (currentUserRef.current.id !== requestingUser.id) {
+          setAnnotations((current) => current.filter((item) => item.id !== tempId));
+          throw new StaleAccountError();
+        }
         const withLocalIdentity: Annotation = {
           ...created,
-          createdBy: currentUser,
+          createdBy: requestingUser,
           comments: created.comments.map((comment, index) =>
-            index === 0 ? { ...comment, createdBy: currentUser } : comment,
+            index === 0 ? { ...comment, createdBy: requestingUser } : comment,
           ),
         };
         setAnnotations((current) =>
@@ -175,21 +204,28 @@ export function useAnnotationCollection(
         return withLocalIdentity;
       } catch (err) {
         setAnnotations((current) => current.filter((item) => item.id !== tempId));
+        if (err instanceof StaleAccountError) {
+          throw err;
+        }
+        if (err instanceof DOMException && err.name === "AbortError") {
+          throw new StaleAccountError();
+        }
         setActionError(errorMessage(err));
         throw err;
       }
     },
-    [api, currentUser],
+    [api],
   );
 
   const addComment = useCallback(
     async (annotationId: string, message: string) => {
       const tempId = createClientId("comment");
       const now = new Date().toISOString();
+      const requestingUser = currentUserRef.current;
       const optimistic: AnnotationComment = {
         id: tempId,
         message,
-        createdBy: currentUser,
+        createdBy: requestingUser,
         createdAt: now,
         updatedAt: now,
       };
@@ -203,13 +239,31 @@ export function useAnnotationCollection(
       );
       setActionError(null);
 
+      writeControllerRef.current?.abort();
+      const controller = new AbortController();
+      writeControllerRef.current = controller;
+
       try {
-        const created = await api.createComment(annotationId, {
-          message,
-          authorId: currentUser.id,
-          authorName: currentUser.name,
-        });
-        const withLocalIdentity: AnnotationComment = { ...created, createdBy: currentUser };
+        const created = await api.createComment(
+          annotationId,
+          {
+            message,
+            authorId: requestingUser.id,
+            authorName: requestingUser.name,
+          },
+          controller.signal,
+        );
+        if (currentUserRef.current.id !== requestingUser.id) {
+          setAnnotations((current) =>
+            current.map((item) =>
+              item.id === annotationId
+                ? { ...item, comments: item.comments.filter((comment) => comment.id !== tempId) }
+                : item,
+            ),
+          );
+          return;
+        }
+        const withLocalIdentity: AnnotationComment = { ...created, createdBy: requestingUser };
         setAnnotations((current) =>
           current.map((item) =>
             item.id === annotationId
@@ -230,11 +284,14 @@ export function useAnnotationCollection(
               : item,
           ),
         );
+        if (err instanceof DOMException && err.name === "AbortError") {
+          return;
+        }
         setActionError(errorMessage(err));
         throw err;
       }
     },
-    [api, currentUser],
+    [api],
   );
 
   const editComment = useCallback(

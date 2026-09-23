@@ -22,8 +22,6 @@ export function LoginDialog({ user, onCancel, onSubmit }: LoginDialogProps) {
   const inputRef = useRef<HTMLInputElement>(null);
   useFocusTrap(dialogRef, inputRef);
 
-  // Dismissing mid-request would leave the login resolving against a closed
-  // dialog, so the exits stay shut until it settles.
   const dismiss = useCallback(() => {
     if (!pending) {
       onCancel();
@@ -65,7 +63,6 @@ export function LoginDialog({ user, onCancel, onSubmit }: LoginDialogProps) {
           </span>
           <span className="wpn-login-dialog__identity-copy">
             <span className="wpn-login-dialog__name">{user.name}</span>
-            <span className="wpn-login-dialog__email">{user.email}</span>
           </span>
         </div>
         <h2 className="wpn-sr-only" id={titleId}>
