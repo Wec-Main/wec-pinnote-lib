@@ -39,10 +39,7 @@
   box-sizing: border-box;
 }
 
-.wpn-root button,
-.wpn-root textarea,
-.wpn-root input,
-.wpn-root select {
+.wpn-root :is(button, textarea, input, select):not(.wpn-flow-panel__body *) {
   font: inherit;
 }
 

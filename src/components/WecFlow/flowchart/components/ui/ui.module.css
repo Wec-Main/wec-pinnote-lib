@@ -5,23 +5,34 @@
   align-items: center;
   justify-content: center;
   gap: 6px;
-  height: 32px;
-  padding: 0 11px;
-  border: 1px solid var(--fb-border);
-  border-radius: 8px;
+  height: 30px;
+  padding: 0 10px;
+  border: 1px solid var(--fb-border-strong);
+  border-radius: 7px;
   font: inherit;
-  font-size: 13px;
+  font-size: 12px;
+  line-height: 1;
   font-weight: 500;
   color: var(--fb-text);
   background: var(--fb-panel);
   white-space: nowrap;
   cursor: pointer;
-  transition: background 0.12s, border-color 0.12s, color 0.12s;
+  transition: background 0.12s, border-color 0.12s, color 0.12s, transform 0.06s;
 }
 
 .btn:hover:not(:disabled) {
-  border-color: var(--fb-border-strong);
+  border-color: var(--fb-border-hover);
   background: var(--fb-panel-muted);
+}
+
+.btn svg {
+  flex: none;
+  width: 14px;
+  height: 14px;
+}
+
+.btn:active:not(:disabled) {
+  transform: translateY(0.5px);
 }
 
 .btn:disabled {
@@ -36,15 +47,12 @@
 }
 
 .btnGhost {
-  border-color: transparent;
   background: transparent;
-  color: var(--fb-text-muted);
+  color: var(--fb-text);
 }
 
 .btnGhost:hover:not(:disabled) {
-  border-color: transparent;
   color: var(--fb-text);
-  background: var(--fb-panel-muted);
 }
 
 .btnPrimary {
@@ -75,7 +83,7 @@
 }
 
 .iconBtn {
-  width: 32px;
+  width: 30px;
   padding: 0;
 }
 

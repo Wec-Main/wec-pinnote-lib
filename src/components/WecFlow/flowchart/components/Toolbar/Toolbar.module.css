@@ -36,7 +36,7 @@
   border: 1px solid transparent;
   border-radius: 7px;
   font: inherit;
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 600;
   color: var(--fb-text);
   background: transparent;
@@ -67,8 +67,8 @@
 .group {
   display: flex;
   align-items: center;
-  gap: 2px;
-  padding-right: 6px;
+  gap: 6px;
+  padding-right: 8px;
   border-right: 1px solid var(--fb-border);
 }
 

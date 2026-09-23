@@ -99,9 +99,6 @@ export const Toolbar = memo(function Toolbar({ brand, onNotify, onExport, extraA
           </button>
         </div>
         <div className={styles.group}>
-          <button type="button" className={cx(ui.btn, ui.btnGhost)} onClick={() => engine.fitView()} title="Fit all nodes into view">
-            <Icon name="fit" /> Fit View
-          </button>
           <button type="button" className={cx(ui.btn, ui.btnGhost)} onClick={validate} title="Check the flow for problems">
             <Icon name="check" /> Validate
             {errorCount !== null && errorCount > 0 && <span className={styles.badge}>{errorCount}</span>}

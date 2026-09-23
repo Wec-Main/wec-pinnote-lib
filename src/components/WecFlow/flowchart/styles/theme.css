@@ -11,6 +11,7 @@
   --fb-panel-muted: rgba(255, 255, 255, 0.06);
   --fb-border: rgba(255, 255, 255, 0.1);
   --fb-border-strong: rgba(255, 255, 255, 0.18);
+  --fb-border-hover: rgba(255, 255, 255, 0.32);
   --fb-text: #fff;
   --fb-text-muted: rgba(255, 255, 255, 0.6);
   --fb-text-subtle: rgba(255, 255, 255, 0.4);
