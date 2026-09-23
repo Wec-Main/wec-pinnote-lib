@@ -47,9 +47,13 @@ export function AnnotationOverlay() {
     setTagModeEnabled,
     tagDraft,
     startTagDraft,
+    flowPinModeEnabled,
+    setFlowPinModeEnabled,
+    flowPinDraft,
+    startFlowPinDraft,
   } = useAnnotationUi();
-  const placing = modeEnabled || tagModeEnabled;
-  const pendingDraft = draft ?? tagDraft;
+  const placing = modeEnabled || tagModeEnabled || flowPinModeEnabled;
+  const pendingDraft = draft ?? tagDraft ?? flowPinDraft;
   const [highlight, setHighlight] = useState<DOMRect | null>(null);
   const [announcement, setAnnouncement] = useState("");
   const overlayRef = useRef<HTMLDivElement>(null);
@@ -67,15 +71,20 @@ export function AnnotationOverlay() {
     if (tagModeEnabled) {
       setTagModeEnabled(false);
     }
+    if (flowPinModeEnabled) {
+      setFlowPinModeEnabled(false);
+    }
   });
 
   useEffect(() => {
     if (placing) {
-      setAnnouncement(tagModeEnabled ? "Tagging mode enabled" : "Annotation mode enabled");
+      setAnnouncement(
+        flowPinModeEnabled ? "Flow placement mode enabled" : tagModeEnabled ? "Tagging mode enabled" : "Annotation mode enabled",
+      );
     } else {
       setAnnouncement((current) => (current ? "Annotation mode disabled" : current));
     }
-  }, [placing, tagModeEnabled]);
+  }, [flowPinModeEnabled, placing, tagModeEnabled]);
 
   useEffect(() => {
     if (!pendingDraft) {
@@ -97,13 +106,15 @@ export function AnnotationOverlay() {
       draftLock.current = true;
       const anchor = createElementAnchor(target, clientX, clientY);
       const label = getElementLabel(target);
-      if (tagModeEnabled) {
+      if (flowPinModeEnabled) {
+        startFlowPinDraft(anchor, label);
+      } else if (tagModeEnabled) {
         startTagDraft(anchor, label);
       } else {
         startDraft(anchor, label);
       }
     },
-    [pendingDraft, startDraft, startTagDraft, tagModeEnabled],
+    [flowPinModeEnabled, pendingDraft, startDraft, startFlowPinDraft, startTagDraft, tagModeEnabled],
   );
 
   useEffect(() => {
@@ -212,7 +223,11 @@ export function AnnotationOverlay() {
       {liveRegion}
       <div
         ref={overlayRef}
-        className={["wpn-overlay", tagModeEnabled ? "wpn-overlay--tag" : ""]
+        className={[
+          "wpn-overlay",
+          tagModeEnabled ? "wpn-overlay--tag" : "",
+          flowPinModeEnabled ? "wpn-overlay--flow" : "",
+        ]
           .filter(Boolean)
           .join(" ")}
         onPointerMove={onPointerMove}

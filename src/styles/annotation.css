@@ -5519,7 +5519,8 @@ body.wpn-epicflow-resizing {
   }
 }
 
-.wpn-overlay--tag {
+.wpn-overlay--tag,
+.wpn-overlay--flow {
   cursor: cell;
 }
 
@@ -5637,6 +5638,114 @@ body.wpn-epicflow-resizing {
   padding: 6px 2px;
   color: #fca5a5;
   font-size: 11.5px;
+}
+
+.wpn-flow-pin {
+  position: fixed;
+  transform: translate(-50%, -50%);
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  max-width: 180px;
+  height: 24px;
+  padding: 0 10px 0 8px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--wpn-accent);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.28),
+    0 1px 3px rgba(0, 0, 0, 0.35);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1;
+  cursor: pointer;
+  z-index: 2;
+}
+
+.wpn-flow-pin svg {
+  flex-shrink: 0;
+  width: 12px;
+  height: 12px;
+}
+
+.wpn-flow-pin__label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.wpn-flow-pin--orphaned {
+  opacity: 0.6;
+  outline: 1px dashed rgba(255, 255, 255, 0.7);
+  outline-offset: 1px;
+}
+
+.wpn-flow-pin-picker {
+  position: fixed;
+  transform: translate(-50%, 12px);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 240px;
+  padding: 12px;
+  background: rgba(0, 0, 0, 0.9);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 10px;
+  box-shadow: var(--wpn-shadow);
+  color: #fff;
+  pointer-events: auto;
+  z-index: 5;
+}
+
+.wpn-flow-pin-picker__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.wpn-flow-pin-picker__title {
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.wpn-flow-pin-picker__input {
+  width: 100%;
+  height: 32px;
+  padding: 0 10px;
+  border: 1px solid rgba(255, 255, 255, 0.24);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.06);
+  color: #fff;
+  font-size: 13px;
+}
+
+.wpn-flow-pin-picker__input:focus {
+  outline: none;
+  border-color: var(--wpn-accent);
+}
+
+.wpn-flow-pin-picker__footer {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.wpn-flow-pin-picker__footer .wpn-btn {
+  padding: 6px 12px;
+  font-size: 12px;
+  border-radius: 8px;
+}
+
+.wpn-flow-pin-picker__footer .wpn-btn--ghost {
+  border-color: rgba(255, 255, 255, 0.24);
+  color: #fff;
+}
+
+.wpn-flow-pin-picker__footer .wpn-btn--ghost:hover {
+  background: rgba(255, 255, 255, 0.1);
 }
 
 .wpn-modal-scrim {

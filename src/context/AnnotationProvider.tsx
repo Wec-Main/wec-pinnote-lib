@@ -26,6 +26,7 @@ import {
 import { resolveElement } from "../utils/elementResolver";
 import { isBoolean, usePersistentState } from "../hooks/usePersistentState";
 import { useAnnotationTags } from "../hooks/useAnnotationTags";
+import { useFlowPins } from "../hooks/useFlowPins";
 import { useSharedFetch } from "../hooks/useSharedFetch";
 import { fetchTags } from "../services/tagsApi";
 import type { ProjectTag } from "../types/tag.types";
@@ -149,6 +150,8 @@ export function AnnotationProvider({ config, children }: AnnotationProviderProps
     enabled: Boolean(activeAccount),
   });
 
+  const flowPins = useFlowPins({ projectId, pageKey });
+
   const projectTagsToken = activeAccount?.token;
   const projectTagsKey = projectTagsToken
     ? `project-tags:${activeConfig.apiBaseUrl}:${projectTagsToken}:${projectId}:active`
@@ -163,10 +166,11 @@ export function AnnotationProvider({ config, children }: AnnotationProviderProps
       if (enabled) {
         tags.setTagModeEnabled(false);
         tags.cancelTagDraft();
+        flowPins.setFlowPinModeEnabled(false);
       }
       setModeEnabled(enabled);
     },
-    [setModeEnabled, tags],
+    [flowPins, setModeEnabled, tags],
   );
 
   const setTagModeEnabled = useCallback(
@@ -177,12 +181,29 @@ export function AnnotationProvider({ config, children }: AnnotationProviderProps
       if (enabled) {
         setModeEnabled(false);
         setDraft(null);
+        flowPins.setFlowPinModeEnabled(false);
       } else {
         tags.cancelTagDraft();
       }
       tags.setTagModeEnabled(enabled);
     },
-    [activeAccount, setModeEnabled, tags],
+    [activeAccount, flowPins, setModeEnabled, tags],
+  );
+
+  const setFlowPinModeEnabled = useCallback(
+    (enabled: boolean) => {
+      if (enabled && !activeAccount) {
+        return;
+      }
+      if (enabled) {
+        setModeEnabled(false);
+        setDraft(null);
+        tags.setTagModeEnabled(false);
+        tags.cancelTagDraft();
+      }
+      flowPins.setFlowPinModeEnabled(enabled);
+    },
+    [activeAccount, flowPins, setModeEnabled, tags],
   );
 
   const openListExclusive = useCallback(
@@ -254,8 +275,10 @@ export function AnnotationProvider({ config, children }: AnnotationProviderProps
       setEpicFlowOpen(false);
       setUserManagementOpen(false);
       setAuditHistoryOpen(false);
+      flowPins.setFlowPinModeEnabled(false);
+      flowPins.selectFlowPin(null);
     }
-  }, [activeAccount, setAuditHistoryOpen, setEpicFlowOpen, setListOpen, setUserManagementOpen]);
+  }, [activeAccount, flowPins, setAuditHistoryOpen, setEpicFlowOpen, setListOpen, setUserManagementOpen]);
 
   useEffect(() => {
     document.body.classList.toggle("wpn-mode-active", resolved.enabled && modeEnabled);
@@ -424,6 +447,8 @@ export function AnnotationProvider({ config, children }: AnnotationProviderProps
       projectTags,
       submitTagDraft: tags.submitTagDraft,
       removeAnnotationTag: tags.removeAnnotationTag,
+      flowPins: flowPins.flowPins,
+      updateFlowPinFlow: flowPins.updateFlowPinFlow,
     }),
     [
       activeConfig,
@@ -448,6 +473,8 @@ export function AnnotationProvider({ config, children }: AnnotationProviderProps
       tags.annotationTags,
       tags.submitTagDraft,
       tags.removeAnnotationTag,
+      flowPins.flowPins,
+      flowPins.updateFlowPinFlow,
     ],
   );
 
@@ -476,6 +503,17 @@ export function AnnotationProvider({ config, children }: AnnotationProviderProps
       tagDraft: tags.tagDraft,
       startTagDraft: tags.startTagDraft,
       cancelTagDraft: tags.cancelTagDraft,
+      flowPinModeEnabled: flowPins.flowPinModeEnabled,
+      setFlowPinModeEnabled,
+      flowPinsVisible: flowPins.flowPinsVisible,
+      setFlowPinsVisible: flowPins.setFlowPinsVisible,
+      flowPinDraft: flowPins.flowPinDraft,
+      startFlowPinDraft: flowPins.startFlowPinDraft,
+      cancelFlowPinDraft: flowPins.cancelFlowPinDraft,
+      submitFlowPinDraft: flowPins.submitFlowPinDraft,
+      removeFlowPin: flowPins.removeFlowPin,
+      selectedFlowPinId: flowPins.selectedFlowPinId,
+      selectFlowPin: flowPins.selectFlowPin,
       listOpen,
       setListOpen: openListExclusive,
       epicFlowOpen,
@@ -503,6 +541,17 @@ export function AnnotationProvider({ config, children }: AnnotationProviderProps
       modeEnabled,
       pinsVisible,
       setAuditHistoryOpen,
+      setFlowPinModeEnabled,
+      flowPins.flowPinModeEnabled,
+      flowPins.flowPinsVisible,
+      flowPins.setFlowPinsVisible,
+      flowPins.flowPinDraft,
+      flowPins.startFlowPinDraft,
+      flowPins.cancelFlowPinDraft,
+      flowPins.submitFlowPinDraft,
+      flowPins.removeFlowPin,
+      flowPins.selectedFlowPinId,
+      flowPins.selectFlowPin,
       openEpicFlowExclusive,
       openFlowExclusive,
       openListExclusive,

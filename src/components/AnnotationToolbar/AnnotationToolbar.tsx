@@ -62,6 +62,10 @@ export function AnnotationToolbar() {
     setTagModeEnabled,
     tagsVisible,
     setTagsVisible,
+    flowPinModeEnabled,
+    setFlowPinModeEnabled,
+    flowPinsVisible,
+    setFlowPinsVisible,
     setModeEnabled,
     selectAnnotation,
     requestCancelDraft,
@@ -479,6 +483,30 @@ export function AnnotationToolbar() {
             </div>
             <ToolbarAuthControl />
             <span className="wpn-toolbar__divider" aria-hidden="true" />
+            <Tooltip label={loggedOut ? "Log in first" : "Comments"} placement="bottom">
+              <button
+                type="button"
+                className={[
+                  "wpn-toolbar__list",
+                  listOpen ? "wpn-toolbar__list--active" : "",
+                  loggedOut ? "wpn-toolbar__list--blocked" : "",
+                ]
+                  .filter(Boolean)
+                  .join(" ")}
+                aria-pressed={listOpen}
+                aria-disabled={loggedOut}
+                aria-label="Toggle comments"
+                onClick={() => {
+                  if (!loggedOut) {
+                    setListOpen(!listOpen);
+                  }
+                }}
+              >
+                <Icon name="comment" className="wpn-toolbar__list-icon" />
+                <span className="wpn-toolbar__count">{annotations.length}</span>
+              </button>
+            </Tooltip>
+            <span className="wpn-toolbar__divider" aria-hidden="true" />
             <AnnotationToggleButton />
             <Tooltip label={pinsVisible ? "Hide pins" : "Show pins"} placement="bottom">
               <button
@@ -530,34 +558,45 @@ export function AnnotationToolbar() {
                 <Icon name={tagsVisible ? "eye" : "eyeOff"} className="wpn-toggle__icon" />
               </button>
             </Tooltip>
-            <span className="wpn-toolbar__divider" aria-hidden="true" />
-            <Tooltip label={loggedOut ? "Log in first" : "Comments"} placement="bottom">
-              <button
-                type="button"
-                className={[
-                  "wpn-toolbar__list",
-                  listOpen ? "wpn-toolbar__list--active" : "",
-                  loggedOut ? "wpn-toolbar__list--blocked" : "",
-                ]
-                  .filter(Boolean)
-                  .join(" ")}
-                aria-pressed={listOpen}
-                aria-disabled={loggedOut}
-                aria-label="Toggle comments"
-                onClick={() => {
-                  if (!loggedOut) {
-                    setListOpen(!listOpen);
-                  }
-                }}
-              >
-                <Icon name="comment" className="wpn-toolbar__list-icon" />
-                <span className="wpn-toolbar__count">{annotations.length}</span>
-              </button>
-            </Tooltip>
             {/* Comments only load for a signed-in actor, so refreshing and the
                 failure it would report are meaningless while logged out. */}
             {loggedOut ? null : (
               <>
+                <span className="wpn-toolbar__divider" aria-hidden="true" />
+                <Tooltip
+                  label={loggedOut ? "Log in first" : flowPinModeEnabled ? "Stop placing flows" : "Place a flow"}
+                  placement="bottom"
+                >
+                  <button
+                    type="button"
+                    className={[
+                      "wpn-toggle",
+                      flowPinModeEnabled ? "wpn-toggle--active" : "",
+                      loggedOut ? "wpn-toggle--blocked" : "",
+                    ]
+                      .filter(Boolean)
+                      .join(" ")}
+                    aria-pressed={flowPinModeEnabled}
+                    aria-disabled={loggedOut}
+                    aria-label={flowPinModeEnabled ? "Stop placing flows" : "Place a flow"}
+                    onClick={() => setFlowPinModeEnabled(!flowPinModeEnabled)}
+                  >
+                    <Icon name="flow" className="wpn-toggle__icon" />
+                  </button>
+                </Tooltip>
+                <Tooltip label={flowPinsVisible ? "Hide flows" : "Show flows"} placement="bottom">
+                  <button
+                    type="button"
+                    className={["wpn-toolbar__eye", flowPinsVisible ? "" : "wpn-toolbar__eye--hidden"]
+                      .filter(Boolean)
+                      .join(" ")}
+                    aria-pressed={!flowPinsVisible}
+                    aria-label={flowPinsVisible ? "Hide flows" : "Show flows"}
+                    onClick={() => setFlowPinsVisible(!flowPinsVisible)}
+                  >
+                    <Icon name={flowPinsVisible ? "eye" : "eyeOff"} className="wpn-toggle__icon" />
+                  </button>
+                </Tooltip>
                 <span className="wpn-toolbar__divider" aria-hidden="true" />
                 <Tooltip label={loading ? "Refreshing..." : "Refresh comments"} placement="bottom">
                   <button

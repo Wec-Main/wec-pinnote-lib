@@ -12,6 +12,7 @@ import { AnnotationPin } from "./AnnotationPin";
 import { AnnotationThreadPanel } from "./AnnotationThreadPanel";
 import { AnnotationToolbar } from "./AnnotationToolbar";
 import { TagPicker, TagPin } from "./TagPin";
+import { FlowPinPanel, FlowPinPicker, FlowPinPin } from "./FlowPin";
 import { ConfirmDialog } from "./UserManagement/ConfirmDialog";
 
 const EpicFlowPanel = lazy(() =>
@@ -34,6 +35,7 @@ export function AnnotationLayer() {
     config,
     annotationTags,
     removeAnnotationTag,
+    flowPins,
     actionError,
     clearActionError,
   } = useAnnotationData();
@@ -45,6 +47,10 @@ export function AnnotationLayer() {
     pinsVisible,
     tagsVisible,
     tagDraft,
+    flowPinsVisible,
+    flowPinDraft,
+    selectedFlowPinId,
+    selectFlowPin,
     listOpen,
     epicFlowOpen,
     flowOpen,
@@ -76,6 +82,11 @@ export function AnnotationLayer() {
     [activeAccount, annotationTags, tagsVisible],
   );
 
+  const visibleFlowPins = useMemo(
+    () => (activeAccount && flowPinsVisible ? flowPins : []),
+    [activeAccount, flowPins, flowPinsVisible],
+  );
+
   const selected = activeAccount ? annotations.find((item) => item.id === selectedId) : undefined;
 
   const rawPositionItems = useMemo(() => {
@@ -92,8 +103,14 @@ export function AnnotationLayer() {
     if (tagDraft) {
       items.push({ id: tagDraft.id, anchor: tagDraft.anchor });
     }
+    for (const flowPin of visibleFlowPins) {
+      items.push({ id: flowPin.id, anchor: flowPin.anchor });
+    }
+    if (flowPinDraft) {
+      items.push({ id: flowPinDraft.id, anchor: flowPinDraft.anchor });
+    }
     return items;
-  }, [draft, selected, tagDraft, visible, visibleTags]);
+  }, [draft, flowPinDraft, selected, tagDraft, visible, visibleFlowPins, visibleTags]);
 
   const nextItemsKey = positionItemsKey(rawPositionItems);
   const positionItemsRef = useRef(rawPositionItems);
@@ -112,6 +129,16 @@ export function AnnotationLayer() {
         y: tagDraft.anchor.fallbackY,
         resolved: true,
       })
+    : undefined;
+  const flowPinDraftPosition = flowPinDraft
+    ? (positions.get(flowPinDraft.id) ?? {
+        x: flowPinDraft.anchor.fallbackX,
+        y: flowPinDraft.anchor.fallbackY,
+        resolved: true,
+      })
+    : undefined;
+  const selectedFlowPin = selectedFlowPinId
+    ? flowPins.find((item) => item.id === selectedFlowPinId)
     : undefined;
   const draftPosition = draft
     ? (positions.get(draft.id) ?? {
@@ -166,6 +193,26 @@ export function AnnotationLayer() {
       {tagDraft && tagDraftPosition ? (
         <TagPicker x={tagDraftPosition.x} y={tagDraftPosition.y} />
       ) : null}
+      {visibleFlowPins.map((flowPin) => {
+        const position = positions.get(flowPin.id);
+        if (!position) {
+          return null;
+        }
+        return (
+          <FlowPinPin
+            key={flowPin.id}
+            name={flowPin.name}
+            x={position.x}
+            y={position.y}
+            resolvedTarget={position.resolved}
+            onSelect={() => selectFlowPin(flowPin.id)}
+          />
+        );
+      })}
+      {flowPinDraft && flowPinDraftPosition ? (
+        <FlowPinPicker x={flowPinDraftPosition.x} y={flowPinDraftPosition.y} />
+      ) : null}
+      {selectedFlowPin ? <FlowPinPanel key={selectedFlowPin.id} flowPin={selectedFlowPin} /> : null}
       {draft && draftPosition ? (
         <>
           {pinsVisible ? (
