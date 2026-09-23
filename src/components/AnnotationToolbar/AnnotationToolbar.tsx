@@ -252,7 +252,7 @@ export function AnnotationToolbar() {
           })}
         >
           <span className="wpn-launcher-item__icon-wrap">
-            <Icon name="flow" className="wpn-launcher-item__icon" />
+            <Icon name="flow" />
           </span>
         </button>
       </Tooltip>

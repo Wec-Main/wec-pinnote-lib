@@ -118,10 +118,10 @@ const PATHS: Record<IconName, ReactElement> = {
   ),
   flow: (
     <>
-      <rect x="3.5" y="4" width="6" height="4.5" rx="1" />
-      <rect x="14.5" y="4" width="6" height="4.5" rx="1" />
-      <rect x="9" y="15.5" width="6" height="4.5" rx="1" />
-      <path d="M6.5 8.5v2a2 2 0 0 0 2 2h1M17.5 8.5v2a2 2 0 0 1-2 2h-1M12 12.5v3" />
+      <circle cx="6" cy="5.5" r="2.2" />
+      <circle cx="6" cy="18.5" r="2.2" />
+      <circle cx="18" cy="12" r="2.2" />
+      <path d="M6 7.7v8.6M8 6.2l7.3 4.6M8 17.8l7.3-4.6" />
     </>
   ),
   comment: (

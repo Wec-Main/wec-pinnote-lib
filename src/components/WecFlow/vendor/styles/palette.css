@@ -4,11 +4,11 @@
   box-sizing: border-box;
   overflow-y: auto;
   padding: 12px;
-  background-color: #fafafa;
-  border-right: 1px solid #e2e2e2;
+  background-color: transparent;
+  border-right: 1px solid rgba(255, 255, 255, 0.12);
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica,
     Arial, sans-serif;
-  color: #2b2b2b;
+  color: #fff;
 }
 
 .wec-flow-palette__header {
@@ -17,13 +17,13 @@
   font-weight: 600;
   letter-spacing: 0.04em;
   text-transform: uppercase;
-  color: #4a4a4a;
+  color: rgba(255, 255, 255, 0.72);
 }
 
 .wec-flow-palette__note {
   margin: 0 0 10px 0;
   font-size: 11px;
-  color: #8a8a8a;
+  color: rgba(255, 255, 255, 0.5);
 }
 
 .wec-flow-palette__list {
@@ -37,10 +37,10 @@
   align-items: center;
   gap: 8px;
   padding: 8px 10px;
-  border: 1px solid #e0e0e0;
+  border: 1px solid rgba(255, 255, 255, 0.14);
   border-radius: 6px;
-  background-color: #ffffff;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+  background-color: rgba(255, 255, 255, 0.05);
+  box-shadow: none;
   cursor: grab;
   font-size: 13px;
   user-select: none;
@@ -48,8 +48,8 @@
 }
 
 .wec-flow-palette__item:hover {
-  border-color: #b9b9b9;
-  background-color: #f5f5f5;
+  border-color: rgba(255, 255, 255, 0.28);
+  background-color: rgba(255, 255, 255, 0.1);
 }
 
 .wec-flow-palette__item:active {
@@ -68,8 +68,8 @@
 }
 
 .wec-flow-palette__item--disabled:hover {
-  border-color: #e0e0e0;
-  background-color: #ffffff;
+  border-color: rgba(255, 255, 255, 0.14);
+  background-color: rgba(255, 255, 255, 0.05);
 }
 
 .wec-flow-palette__shape {
@@ -144,5 +144,5 @@
 
 .wec-flow-palette__label {
   font-size: 13px;
-  color: #2b2b2b;
+  color: #fff;
 }
