@@ -2,6 +2,7 @@ import { useRef } from "react";
 import { useComboboxList, type ComboboxOption } from "../../hooks/useComboboxList";
 import { useFloatingPosition } from "../../hooks/useFloatingPosition";
 import { Icon } from "./Icon";
+import { SelectSearchField, SelectTrigger } from "./SelectParts";
 
 export type SelectOption = ComboboxOption;
 
@@ -41,6 +42,7 @@ export function SearchableSelect({
     filtered,
     rootRef,
     inputRef,
+    triggerRef,
     listboxId,
     optionId,
     activeDescendant,
@@ -65,42 +67,15 @@ export function SearchableSelect({
       ref={rootRef}
       onKeyDown={(event) => onRootKeyDown(event, commit)}
     >
-      <div
-        className={["wpn-select__trigger", open ? "wpn-select__trigger--open" : ""]
-          .filter(Boolean)
-          .join(" ")}
-        onClick={() => {
-          if (open) {
-            setOpen(false);
-          } else {
-            openMenu();
-          }
-        }}
-      >
-        <input
-          ref={inputRef}
-          id={id}
-          type="text"
-          role="combobox"
-          className="wpn-select__search-input wpn-select__search-input--trigger"
-          value={open ? query : (selected?.label ?? "")}
-          placeholder={open ? searchPlaceholder : placeholder}
-          aria-label={ariaLabel}
-          aria-expanded={open}
-          aria-controls={listboxId}
-          aria-activedescendant={activeDescendant}
-          aria-autocomplete="list"
-          onFocus={() => {
-            if (!open) {
-              openMenu();
-            }
-          }}
-          onChange={(event) => onInputChange(event.target.value)}
-        />
-        <span className="wpn-select__indicators">
-          <Icon name="chevronDown" className="wpn-select__chevron" />
-        </span>
-      </div>
+      <SelectTrigger
+        triggerRef={triggerRef}
+        id={id}
+        open={open}
+        label={selected?.label ?? ""}
+        placeholder={placeholder}
+        ariaLabel={ariaLabel}
+        onToggle={() => (open ? setOpen(false) : openMenu())}
+      />
       {clearable && selected ? (
         <button
           type="button"
@@ -126,6 +101,15 @@ export function SearchableSelect({
               : undefined
           }
         >
+          <SelectSearchField
+            inputRef={inputRef}
+            value={query}
+            placeholder={searchPlaceholder}
+            ariaLabel={`Search ${ariaLabel}`}
+            listboxId={listboxId}
+            activeDescendant={activeDescendant}
+            onChange={onInputChange}
+          />
           <ul className="wpn-select__list" role="listbox" id={listboxId} aria-label={ariaLabel}>
             {filtered.length === 0 ? (
               <li className="wpn-select__empty">{emptyMessage}</li>

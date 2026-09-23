@@ -118,7 +118,7 @@ export function AnnotationThreadPanel({
           <div className="wpn-panel__toolbar-end">
             <AnnotationStatusSelect
               value={annotation.status}
-              onChange={(status) => setStatus(annotation.id, status)}
+              onChange={(status) => setStatus(annotation.id, status).catch(() => undefined)}
             />
             {canDelete ? (
               confirmDelete ? (
@@ -133,9 +133,11 @@ export function AnnotationThreadPanel({
                   <button
                     type="button"
                     className="wpn-btn-delete"
-                    onClick={async () => {
-                      await removeAnnotation(annotation.id);
-                      selectAnnotation(null);
+                    onClick={() => {
+                      removeAnnotation(annotation.id).then(
+                        () => selectAnnotation(null),
+                        () => undefined,
+                      );
                     }}
                   >
                     <Icon name="trash" className="wpn-btn__icon" />

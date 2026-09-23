@@ -28,6 +28,6 @@ export interface AuthApiClient {
     password: string,
     signal?: AbortSignal,
   ): Promise<AuthSession>;
-  logout(projectId: string, userId: string, signal?: AbortSignal): Promise<void>;
+  logout(projectId: string, userId: string, signal?: AbortSignal, token?: string): Promise<void>;
   refresh(projectId: string, refreshToken: string, signal?: AbortSignal): Promise<string>;
 }

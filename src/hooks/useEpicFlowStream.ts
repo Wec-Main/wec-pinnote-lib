@@ -140,13 +140,10 @@ export function useEpicFlowStream({
       if (stopped) {
         return;
       }
-      reconnectDelay = RECONNECT_DELAY_MS;
-
       source = new EventSource(streamUrl(apiBaseUrl, ticket, lastEventId));
-      let openedThisAttempt = false;
 
       source.addEventListener("open", () => {
-        openedThisAttempt = true;
+        reconnectDelay = RECONNECT_DELAY_MS;
         setState("open");
         if (openedOnce) {
           resync();
@@ -160,10 +157,6 @@ export function useEpicFlowStream({
         }
         source?.close();
         source = null;
-        if (!openedThisAttempt) {
-          setState("unauthenticated");
-          return;
-        }
         scheduleReconnect();
       });
 

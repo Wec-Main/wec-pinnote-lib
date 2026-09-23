@@ -19,6 +19,8 @@ export function AnnotationReplyComposer({ onSubmit }: AnnotationReplyComposerPro
     try {
       await onSubmit(trimmed);
       setMessage("");
+    } catch {
+      setMessage(trimmed);
     } finally {
       setSubmitting(false);
     }

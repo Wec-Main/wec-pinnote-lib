@@ -1,17 +1,10 @@
 import { useState } from "react";
-import { useAnnotationContext } from "../../context/AnnotationContext";
+import { useAnnotationAuth, useAnnotationContext } from "../../context/AnnotationContext";
 import { Icon, Tooltip } from "../primitives";
-import { usePersistentState } from "../../hooks/usePersistentState";
-import { FlowEditor, parseFlow, type FlowJSON } from "./flowchart";
-
-function isFlowJSON(value: unknown): value is FlowJSON {
-  try {
-    parseFlow(value);
-    return true;
-  } catch {
-    return false;
-  }
-}
+import { useSharedFetch } from "../../hooks/useSharedFetch";
+import { useFlowDocument } from "../../hooks/useFlowDocument";
+import { resolveDefaultFlow } from "../../services/flowApi";
+import { FlowDocumentEditor } from "./FlowDocumentEditor";
 
 const SHORTCUTS: [string, string][] = [
   ["Delete", "Delete selection"],
@@ -50,27 +43,33 @@ const shortcutList = (
   </dl>
 );
 
-const EMPTY_FLOW: FlowJSON = { version: 1, nodes: [], edges: [], meta: { name: "Untitled Flow" } };
+function errorMessage(error: unknown): string | null {
+  if (!error) {
+    return null;
+  }
+  return error instanceof Error && error.message ? error.message : "Could not load the flow";
+}
 
 export function WecFlowPanel() {
   const { setFlowOpen, config } = useAnnotationContext();
+  const { activeAccount } = useAnnotationAuth();
   const [minimized, setMinimized] = useState(false);
-  const [flow, setFlow] = usePersistentState<FlowJSON>(
-    `wpn-ui:${config.projectId}:wecFlowchart`,
-    EMPTY_FLOW,
-    isFlowJSON,
+  const authToken = activeAccount?.token;
+  const flowKey = authToken
+    ? `default-flow:${config.apiBaseUrl}:${authToken}:${config.projectId}`
+    : null;
+  const {
+    data: flow,
+    error: flowError,
+    reload: reloadFlow,
+  } = useSharedFetch(flowKey, (signal) =>
+    resolveDefaultFlow(config.apiBaseUrl, authToken, config.projectId, signal),
   );
-  const [, setPublishedFlow] = usePersistentState<FlowJSON>(
-    `wpn-ui:${config.projectId}:wecFlowchart:published`,
-    EMPTY_FLOW,
-    isFlowJSON,
-  );
-  const [initialFlow] = useState(() => parseFlow(flow));
-
-  const publish = (next: FlowJSON) => {
-    setFlow(next);
-    setPublishedFlow(next);
-  };
+  const flowDocument = useFlowDocument({
+    apiBaseUrl: config.apiBaseUrl,
+    authToken,
+    flowId: flow?.id ?? null,
+  });
 
   return (
     <div
@@ -115,13 +114,11 @@ export function WecFlowPanel() {
       </div>
 
       <div className="wpn-flow-panel__body">
-        <FlowEditor
-          initialFlow={initialFlow}
-          defaultEdgeType="step"
-          onChange={setFlow}
-          onSave={setFlow}
-          onPublish={publish}
-          brand={<></>}
+        <FlowDocumentEditor
+          flowDocument={flowDocument}
+          signedIn={Boolean(authToken)}
+          resolveError={errorMessage(flowError)}
+          onRetry={flowError ? reloadFlow : undefined}
         />
       </div>
     </div>

@@ -5,15 +5,23 @@ interface FlowPinPinProps {
   x: number;
   y: number;
   resolvedTarget: boolean;
+  active: boolean;
   onSelect: () => void;
 }
 
-export function FlowPinPin({ name, x, y, resolvedTarget, onSelect }: FlowPinPinProps) {
+export function FlowPinPin({ name, x, y, resolvedTarget, active, onSelect }: FlowPinPinProps) {
   return (
     <Tooltip label={name} placement="bottom">
       <button
         type="button"
-        className={["wpn-flow-pin", resolvedTarget ? "" : "wpn-flow-pin--orphaned"].filter(Boolean).join(" ")}
+        className={[
+          "wpn-flow-pin",
+          resolvedTarget ? "" : "wpn-flow-pin--orphaned",
+          active ? "wpn-flow-pin--active" : "",
+        ]
+          .filter(Boolean)
+          .join(" ")}
+        aria-expanded={active}
         style={{ left: x, top: y }}
         aria-label={`Open flow: ${name}`}
         onClick={onSelect}

@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createAuthApi } from "../services/authApi";
+import { UNAUTHORIZED_EVENT, type UnauthorizedDetail } from "../services/httpClient";
 import { useSharedFetch } from "./useSharedFetch";
 import { AnnotationApiError } from "../types/annotation.types";
 import type { AuthApiClient, AuthSession, LoginOption } from "../types/auth.types";
@@ -57,6 +58,10 @@ export function isSession(value: unknown): value is AuthSession {
     candidate.refreshToken.length > 0 &&
     isTokenUnexpired(candidate.token)
   );
+}
+
+function isUnauthorized(error: unknown): boolean {
+  return error instanceof AnnotationApiError && error.status === 401;
 }
 
 function resolveActiveId(accounts: AuthSession[], activeId: string | null): string | null {
@@ -154,6 +159,45 @@ export function useAuthSessions(
     [persist],
   );
 
+  const renewingRef = useRef<Set<string>>(new Set());
+
+  const renewAccount = useCallback(
+    async (accountId: string, refreshToken: string) => {
+      if (renewingRef.current.has(accountId)) {
+        return;
+      }
+      renewingRef.current.add(accountId);
+      try {
+        const token = await authApi.refresh(projectId, refreshToken);
+        persist((current) => ({
+          ...current,
+          accounts: current.accounts.map((item) =>
+            item.id === accountId ? { ...item, token } : item,
+          ),
+        }));
+      } catch (err) {
+        if (isUnauthorized(err)) {
+          removeAccount(accountId);
+        }
+      } finally {
+        renewingRef.current.delete(accountId);
+      }
+    },
+    [authApi, projectId, persist, removeAccount],
+  );
+
+  useEffect(() => {
+    const onUnauthorized = (event: Event) => {
+      const { token } = (event as CustomEvent<UnauthorizedDetail>).detail;
+      const account = readStored(projectId).accounts.find((item) => item.token === token);
+      if (account) {
+        void renewAccount(account.id, account.refreshToken);
+      }
+    };
+    window.addEventListener(UNAUTHORIZED_EVENT, onUnauthorized);
+    return () => window.removeEventListener(UNAUTHORIZED_EVENT, onUnauthorized);
+  }, [projectId, renewAccount]);
+
   const timersRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
 
   useEffect(() => {
@@ -188,25 +232,13 @@ export function useAuthSessions(
       const delay = Math.max(0, fireAt - Date.now());
       const accountId = account.id;
       const refreshToken = account.refreshToken;
-      const timer = setTimeout(async () => {
+      const timer = setTimeout(() => {
         timersRef.current.delete(accountId);
-        try {
-          const token = await authApi.refresh(projectId, refreshToken);
-          persist((current) => ({
-            ...current,
-            accounts: current.accounts.map((item) =>
-              item.id === accountId ? { ...item, token } : item,
-            ),
-          }));
-        } catch (err) {
-          if (err instanceof AnnotationApiError && err.status === 401) {
-            removeAccount(accountId);
-          }
-        }
+        void renewAccount(accountId, refreshToken);
       }, delay);
       timers.set(account.id, timer);
     }
-  }, [stored.accounts, authApi, projectId, persist, removeAccount]);
+  }, [stored.accounts, renewAccount]);
 
   const loginOptionsKey = `auth-users:${apiBaseUrl}:${projectId}`;
   const {
@@ -249,20 +281,40 @@ export function useAuthSessions(
     [authApi, projectId, persist],
   );
 
-  const logout = useCallback(
-    async (userId: string) => {
-      let logoutError: unknown;
+  const revokeServerSession = useCallback(
+    async (account: AuthSession) => {
       try {
-        await authApi.logout(projectId, userId);
+        await authApi.logout(projectId, account.id, undefined, account.token);
+        return;
       } catch (err) {
-        logoutError = err;
+        if (!isUnauthorized(err)) {
+          throw err;
+        }
       }
-      removeAccount(userId);
-      if (logoutError) {
-        throw logoutError;
+      try {
+        const token = await authApi.refresh(projectId, account.refreshToken);
+        await authApi.logout(projectId, account.id, undefined, token);
+      } catch (err) {
+        if (!isUnauthorized(err)) {
+          throw err;
+        }
       }
     },
-    [authApi, projectId, removeAccount],
+    [authApi, projectId],
+  );
+
+  const logout = useCallback(
+    async (userId: string) => {
+      const account = readStored(projectId).accounts.find((item) => item.id === userId);
+      try {
+        if (account) {
+          await revokeServerSession(account);
+        }
+      } finally {
+        removeAccount(userId);
+      }
+    },
+    [projectId, removeAccount, revokeServerSession],
   );
 
   const switchAccount = useCallback(

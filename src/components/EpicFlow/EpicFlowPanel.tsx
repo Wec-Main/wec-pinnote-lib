@@ -33,7 +33,7 @@ const RESIZING_BODY_CLASS = "wpn-epicflow-resizing";
 
 function describeApiError(err: unknown): string {
   return err instanceof EpicFlowApiError
-    ? `EpicFlow request failed (${err.status}). Please try again.`
+    ? err.message
     : "Could not reach the EpicFlow API. Please try again.";
 }
 
@@ -447,6 +447,7 @@ export function EpicFlowPanel() {
         <div className="wpn-epicflow-panel__columns">
           <div ref={paneRefs[0]} className="wpn-epicflow-pane" style={{ flexGrow: colWeights[0] }}>
             <EpicColumn
+              key={normalizedQuery}
               epics={filteredEpics}
               hasAnyEpics={epics.length > 0}
               selectedEpicId={selectedEpicId}
@@ -461,6 +462,7 @@ export function EpicFlowPanel() {
           <ResizeHandle onMouseDown={onHandleMouseDown(0, 1)} />
           <div ref={paneRefs[1]} className="wpn-epicflow-pane" style={{ flexGrow: colWeights[1] }}>
             <UserStoryColumn
+              key={`${selectedEpicId ?? ""}:${normalizedQuery}`}
               stories={filteredStories}
               hasStoriesForEpic={storiesForSelectedEpic.length > 0}
               epicSelected={Boolean(selectedEpicId)}

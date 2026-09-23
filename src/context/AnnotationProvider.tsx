@@ -150,7 +150,13 @@ export function AnnotationProvider({ config, children }: AnnotationProviderProps
     enabled: Boolean(activeAccount),
   });
 
-  const flowPins = useFlowPins({ projectId, pageKey });
+  const flowPins = useFlowPins({
+    apiBaseUrl: activeConfig.apiBaseUrl,
+    projectId,
+    pageKey,
+    authToken: activeAccount?.token,
+    enabled: Boolean(activeAccount),
+  });
 
   const projectTagsToken = activeAccount?.token;
   const projectTagsKey = projectTagsToken
@@ -448,7 +454,7 @@ export function AnnotationProvider({ config, children }: AnnotationProviderProps
       submitTagDraft: tags.submitTagDraft,
       removeAnnotationTag: tags.removeAnnotationTag,
       flowPins: flowPins.flowPins,
-      updateFlowPinFlow: flowPins.updateFlowPinFlow,
+      syncFlowPinName: flowPins.syncFlowPinName,
     }),
     [
       activeConfig,
@@ -474,7 +480,7 @@ export function AnnotationProvider({ config, children }: AnnotationProviderProps
       tags.submitTagDraft,
       tags.removeAnnotationTag,
       flowPins.flowPins,
-      flowPins.updateFlowPinFlow,
+      flowPins.syncFlowPinName,
     ],
   );
 

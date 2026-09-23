@@ -1,5 +1,7 @@
 import { Icon, Tooltip } from "../primitives";
 import { AuthorBadge } from "./AuthorBadge";
+import { EPICFLOW_PAGE_SIZE, ShowMoreButton } from "./ShowMoreButton";
+import { useIncrementalList } from "../../hooks/useIncrementalList";
 import type { UserStory } from "../../types/epicFlow.types";
 import type { AnnotationUser } from "../../types/annotation.types";
 import { formatTimestamp } from "../../utils/format";
@@ -28,6 +30,12 @@ export function UserStoryColumn({
   onEdit,
   onDelete,
 }: UserStoryColumnProps) {
+  const { visible, remaining, showMore } = useIncrementalList(
+    stories,
+    EPICFLOW_PAGE_SIZE,
+    stories.findIndex((story) => story.id === selectedUserStoryId),
+  );
+
   return (
     <div className="wpn-epicflow-column">
       <div className="wpn-epicflow-column__header wpn-epicflow-column__header--story">
@@ -60,71 +68,74 @@ export function UserStoryColumn({
               : "No User Stories available for this Epic"}
           </p>
         ) : (
-          stories.map((story) => (
-            <div
-              key={story.id}
-              role="button"
-              tabIndex={0}
-              aria-pressed={selectedUserStoryId === story.id}
-              className={[
-                "wpn-epicflow-card",
-                selectedUserStoryId === story.id ? "wpn-epicflow-card--selected" : "",
-              ]
-                .filter(Boolean)
-                .join(" ")}
-              onClick={() => onSelect(story.id)}
-              onKeyDown={(event) => {
-                if (event.key === "Enter" || event.key === " ") {
-                  event.preventDefault();
-                  onSelect(story.id);
-                }
-              }}
-            >
-              <span className="wpn-epicflow-card__title">{story.title}</span>
-              <div className="wpn-epicflow-card__footer">
-                <div className="wpn-epicflow-card__meta">
-                  <AuthorBadge name={story.createdByUser} />
-                  <span
-                    className="wpn-epicflow-card__stat"
-                    title={`Created ${formatTimestamp(story.createdAt)}`}
-                  >
-                    <Icon name="calendar" className="wpn-epicflow-card__stat-icon" />
-                    {formatTimestamp(story.createdAt)}
-                  </span>
-                </div>
-                <div className="wpn-epicflow-card__actions">
-                  <Tooltip label="Edit user story" placement="bottom">
-                    <button
-                      type="button"
-                      className="wpn-epicflow-card__action-btn"
-                      aria-label="Edit user story"
-                      onClick={(event) => {
-                        event.stopPropagation();
-                        onEdit(story);
-                      }}
+          <>
+            {visible.map((story) => (
+              <div
+                key={story.id}
+                role="button"
+                tabIndex={0}
+                aria-pressed={selectedUserStoryId === story.id}
+                className={[
+                  "wpn-epicflow-card",
+                  selectedUserStoryId === story.id ? "wpn-epicflow-card--selected" : "",
+                ]
+                  .filter(Boolean)
+                  .join(" ")}
+                onClick={() => onSelect(story.id)}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter" || event.key === " ") {
+                    event.preventDefault();
+                    onSelect(story.id);
+                  }
+                }}
+              >
+                <span className="wpn-epicflow-card__title">{story.title}</span>
+                <div className="wpn-epicflow-card__footer">
+                  <div className="wpn-epicflow-card__meta">
+                    <AuthorBadge name={story.createdByUser} />
+                    <span
+                      className="wpn-epicflow-card__stat"
+                      title={`Created ${formatTimestamp(story.createdAt)}`}
                     >
-                      <Icon name="edit" />
-                    </button>
-                  </Tooltip>
-                  {canDeleteBoardItem(story.createdById, currentUser) ? (
-                    <Tooltip label="Delete user story" placement="bottom">
+                      <Icon name="calendar" className="wpn-epicflow-card__stat-icon" />
+                      {formatTimestamp(story.createdAt)}
+                    </span>
+                  </div>
+                  <div className="wpn-epicflow-card__actions">
+                    <Tooltip label="Edit user story" placement="bottom">
                       <button
                         type="button"
-                        className="wpn-epicflow-card__action-btn wpn-epicflow-card__action-btn--danger"
-                        aria-label="Delete user story"
+                        className="wpn-epicflow-card__action-btn"
+                        aria-label="Edit user story"
                         onClick={(event) => {
                           event.stopPropagation();
-                          onDelete(story);
+                          onEdit(story);
                         }}
                       >
-                        <Icon name="trash" />
+                        <Icon name="edit" />
                       </button>
                     </Tooltip>
-                  ) : null}
+                    {canDeleteBoardItem(story.createdById, currentUser) ? (
+                      <Tooltip label="Delete user story" placement="bottom">
+                        <button
+                          type="button"
+                          className="wpn-epicflow-card__action-btn wpn-epicflow-card__action-btn--danger"
+                          aria-label="Delete user story"
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            onDelete(story);
+                          }}
+                        >
+                          <Icon name="trash" />
+                        </button>
+                      </Tooltip>
+                    ) : null}
+                  </div>
                 </div>
               </div>
-            </div>
-          ))
+            ))}
+            <ShowMoreButton remaining={remaining} onClick={showMore} />
+          </>
         )}
       </div>
     </div>

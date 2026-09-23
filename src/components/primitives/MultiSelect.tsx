@@ -1,6 +1,7 @@
 import { useMemo } from "react";
 import { useComboboxList, type ComboboxOption } from "../../hooks/useComboboxList";
 import { Icon } from "./Icon";
+import { SelectSearchField, SelectTrigger } from "./SelectParts";
 import type { SelectOption } from "./SearchableSelect";
 
 interface MultiSelectProps {
@@ -34,6 +35,7 @@ export function MultiSelect({
     filtered,
     rootRef,
     inputRef,
+    triggerRef,
     listboxId,
     optionId,
     activeDescendant,
@@ -72,42 +74,15 @@ export function MultiSelect({
       ref={rootRef}
       onKeyDown={(event) => onRootKeyDown(event, commit)}
     >
-      <div
-        className={["wpn-select__trigger", open ? "wpn-select__trigger--open" : ""]
-          .filter(Boolean)
-          .join(" ")}
-        onClick={() => {
-          if (open) {
-            closeMenu();
-          } else {
-            openMenu();
-          }
-        }}
-      >
-        <input
-          ref={inputRef}
-          id={id}
-          type="text"
-          role="combobox"
-          className="wpn-select__search-input wpn-select__search-input--trigger"
-          value={open ? query : summary()}
-          placeholder={open ? searchPlaceholder : placeholder}
-          aria-label={ariaLabel}
-          aria-expanded={open}
-          aria-controls={listboxId}
-          aria-activedescendant={activeDescendant}
-          aria-autocomplete="list"
-          onFocus={() => {
-            if (!open) {
-              openMenu();
-            }
-          }}
-          onChange={(event) => onInputChange(event.target.value)}
-        />
-        <span className="wpn-select__indicators">
-          <Icon name="chevronDown" className="wpn-select__chevron" />
-        </span>
-      </div>
+      <SelectTrigger
+        triggerRef={triggerRef}
+        id={id}
+        open={open}
+        label={summary()}
+        placeholder={placeholder}
+        ariaLabel={ariaLabel}
+        onToggle={() => (open ? closeMenu() : openMenu())}
+      />
       {selected.length > 0 ? (
         <button
           type="button"
@@ -121,6 +96,15 @@ export function MultiSelect({
 
       {open ? (
         <div className="wpn-select__menu">
+          <SelectSearchField
+            inputRef={inputRef}
+            value={query}
+            placeholder={searchPlaceholder}
+            ariaLabel={`Search ${ariaLabel}`}
+            listboxId={listboxId}
+            activeDescendant={activeDescendant}
+            onChange={onInputChange}
+          />
           <ul
             className="wpn-select__list"
             role="listbox"

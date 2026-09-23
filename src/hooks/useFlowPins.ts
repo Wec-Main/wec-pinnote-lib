@@ -1,13 +1,16 @@
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import type { AnnotationAnchor } from "../types/annotation.types";
 import type { DraftFlowPin, FlowPin } from "../types/flowPin.types";
-import type { FlowJSON } from "../components/WecFlow/flowchart";
+import { createFlowPin, deleteFlowPin, fetchFlowPins } from "../services/flowApi";
 import { createClientId } from "../utils/format";
 import { isBoolean, usePersistentState } from "./usePersistentState";
 
 interface UseFlowPinsOptions {
+  apiBaseUrl: string;
   projectId: string;
   pageKey: string;
+  authToken: string | undefined;
+  enabled: boolean;
 }
 
 export interface FlowPinsState {
@@ -19,25 +22,18 @@ export interface FlowPinsState {
   flowPinDraft: DraftFlowPin | null;
   startFlowPinDraft: (anchor: AnnotationAnchor, label: string) => void;
   cancelFlowPinDraft: () => void;
-  submitFlowPinDraft: (name: string) => void;
-  removeFlowPin: (flowPinId: string) => void;
-  updateFlowPinFlow: (flowPinId: string, flow: FlowJSON) => void;
+  submitFlowPinDraft: (name: string) => Promise<void>;
+  removeFlowPin: (flowPinId: string) => Promise<void>;
+  syncFlowPinName: (flowPinId: string, name: string) => void;
   selectedFlowPinId: string | null;
   selectFlowPin: (id: string | null) => void;
 }
 
-function isFlowPinArray(value: unknown): value is FlowPin[] {
-  return Array.isArray(value);
-}
-
-/** Flow pins are attached to page elements the same way tags are, but hold a
- * full flowchart per pin instead of a shared tag definition. Persisted per
- * project + page in the browser, matching WecFlowPanel's own storage until a
- * backend endpoint exists for them. */
+/** Flow pins are attached to page elements the same way tags are; each pin owns a
+ * server-side flow that the pin's panel loads and saves through the flow document API. */
 export function useFlowPins(options: UseFlowPinsOptions): FlowPinsState {
-  const { projectId, pageKey } = options;
-  const storageKey = `wpn-ui:${projectId}:${pageKey}:flowPins`;
-  const [allFlowPins, setAllFlowPins] = usePersistentState<FlowPin[]>(storageKey, [], isFlowPinArray);
+  const { apiBaseUrl, projectId, pageKey, authToken, enabled } = options;
+  const [flowPins, setFlowPins] = useState<FlowPin[]>([]);
   const [flowPinsVisible, setFlowPinsVisible] = usePersistentState(
     `wpn-ui:${projectId}:flowPinsVisible`,
     true,
@@ -47,7 +43,18 @@ export function useFlowPins(options: UseFlowPinsOptions): FlowPinsState {
   const [flowPinDraft, setFlowPinDraft] = useState<DraftFlowPin | null>(null);
   const [selectedFlowPinId, setSelectedFlowPinId] = useState<string | null>(null);
 
-  const flowPins = useMemo(() => allFlowPins, [allFlowPins]);
+  useEffect(() => {
+    if (!enabled) {
+      setFlowPins([]);
+      setSelectedFlowPinId(null);
+      return;
+    }
+    const controller = new AbortController();
+    fetchFlowPins(apiBaseUrl, authToken, projectId, pageKey, controller.signal)
+      .then(setFlowPins)
+      .catch(() => undefined);
+    return () => controller.abort();
+  }, [apiBaseUrl, authToken, projectId, pageKey, enabled]);
 
   const setFlowPinModeEnabled = useCallback((enabled: boolean) => {
     setFlowPinModeEnabledState(enabled);
@@ -63,50 +70,40 @@ export function useFlowPins(options: UseFlowPinsOptions): FlowPinsState {
   const cancelFlowPinDraft = useCallback(() => setFlowPinDraft(null), []);
 
   const submitFlowPinDraft = useCallback(
-    (name: string) => {
+    async (name: string) => {
       if (!flowPinDraft) {
         return;
       }
-      const trimmed = name.trim() || flowPinDraft.label;
-      const now = new Date().toISOString();
-      const created: FlowPin = {
-        id: createClientId("wpn-flow-pin"),
+      const created = await createFlowPin(apiBaseUrl, authToken, {
         projectId,
         pageKey,
-        name: trimmed,
+        name: name.trim() || flowPinDraft.label,
         anchor: flowPinDraft.anchor,
-        flow: { version: 1, nodes: [], edges: [], meta: { name: trimmed } },
-        createdAt: now,
-        updatedAt: now,
-      };
-      setAllFlowPins([created, ...allFlowPins]);
+      });
+      setFlowPins((current) => [created, ...current]);
       setFlowPinDraft(null);
       setFlowPinModeEnabledState(false);
       setSelectedFlowPinId(created.id);
     },
-    [allFlowPins, flowPinDraft, pageKey, projectId, setAllFlowPins],
+    [apiBaseUrl, authToken, flowPinDraft, pageKey, projectId],
   );
 
   const removeFlowPin = useCallback(
-    (flowPinId: string) => {
-      setAllFlowPins(allFlowPins.filter((item) => item.id !== flowPinId));
+    async (flowPinId: string) => {
+      await deleteFlowPin(apiBaseUrl, authToken, flowPinId);
+      setFlowPins((current) => current.filter((item) => item.id !== flowPinId));
       setSelectedFlowPinId((current) => (current === flowPinId ? null : current));
     },
-    [allFlowPins, setAllFlowPins],
+    [apiBaseUrl, authToken],
   );
 
-  const updateFlowPinFlow = useCallback(
-    (flowPinId: string, flow: FlowJSON) => {
-      setAllFlowPins(
-        allFlowPins.map((item) =>
-          item.id === flowPinId
-            ? { ...item, flow, name: flow.meta?.name?.trim() || item.name, updatedAt: new Date().toISOString() }
-            : item,
-        ),
-      );
-    },
-    [allFlowPins, setAllFlowPins],
-  );
+  const syncFlowPinName = useCallback((flowPinId: string, name: string) => {
+    setFlowPins((current) =>
+      current.map((item) =>
+        item.id === flowPinId && item.name !== name ? { ...item, name } : item,
+      ),
+    );
+  }, []);
 
   const selectFlowPin = useCallback((id: string | null) => setSelectedFlowPinId(id), []);
 
@@ -121,7 +118,7 @@ export function useFlowPins(options: UseFlowPinsOptions): FlowPinsState {
     cancelFlowPinDraft,
     submitFlowPinDraft,
     removeFlowPin,
-    updateFlowPinFlow,
+    syncFlowPinName,
     selectedFlowPinId,
     selectFlowPin,
   };

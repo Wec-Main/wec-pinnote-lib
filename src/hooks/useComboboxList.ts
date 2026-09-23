@@ -19,9 +19,13 @@ export function useComboboxList({ options, activeValue, onOpenChange }: UseCombo
   const [activeIndex, setActiveIndex] = useState(0);
   const rootRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
   const listboxId = useId();
 
   const setOpen = (next: boolean) => {
+    if (!next && rootRef.current?.contains(document.activeElement)) {
+      triggerRef.current?.focus();
+    }
     setOpenState(next);
     onOpenChange?.(next);
   };
@@ -115,6 +119,7 @@ export function useComboboxList({ options, activeValue, onOpenChange }: UseCombo
     filtered,
     rootRef,
     inputRef,
+    triggerRef,
     listboxId,
     optionId,
     activeDescendant,

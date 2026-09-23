@@ -1,4 +1,4 @@
-import { lazy, Suspense, useMemo, useRef } from "react";
+import { lazy, Suspense, useMemo, useRef, useState } from "react";
 import {
   useAnnotationAuth,
   useAnnotationData,
@@ -60,6 +60,7 @@ export function AnnotationLayer() {
     cancelDiscardPrompt,
   } = useAnnotationUi();
   const { activeAccount } = useAnnotationAuth();
+  const [tagError, setTagError] = useState<string | null>(null);
 
   const visible = useMemo(() => {
     if (!activeAccount || !pinsVisible || (!modeEnabled && !config.showPinsWhenIdle)) {
@@ -140,6 +141,12 @@ export function AnnotationLayer() {
   const selectedFlowPin = selectedFlowPinId
     ? flowPins.find((item) => item.id === selectedFlowPinId)
     : undefined;
+  const selectedFlowPinOrigin = selectedFlowPin
+    ? (positions.get(selectedFlowPin.id) ?? {
+        x: selectedFlowPin.anchor.fallbackX,
+        y: selectedFlowPin.anchor.fallbackY,
+      })
+    : undefined;
   const draftPosition = draft
     ? (positions.get(draft.id) ?? {
         x: draft.anchor.fallbackX,
@@ -186,7 +193,12 @@ export function AnnotationLayer() {
             x={position.x}
             y={position.y}
             resolvedTarget={position.resolved}
-            onRemove={() => void removeAnnotationTag(tag.id)}
+            onRemove={() => {
+              setTagError(null);
+              removeAnnotationTag(tag.id).catch((err: unknown) => {
+                setTagError(err instanceof Error && err.message ? err.message : "Could not remove that tag");
+              });
+            }}
           />
         );
       })}
@@ -205,6 +217,7 @@ export function AnnotationLayer() {
             x={position.x}
             y={position.y}
             resolvedTarget={position.resolved}
+            active={flowPin.id === selectedFlowPinId}
             onSelect={() => selectFlowPin(flowPin.id)}
           />
         );
@@ -212,7 +225,14 @@ export function AnnotationLayer() {
       {flowPinDraft && flowPinDraftPosition ? (
         <FlowPinPicker x={flowPinDraftPosition.x} y={flowPinDraftPosition.y} />
       ) : null}
-      {selectedFlowPin ? <FlowPinPanel key={selectedFlowPin.id} flowPin={selectedFlowPin} /> : null}
+      {selectedFlowPin && selectedFlowPinOrigin ? (
+        <FlowPinPanel
+          key={selectedFlowPin.id}
+          flowPin={selectedFlowPin}
+          originX={selectedFlowPinOrigin.x}
+          originY={selectedFlowPinOrigin.y}
+        />
+      ) : null}
       {draft && draftPosition ? (
         <>
           {pinsVisible ? (
@@ -267,13 +287,16 @@ export function AnnotationLayer() {
           onConfirm={confirmDiscard}
         />
       ) : null}
-      {actionError ? (
+      {actionError || tagError ? (
         <div className="wpn-toast" role="alert">
-          <span>{actionError}</span>
+          <span>{actionError ?? tagError}</span>
           <button
             type="button"
             className="wpn-icon-btn"
-            onClick={clearActionError}
+            onClick={() => {
+              clearActionError();
+              setTagError(null);
+            }}
             aria-label="Dismiss"
           >
             ×

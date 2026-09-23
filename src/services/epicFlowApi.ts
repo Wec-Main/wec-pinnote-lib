@@ -1,4 +1,5 @@
 import type { Epic, EpicFlowFormInput, UserStory } from "../types/epicFlow.types";
+import { readErrorMessage, reportUnauthorized } from "./httpClient";
 
 export class EpicFlowApiError extends Error {
   readonly status: number;
@@ -92,12 +93,12 @@ export function createEpicFlowApi(config: EpicFlowApiConfig): EpicFlowApiClient 
     });
 
     if (!response.ok) {
-      const body = await response.text().catch(() => null);
-      throw new EpicFlowApiError(
+      reportUnauthorized(response.status, token);
+      const { message, text } = await readErrorMessage(
+        response,
         `EpicFlow API request failed (${response.status})`,
-        response.status,
-        body,
       );
+      throw new EpicFlowApiError(message, response.status, text || null);
     }
 
     if (response.status === 204) {

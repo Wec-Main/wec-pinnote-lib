@@ -10,12 +10,20 @@ interface FlowPinPickerProps {
 export function FlowPinPicker({ x, y }: FlowPinPickerProps) {
   const { flowPinDraft, submitFlowPinDraft, cancelFlowPinDraft } = useAnnotationContext();
   const [name, setName] = useState(flowPinDraft?.label ?? "");
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const create = () => {
-    if (!name.trim()) {
+    if (!name.trim() || submitting) {
       return;
     }
-    submitFlowPinDraft(name);
+    setSubmitting(true);
+    setError(null);
+    submitFlowPinDraft(name)
+      .catch((err: unknown) => {
+        setError(err instanceof Error && err.message ? err.message : "Could not create the flow");
+      })
+      .finally(() => setSubmitting(false));
   };
 
   return (
@@ -27,7 +35,12 @@ export function FlowPinPicker({ x, y }: FlowPinPickerProps) {
     >
       <div className="wpn-flow-pin-picker__header">
         <span className="wpn-flow-pin-picker__title">New flow</span>
-        <button type="button" className="wpn-icon-btn" aria-label="Cancel" onClick={cancelFlowPinDraft}>
+        <button
+          type="button"
+          className="wpn-icon-btn"
+          aria-label="Cancel"
+          onClick={cancelFlowPinDraft}
+        >
           <Icon name="close" />
         </button>
       </div>
@@ -50,11 +63,22 @@ export function FlowPinPicker({ x, y }: FlowPinPickerProps) {
         }}
       />
 
+      {error ? (
+        <p className="wpn-flow-pin-picker__error" role="alert">
+          {error}
+        </p>
+      ) : null}
+
       <div className="wpn-flow-pin-picker__footer">
         <button type="button" className="wpn-btn wpn-btn--ghost" onClick={cancelFlowPinDraft}>
           Cancel
         </button>
-        <button type="button" className="wpn-btn wpn-btn--primary" disabled={!name.trim()} onClick={create}>
+        <button
+          type="button"
+          className="wpn-btn wpn-btn--primary"
+          disabled={!name.trim() || submitting}
+          onClick={create}
+        >
           Create
         </button>
       </div>

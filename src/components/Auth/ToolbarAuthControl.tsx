@@ -163,7 +163,9 @@ export function ToolbarAuthControl() {
                   type="button"
                   className="wpn-account-menu__logout"
                   aria-label={`Log out ${account.name}`}
-                  onClick={() => logout(account.id)}
+                  onClick={() => {
+                    Promise.resolve(logout(account.id)).catch(() => undefined);
+                  }}
                 >
                   <Icon name="close" />
                 </button>

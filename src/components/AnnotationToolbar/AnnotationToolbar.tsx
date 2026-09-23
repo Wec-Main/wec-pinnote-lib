@@ -471,7 +471,7 @@ export function AnnotationToolbar() {
                         .filter(Boolean)
                         .join(" ")}
                       onClick={() => {
-                        void setPageStatus(option.value);
+                        setPageStatus(option.value).catch(() => undefined);
                         setScreenStatusOpen(false);
                       }}
                     >

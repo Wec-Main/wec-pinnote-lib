@@ -74,9 +74,11 @@ function CommentItem({
                 type="button"
                 className="wpn-link wpn-link--chip wpn-link--save"
                 disabled={!value.trim()}
-                onClick={async () => {
-                  await onEdit(comment.id, value.trim());
-                  setEditing(false);
+                onClick={() => {
+                  onEdit(comment.id, value.trim()).then(
+                    () => setEditing(false),
+                    () => undefined,
+                  );
                 }}
               >
                 Save
@@ -112,7 +114,7 @@ function CommentItem({
                 <button
                   type="button"
                   className="wpn-link wpn-link--chip wpn-link--danger"
-                  onClick={() => onDelete(comment.id)}
+                  onClick={() => onDelete(comment.id).catch(() => undefined)}
                 >
                   Confirm
                 </button>

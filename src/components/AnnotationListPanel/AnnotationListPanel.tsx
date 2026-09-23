@@ -153,6 +153,11 @@ export function AnnotationListPanel() {
   const { annotations, config, loading, error, retry } = useAnnotationData();
   const { selectedId, revealAnnotation, setListOpen } = useAnnotationUi();
 
+  const openAnnotation = (annotationId: string) => {
+    revealAnnotation(annotationId);
+    setListOpen(false);
+  };
+
   const [filters, setFilters] = useState<CommentFilters>(DEFAULT_COMMENT_FILTERS);
   const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
   const [grouped, setGrouped] = usePersistentState(
@@ -400,7 +405,7 @@ export function AnnotationListPanel() {
                   selectedId={selectedId}
                   collapsed={collapsedGroups.has(annotationId)}
                   onToggle={() => toggleGroup(annotationId)}
-                  onSelect={revealAnnotation}
+                  onSelect={openAnnotation}
                 />
               ))
             : entries.map((entry) => (
@@ -408,7 +413,7 @@ export function AnnotationListPanel() {
                   key={`${entry.annotation.id}:${entry.comment.id}`}
                   entry={entry}
                   active={selectedId === entry.annotation.id}
-                  onSelect={() => revealAnnotation(entry.annotation.id)}
+                  onSelect={() => openAnnotation(entry.annotation.id)}
                 />
               ))}
         </ul>

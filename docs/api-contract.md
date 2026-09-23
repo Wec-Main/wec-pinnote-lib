@@ -253,8 +253,8 @@ activity alongside annotations and users.
 
 `organizationId` and `projectId` are server-derived — an epic inherits them from its project, a
 user story from its epic — and are never accepted from the client. `status` is one of `backlog`,
-`in_progress`, `done`, `archived` (default `backlog`), validated in the API rather than by a
-database CHECK so the vocabulary can change without a migration. `position` is the board sort key,
+`in_progress`, `done`, `archived` (default `backlog`), validated in the API and enforced by a
+database CHECK, so changing the vocabulary needs a migration. `position` is the board sort key,
 assigned as `max(position) + 1` within the project (epics) or epic (stories) on create.
 
 ## List epics
@@ -409,6 +409,152 @@ DELETE /user-stories/{userStoryId}
 
 Response: `204`.
 
+# Flow API contract
+
+A flow is a flowchart owned by a project. The Flow panel edits the project's default flow; each
+flow pin placed on a page element owns a flow of its own. Flow documents use the editor's own JSON
+shape (`FlowJSON`), so the client sends and receives exactly what the editor produces.
+
+Every flow endpoint requires a signed-in project member. `organizationId` and `projectId` are
+derived on the server from the project or flow and are never taken from the client.
+
+## Resolve the default flow
+
+```http
+POST /flows/default
+```
+
+```json
+{ "projectId": "project-001" }
+```
+
+Response: the project's most recently updated active flow that does not belong to a pin, or a new
+`Untitled Flow` when it has none. Concurrent calls for the same project return the same flow.
+
+## Get a flow document
+
+```http
+GET /flows/{flowId}/document
+```
+
+```json
+{
+  "flow": { "id": "0b1c…", "projectId": "project-001", "name": "Checkout", "updatedAt": "…" },
+  "pageId": "5d2e…",
+  "revision": 4,
+  "document": {
+    "version": 1,
+    "nodes": [
+      {
+        "id": "start_k3j9x2a1",
+        "type": "start",
+        "position": { "x": 120, "y": 40 },
+        "width": 180,
+        "height": 56,
+        "data": { "label": "Start", "description": "", "properties": {} }
+      }
+    ],
+    "edges": [
+      {
+        "id": "edge_p0q1r2s3",
+        "source": "start_k3j9x2a1",
+        "target": "process_a1b2c3d4",
+        "sourceHandle": "out",
+        "type": "step"
+      }
+    ],
+    "viewport": { "x": 0, "y": 0, "zoom": 1 },
+    "meta": { "name": "Checkout", "edgeType": "step" }
+  }
+}
+```
+
+Node and edge `id`s are the editor's own ids and are kept as sent. `meta.name` is the flow name and
+`meta.edgeType` its default edge style; any other `meta` keys are stored and returned unchanged.
+
+## Save a flow document
+
+```http
+PUT /flows/{flowId}/document
+```
+
+```json
+{ "revision": 4, "document": { "version": 1, "nodes": [], "edges": [], "meta": { "name": "Checkout" } } }
+```
+
+Replaces the flow's nodes and edges in one transaction and returns the same shape as the get, with
+`revision` incremented. Send the `revision` from the last get or save: a stale revision returns
+`409` without changing anything, so one editor never silently overwrites another. Omitting
+`revision` skips the check.
+
+A document is rejected with `400` when a node id repeats, an edge points at a node that is not in
+the document, an edge connects a node to itself, or a key is `__proto__`, `constructor` or
+`prototype`. A document holds at most 2000 nodes and 4000 edges.
+
+## Publish a flow
+
+```http
+POST /flows/{flowId}/versions
+```
+
+Snapshots the saved document as the next version (1, 2, 3 …). Response: `201` with the version,
+including its `document`.
+
+## List and get versions
+
+```http
+GET /flows/{flowId}/versions
+GET /flows/{flowId}/versions/{version}
+```
+
+The list returns the 100 newest versions without their documents, newest first:
+
+```json
+[
+  {
+    "id": "9f8e…",
+    "flowId": "0b1c…",
+    "version": 2,
+    "publishedById": "dd199b4d-d950-446a-b339-b93910500a32",
+    "publishedByUser": "Kaviyarasu",
+    "publishedAt": "2026-09-23T10:00:00.000Z"
+  }
+]
+```
+
+## Flow pins
+
+```http
+GET /flow-pins?projectId={projectId}&pageKey={pageKey}
+POST /flow-pins
+PATCH /flow-pins/{flowPinId}
+DELETE /flow-pins/{flowPinId}
+```
+
+Create body, anchored the same way as annotations:
+
+```json
+{
+  "projectId": "project-001",
+  "pageKey": "/checkout",
+  "name": "Payment retry flow",
+  "selector": "form.payment > button.submit",
+  "elementIdentifier": "Pay now button",
+  "relativeX": 0.5,
+  "relativeY": 0.5,
+  "fallbackX": 640,
+  "fallbackY": 420,
+  "viewportWidth": 1440,
+  "viewportHeight": 900
+}
+```
+
+Creating a pin also creates its flow. The response carries `flowId`, which the pin's panel loads
+and saves through the flow document endpoints above. `PATCH` takes `{ "name": "…" }` and renames
+both the pin and its flow; saving the flow under a new name renames the pin too. Deleting a pin
+deletes its flow, and is allowed for the pin's author or an admin. Pin flows are left out of
+`GET /flows`.
+
 # Settings API contract
 
 The Settings panel (Users, Organizations, Projects, Tags, Audit history) and the login picker each
@@ -486,7 +632,11 @@ POST /auth/logout
 { "projectId": "project-001", "userId": "6ba7b812-9dad-11d1-80b4-00c04fd430c8" }
 ```
 
-Response: `204` or an empty body. The client does not surface failures from this call.
+Send the session's bearer token: the server identifies who is logging out from it and revokes that
+user's sessions. Response: `204`, or `401` when the token is missing or no longer valid. On a `401`
+the client refreshes the token once and retries; if that is also rejected the server session is
+already dead, so the client just drops the local session. Either way the account is removed from
+the browser.
 
 ## Organizations
 

@@ -11,6 +11,7 @@ import {
   type UpdateCommentRequest,
   type UpdatePageStatusRequest,
 } from "../types/annotation.types";
+import { readErrorMessage, reportUnauthorized } from "./httpClient";
 
 const PATHS = {
   annotations: "/annotations",
@@ -81,12 +82,12 @@ export function createAnnotationApi(
     });
 
     if (!response.ok) {
-      const body = await response.text().catch(() => null);
-      throw new AnnotationApiError(
+      reportUnauthorized(response.status, token);
+      const { message, text } = await readErrorMessage(
+        response,
         `Annotation API request failed (${response.status})`,
-        response.status,
-        body,
       );
+      throw new AnnotationApiError(message, response.status, text || null);
     }
 
     if (response.status === 204) {

@@ -1,4 +1,5 @@
 import { AnnotationApiError } from "../types/annotation.types";
+import { actorHeaders } from "./actorIdentity";
 import type { AuthApiClient, AuthSession, LoginOption } from "../types/auth.types";
 
 function joinUrl(baseUrl: string, path: string): string {
@@ -54,10 +55,10 @@ export function createAuthApi(apiBaseUrl: string): AuthApiClient {
       return { ...payload.user, token: payload.token, refreshToken: payload.refreshToken };
     },
 
-    async logout(projectId, userId, signal) {
+    async logout(projectId, userId, signal, token) {
       const response = await fetch(joinUrl(apiBaseUrl, "/auth/logout"), {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", ...actorHeaders(token) },
         body: JSON.stringify({ projectId, userId }),
         signal,
       });

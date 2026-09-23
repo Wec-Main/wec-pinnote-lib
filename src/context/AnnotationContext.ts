@@ -13,7 +13,6 @@ import type {
 import type { AnnotationTag, DraftTagPin } from "../types/annotationTag.types";
 import type { ProjectTag } from "../types/tag.types";
 import type { DraftFlowPin, FlowPin } from "../types/flowPin.types";
-import type { FlowJSON } from "../components/WecFlow/flowchart";
 
 export interface DiscardPrompt {
   kind: "draft" | "edit";
@@ -44,7 +43,7 @@ export interface AnnotationDataContextValue {
   submitTagDraft: (tagId: string) => Promise<void>;
   removeAnnotationTag: (annotationTagId: string) => Promise<void>;
   flowPins: FlowPin[];
-  updateFlowPinFlow: (flowPinId: string, flow: FlowJSON) => void;
+  syncFlowPinName: (flowPinId: string, name: string) => void;
 }
 
 export interface AnnotationUiContextValue {
@@ -78,8 +77,8 @@ export interface AnnotationUiContextValue {
   flowPinDraft: DraftFlowPin | null;
   startFlowPinDraft: (anchor: AnnotationAnchor, label: string) => void;
   cancelFlowPinDraft: () => void;
-  submitFlowPinDraft: (name: string) => void;
-  removeFlowPin: (flowPinId: string) => void;
+  submitFlowPinDraft: (name: string) => Promise<void>;
+  removeFlowPin: (flowPinId: string) => Promise<void>;
   selectedFlowPinId: string | null;
   selectFlowPin: (id: string | null) => void;
   listOpen: boolean;

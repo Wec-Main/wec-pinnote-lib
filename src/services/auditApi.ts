@@ -1,5 +1,6 @@
 import { AnnotationApiError } from "../types/annotation.types";
 import { actorHeaders } from "./actorIdentity";
+import { readErrorMessage, reportUnauthorized } from "./httpClient";
 import type { AuditPage, AuditQuery } from "../types/audit.types";
 
 export async function fetchAuditPage(
@@ -22,16 +23,11 @@ export async function fetchAuditPage(
   });
 
   if (!response.ok) {
-    const text = await response.text().catch(() => "");
-    let message = `Unable to load audit history (${response.status})`;
-    try {
-      const parsed = JSON.parse(text) as { error?: string; message?: string };
-      message = parsed.error ?? parsed.message ?? message;
-    } catch {
-      if (text) {
-        message = text;
-      }
-    }
+    reportUnauthorized(response.status, authToken);
+    const { message, text } = await readErrorMessage(
+      response,
+      `Unable to load audit history (${response.status})`,
+    );
     throw new AnnotationApiError(message, response.status, text || null);
   }
 

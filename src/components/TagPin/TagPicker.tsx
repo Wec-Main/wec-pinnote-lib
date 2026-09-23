@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import { useAnnotationContext } from "../../context/AnnotationContext";
 import { useComboboxList, type ComboboxOption } from "../../hooks/useComboboxList";
 import { Icon } from "../primitives";
+import { SelectSearchField, SelectTrigger } from "../primitives/SelectParts";
 
 interface TagPickerProps {
   x: number;
@@ -31,6 +32,7 @@ export function TagPicker({ x, y }: TagPickerProps) {
     filtered,
     rootRef,
     inputRef,
+    triggerRef,
     listboxId,
     optionId,
     activeDescendant,
@@ -79,48 +81,28 @@ export function TagPicker({ x, y }: TagPickerProps) {
         ref={rootRef}
         onKeyDown={(event) => onRootKeyDown(event, commit)}
       >
-        <div
-          className={["wpn-select__trigger", open ? "wpn-select__trigger--open" : ""]
-            .filter(Boolean)
-            .join(" ")}
-          onClick={() => {
-            if (busy) {
-              return;
-            }
-            if (open) {
-              closeMenu();
-            } else {
-              openMenu();
-            }
-          }}
-        >
-          <input
-            ref={inputRef}
-            type="text"
-            role="combobox"
-            className="wpn-select__search-input wpn-select__search-input--trigger"
-            value={open ? query : (selectedTag?.label ?? "")}
-            placeholder={open ? "Search tags" : "Choose a tag"}
-            aria-label="Choose a tag"
-            aria-expanded={open}
-            aria-controls={listboxId}
-            aria-activedescendant={activeDescendant}
-            aria-autocomplete="list"
-            disabled={busy}
-            onFocus={() => {
-              if (!open) {
-                openMenu();
-              }
-            }}
-            onChange={(event) => onInputChange(event.target.value)}
-          />
-          <span className="wpn-select__indicators">
-            <Icon name="chevronDown" className="wpn-select__chevron" />
-          </span>
-        </div>
+        <SelectTrigger
+          triggerRef={triggerRef}
+          open={open}
+          label={selectedTag?.label ?? ""}
+          placeholder="Choose a tag"
+          ariaLabel="Choose a tag"
+          disabled={busy}
+          onToggle={() => (open ? closeMenu() : openMenu())}
+        />
 
         {open ? (
           <div className="wpn-select__menu">
+            <SelectSearchField
+              inputRef={inputRef}
+              value={query}
+              placeholder="Search tags"
+              ariaLabel="Search tags"
+              listboxId={listboxId}
+              activeDescendant={activeDescendant}
+              disabled={busy}
+              onChange={onInputChange}
+            />
             <ul className="wpn-select__list" role="listbox" id={listboxId} aria-label="Tags">
               {projectTags.length === 0 ? (
                 <li className="wpn-select__empty">
