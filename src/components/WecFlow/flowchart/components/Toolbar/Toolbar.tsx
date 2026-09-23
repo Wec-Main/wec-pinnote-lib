@@ -122,6 +122,7 @@ export const Toolbar = memo(function Toolbar({ brand, onNotify, onExport, onSave
         <button type="button" className={cx(ui.btn, ui.btnGhost, ui.iconBtn)} disabled={readOnly || !canRedo} onClick={() => engine.redo()} title="Redo (Ctrl+Shift+Z)" aria-label="Redo">
           <Icon name="redo" />
         </button>
+        <span className={styles.divider} aria-hidden="true" />
         <button
           type="button"
           className={cx(ui.btn, readOnly && ui.btnActive)}
