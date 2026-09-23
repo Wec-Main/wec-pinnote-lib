@@ -19,34 +19,6 @@
   color: var(--fb-text);
 }
 
-.search {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  height: 34px;
-  padding: 0 10px;
-  border: 1px solid var(--fb-border);
-  border-radius: 8px;
-  color: var(--fb-text-subtle);
-  background: var(--fb-panel-muted);
-}
-
-.search:focus-within {
-  border-color: var(--fb-accent);
-  background: var(--fb-panel);
-}
-
-.searchInput {
-  flex: 1;
-  min-width: 0;
-  border: none;
-  outline: none;
-  font: inherit;
-  font-size: 13px;
-  color: var(--fb-text);
-  background: transparent;
-}
-
 .list {
   flex: 1;
   overflow-y: auto;
@@ -144,11 +116,3 @@
   opacity: 1;
 }
 
-.none {
-  padding: 16px 4px;
-}
-
-.footer {
-  padding: 12px 16px;
-  border-top: 1px solid var(--fb-border);
-}

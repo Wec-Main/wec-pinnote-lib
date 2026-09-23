@@ -72,45 +72,58 @@ export function getStepPoints({ source, sourceSide, target, targetSide }: EdgePa
     cleaned.push(p);
   }
   return cleaned.filter((p, i) => {
-    if (i === 0 || i === cleaned.length - 1) return true;
-    const a = cleaned[i - 1]!;
-    const b = cleaned[i + 1]!;
+    const a = cleaned[i - 1];
+    const b = cleaned[i + 1];
+    if (!a || !b) return true;
     return !((a.x === p.x && p.x === b.x) || (a.y === p.y && p.y === b.y));
   });
 }
 
-export function getStepPath(input: EdgePathInput, radius = 10): EdgePath {
-  const pts = getStepPoints(input);
-  let d = `M ${r(pts[0]!.x)},${r(pts[0]!.y)}`;
-  for (let i = 1; i < pts.length - 1; i++) {
-    const prev = pts[i - 1]!;
-    const cur = pts[i]!;
-    const next = pts[i + 1]!;
-    const inLen = Math.hypot(cur.x - prev.x, cur.y - prev.y);
-    const outLen = Math.hypot(next.x - cur.x, next.y - cur.y);
-    const rad = Math.min(radius, inLen / 2, outLen / 2);
-    const before = { x: cur.x - ((cur.x - prev.x) / inLen) * rad, y: cur.y - ((cur.y - prev.y) / inLen) * rad };
-    const after = { x: cur.x + ((next.x - cur.x) / outLen) * rad, y: cur.y + ((next.y - cur.y) / outLen) * rad };
-    d += ` L ${r(before.x)},${r(before.y)} Q ${r(cur.x)},${r(cur.y)} ${r(after.x)},${r(after.y)}`;
-  }
-  const last = pts[pts.length - 1]!;
-  d += ` L ${r(last.x)},${r(last.y)}`;
+interface StepSegment {
+  from: XYPosition;
+  to: XYPosition;
+  length: number;
+}
 
-  // Label at the midpoint of the polyline, measured by length.
-  const lengths = pts.slice(1).map((p, i) => Math.hypot(p.x - pts[i]!.x, p.y - pts[i]!.y));
-  let remaining = lengths.reduce((a, b) => a + b, 0) / 2;
-  let labelX = pts[0]!.x;
-  let labelY = pts[0]!.y;
-  for (let i = 0; i < lengths.length; i++) {
-    if (remaining <= lengths[i]!) {
-      const t = lengths[i]! === 0 ? 0 : remaining / lengths[i]!;
-      labelX = pts[i]!.x + (pts[i + 1]!.x - pts[i]!.x) * t;
-      labelY = pts[i]!.y + (pts[i + 1]!.y - pts[i]!.y) * t;
-      break;
+function roundedCorner(incoming: StepSegment, outgoing: StepSegment, radius: number): string {
+  const { from: prev, to: cur, length: inLen } = incoming;
+  const { to: next, length: outLen } = outgoing;
+  const rad = Math.min(radius, inLen / 2, outLen / 2);
+  const before = { x: cur.x - ((cur.x - prev.x) / inLen) * rad, y: cur.y - ((cur.y - prev.y) / inLen) * rad };
+  const after = { x: cur.x + ((next.x - cur.x) / outLen) * rad, y: cur.y + ((next.y - cur.y) / outLen) * rad };
+  return ` L ${r(before.x)},${r(before.y)} Q ${r(cur.x)},${r(cur.y)} ${r(after.x)},${r(after.y)}`;
+}
+
+function midpointAlong(segments: StepSegment[], start: XYPosition): XYPosition {
+  let remaining = segments.reduce((total, segment) => total + segment.length, 0) / 2;
+  for (const { from, to, length } of segments) {
+    if (remaining <= length) {
+      const t = length === 0 ? 0 : remaining / length;
+      return { x: from.x + (to.x - from.x) * t, y: from.y + (to.y - from.y) * t };
     }
-    remaining -= lengths[i]!;
+    remaining -= length;
   }
-  return { path: d, labelX, labelY };
+  return start;
+}
+
+export function getStepPath(input: EdgePathInput, radius = 10): EdgePath {
+  const [first, ...rest] = getStepPoints(input);
+  if (!first) return { path: '', labelX: 0, labelY: 0 };
+  const segments: StepSegment[] = [];
+  let from = first;
+  for (const to of rest) {
+    segments.push({ from, to, length: Math.hypot(to.x - from.x, to.y - from.y) });
+    from = to;
+  }
+  let d = `M ${r(first.x)},${r(first.y)}`;
+  let previous: StepSegment | undefined;
+  for (const segment of segments) {
+    if (previous) d += roundedCorner(previous, segment, radius);
+    previous = segment;
+  }
+  d += ` L ${r(from.x)},${r(from.y)}`;
+  const label = midpointAlong(segments, first);
+  return { path: d, labelX: label.x, labelY: label.y };
 }
 
 export function getEdgePath(type: EdgePathType, input: EdgePathInput): EdgePath {

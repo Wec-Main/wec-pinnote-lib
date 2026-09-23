@@ -629,7 +629,8 @@ export class FlowEngine {
       .map((h) => ({ h, p: getHandlePosition(hovered!, def, h) }))
       .filter(({ h }) => this.canConnect(this.connectionFor(conn.from, { nodeId: hovered!.id, handleId: h.id })).valid)
       .sort((a, b) => Math.hypot(a.p.x - pointer.x, a.p.y - pointer.y) - Math.hypot(b.p.x - pointer.x, b.p.y - pointer.y));
-    return options.length ? { nodeId: hovered.id, handleId: options[0]!.h.id } : { nodeId: hovered.id, handleId: '' };
+    const [closest] = options;
+    return { nodeId: hovered.id, handleId: closest ? closest.h.id : '' };
   }
 
   updateConnection(pointer: XYPosition): void {

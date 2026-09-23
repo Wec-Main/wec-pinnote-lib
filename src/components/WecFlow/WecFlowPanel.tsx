@@ -13,6 +13,32 @@ function isFlowJSON(value: unknown): value is FlowJSON {
   }
 }
 
+const SHORTCUTS: [string, string][] = [
+  ["Delete", "Delete selection"],
+  ["Ctrl Z", "Undo"],
+  ["Ctrl Shift Z", "Redo"],
+  ["Ctrl D", "Duplicate"],
+  ["Ctrl A", "Select all"],
+  ["Shift drag", "Box select"],
+  ["Wheel", "Zoom"],
+  ["Arrows", "Nudge nodes"],
+];
+
+const shortcutList = (
+  <dl className="wpn-flow-panel__shortcuts">
+    {SHORTCUTS.map(([keys, action]) => (
+      <div key={keys}>
+        <dt>
+          {keys.split(" ").map((key) => (
+            <kbd key={key}>{key}</kbd>
+          ))}
+        </dt>
+        <dd>{action}</dd>
+      </div>
+    ))}
+  </dl>
+);
+
 const EMPTY_FLOW: FlowJSON = { version: 1, nodes: [], edges: [], meta: { name: "Untitled Flow" } };
 
 export function WecFlowPanel() {
@@ -39,6 +65,11 @@ export function WecFlowPanel() {
           <span className="wpn-panel__title">Flow</span>
         </span>
         <div className="wpn-flow-panel__header-actions">
+          <Tooltip label={shortcutList} placement="bottom">
+            <button type="button" className="wpn-icon-btn" aria-label="Keyboard shortcuts">
+              <Icon name="info" />
+            </button>
+          </Tooltip>
           <Tooltip label={minimized ? "Maximize" : "Minimize"} placement="bottom">
             <button
               type="button"

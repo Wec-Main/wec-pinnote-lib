@@ -2,7 +2,7 @@ import type { ComponentType, ReactNode } from 'react';
 import type { Dimensions, FlowNode, HandleKind, HandleSide, NodeData, PropertyValue } from './FlowTypes';
 
 /** Visual outline drawn behind a node's content. */
-export type NodeShape = 'rounded' | 'pill' | 'diamond' | 'parallelogram' | 'rectangle';
+export type NodeShape = 'rounded' | 'pill' | 'diamond' | 'parallelogram' | 'rectangle' | 'subprocess';
 
 /** Semantic role used by the validator (lets plugins declare their own start/end nodes). */
 export type NodeRole = 'start' | 'end' | 'default';
@@ -48,7 +48,8 @@ export type BuiltInIcon =
   | 'globe'
   | 'mail'
   | 'database'
-  | 'clock';
+  | 'clock'
+  | 'subprocess';
 
 /**
  * Everything the editor needs to know about a node type. Registering a new
@@ -104,6 +105,43 @@ export const builtInNodeTypes: NodeTypeDefinition[] = [
     defaultData: { label: 'Start' },
   },
   {
+    type: 'process',
+    label: 'Process',
+    description: 'A step that performs work',
+    category: 'Flow control',
+    color: '#3b82f6',
+    icon: 'cog',
+    shape: 'rounded',
+    defaultSize: { width: 220, height: 76 },
+    minSize: { width: 140, height: 56 },
+    resizable: true,
+    handles: inOut([
+      { id: 'in-left', kind: 'target', side: 'left' },
+      { id: 'out-right', kind: 'source', side: 'right' },
+    ]),
+    defaultData: { label: 'Process' },
+  },
+  {
+    type: 'decision',
+    label: 'Decision',
+    description: 'Branches on a condition',
+    category: 'Flow control',
+    color: '#f59e0b',
+    icon: 'branch',
+    shape: 'diamond',
+    defaultSize: { width: 200, height: 120 },
+    minSize: { width: 140, height: 90 },
+    resizable: true,
+    handles: [
+      { id: 'in', kind: 'target', side: 'top' },
+      { id: 'yes', kind: 'source', side: 'bottom', label: 'Yes' },
+      { id: 'no', kind: 'source', side: 'right', label: 'No' },
+      { id: 'in-left', kind: 'target', side: 'left' },
+    ],
+    defaultEdgeLabels: { yes: 'Yes', no: 'No' },
+    defaultData: { label: 'Condition?' },
+  },
+  {
     type: 'end',
     label: 'End',
     description: 'Terminates the flow',
@@ -120,13 +158,13 @@ export const builtInNodeTypes: NodeTypeDefinition[] = [
     defaultData: { label: 'End' },
   },
   {
-    type: 'process',
-    label: 'Process',
-    description: 'A step that performs work',
-    category: 'Steps',
-    color: '#3b82f6',
-    icon: 'cog',
-    shape: 'rounded',
+    type: 'subprocess',
+    label: 'Sub Process',
+    description: 'Runs a nested process',
+    category: 'Flow control',
+    color: '#6366f1',
+    icon: 'subprocess',
+    shape: 'subprocess',
     defaultSize: { width: 220, height: 76 },
     minSize: { width: 140, height: 56 },
     resizable: true,
@@ -134,86 +172,7 @@ export const builtInNodeTypes: NodeTypeDefinition[] = [
       { id: 'in-left', kind: 'target', side: 'left' },
       { id: 'out-right', kind: 'source', side: 'right' },
     ]),
-    defaultData: { label: 'Process' },
-    propertySchema: [
-      { key: 'assignee', label: 'Assignee', type: 'text', placeholder: 'Team or person' },
-      { key: 'duration', label: 'Duration (min)', type: 'number', defaultValue: 0 },
-      { key: 'automated', label: 'Automated', type: 'boolean', defaultValue: false },
-    ],
-  },
-  {
-    type: 'decision',
-    label: 'Decision',
-    description: 'Branches on a condition',
-    category: 'Steps',
-    color: '#f59e0b',
-    icon: 'branch',
-    shape: 'diamond',
-    defaultSize: { width: 200, height: 120 },
-    minSize: { width: 140, height: 90 },
-    resizable: true,
-    handles: [
-      { id: 'in', kind: 'target', side: 'top' },
-      { id: 'yes', kind: 'source', side: 'bottom', label: 'Yes' },
-      { id: 'no', kind: 'source', side: 'right', label: 'No' },
-      { id: 'in-left', kind: 'target', side: 'left' },
-    ],
-    defaultEdgeLabels: { yes: 'Yes', no: 'No' },
-    defaultData: { label: 'Condition?' },
-    propertySchema: [{ key: 'condition', label: 'Condition', type: 'textarea', placeholder: 'e.g. amount > 100' }],
-  },
-  {
-    type: 'input',
-    label: 'Input',
-    description: 'Receives data into the flow',
-    category: 'Data',
-    color: '#8b5cf6',
-    icon: 'input',
-    shape: 'parallelogram',
-    defaultSize: { width: 220, height: 72 },
-    minSize: { width: 150, height: 56 },
-    resizable: true,
-    handles: inOut(),
-    defaultData: { label: 'Input' },
-    propertySchema: [
-      { key: 'source', label: 'Source', type: 'text', placeholder: 'Form, API, file…' },
-      { key: 'dataType', label: 'Data type', type: 'select', options: ['text', 'number', 'json', 'file'], defaultValue: 'text' },
-    ],
-  },
-  {
-    type: 'output',
-    label: 'Output',
-    description: 'Emits data from the flow',
-    category: 'Data',
-    color: '#14b8a6',
-    icon: 'output',
-    shape: 'parallelogram',
-    defaultSize: { width: 220, height: 72 },
-    minSize: { width: 150, height: 56 },
-    resizable: true,
-    handles: inOut(),
-    defaultData: { label: 'Output' },
-    propertySchema: [
-      { key: 'destination', label: 'Destination', type: 'text', placeholder: 'Email, API, file…' },
-      { key: 'format', label: 'Format', type: 'select', options: ['text', 'json', 'csv', 'pdf'], defaultValue: 'json' },
-    ],
-  },
-  {
-    type: 'custom',
-    label: 'Custom',
-    description: 'Generic node with free-form properties',
-    category: 'Other',
-    color: '#64748b',
-    icon: 'puzzle',
-    shape: 'rectangle',
-    defaultSize: { width: 220, height: 76 },
-    minSize: { width: 120, height: 50 },
-    resizable: true,
-    handles: inOut([
-      { id: 'in-left', kind: 'target', side: 'left' },
-      { id: 'out-right', kind: 'source', side: 'right' },
-    ]),
-    defaultData: { label: 'Custom node' },
+    defaultData: { label: 'Sub Process' },
   },
 ];
 

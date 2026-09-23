@@ -92,6 +92,10 @@
   padding: 10px 30px;
 }
 
+.shape-subprocess .body {
+  padding: 10px 24px;
+}
+
 .bodyCentered {
   justify-content: center;
   text-align: center;

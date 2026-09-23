@@ -21,6 +21,17 @@ export const NodeShape = memo(function NodeShape({ shape, width: w, height: h }:
       el = <polygon points={`${s},1 ${w - 1},1 ${w - s},${h - 1} 1,${h - 1}`} />;
       break;
     }
+    case 'subprocess': {
+      const inset = Math.min(14, w / 8);
+      el = (
+        <g>
+          <rect x={1} y={1} width={Math.max(0, w - 2)} height={Math.max(0, h - 2)} rx={4} />
+          <line x1={inset} y1={1} x2={inset} y2={h - 1} />
+          <line x1={w - inset} y1={1} x2={w - inset} y2={h - 1} />
+        </g>
+      );
+      break;
+    }
     default: {
       const rx = shape === 'pill' ? h / 2 : shape === 'rounded' ? 12 : 4;
       el = <rect x={1} y={1} width={Math.max(0, w - 2)} height={Math.max(0, h - 2)} rx={rx} />;

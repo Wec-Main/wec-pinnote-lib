@@ -1,8 +1,7 @@
 import { memo, useState, type CSSProperties } from 'react';
 import { useFlowEngine, useFlowState } from '../../hooks/FlowContext';
 import { useEditSession } from '../../hooks/useEditSession';
-import type { EdgePathType, PropertyValue } from '../../models/FlowTypes';
-import type { PropertyField } from '../../models/NodeTypes';
+import type { EdgePathType } from '../../models/FlowTypes';
 import { getNodeSize } from '../../utils/geometry';
 import { cx, shallowEqual } from '../../utils/shallow';
 import { Icon, NodeIcon } from '../icons';
@@ -19,8 +18,10 @@ export const PropertiesPanel = memo(function PropertiesPanel({ className }: Prop
     shallowEqual(a[0], b[0]) && shallowEqual(a[1], b[1]),
   );
   let content;
-  if (nodeIds.length === 1 && edgeIds.length === 0) content = <NodeProperties key={nodeIds[0]} nodeId={nodeIds[0]!} />;
-  else if (edgeIds.length === 1 && nodeIds.length === 0) content = <EdgeProperties key={edgeIds[0]} edgeId={edgeIds[0]!} />;
+  const [onlyNodeId] = nodeIds;
+  const [onlyEdgeId] = edgeIds;
+  if (onlyNodeId !== undefined && nodeIds.length === 1 && edgeIds.length === 0) content = <NodeProperties key={onlyNodeId} nodeId={onlyNodeId} />;
+  else if (onlyEdgeId !== undefined && edgeIds.length === 1 && nodeIds.length === 0) content = <EdgeProperties key={onlyEdgeId} edgeId={onlyEdgeId} />;
   else if (nodeIds.length + edgeIds.length > 1) content = <MultiSelection nodeIds={nodeIds} edgeIds={edgeIds} />;
   else content = <FlowOverview />;
   return <aside className={cx(styles.panel, className)}>{content}</aside>;
@@ -53,9 +54,6 @@ function NodeProperties({ nodeId }: { nodeId: string }) {
   if (!node) return null;
   const def = engine.getDefinition(node.type);
   const size = getNodeSize(node, def);
-  const schema = def.propertySchema ?? [];
-  const schemaKeys = new Set(schema.map((f) => f.key));
-  const custom = Object.entries(node.data.properties).filter(([k]) => !schemaKeys.has(k));
 
   return (
     <>
@@ -94,47 +92,6 @@ function NodeProperties({ nodeId }: { nodeId: string }) {
             {...session}
           />
         </label>
-      </section>
-
-      {schema.length > 0 && (
-        <section className={ui.section}>
-          <h3 className={ui.sectionTitle}>{def.label} settings</h3>
-          {schema.map((field) => (
-            <SchemaField
-              key={field.key}
-              field={field}
-              value={node.data.properties[field.key] ?? null}
-              disabled={readOnly}
-              session={session}
-              onChange={(v) => engine.setNodeProperty(nodeId, field.key, v)}
-            />
-          ))}
-        </section>
-      )}
-
-      <section className={ui.section}>
-        <h3 className={ui.sectionTitle}>Custom properties</h3>
-        {custom.length === 0 && <p className={cx(ui.muted, styles.noProps)}>No custom properties yet.</p>}
-        {custom.map(([key, value]) => (
-          <div key={key} className={styles.propRow}>
-            <span className={styles.propKey} title={key}>
-              {key}
-            </span>
-            <input
-              className={ui.input}
-              value={value === null ? '' : String(value)}
-              disabled={readOnly}
-              onChange={(e) => engine.setNodeProperty(nodeId, key, e.target.value)}
-              {...session}
-            />
-            {!readOnly && (
-              <button type="button" className={cx(ui.btn, ui.btnGhost, ui.iconBtn)} title={`Remove "${key}"`} onClick={() => engine.removeNodeProperty(nodeId, key)}>
-                <Icon name="trash" size={14} />
-              </button>
-            )}
-          </div>
-        ))}
-        {!readOnly && <AddProperty existing={Object.keys(node.data.properties)} onAdd={(k, v) => engine.setNodeProperty(nodeId, k, v)} />}
       </section>
 
       <section className={ui.section}>
@@ -196,88 +153,6 @@ function NumberField({ label, value, disabled, onCommit }: { label: string; valu
         }}
       />
     </label>
-  );
-}
-
-interface SchemaFieldProps {
-  field: PropertyField;
-  value: PropertyValue;
-  disabled: boolean;
-  session: ReturnType<typeof useEditSession>;
-  onChange: (value: PropertyValue) => void;
-}
-
-function SchemaField({ field, value, disabled, session, onChange }: SchemaFieldProps) {
-  if (field.type === 'boolean') {
-    return (
-      <label className={ui.switchRow}>
-        <span>{field.label}</span>
-        <input type="checkbox" className={ui.switch} checked={value === true} disabled={disabled} onChange={(e) => onChange(e.target.checked)} />
-      </label>
-    );
-  }
-  let input;
-  if (field.type === 'select') {
-    input = (
-      <select className={ui.input} value={value === null ? '' : String(value)} disabled={disabled} onChange={(e) => onChange(e.target.value)}>
-        {value === null && <option value="">Select…</option>}
-        {field.options?.map((o) => (
-          <option key={o} value={o}>
-            {o}
-          </option>
-        ))}
-      </select>
-    );
-  } else if (field.type === 'textarea') {
-    input = <textarea className={ui.input} value={value === null ? '' : String(value)} placeholder={field.placeholder} disabled={disabled} onChange={(e) => onChange(e.target.value)} {...session} />;
-  } else if (field.type === 'number') {
-    input = (
-      <input
-        className={ui.input}
-        type="number"
-        value={value === null ? '' : String(value)}
-        placeholder={field.placeholder}
-        disabled={disabled}
-        onChange={(e) => onChange(e.target.value === '' ? null : Number(e.target.value))}
-        {...session}
-      />
-    );
-  } else {
-    input = <input className={ui.input} value={value === null ? '' : String(value)} placeholder={field.placeholder} disabled={disabled} onChange={(e) => onChange(e.target.value)} {...session} />;
-  }
-  return (
-    <label className={ui.field}>
-      <span className={ui.fieldLabel}>{field.label}</span>
-      {input}
-    </label>
-  );
-}
-
-function AddProperty({ existing, onAdd }: { existing: string[]; onAdd: (key: string, value: string) => void }) {
-  const [key, setKey] = useState('');
-  const [value, setValue] = useState('');
-  const k = key.trim();
-  const duplicate = existing.includes(k);
-  const submit = () => {
-    if (!k || duplicate) return;
-    onAdd(k, value);
-    setKey('');
-    setValue('');
-  };
-  return (
-    <form
-      className={styles.addProp}
-      onSubmit={(e) => {
-        e.preventDefault();
-        submit();
-      }}
-    >
-      <input className={ui.input} placeholder="Key" value={key} onChange={(e) => setKey(e.target.value)} aria-invalid={duplicate} />
-      <input className={ui.input} placeholder="Value" value={value} onChange={(e) => setValue(e.target.value)} />
-      <button type="submit" className={cx(ui.btn, ui.iconBtn)} disabled={!k || duplicate} title={duplicate ? 'Key already exists' : 'Add property'}>
-        <Icon name="plus" size={14} />
-      </button>
-    </form>
   );
 }
 
@@ -438,32 +313,6 @@ function FlowOverview() {
           <span>Snap to grid</span>
           <input type="checkbox" className={ui.switch} checked={snap} onChange={(e) => engine.setSnapToGrid(e.target.checked)} />
         </label>
-      </section>
-      <section className={ui.section}>
-        <h3 className={ui.sectionTitle}>Shortcuts</h3>
-        <dl className={styles.shortcuts}>
-          {[
-            ['Delete', 'Delete selection'],
-            ['Ctrl Z', 'Undo'],
-            ['Ctrl Shift Z', 'Redo'],
-            ['Ctrl D', 'Duplicate'],
-            ['Ctrl A', 'Select all'],
-            ['Shift drag', 'Box select'],
-            ['Wheel', 'Zoom'],
-            ['Arrows', 'Nudge nodes'],
-          ].map(([k = "", v]) => (
-            <div key={k}>
-              <dt>
-                {k.split(' ').map((part) => (
-                  <kbd key={part} className={ui.kbd}>
-                    {part}
-                  </kbd>
-                ))}
-              </dt>
-              <dd>{v}</dd>
-            </div>
-          ))}
-        </dl>
       </section>
     </>
   );

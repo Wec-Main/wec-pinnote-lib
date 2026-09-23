@@ -41,9 +41,17 @@ export type IconName =
   | "zoomOut"
   | "layers"
   | "lock"
-  | "lockOpen";
+  | "lockOpen"
+  | "info";
 
 const PATHS: Record<IconName, ReactElement> = {
+  info: (
+    <>
+      <circle cx="12" cy="12" r="8.5" />
+      <path d="M12 11v5" />
+      <path d="M12 7.8v.3" />
+    </>
+  ),
   search: (
     <>
       <circle cx="11" cy="11" r="6.5" />

@@ -40,7 +40,7 @@ describe('FlowEngine', () => {
   it('adds nodes with defaults from the type definition', () => {
     const { proc } = simpleFlow();
     expect(proc.data.label).toBe('Process');
-    expect(proc.data.properties).toEqual({ duration: 0, automated: false });
+    expect(proc.data.properties).toEqual({});
   });
 
   it('adds valid edges and applies default decision labels', () => {

@@ -1,9 +1,9 @@
-import { memo, useMemo, useState, type CSSProperties } from 'react';
+import { memo, useMemo, type CSSProperties } from 'react';
 import { useFlowEngine, useFlowState } from '../../hooks/FlowContext';
 import type { NodeTypeDefinition } from '../../models/NodeTypes';
 import { cx } from '../../utils/shallow';
 import { NODE_DRAG_MIME } from '../../utils/constants';
-import { NodeIcon, Icon } from '../icons';
+import { NodeIcon } from '../icons';
 import ui from '../ui/ui.module.css';
 import styles from './Sidebar.module.css';
 
@@ -19,21 +19,18 @@ export const Sidebar = memo(function Sidebar({ title = 'Nodes', nodeTypes, class
   const engine = useFlowEngine();
   const readOnly = useFlowState((s) => s.readOnly);
   const registryVersion = useFlowState((s) => s.registryVersion);
-  const [query, setQuery] = useState('');
 
   const groups = useMemo(() => {
     void registryVersion;
     const all = nodeTypes ? nodeTypes.map((t) => engine.registry.get(t)).filter((d) => engine.registry.has(d.type)) : engine.registry.list();
-    const q = query.trim().toLowerCase();
-    const matches = all.filter((d) => !q || d.label.toLowerCase().includes(q) || d.description?.toLowerCase().includes(q));
     const map = new Map<string, NodeTypeDefinition[]>();
-    for (const d of matches) {
+    for (const d of all) {
       const key = d.category ?? 'Other';
       if (!map.has(key)) map.set(key, []);
       map.get(key)!.push(d);
     }
     return [...map.entries()];
-  }, [engine, nodeTypes, query, registryVersion]);
+  }, [engine, nodeTypes, registryVersion]);
 
   const addAtCenter = (def: NodeTypeDefinition) => {
     const { canvasSize } = engine.getState();
@@ -51,10 +48,6 @@ export const Sidebar = memo(function Sidebar({ title = 'Nodes', nodeTypes, class
     <aside className={cx(styles.sidebar, className)}>
       <div className={styles.header}>
         <h2 className={styles.title}>{title}</h2>
-        <div className={styles.search}>
-          <Icon name="search" size={14} />
-          <input className={styles.searchInput} placeholder="Search nodes…" value={query} onChange={(e) => setQuery(e.target.value)} />
-        </div>
       </div>
       <div className={styles.list}>
         {groups.map(([category, defs]) => (
@@ -96,16 +89,6 @@ export const Sidebar = memo(function Sidebar({ title = 'Nodes', nodeTypes, class
             ))}
           </div>
         ))}
-        {groups.length === 0 && <div className={cx(ui.muted, styles.none)}>No node types match “{query}”.</div>}
-      </div>
-      <div className={styles.footer}>
-        {readOnly ? (
-          <span className={ui.muted}>
-            <Icon name="lock" size={12} /> Read-only mode — editing is disabled.
-          </span>
-        ) : (
-          <span className={ui.muted}>Drag nodes onto the canvas. Connect them by dragging from a handle.</span>
-        )}
       </div>
     </aside>
   );
