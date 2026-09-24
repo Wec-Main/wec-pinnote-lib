@@ -1,6 +1,7 @@
 import { buildUrl, request, requestNoContent } from "./httpClient";
 import type { AnnotationAnchor } from "../types/annotation.types";
 import type {
+  Flow,
   FlowDocumentRecord,
   FlowPin,
   FlowSummary,
@@ -22,6 +23,48 @@ export function resolveDefaultFlow(
     method: "POST",
     body: JSON.stringify({ projectId }),
     signal,
+  });
+}
+
+export function listFlows(
+  apiBaseUrl: string,
+  authToken: string | undefined,
+  projectId: string,
+  signal?: AbortSignal,
+): Promise<Flow[]> {
+  return request<Flow[]>(buildUrl(apiBaseUrl, "/flows", { projectId }), authToken, { signal });
+}
+
+export function createFlow(
+  apiBaseUrl: string,
+  authToken: string | undefined,
+  input: { projectId: string; name: string; description?: string },
+): Promise<Flow> {
+  return request<Flow>(buildUrl(apiBaseUrl, "/flows"), authToken, {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+}
+
+export function updateFlow(
+  apiBaseUrl: string,
+  authToken: string | undefined,
+  flowId: string,
+  input: { name?: string; description?: string },
+): Promise<Flow> {
+  return request<Flow>(buildUrl(apiBaseUrl, flowPath(flowId, "")), authToken, {
+    method: "PATCH",
+    body: JSON.stringify(input),
+  });
+}
+
+export function deleteFlow(
+  apiBaseUrl: string,
+  authToken: string | undefined,
+  flowId: string,
+): Promise<void> {
+  return requestNoContent(buildUrl(apiBaseUrl, flowPath(flowId, "")), authToken, {
+    method: "DELETE",
   });
 }
 

@@ -31,7 +31,7 @@ function CommentItem({
   onDelete: (commentId: string) => Promise<void>;
   onEditingChange?: (commentId: string, editing: boolean) => void;
 }) {
-  const canEdit = canEditComment();
+  const canEdit = canEditComment(comment, currentUser);
   const canDelete = canDeleteComment(comment, currentUser);
   const [editing, setEditing] = useState(false);
   const [value, setValue] = useState(comment.message);

@@ -9,7 +9,8 @@
   background: var(--fb-panel);
 }
 
-.close {
+.close,
+.expand {
   position: absolute;
   top: 12px;
   right: 12px;
@@ -25,9 +26,23 @@
   cursor: pointer;
 }
 
-.close:hover {
+.expand {
+  right: 44px;
+}
+
+.close:hover,
+.expand:hover {
   color: var(--fb-text);
   background: var(--fb-hover);
+}
+
+.panelExpanded {
+  position: absolute;
+  inset: 0;
+  z-index: 8;
+  width: auto;
+  border-left: none;
+  box-shadow: var(--fb-shadow-lg);
 }
 
 .header {
@@ -146,30 +161,5 @@
 .endpoint code {
   font-size: 11px;
   color: var(--fb-text-subtle);
-}
-
-.stats {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 8px;
-}
-
-.stats > div {
-  display: flex;
-  flex-direction: column;
-  padding: 10px 12px;
-  border: 1px solid var(--fb-border);
-  border-radius: 8px;
-  background: var(--fb-panel-muted);
-}
-
-.stats strong {
-  font-size: 18px;
-  font-weight: 600;
-}
-
-.stats span {
-  font-size: 12px;
-  color: var(--fb-text-muted);
 }
 

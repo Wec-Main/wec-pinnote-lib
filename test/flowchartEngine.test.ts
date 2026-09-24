@@ -154,6 +154,20 @@ describe('FlowEngine', () => {
     expect(other.getState().canUndo).toBe(false);
   });
 
+  it('carries flow-level notes through save and reload, independent of any node', () => {
+    const { engine } = simpleFlow();
+    expect(engine.getState().flowNotes).toBe('');
+    engine.setFlowNotes('Handles the checkout funnel.');
+    expect(engine.toJSON().meta?.notes).toBe('Handles the checkout funnel.');
+
+    const other = new FlowEngine();
+    other.loadFlow(parseFlow(JSON.stringify(engine.toJSON())));
+    expect(other.getState().flowNotes).toBe('Handles the checkout funnel.');
+
+    other.newFlow();
+    expect(other.getState().flowNotes).toBe('');
+  });
+
   it('emits change events', () => {
     const engine = new FlowEngine();
     let count = 0;

@@ -1,11 +1,9 @@
 import { useState } from "react";
 import { useAnnotationAuth, useAnnotationContext } from "../../context/AnnotationContext";
 import { Icon, Tooltip } from "../primitives";
-import { useSharedFetch } from "../../hooks/useSharedFetch";
 import { useFlowDocument } from "../../hooks/useFlowDocument";
-import { useTokenGetter } from "../../hooks/useTokenGetter";
-import { resolveDefaultFlow } from "../../services/flowApi";
 import { FlowDocumentEditor } from "./FlowDocumentEditor";
+import { FlowListPanel } from "./FlowListPanel";
 
 const SHORTCUTS: [string, string][] = [
   ["Delete", "Delete selection"],
@@ -51,31 +49,31 @@ function errorMessage(error: unknown): string | null {
   return error instanceof Error && error.message ? error.message : "Could not load the flow";
 }
 
-export function WecFlowPanel() {
-  const { setFlowOpen, config } = useAnnotationContext();
+function FlowEditorPane({ flowId }: { flowId: string }) {
+  const { config } = useAnnotationContext();
   const { hostAuthenticated, activeAccount } = useAnnotationAuth();
-  const [minimized, setMinimized] = useState(false);
-  const getToken = useTokenGetter(config.getAuthToken);
   const signedIn = Boolean(config.getAuthToken);
   const sessionKey = hostAuthenticated ? "host" : (activeAccount?.id ?? "");
-  const flowKey = sessionKey
-    ? `default-flow:${config.apiBaseUrl}:${sessionKey}:${config.projectId}`
-    : null;
-  const {
-    data: flow,
-    error: flowError,
-    reload: reloadFlow,
-  } = useSharedFetch(flowKey, (signal) =>
-    getToken().then((authToken) =>
-      resolveDefaultFlow(config.apiBaseUrl, authToken, config.projectId, signal),
-    ),
-  );
   const flowDocument = useFlowDocument({
     apiBaseUrl: config.apiBaseUrl,
     getAuthToken: config.getAuthToken,
     sessionKey,
-    flowId: flow?.id ?? null,
+    flowId,
   });
+
+  return (
+    <FlowDocumentEditor
+      flowDocument={flowDocument}
+      signedIn={signedIn}
+      resolveError={errorMessage(flowDocument.error)}
+    />
+  );
+}
+
+export function WecFlowPanel() {
+  const { setFlowOpen } = useAnnotationContext();
+  const [minimized, setMinimized] = useState(false);
+  const [openFlowId, setOpenFlowId] = useState<string | null>(null);
 
   return (
     <div
@@ -91,11 +89,25 @@ export function WecFlowPanel() {
           <span className="wpn-panel__title">Flow</span>
         </span>
         <div className="wpn-flow-panel__header-actions">
-          <Tooltip label={shortcutList} placement="bottom">
-            <button type="button" className="wpn-icon-btn" aria-label="Keyboard shortcuts">
-              <Icon name="info" />
-            </button>
-          </Tooltip>
+          {openFlowId ? (
+            <>
+              <Tooltip label="Back to flow list" placement="bottom">
+                <button
+                  type="button"
+                  className="wpn-icon-btn"
+                  aria-label="Back to flow list"
+                  onClick={() => setOpenFlowId(null)}
+                >
+                  <Icon name="chevronLeft" />
+                </button>
+              </Tooltip>
+              <Tooltip label={shortcutList} placement="bottom">
+                <button type="button" className="wpn-icon-btn" aria-label="Keyboard shortcuts">
+                  <Icon name="info" />
+                </button>
+              </Tooltip>
+            </>
+          ) : null}
           <Tooltip label={minimized ? "Maximize" : "Minimize"} placement="bottom">
             <button
               type="button"
@@ -120,12 +132,11 @@ export function WecFlowPanel() {
       </div>
 
       <div className="wpn-flow-panel__body">
-        <FlowDocumentEditor
-          flowDocument={flowDocument}
-          signedIn={signedIn}
-          resolveError={errorMessage(flowError)}
-          onRetry={flowError ? reloadFlow : undefined}
-        />
+        {openFlowId ? (
+          <FlowEditorPane flowId={openFlowId} />
+        ) : (
+          <FlowListPanel onOpen={setOpenFlowId} />
+        )}
       </div>
     </div>
   );

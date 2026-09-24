@@ -6,8 +6,8 @@ function owns(entity: { createdBy: AnnotationUser }, currentUser: AnnotationUser
   return entity.createdBy.id === currentUser.id;
 }
 
-export function canEditComment(): boolean {
-  return true;
+export function canEditComment(comment: AnnotationComment, currentUser: AnnotationUser): boolean {
+  return owns(comment, currentUser) || MODERATOR_ROLES.has(currentUser.role ?? "");
 }
 
 export function canDeleteComment(comment: AnnotationComment, currentUser: AnnotationUser): boolean {

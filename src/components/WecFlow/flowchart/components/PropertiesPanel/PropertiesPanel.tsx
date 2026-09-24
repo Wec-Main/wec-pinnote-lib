@@ -1,8 +1,7 @@
-import { memo, useState, type CSSProperties } from 'react';
+import { memo, type CSSProperties } from 'react';
 import { useFlowEngine, useFlowState } from '../../hooks/FlowContext';
 import { useEditSession } from '../../hooks/useEditSession';
 import type { EdgePathType } from '../../models/FlowTypes';
-import { getNodeSize } from '../../utils/geometry';
 import { cx, shallowEqual } from '../../utils/shallow';
 import { Icon, NodeIcon, type IconName } from '../icons';
 import { lineStyleOptions } from '../lineStyles';
@@ -12,10 +11,14 @@ import styles from './PropertiesPanel.module.css';
 export interface PropertiesPanelProps {
   className?: string;
   onClose?: () => void;
+  /** Whether the panel currently fills the whole editor area. */
+  expanded?: boolean;
+  /** Toggles `expanded`. Omit to hide the expand control. */
+  onToggleExpand?: () => void;
 }
 
 /** Right-hand inspector: edits whatever is selected (node, edge, multi-selection or the flow itself). */
-export const PropertiesPanel = memo(function PropertiesPanel({ className, onClose }: PropertiesPanelProps) {
+export const PropertiesPanel = memo(function PropertiesPanel({ className, onClose, expanded = false, onToggleExpand }: PropertiesPanelProps) {
   const [nodeIds, edgeIds] = useFlowState((s) => [[...s.selectedNodeIds], [...s.selectedEdgeIds]] as const, (a, b) =>
     shallowEqual(a[0], b[0]) && shallowEqual(a[1], b[1]),
   );
@@ -27,7 +30,19 @@ export const PropertiesPanel = memo(function PropertiesPanel({ className, onClos
   else if (nodeIds.length + edgeIds.length > 1) content = <MultiSelection nodeIds={nodeIds} edgeIds={edgeIds} />;
   else content = <FlowOverview />;
   return (
-    <aside className={cx(styles.panel, className)}>
+    <aside className={cx(styles.panel, expanded && styles.panelExpanded, className)}>
+      {onToggleExpand && (
+        <button
+          type="button"
+          className={styles.expand}
+          aria-label={expanded ? 'Collapse panel' : 'Expand panel'}
+          aria-pressed={expanded}
+          title={expanded ? 'Collapse panel' : 'Expand panel'}
+          onClick={onToggleExpand}
+        >
+          <Icon name={expanded ? 'collapse' : 'expand'} size={14} />
+        </button>
+      )}
       {onClose && (
         <button type="button" className={styles.close} aria-label="Close panel" title="Close panel" onClick={onClose}>
           <Icon name="x" size={14} />
@@ -60,7 +75,6 @@ function NodeProperties({ nodeId }: { nodeId: string }) {
   const session = useEditSession();
   if (!node) return null;
   const def = engine.getDefinition(node.type);
-  const size = getNodeSize(node, def);
 
   return (
     <>
@@ -92,6 +106,7 @@ function NodeProperties({ nodeId }: { nodeId: string }) {
           <span className={ui.fieldLabel}>Description</span>
           <textarea
             className={ui.input}
+            style={{ minHeight: 220 }}
             value={node.data.description ?? ''}
             placeholder="What does this step do?"
             disabled={readOnly}
@@ -100,56 +115,7 @@ function NodeProperties({ nodeId }: { nodeId: string }) {
           />
         </label>
       </section>
-
-      <section className={ui.section}>
-        <h3 className={ui.sectionTitle}>Layout</h3>
-        <div className={ui.row}>
-          <NumberField label="X" value={node.position.x} disabled={readOnly} onCommit={(x) => engine.updateNode(nodeId, { position: { ...node.position, x } })} />
-          <NumberField label="Y" value={node.position.y} disabled={readOnly} onCommit={(y) => engine.updateNode(nodeId, { position: { ...node.position, y } })} />
-        </div>
-        <div className={ui.row}>
-          <NumberField label="Width" value={size.width} disabled={readOnly || def.resizable === false} onCommit={(width) => engine.updateNode(nodeId, { width: Math.max(def.minSize?.width ?? 40, width) })} />
-          <NumberField label="Height" value={size.height} disabled={readOnly || def.resizable === false} onCommit={(height) => engine.updateNode(nodeId, { height: Math.max(def.minSize?.height ?? 30, height) })} />
-        </div>
-      </section>
-
-      {!readOnly && (
-        <section className={cx(ui.section, styles.actions)}>
-          <button type="button" className={ui.btn} onClick={() => engine.duplicateNodes([nodeId])}>
-            <Icon name="copy" size={14} /> Duplicate
-          </button>
-          <button type="button" className={cx(ui.btn, ui.btnDanger)} onClick={() => engine.removeNodes([nodeId])}>
-            <Icon name="trash" size={14} /> Delete node
-          </button>
-        </section>
-      )}
     </>
-  );
-}
-
-/** Numeric input that commits on blur / Enter, so intermediate keystrokes aren't clamped. */
-function NumberField({ label, value, disabled, onCommit }: { label: string; value: number; disabled?: boolean; onCommit: (value: number) => void }) {
-  const [draft, setDraft] = useState<string | null>(null);
-  const commit = () => {
-    if (draft !== null && draft.trim() !== '' && Number.isFinite(Number(draft))) onCommit(Number(draft));
-    setDraft(null);
-  };
-  return (
-    <label className={ui.field}>
-      <span className={ui.fieldLabel}>{label}</span>
-      <input
-        className={ui.input}
-        type="number"
-        value={draft ?? String(Math.round(value))}
-        disabled={disabled}
-        onChange={(e) => setDraft(e.target.value)}
-        onBlur={commit}
-        onKeyDown={(e) => {
-          if (e.key === 'Enter') commit();
-          if (e.key === 'Escape') setDraft(null);
-        }}
-      />
-    </label>
   );
 }
 
@@ -270,10 +236,9 @@ function MultiSelection({ nodeIds, edgeIds }: { nodeIds: readonly string[]; edge
 
 function FlowOverview() {
   const engine = useFlowEngine();
-  const [nodeCount, edgeCount] = useFlowState((s) => [s.nodes.length, s.edges.length] as const, shallowEqual);
   const name = useFlowState((s) => s.flowName);
+  const notes = useFlowState((s) => s.flowNotes);
   const readOnly = useFlowState((s) => s.readOnly);
-  const edgeType = useFlowState((s) => s.defaultEdgeType);
   return (
     <>
       <PanelHeader title="Flow settings" subtitle="Select a node or connection to edit it" icon={<Icon name="flow" size={16} />} />
@@ -282,36 +247,17 @@ function FlowOverview() {
           <span className={ui.fieldLabel}>Flow name</span>
           <input className={ui.input} value={name} disabled={readOnly} onChange={(e) => engine.setFlowName(e.target.value)} />
         </label>
-        <div className={styles.stats}>
-          <div>
-            <strong>{nodeCount}</strong>
-            <span>Nodes</span>
-          </div>
-          <div>
-            <strong>{edgeCount}</strong>
-            <span>Connections</span>
-          </div>
-        </div>
-      </section>
-      <section className={ui.section}>
-        <h3 className={ui.sectionTitle}>Editor</h3>
-        <div className={ui.field}>
-          <span className={ui.fieldLabel}>Default line style</span>
-          <div className={ui.segmented}>
-            {lineStyleOptions.map((t) => (
-              <button
-                key={t.value}
-                type="button"
-                className={cx(ui.segment, edgeType === t.value && ui.segmentActive)}
-                title={`${t.label} line`}
-                onClick={() => engine.setDefaultEdgeType(t.value)}
-              >
-                <Icon name={t.icon} size={13} />
-                {t.label}
-              </button>
-            ))}
-          </div>
-        </div>
+        <label className={ui.field}>
+          <span className={ui.fieldLabel}>Notes</span>
+          <textarea
+            className={ui.input}
+            style={{ minHeight: 220 }}
+            value={notes}
+            placeholder="Notes about this flow as a whole..."
+            disabled={readOnly}
+            onChange={(e) => engine.setFlowNotes(e.target.value)}
+          />
+        </label>
       </section>
     </>
   );

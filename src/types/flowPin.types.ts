@@ -28,6 +28,21 @@ export interface FlowSummary {
   updatedAt: string;
 }
 
+/** A project-level flow, as listed/managed from the Flow browser. */
+export interface Flow {
+  id: string;
+  projectId: string;
+  name: string;
+  description: string;
+  status: string;
+  createdByUser: string;
+  createdById: string | null;
+  updatedByUser: string | null;
+  updatedById: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface FlowDocumentRecord {
   flow: FlowSummary;
   pageId: string | null;

@@ -151,13 +151,18 @@ body.wpn-mode-active {
   z-index: 5;
 }
 
-/* While the toolbar is open the launcher keeps its own corner, so the two never
+/* Default bottom-left corner for a launcher that hasn't been explicitly
+   dragged elsewhere. Also used while the toolbar is open, so the two never
    stack on the same coordinates. */
 .wpn-toolbar--launcher-docked {
   top: auto;
   bottom: 16px;
   left: 16px;
   transform: none;
+}
+
+/* Only while the toolbar is open is the launcher's own drag disabled. */
+.wpn-toolbar--launcher-locked {
   cursor: default;
 }
 
@@ -3022,6 +3027,122 @@ body.wpn-epicflow-resizing {
   color: #fca5a5;
   font-size: 13px;
   animation: wpn-flow-slide-down 220ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+
+.wpn-flow-list {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 20px;
+  min-height: 0;
+  padding: 16px 20px 20px;
+  overflow-y: auto;
+}
+
+.wpn-flow-list__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex: 0 0 auto;
+}
+
+.wpn-flow-list__title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.wpn-flow-list__count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.1);
+  color: rgba(255, 255, 255, 0.72);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.wpn-flow-list__empty {
+  margin: 0;
+  padding: 24px 0;
+  text-align: center;
+  color: rgba(255, 255, 255, 0.6);
+  font-size: 13px;
+}
+
+.wpn-flow-list__section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.wpn-flow-list__section-title {
+  margin: 0;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.5);
+}
+
+.wpn-flow-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.wpn-flow-table th {
+  padding: 8px 12px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.14);
+  color: rgba(255, 255, 255, 0.55);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  text-align: left;
+}
+
+.wpn-flow-table td {
+  padding: 10px 12px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  vertical-align: middle;
+}
+
+.wpn-flow-table tbody tr:hover {
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.wpn-flow-table__name {
+  font-weight: 600;
+}
+
+.wpn-flow-table__meta {
+  color: rgba(255, 255, 255, 0.65);
+  white-space: nowrap;
+}
+
+.wpn-flow-table__notes {
+  max-width: 520px;
+  color: rgba(255, 255, 255, 0.78);
+  white-space: pre-wrap;
+}
+
+.wpn-flow-table__actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 4px;
+}
+
+.wpn-flow-table__open {
+  padding: 5px 10px;
+  font-size: 12px;
 }
 
 .wpn-flow-stage {

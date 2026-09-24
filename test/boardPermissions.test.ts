@@ -43,7 +43,26 @@ describe("canDeleteComment", () => {
 });
 
 describe("canEditComment", () => {
-  it("is open to every signed-in role, not just the author", () => {
-    expect(canEditComment()).toBe(true);
+  it("lets the author edit their own comment", () => {
+    expect(canEditComment(comment("u1"), owner)).toBe(true);
+  });
+
+  it("lets an admin and a super admin edit another user's comment", () => {
+    expect(canEditComment(comment("u1"), admin)).toBe(true);
+    expect(canEditComment(comment("u1"), superAdmin)).toBe(true);
+  });
+
+  it("stops a contributor editing another contributor's comment", () => {
+    expect(canEditComment(comment("u1"), contributor)).toBe(false);
+  });
+
+  it("stops a user with no role editing someone else's comment", () => {
+    expect(canEditComment(comment("u1"), { id: "u9", name: "Nobody" })).toBe(false);
+  });
+
+  it("matches on id, not display name", () => {
+    const sameNameDifferentPerson: AnnotationUser = { id: "u9", name: "Ada Lovelace" };
+
+    expect(canEditComment(comment("u1"), sameNameDifferentPerson)).toBe(false);
   });
 });

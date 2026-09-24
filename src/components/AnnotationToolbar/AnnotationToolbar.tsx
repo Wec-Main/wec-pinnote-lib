@@ -1,6 +1,5 @@
 import {
   useEffect,
-  useLayoutEffect,
   useRef,
   useState,
   type PointerEvent as ReactPointerEvent,
@@ -18,7 +17,9 @@ import { Icon, Tooltip } from "../primitives";
 import { isBoolean, usePersistentState } from "../../hooks/usePersistentState";
 
 const EDGE = 8;
-const LAUNCHER_SIZE = 36;
+// Temporarily hidden from the launcher per product request; keep the Flow
+// feature (state, panel, API) intact so this can be flipped back on.
+const SHOW_FLOW_LAUNCHER_ICON = false;
 
 interface ToolbarPosition {
   x: number;
@@ -113,20 +114,6 @@ export function AnnotationToolbar() {
     window.addEventListener("resize", onResize);
     return () => window.removeEventListener("resize", onResize);
   }, [position, setPosition]);
-
-  useLayoutEffect(() => {
-    const el = toolbarRef.current;
-    if (!el) {
-      return;
-    }
-    if (!position) {
-      return;
-    }
-    const next = clampPosition(position.x, position.y, el.offsetWidth, el.offsetHeight);
-    if (next.x !== position.x || next.y !== position.y) {
-      setPosition(next);
-    }
-  }, [activeAccount, barOpen, barExpanded, launcherExpanded, position, setPosition]);
 
   useEffect(() => {
     if (!screenStatusOpen) {
@@ -232,34 +219,36 @@ export function AnnotationToolbar() {
           </span>
         </button>
       </Tooltip>
-      <Tooltip label={loggedOut ? "Log in first" : "Flow"} placement="right">
-        <button
-          type="button"
-          className={[
-            "wpn-launcher-item",
-            flowOpen ? "wpn-launcher-item--active" : "",
-            loggedOut ? "wpn-launcher-item--blocked" : "",
-          ]
-            .filter(Boolean)
-            .join(" ")}
-          aria-label="Open Flow"
-          aria-pressed={flowOpen}
-          aria-disabled={loggedOut}
-          onPointerDown={onDragStart}
-          onPointerMove={onDragMove}
-          onPointerUp={onDragEnd}
-          onPointerCancel={onDragEnd}
-          onClick={guardedClick(() => {
-            if (!loggedOut) {
-              setFlowOpen(true);
-            }
-          })}
-        >
-          <span className="wpn-launcher-item__icon-wrap">
-            <Icon name="flow" />
-          </span>
-        </button>
-      </Tooltip>
+      {SHOW_FLOW_LAUNCHER_ICON ? (
+        <Tooltip label={loggedOut ? "Log in first" : "Flow"} placement="right">
+          <button
+            type="button"
+            className={[
+              "wpn-launcher-item",
+              flowOpen ? "wpn-launcher-item--active" : "",
+              loggedOut ? "wpn-launcher-item--blocked" : "",
+            ]
+              .filter(Boolean)
+              .join(" ")}
+            aria-label="Open Flow"
+            aria-pressed={flowOpen}
+            aria-disabled={loggedOut}
+            onPointerDown={onDragStart}
+            onPointerMove={onDragMove}
+            onPointerUp={onDragEnd}
+            onPointerCancel={onDragEnd}
+            onClick={guardedClick(() => {
+              if (!loggedOut) {
+                setFlowOpen(true);
+              }
+            })}
+          >
+            <span className="wpn-launcher-item__icon-wrap">
+              <Icon name="flow" />
+            </span>
+          </button>
+        </Tooltip>
+      ) : null}
       <Tooltip label={loggedOut ? "Log in first" : "Settings"} placement="right">
         <button
           type="button"
@@ -292,9 +281,10 @@ export function AnnotationToolbar() {
   );
 
   const closeBar = () => {
-    setPosition(
-      clampPosition(EDGE, window.innerHeight - LAUNCHER_SIZE - EDGE, LAUNCHER_SIZE, LAUNCHER_SIZE),
-    );
+    // Drop back to the default bottom-left dock instead of computing a pixel
+    // position: the launcher's real size doesn't match a hardcoded guess, and
+    // computing it wrong is what made the launcher appear to "jump" on close.
+    setPosition(null);
     setModeEnabled(false);
     setListOpen(false);
     setUserManagementOpen(false);
@@ -343,9 +333,11 @@ export function AnnotationToolbar() {
     </Tooltip>
   );
 
-  // The launcher stays on screen while the toolbar is open, so it only follows
-  // the dragged position when it is the sole element; otherwise it keeps its own
-  // corner and the toolbar owns `position`.
+  // The launcher only follows a dragged `position` when it is the sole,
+  // explicitly-placed element (toolbar closed and the user has dragged it).
+  // Otherwise — toolbar open, or never dragged — it stays docked to its
+  // default bottom-left corner via CSS rather than a computed inline position.
+  const launcherPlaced = !barOpen && position;
   const launcher = (
     <div
       ref={barOpen ? undefined : setToolbarRef}
@@ -353,12 +345,12 @@ export function AnnotationToolbar() {
         "wpn-toolbar",
         "wpn-toolbar--launcher",
         launcherExpanded ? "" : "wpn-toolbar--launcher-collapsed",
-        !barOpen && position ? "wpn-toolbar--placed" : "",
-        barOpen ? "wpn-toolbar--launcher-docked" : "",
+        launcherPlaced ? "wpn-toolbar--placed" : "wpn-toolbar--launcher-docked",
+        barOpen ? "wpn-toolbar--launcher-locked" : "",
       ]
         .filter(Boolean)
         .join(" ")}
-      style={!barOpen && position ? { left: position.x, top: position.y } : undefined}
+      style={launcherPlaced ? { left: position.x, top: position.y } : undefined}
     >
       <Tooltip label={launcherExpanded ? "Collapse launcher" : "Expand launcher"} placement="right">
         <button
@@ -376,22 +368,26 @@ export function AnnotationToolbar() {
         </button>
       </Tooltip>
       {launcherExpanded ? (
-        <Tooltip label="Drag to move" placement="right">
-          <button
-            type="button"
-            className="wpn-toolbar__drag"
-            aria-label="Drag annotation toolbar"
-            onPointerDown={barOpen ? undefined : onDragStart}
-            onPointerMove={barOpen ? undefined : onDragMove}
-            onPointerUp={barOpen ? undefined : onDragEnd}
-            onPointerCancel={barOpen ? undefined : onDragEnd}
-          >
-            <Icon name="drag" className="wpn-toolbar__drag-icon" />
-          </button>
-        </Tooltip>
-      ) : null}
-      {openToolbarButton}
-      {launcherShortcuts}
+        <>
+          <Tooltip label="Drag to move" placement="right">
+            <button
+              type="button"
+              className="wpn-toolbar__drag"
+              aria-label="Drag annotation toolbar"
+              onPointerDown={barOpen ? undefined : onDragStart}
+              onPointerMove={barOpen ? undefined : onDragMove}
+              onPointerUp={barOpen ? undefined : onDragEnd}
+              onPointerCancel={barOpen ? undefined : onDragEnd}
+            >
+              <Icon name="drag" className="wpn-toolbar__drag-icon" />
+            </button>
+          </Tooltip>
+          {openToolbarButton}
+          {launcherShortcuts}
+        </>
+      ) : (
+        openToolbarButton
+      )}
     </div>
   );
 

@@ -87,5 +87,5 @@ export const FLOW_JSON_VERSION = 1;
 export interface FlowJSON extends FlowSnapshot {
   version: number;
   viewport?: Viewport;
-  meta?: { name?: string; [key: string]: unknown };
+  meta?: { name?: string; notes?: string; [key: string]: unknown };
 }

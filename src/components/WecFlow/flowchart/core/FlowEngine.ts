@@ -79,6 +79,8 @@ export interface FlowState {
   canUndo: boolean;
   canRedo: boolean;
   flowName: string;
+  /** Flow-level notes, not tied to any individual node. */
+  flowNotes: string;
   /** Bumped when node type definitions change so renderers refresh. */
   registryVersion: number;
 }
@@ -197,6 +199,7 @@ export class FlowEngine {
       canUndo: false,
       canRedo: false,
       flowName: initial.meta?.name ?? 'Untitled flow',
+      flowNotes: initial.meta?.notes ?? '',
       registryVersion: 0,
     });
     this.pendingFitView = !initial.viewport && nodes.length > 0;
@@ -891,6 +894,7 @@ export class FlowEngine {
       issueNodeIds: EMPTY_MAP,
       issueEdgeIds: EMPTY_MAP,
       flowName: flow.meta?.name ?? this.getState().flowName,
+      flowNotes: flow.meta?.notes ?? this.getState().flowNotes,
       defaultEdgeType: savedEdgeType(flow.meta) ?? this.getState().defaultEdgeType,
     });
     if (flow.viewport) this.setViewport(flow.viewport);
@@ -901,18 +905,23 @@ export class FlowEngine {
   newFlow(name = 'Untitled flow'): void {
     this.commit([], [], { type: 'load', flow: { nodes: [], edges: [] } });
     this.clearValidation();
-    this.store.setState({ flowName: name, selectedNodeIds: EMPTY_SET, selectedEdgeIds: EMPTY_SET });
+    this.store.setState({ flowName: name, flowNotes: '', selectedNodeIds: EMPTY_SET, selectedEdgeIds: EMPTY_SET });
     const { canvasSize } = this.getState();
     this.setViewport({ x: canvasSize.width / 2, y: canvasSize.height / 3, zoom: 1 });
   }
 
   toJSON(): FlowJSON {
     const s = this.getState();
-    return { version: FLOW_JSON_VERSION, nodes: s.nodes, edges: s.edges, viewport: s.viewport, meta: { name: s.flowName, edgeType: s.defaultEdgeType } };
+    return { version: FLOW_JSON_VERSION, nodes: s.nodes, edges: s.edges, viewport: s.viewport, meta: { name: s.flowName, edgeType: s.defaultEdgeType, notes: s.flowNotes } };
   }
 
   setFlowName(name: string): void {
     this.store.setState({ flowName: name });
+    this.events.emit('change', this.getSnapshot());
+  }
+
+  setFlowNotes(notes: string): void {
+    this.store.setState({ flowNotes: notes });
     this.events.emit('change', this.getSnapshot());
   }
 

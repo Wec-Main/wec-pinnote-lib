@@ -61,6 +61,7 @@ function EditorLayout({
   const [notices, setNotices] = useState<Notice[]>([]);
   const noticeId = useRef(0);
   const [propertiesOpen, setPropertiesOpen] = useState(true);
+  const [propertiesExpanded, setPropertiesExpanded] = useState(false);
 
   // Keep the engine's read-only flag in sync with the prop (when controlled).
   useEffect(() => {
@@ -113,7 +114,13 @@ function EditorLayout({
             </button>
           )}
         </main>
-        {showProperties && propertiesOpen && <PropertiesPanel onClose={() => setPropertiesOpen(false)} />}
+        {showProperties && propertiesOpen && (
+          <PropertiesPanel
+            onClose={() => setPropertiesOpen(false)}
+            expanded={propertiesExpanded}
+            onToggleExpand={() => setPropertiesExpanded((v) => !v)}
+          />
+        )}
       </div>
     </div>
   );
