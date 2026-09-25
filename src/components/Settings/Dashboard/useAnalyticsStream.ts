@@ -3,6 +3,7 @@ import {
   fetchAnalyticsStreamTicket,
   type AnalyticsStreamScope,
 } from "../../../services/analyticsApi";
+import { normalizeApiBase } from "../../../services/httpClient";
 import { AnnotationApiError } from "../../../types/annotation.types";
 import {
   INITIAL_RECONNECT_DELAY_MS,
@@ -23,7 +24,7 @@ export interface AnalyticsStreamOptions {
 }
 
 function analyticsStreamUrl(apiBaseUrl: string, ticket: string): string {
-  const base = apiBaseUrl.replace(/\/+$/, "");
+  const base = normalizeApiBase(apiBaseUrl);
   const url = new URL(`${base}/analytics/events`, window.location.origin);
   url.searchParams.set("ticket", ticket);
   return url.toString();

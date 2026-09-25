@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import type { StreamConnectionState, StreamEvent, StreamEventType } from "../types/stream.types";
 import { AnnotationApiError } from "../types/annotation.types";
 import { fetchSseTicket } from "../services/streamApi";
+import { normalizeApiBase } from "../services/httpClient";
 import { hasExpiry, isTokenUnexpired } from "../utils/authSession";
 import { parseStreamEnvelope } from "../utils/streamPayloadGuards";
 
@@ -28,7 +29,7 @@ export interface SseStreamOptions {
 }
 
 function streamUrl(apiBaseUrl: string, ticket: string, lastEventId: string | undefined): string {
-  const base = apiBaseUrl.replace(/\/+$/, "");
+  const base = normalizeApiBase(apiBaseUrl);
   const url = new URL(`${base}/events`, window.location.origin);
   url.searchParams.set("ticket", ticket);
   if (lastEventId) {

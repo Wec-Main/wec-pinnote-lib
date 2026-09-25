@@ -7,6 +7,7 @@ const UNAUTHORIZED_STATUS = 401;
 const NO_CONTENT_STATUS = 204;
 const ABSOLUTE_URL = /^https?:\/\//i;
 const PLACEHOLDER_ORIGIN = "http://local.invalid";
+const API_PREFIX = "/api/v1/pinnote";
 
 export interface UnauthorizedDetail {
   token: string;
@@ -52,12 +53,17 @@ export async function readErrorMessage(
   }
 }
 
+export function normalizeApiBase(apiBaseUrl: string): string {
+  const base = apiBaseUrl.replace(/\/+$/, "");
+  return base.endsWith(API_PREFIX) ? base : `${base}${API_PREFIX}`;
+}
+
 export function buildUrl(
   apiBaseUrl: string,
   path: string,
   query?: Record<string, QueryValue>,
 ): string {
-  const base = apiBaseUrl.replace(/\/+$/, "");
+  const base = normalizeApiBase(apiBaseUrl);
   const url = new URL(`${base}${path}`, PLACEHOLDER_ORIGIN);
   if (query) {
     for (const [key, value] of Object.entries(query)) {
