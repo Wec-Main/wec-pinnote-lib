@@ -65,12 +65,9 @@ export type {
   CreateAnnotationRequest,
   CreateCommentRequest,
   DraftAnnotation,
-  PageStatus,
-  PageStatusRecord,
   ResolvedAnnotationConfig,
   UpdateAnnotationRequest,
   UpdateCommentRequest,
-  UpdatePageStatusRequest,
 } from "./types/annotation.types";
 export type {
   AnnotationContextValue,

@@ -26,7 +26,6 @@ export interface Project {
 }
 
 export interface ProjectDraft {
-  projectId: string;
   organizationId: string;
   name: string;
   description?: string;

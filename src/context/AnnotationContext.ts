@@ -8,7 +8,6 @@ import type {
   AnnotationStatus,
   CreateAnnotationRequest,
   DraftAnnotation,
-  PageStatus,
   ResolvedAnnotationConfig,
 } from "../types/annotation.types";
 import type { AnnotationTag, DraftTagPin } from "../types/annotationTag.types";
@@ -25,8 +24,6 @@ export interface AnnotationDataContextValue {
   api: AnnotationApiClient;
   pageKey: string;
   annotations: Annotation[];
-  pageStatus: PageStatus;
-  pageStatusError: string | null;
   loading: boolean;
   error: string | null;
   connectionState: StreamConnectionState;
@@ -37,7 +34,6 @@ export interface AnnotationDataContextValue {
   addComment: (annotationId: string, message: string) => Promise<void>;
   editComment: (annotationId: string, commentId: string, message: string) => Promise<void>;
   removeComment: (annotationId: string, commentId: string) => Promise<void>;
-  setPageStatus: (status: PageStatus) => Promise<void>;
   setStatus: (annotationId: string, status: AnnotationStatus) => Promise<void>;
   removeAnnotation: (annotationId: string) => Promise<void>;
   submitDraft: (message: string, status?: AnnotationStatus) => Promise<void>;

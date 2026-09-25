@@ -1,9 +1,4 @@
-import {
-  useEffect,
-  useRef,
-  useState,
-  type PointerEvent as ReactPointerEvent,
-} from "react";
+import { useEffect, useRef, type PointerEvent as ReactPointerEvent } from "react";
 import {
   useAnnotationAuth,
   useAnnotationData,
@@ -11,7 +6,6 @@ import {
 } from "../../context/AnnotationContext";
 import { AnnotationToggleButton } from "../AnnotationToggleButton";
 import { ToolbarAuthControl } from "../Auth";
-import { PAGE_STATUS_OPTIONS, pageStatusLabel } from "../../utils/status";
 import { Icons } from "../../assets/icons";
 import { Icon, Tooltip } from "../primitives";
 import { isBoolean, usePersistentState } from "../../hooks/usePersistentState";
@@ -45,8 +39,7 @@ function clampPosition(x: number, y: number, width: number, height: number) {
 }
 
 export function AnnotationToolbar() {
-  const { config, annotations, loading, error, retry, connectionState, pageStatus, setPageStatus } =
-    useAnnotationData();
+  const { config, annotations, loading, error, retry, connectionState } = useAnnotationData();
   const {
     listOpen,
     setListOpen,
@@ -76,7 +69,6 @@ export function AnnotationToolbar() {
   const setToolbarRef = (node: HTMLElement | null) => {
     toolbarRef.current = node;
   };
-  const screenStatusRef = useRef<HTMLDivElement>(null);
   const dragOffset = useRef({ x: 0, y: 0 });
   const dragOrigin = useRef({ x: 0, y: 0 });
   const dragging = useRef(false);
@@ -86,7 +78,6 @@ export function AnnotationToolbar() {
     null,
     isToolbarPosition,
   );
-  const [screenStatusOpen, setScreenStatusOpen] = useState(false);
   const [barOpen, setBarOpen] = usePersistentState(
     `wpn-ui:${config.projectId}:toolbarOpen`,
     true,
@@ -115,18 +106,6 @@ export function AnnotationToolbar() {
     return () => window.removeEventListener("resize", onResize);
   }, [position, setPosition]);
 
-  useEffect(() => {
-    if (!screenStatusOpen) {
-      return;
-    }
-    const onPointerDown = (event: PointerEvent) => {
-      if (!screenStatusRef.current?.contains(event.target as Node)) {
-        setScreenStatusOpen(false);
-      }
-    };
-    document.addEventListener("pointerdown", onPointerDown, true);
-    return () => document.removeEventListener("pointerdown", onPointerDown, true);
-  }, [screenStatusOpen]);
 
   const onDragStart = (event: ReactPointerEvent<HTMLElement>) => {
     const el = toolbarRef.current;
@@ -249,7 +228,10 @@ export function AnnotationToolbar() {
           </button>
         </Tooltip>
       ) : null}
-      <Tooltip label={loggedOut ? "Log in first" : "Settings"} placement="right">
+      <Tooltip
+        label={loggedOut ? "Log in first" : userManagementOpen ? "Close settings" : "Settings"}
+        placement="right"
+      >
         <button
           type="button"
           className={[
@@ -259,7 +241,7 @@ export function AnnotationToolbar() {
           ]
             .filter(Boolean)
             .join(" ")}
-          aria-label="Open settings"
+          aria-label={userManagementOpen ? "Close settings" : "Open settings"}
           aria-pressed={userManagementOpen}
           aria-disabled={loggedOut}
           onPointerDown={onDragStart}
@@ -268,7 +250,7 @@ export function AnnotationToolbar() {
           onPointerCancel={onDragEnd}
           onClick={guardedClick(() => {
             if (!loggedOut) {
-              setUserManagementOpen(true);
+              setUserManagementOpen(!userManagementOpen);
             }
           })}
         >
@@ -438,45 +420,6 @@ export function AnnotationToolbar() {
                 <Icon name="drag" className="wpn-toolbar__drag-icon" />
               </button>
             </Tooltip>
-            <div className="wpn-toolbar__screen" ref={screenStatusRef}>
-              <button
-                type="button"
-                className="wpn-toolbar__screen-trigger"
-                aria-haspopup="listbox"
-                aria-expanded={screenStatusOpen}
-                aria-label={`Screen status: ${pageStatusLabel(pageStatus)}`}
-                onClick={() => setScreenStatusOpen((open) => !open)}
-              >
-                {pageStatusLabel(pageStatus)}
-                <svg viewBox="0 0 16 16" className="wpn-toolbar__screen-chevron" aria-hidden="true">
-                  <path fill="currentColor" d="M4.2 6.2 8 10l3.8-3.8L13 7.4 8 12.4 3 7.4z" />
-                </svg>
-              </button>
-              {screenStatusOpen ? (
-                <div className="wpn-toolbar__screen-menu" role="listbox">
-                  {PAGE_STATUS_OPTIONS.map((option) => (
-                    <button
-                      key={option.value}
-                      type="button"
-                      role="option"
-                      aria-selected={option.value === pageStatus}
-                      className={[
-                        "wpn-toolbar__screen-option",
-                        option.value === pageStatus ? "wpn-toolbar__screen-option--active" : "",
-                      ]
-                        .filter(Boolean)
-                        .join(" ")}
-                      onClick={() => {
-                        setPageStatus(option.value).catch(() => undefined);
-                        setScreenStatusOpen(false);
-                      }}
-                    >
-                      {option.label}
-                    </button>
-                  ))}
-                </div>
-              ) : null}
-            </div>
             <ToolbarAuthControl />
             <span className="wpn-toolbar__divider" aria-hidden="true" />
             <Tooltip label={loggedOut ? "Log in first" : "Comments"} placement="bottom">

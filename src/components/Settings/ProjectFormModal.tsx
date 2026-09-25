@@ -30,11 +30,9 @@ export function ProjectFormModal({
   const scrimProps = useScrimDismiss(onCancel);
   const titleId = useId();
   const dialogRef = useRef<HTMLFormElement>(null);
-  const idInputRef = useRef<HTMLInputElement>(null);
   const nameInputRef = useRef<HTMLInputElement>(null);
-  useFocusTrap(dialogRef, project ? nameInputRef : idInputRef);
+  useFocusTrap(dialogRef, nameInputRef);
 
-  const [projectId, setProjectId] = useState(project?.id ?? "");
   const [organizationId, setOrganizationId] = useState(
     project?.organizationId ?? defaultOrganizationId ?? "",
   );
@@ -49,21 +47,18 @@ export function ProjectFormModal({
     description: organization.slug,
   }));
 
-  const idValid = /^[A-Za-z0-9][A-Za-z0-9._-]*$/.test(projectId);
   const nameValid = name.trim().length > 0;
   const organizationValid = organizationId.length > 0;
   const nameServerError = fieldErrors?.name?.[0];
   const organizationServerError = fieldErrors?.organizationId?.[0];
-  const idServerError = fieldErrors?.projectId?.[0];
 
   const handleSubmit = (event: FormEvent) => {
     event.preventDefault();
     setTouched(true);
-    if (!nameValid || !organizationValid || (!project && !idValid) || busy) {
+    if (!nameValid || !organizationValid || busy) {
       return;
     }
     onSubmit({
-      projectId,
       organizationId,
       name: name.trim(),
       description: description.trim() || undefined,
@@ -100,36 +95,6 @@ export function ProjectFormModal({
         <div className="wpn-users-modal__body">
           <div className="wpn-epicflow-modal__row">
             <Field
-              label="Project id"
-              required
-              hint={
-                project
-                  ? "The project id cannot be changed after creation."
-                  : "Used by the client as VITE_ANNOTATION_PROJECT_ID."
-              }
-              error={
-                idServerError ??
-                (touched && !project && !idValid
-                  ? "Letters, numbers, dots, underscores and hyphens only."
-                  : null)
-              }
-            >
-              {(fieldProps) => (
-                <input
-                  {...fieldProps}
-                  ref={idInputRef}
-                  className="wpn-epicflow-modal__input"
-                  value={projectId}
-                  onChange={(event) => setProjectId(event.target.value)}
-                  placeholder="acme-web"
-                  disabled={Boolean(project)}
-                />
-              )}
-            </Field>
-          </div>
-
-          <div className="wpn-epicflow-modal__row">
-            <Field
               label="Name"
               required
               error={
@@ -148,6 +113,21 @@ export function ProjectFormModal({
               )}
             </Field>
           </div>
+
+          {project ? (
+            <div className="wpn-epicflow-modal__row">
+              <Field label="Project id" hint="Generated automatically. It never changes.">
+                {(fieldProps) => (
+                  <input
+                    {...fieldProps}
+                    className="wpn-epicflow-modal__input"
+                    value={project.id}
+                    disabled
+                  />
+                )}
+              </Field>
+            </div>
+          ) : null}
 
           <div className="wpn-epicflow-modal__row">
             <div className="wpn-epicflow-modal__field">

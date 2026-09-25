@@ -1,4 +1,4 @@
-import type { Annotation, AnnotationComment, PageStatusRecord } from "./annotation.types";
+import type { Annotation, AnnotationComment } from "./annotation.types";
 import type { Epic, UserStory } from "./epicFlow.types";
 
 export type StreamEventType =
@@ -8,7 +8,6 @@ export type StreamEventType =
   | "comment.created"
   | "comment.updated"
   | "comment.deleted"
-  | "page-status.updated"
   | "epic.created"
   | "epic.updated"
   | "epic.deleted"
@@ -26,7 +25,6 @@ export interface StreamEventPayloads {
   "comment.created": { annotationId: string; comment: AnnotationComment };
   "comment.updated": { annotationId: string; comment: AnnotationComment };
   "comment.deleted": { annotationId: string; commentId: string };
-  "page-status.updated": { pageStatus: PageStatusRecord };
   "epic.created": { epic: Epic };
   "epic.updated": { epic: Epic };
   "epic.deleted": { epicId: string };

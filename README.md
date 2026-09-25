@@ -178,9 +178,7 @@ import {
 ```
 
 `useAnnotations()` returns the current page annotations, loading/error/retry, mutation helpers
-(including `createAnnotation`), and separate error state for actions and page status:
-`actionError`/`clearActionError` surface a failed mutation, and `pageStatusError` surfaces a failed
-page-status fetch without forcing the status into "review".
+(including `createAnnotation`), and `actionError`/`clearActionError` to surface a failed mutation.
 
 For narrower re-renders than `useAnnotationContext` (which combines everything), use the split
 context hooks: `useAnnotationData` (annotations, mutations, tags, flow pins), `useAnnotationUi`
@@ -199,7 +197,7 @@ Optional panels, mounted the same way as `AnnotationToggleButton`:
 
 Real-time updates:
 
-- `useAnnotationStream` / `applyStreamEvent` — live annotation, comment and page-status updates. Takes `getAuthToken` and `sessionKey` (not a raw token) so the stream reconnects on session changes without losing its place.
+- `useAnnotationStream` / `applyStreamEvent` — live annotation and comment updates. Takes `getAuthToken` and `sessionKey` (not a raw token) so the stream reconnects on session changes without losing its place.
 - `useEpicFlowStream` / `applyEpicFlowStreamEvent` — live epic and user-story updates for the EpicFlow board. Also takes `sessionKey`.
 - `createEpicFlowApi` / `useEpicFlowApi` / `EpicFlowApiClient` / `EpicFlowApiError` — the EpicFlow REST client, exposed for hosts that call it directly.
 
@@ -223,8 +221,6 @@ import { AnnotationProvider } from "wec-pinnote-lib";
 The library calls these backend endpoints. Full request/response shapes live in [docs/api-contract.md](docs/api-contract.md).
 
 - `GET /annotations?projectId=&pageKey=`
-- `GET /page-status?projectId=&pageKey=`
-- `PATCH /page-status`
 - `POST /annotations`
 - `GET /annotations/{annotationId}`
 - `POST /annotations/{annotationId}/comments`

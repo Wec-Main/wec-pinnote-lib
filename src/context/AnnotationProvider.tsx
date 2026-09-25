@@ -113,8 +113,6 @@ export function AnnotationProvider({ config, children }: AnnotationProviderProps
   const pageKey = usePageKey(activeConfig.getPageKey);
   const {
     annotations,
-    pageStatus,
-    pageStatusError,
     loading,
     error,
     connectionState,
@@ -125,7 +123,6 @@ export function AnnotationProvider({ config, children }: AnnotationProviderProps
     addComment,
     editComment,
     removeComment,
-    setPageStatus,
     setStatus,
     removeAnnotation,
   } = useAnnotationCollection({
@@ -469,7 +466,6 @@ export function AnnotationProvider({ config, children }: AnnotationProviderProps
   }, []);
 
   const currentUserId = activeConfig.currentUser.id;
-  const currentUserName = activeConfig.currentUser.name;
   const submitDraft = useCallback(
     async (message: string, status?: AnnotationStatus) => {
       const current = draftRef.current;
@@ -483,14 +479,13 @@ export function AnnotationProvider({ config, children }: AnnotationProviderProps
         comment: {
           message,
           authorId: currentUserId,
-          authorName: currentUserName,
         },
         status,
       });
       clearDraft();
       setSelectedId(created.id);
     },
-    [clearDraft, createAnnotation, currentUserId, currentUserName, pageKey, projectId],
+    [clearDraft, createAnnotation, currentUserId, pageKey, projectId],
   );
 
   const selectAnnotation = useCallback(
@@ -554,8 +549,6 @@ export function AnnotationProvider({ config, children }: AnnotationProviderProps
       api,
       pageKey,
       annotations,
-      pageStatus,
-      pageStatusError,
       loading,
       error,
       connectionState,
@@ -566,7 +559,6 @@ export function AnnotationProvider({ config, children }: AnnotationProviderProps
       addComment,
       editComment,
       removeComment,
-      setPageStatus,
       setStatus,
       removeAnnotation,
       submitDraft,
@@ -582,8 +574,6 @@ export function AnnotationProvider({ config, children }: AnnotationProviderProps
       api,
       pageKey,
       annotations,
-      pageStatus,
-      pageStatusError,
       loading,
       error,
       connectionState,
@@ -594,7 +584,6 @@ export function AnnotationProvider({ config, children }: AnnotationProviderProps
       addComment,
       editComment,
       removeComment,
-      setPageStatus,
       setStatus,
       removeAnnotation,
       submitDraft,

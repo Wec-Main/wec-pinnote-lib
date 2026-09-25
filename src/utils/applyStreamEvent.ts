@@ -1,4 +1,4 @@
-import type { Annotation, AnnotationComment, PageStatus } from "../types/annotation.types";
+import type { Annotation, AnnotationComment } from "../types/annotation.types";
 import type { StreamEvent } from "../types/stream.types";
 import {
   isAnnotation,
@@ -30,11 +30,10 @@ function upsertAnnotation(annotations: Annotation[], incoming: Annotation): Anno
 
 export interface StreamApplication {
   annotations: Annotation[];
-  pageStatus: PageStatus | null;
 }
 
 export function applyStreamEvent(annotations: Annotation[], event: StreamEvent): StreamApplication {
-  const unchanged: StreamApplication = { annotations, pageStatus: null };
+  const unchanged: StreamApplication = { annotations };
   const payload = event.payload;
   if (!payload || typeof payload !== "object") {
     return unchanged;
@@ -51,7 +50,7 @@ export function applyStreamEvent(annotations: Annotation[], event: StreamEvent):
       if (!isAnnotation(candidate)) {
         return unchanged;
       }
-      return { annotations: upsertAnnotation(annotations, candidate), pageStatus: null };
+      return { annotations: upsertAnnotation(annotations, candidate) };
     }
 
     case "annotation.deleted": {
@@ -61,7 +60,6 @@ export function applyStreamEvent(annotations: Annotation[], event: StreamEvent):
       }
       return {
         annotations: annotations.filter((item) => item.id !== annotationId),
-        pageStatus: null,
       };
     }
 
@@ -86,7 +84,6 @@ export function applyStreamEvent(annotations: Annotation[], event: StreamEvent):
         annotations: annotations.map((item) =>
           item.id === annotationId ? { ...item, comments: nextComments } : item,
         ),
-        pageStatus: null,
       };
     }
 
@@ -105,13 +102,7 @@ export function applyStreamEvent(annotations: Annotation[], event: StreamEvent):
             ? { ...item, comments: item.comments.filter((comment) => comment.id !== commentId) }
             : item,
         ),
-        pageStatus: null,
       };
-    }
-
-    case "page-status.updated": {
-      const { pageStatus } = payload as { pageStatus: { status: PageStatus } };
-      return { annotations, pageStatus: pageStatus?.status ?? null };
     }
 
     default:

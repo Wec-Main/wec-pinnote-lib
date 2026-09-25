@@ -105,7 +105,7 @@ export function updateProject(
   apiBaseUrl: string,
   authToken: string | undefined,
   projectId: string,
-  draft: Omit<ProjectDraft, "projectId">,
+  draft: ProjectDraft,
   signal?: AbortSignal,
 ): Promise<Project> {
   return request<Project>(

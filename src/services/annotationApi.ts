@@ -6,17 +6,14 @@ import {
   type AnnotationConfig,
   type CreateAnnotationRequest,
   type CreateCommentRequest,
-  type PageStatusRecord,
   type UpdateAnnotationRequest,
   type UpdateCommentRequest,
-  type UpdatePageStatusRequest,
 } from "../types/annotation.types";
 import { buildUrl, request, requestNoContent, type QueryValue } from "./httpClient";
 import { isAnnotation } from "../utils/streamPayloadGuards";
 
 const PATHS = {
   annotations: "/annotations",
-  pageStatus: "/page-status",
   annotation: (id: string) => `/annotations/${encodeURIComponent(id)}`,
   comments: (id: string) => `/annotations/${encodeURIComponent(id)}/comments`,
   comment: (annotationId: string, commentId: string) =>
@@ -80,29 +77,6 @@ export function createAnnotationApi(
         signal,
       });
       return parseListPayload(payload);
-    },
-
-    async getPageStatus({ projectId, pageKey }, signal) {
-      try {
-        return await call<PageStatusRecord>("GET", PATHS.pageStatus, {
-          query: { projectId, pageKey },
-          signal,
-        });
-      } catch (err) {
-        if (err instanceof AnnotationApiError && err.status === 404) {
-          return {
-            projectId,
-            pageKey,
-            status: "review",
-            updatedAt: new Date().toISOString(),
-          };
-        }
-        throw err;
-      }
-    },
-
-    updatePageStatus(body: UpdatePageStatusRequest, signal) {
-      return call<PageStatusRecord>("PATCH", PATHS.pageStatus, { body, signal });
     },
 
     getAnnotation(annotationId, signal) {
