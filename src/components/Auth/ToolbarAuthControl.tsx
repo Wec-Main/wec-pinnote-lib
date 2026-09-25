@@ -145,7 +145,7 @@ export function ToolbarAuthControl() {
         {accounts.length > 1 ? (
           <span className="wpn-toolbar__account-count">{accounts.length}</span>
         ) : null}
-        <svg viewBox="0 0 16 16" className="wpn-toolbar__screen-chevron" aria-hidden="true">
+        <svg viewBox="0 0 16 16" className="wpn-toolbar__account-chevron" aria-hidden="true">
           <path fill="currentColor" d="M4.2 6.2 8 10l3.8-3.8L13 7.4 8 12.4 3 7.4z" />
         </svg>
       </button>

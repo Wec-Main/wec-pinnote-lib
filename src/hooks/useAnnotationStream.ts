@@ -8,7 +8,6 @@ const EVENT_TYPES: readonly StreamEventType[] = [
   "comment.created",
   "comment.updated",
   "comment.deleted",
-  "page-status.updated",
 ];
 
 export interface AnnotationStreamOptions {

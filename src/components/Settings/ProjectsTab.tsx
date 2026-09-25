@@ -71,8 +71,7 @@ export function ProjectsTab() {
       return result;
     },
     update: async (id, draft) => {
-      const { projectId: _projectId, ...rest } = draft;
-      const result = await updateProject(config.apiBaseUrl, authToken, id, rest);
+      const result = await updateProject(config.apiBaseUrl, authToken, id, draft);
       invalidateProjectCaches();
       return result;
     },

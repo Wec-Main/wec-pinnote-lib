@@ -3,21 +3,6 @@ import type { StreamConnectionState } from "./stream.types";
 
 export type AnnotationStatus = "open" | "re-open" | "dev-inprogress" | "completed" | "closed";
 
-export type PageStatus = "review" | "approved";
-
-export interface PageStatusRecord {
-  projectId: string;
-  pageKey: string;
-  status: PageStatus;
-  updatedAt: string;
-}
-
-export interface UpdatePageStatusRequest {
-  projectId: string;
-  pageKey: string;
-  status: PageStatus;
-}
-
 export interface AnnotationUser {
   id: string;
   name: string;
@@ -64,7 +49,6 @@ export interface CreateAnnotationRequest {
   comment: {
     message: string;
     authorId?: string;
-    authorName?: string;
   };
   status?: AnnotationStatus;
 }
@@ -72,7 +56,6 @@ export interface CreateAnnotationRequest {
 export interface CreateCommentRequest {
   message: string;
   authorId?: string;
-  authorName?: string;
 }
 
 export interface UpdateAnnotationRequest {
@@ -92,14 +75,6 @@ export interface AnnotationApiClient {
     params: { projectId: string; pageKey: string },
     signal?: AbortSignal,
   ): Promise<Annotation[]>;
-  getPageStatus(
-    params: { projectId: string; pageKey: string },
-    signal?: AbortSignal,
-  ): Promise<PageStatusRecord>;
-  updatePageStatus(
-    request: UpdatePageStatusRequest,
-    signal?: AbortSignal,
-  ): Promise<PageStatusRecord>;
   getAnnotation(annotationId: string, signal?: AbortSignal): Promise<Annotation>;
   createAnnotation(request: CreateAnnotationRequest, signal?: AbortSignal): Promise<Annotation>;
   createComment(

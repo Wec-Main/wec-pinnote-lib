@@ -12,12 +12,9 @@ import type {
   AnnotationStatus,
   AnnotationUser,
   CreateAnnotationRequest,
-  PageStatus,
 } from "../types/annotation.types";
 import { AnnotationApiError } from "../types/annotation.types";
 import { createClientId } from "../utils/format";
-
-const NO_ANNOTATIONS: Annotation[] = [];
 
 function nextNumber(annotations: Annotation[]): number {
   return annotations.reduce((max, item) => Math.max(max, item.number), 0) + 1;
@@ -127,8 +124,6 @@ export function useAnnotationCollection({
   events,
 }: AnnotationCollectionOptions) {
   const [annotations, setAnnotations] = useState<Annotation[]>([]);
-  const [pageStatus, setPageStatusState] = useState<PageStatus>("review");
-  const [pageStatusError, setPageStatusError] = useState<string | null>(null);
   const [loading, setLoading] = useState(authenticated);
   const [error, setError] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
@@ -169,10 +164,8 @@ export function useAnnotationCollection({
     loadScopeRef.current = scope;
 
     setError(null);
-    setPageStatusError(null);
     if (scopeChanged) {
       setAnnotations([]);
-      setPageStatusState("review");
     }
 
     if (!authenticated) {
@@ -210,21 +203,6 @@ export function useAnnotationCollection({
         }
         setError(errorMessage(err));
         setLoading(false);
-        reportError(err);
-      });
-
-    api
-      .getPageStatus({ projectId, pageKey }, controller.signal)
-      .then((record) => {
-        if (!ignore) {
-          setPageStatusState(record.status);
-        }
-      })
-      .catch((err: unknown) => {
-        if (ignore || isAbortError(err)) {
-          return;
-        }
-        setPageStatusError(errorMessage(err));
         reportError(err);
       });
 
@@ -267,14 +245,6 @@ export function useAnnotationCollection({
   useEffect(() => abortWrites, [abortWrites]);
 
   const onStreamEvent = useCallback((event: StreamEvent) => {
-    if (event.eventType === "page-status.updated") {
-      const { pageStatus: nextStatus } = applyStreamEvent(NO_ANNOTATIONS, event);
-      if (nextStatus) {
-        setPageStatusState(nextStatus);
-        setPageStatusError(null);
-      }
-      return;
-    }
     setAnnotations((current) => applyStreamEvent(current, event).annotations);
   }, []);
 
@@ -399,7 +369,6 @@ export function useAnnotationCollection({
           {
             message,
             authorId: requestingUser.id,
-            authorName: requestingUser.name,
           },
           controller.signal,
         );
@@ -532,24 +501,6 @@ export function useAnnotationCollection({
     [api, reportActionError],
   );
 
-  const setPageStatus = useCallback(
-    async (status: PageStatus) => {
-      const snapshot = pageStatus;
-      setPageStatusState(status);
-      setActionError(null);
-
-      try {
-        const updated = await api.updatePageStatus({ projectId, pageKey, status });
-        setPageStatusState(updated.status);
-      } catch (err) {
-        setPageStatusState(snapshot);
-        reportActionError(err);
-        throw err;
-      }
-    },
-    [api, pageKey, pageStatus, projectId, reportActionError],
-  );
-
   const setStatus = useCallback(
     async (annotationId: string, status: AnnotationStatus) => {
       const previousStatus = annotationsRef.current.find(
@@ -610,8 +561,6 @@ export function useAnnotationCollection({
   return useMemo(
     () => ({
       annotations,
-      pageStatus,
-      pageStatusError,
       loading,
       error,
       connectionState,
@@ -622,14 +571,11 @@ export function useAnnotationCollection({
       addComment,
       editComment,
       removeComment,
-      setPageStatus,
       setStatus,
       removeAnnotation,
     }),
     [
       annotations,
-      pageStatus,
-      pageStatusError,
       loading,
       error,
       connectionState,
@@ -640,7 +586,6 @@ export function useAnnotationCollection({
       addComment,
       editComment,
       removeComment,
-      setPageStatus,
       setStatus,
       removeAnnotation,
     ],
@@ -652,8 +597,6 @@ export function useAnnotations() {
   const { selectedId, selectAnnotation } = useAnnotationUi();
   return {
     annotations: data.annotations,
-    pageStatus: data.pageStatus,
-    pageStatusError: data.pageStatusError,
     loading: data.loading,
     error: data.error,
     retry: data.retry,
@@ -665,7 +608,6 @@ export function useAnnotations() {
     addComment: data.addComment,
     editComment: data.editComment,
     removeComment: data.removeComment,
-    setPageStatus: data.setPageStatus,
     setStatus: data.setStatus,
     removeAnnotation: data.removeAnnotation,
     pageKey: data.pageKey,

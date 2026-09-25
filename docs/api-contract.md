@@ -18,8 +18,6 @@ GET /annotations?projectId={projectId}&pageKey={pageKey}
 
 Response: an array, or `{ "annotations": [...] }`.
 
-Page status is not part of this response. It is a separate page-level resource.
-
 ```json
 [
   {
@@ -56,55 +54,6 @@ Page status is not part of this response. It is a separate page-level resource.
     "updatedAt": "2026-09-19T10:00:00.000Z"
   }
 ]
-```
-
-## Get page status
-
-```http
-GET /page-status?projectId={projectId}&pageKey={pageKey}
-```
-
-This is the current screen status shown in the toolbar (`Review` / `Approved`). It is scoped to `projectId` + `pageKey`, not to a single annotation.
-
-Supported `status` values:
-
-- `review`
-- `approved`
-
-If the page has never been updated, return `review`.
-
-```json
-{
-  "projectId": "project-001",
-  "pageKey": "/login",
-  "status": "review",
-  "updatedAt": "2026-09-19T10:00:00.000Z"
-}
-```
-
-## Update page status
-
-```http
-PATCH /page-status
-```
-
-```json
-{
-  "projectId": "project-001",
-  "pageKey": "/login",
-  "status": "approved"
-}
-```
-
-Response: the updated page status record.
-
-```json
-{
-  "projectId": "project-001",
-  "pageKey": "/login",
-  "status": "approved",
-  "updatedAt": "2026-09-19T10:05:00.000Z"
-}
 ```
 
 ## Create annotation

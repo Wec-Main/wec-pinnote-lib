@@ -153,15 +153,6 @@ describe("applyStreamEvent", () => {
     expect(result.annotations).toHaveLength(0);
   });
 
-  it("reports a page status change", () => {
-    const result = applyStreamEvent(
-      [],
-      event("page-status.updated", { pageStatus: { status: "approved" } }),
-    );
-
-    expect(result.pageStatus).toBe("approved");
-  });
-
   it("leaves state untouched for a malformed payload", () => {
     const local = [annotation("a-1", 1, "2026-01-01T00:00:00.000Z")];
 
