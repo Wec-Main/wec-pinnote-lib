@@ -1,7 +1,5 @@
-import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useAnnotationData, useAnnotationUi } from "../../context/AnnotationContext";
-import { formatRelativeTime, formatTimestamp, getInitials } from "../../utils/format";
-import { isDoneStatus, statusLabel } from "../../utils/status";
 import { Icons } from "../../assets/icons";
 import { Icon, SearchableSelect, Tooltip } from "../primitives";
 import { usePersistentState } from "../../hooks/usePersistentState";
@@ -11,16 +9,15 @@ import {
   RESOLUTION_OPTIONS,
   SORT_OPTIONS,
   authorOptions,
-  filterEntries,
+  filterThreads,
   filtersActive,
-  groupByAnnotation,
   statusOptions,
-  toEntries,
-  type CommentEntry,
+  toThreads,
   type CommentFilters,
   type CommentResolution,
   type CommentSort,
 } from "./commentFilters";
+import { ThreadCard } from "./ThreadCard";
 
 const PANEL_DEFAULT_WIDTH = 320;
 const PANEL_MIN_WIDTH = 280;
@@ -31,129 +28,10 @@ function clampPanelWidth(value: number): number {
   return Math.max(PANEL_MIN_WIDTH, Math.min(ceiling, Math.round(value)));
 }
 
-const CommentRow = memo(function CommentRow({
-  entry,
-  active,
-  onSelect,
-}: {
-  entry: CommentEntry;
-  active: boolean;
-  onSelect: (annotationId: string) => void;
-}) {
-  const { comment, annotation } = entry;
-  const handleSelect = useCallback(() => onSelect(annotation.id), [onSelect, annotation.id]);
-
-  return (
-    <li>
-      <button
-        type="button"
-        className={[
-          "wpn-list__item",
-          active ? "wpn-list__item--active" : "",
-          isDoneStatus(annotation.status) ? "wpn-list__item--resolved" : "",
-        ]
-          .filter(Boolean)
-          .join(" ")}
-        onClick={handleSelect}
-      >
-        {comment.createdBy.avatarUrl ? (
-          <img className="wpn-avatar" src={comment.createdBy.avatarUrl} alt="" />
-        ) : (
-          <span className="wpn-avatar wpn-avatar--fallback">
-            {getInitials(comment.createdBy.name)}
-          </span>
-        )}
-        <span className="wpn-list__copy">
-          <span className="wpn-list__row">
-            <strong>{comment.createdBy.name}</strong>
-            {entry.replyIndex === 0 ? (
-              <span
-                className={`wpn-status-chip wpn-status-chip--sm wpn-tone--${annotation.status}`}
-              >
-                {statusLabel(annotation.status)}
-              </span>
-            ) : (
-              <span className="wpn-list__reply-tag">Reply</span>
-            )}
-          </span>
-          <span className="wpn-list__meta">
-            <time dateTime={comment.createdAt} title={formatTimestamp(comment.createdAt)}>
-              {formatRelativeTime(comment.createdAt)}
-            </time>
-            {comment.updatedAt !== comment.createdAt ? (
-              <>
-                <span className="wpn-list__dot" aria-hidden="true">
-                  ·
-                </span>
-                <span>edited</span>
-              </>
-            ) : null}
-          </span>
-          <span className="wpn-list__message">{comment.message}</span>
-        </span>
-      </button>
-    </li>
-  );
-});
-
-const AnnotationGroup = memo(function AnnotationGroup({
-  entries,
-  selectedId,
-  collapsed,
-  onToggle,
-  onSelect,
-}: {
-  entries: CommentEntry[];
-  selectedId: string | null;
-  collapsed: boolean;
-  onToggle: () => void;
-  onSelect: (annotationId: string) => void;
-}) {
-  const head = entries[0];
-  if (!head) {
-    return null;
-  }
-  const { annotation, label } = head;
-
-  return (
-    <li className="wpn-list__group">
-      <div className="wpn-list__group-head">
-        <button
-          type="button"
-          className="wpn-list__group-toggle"
-          aria-expanded={!collapsed}
-          onClick={onToggle}
-        >
-          <Icon
-            name="chevronDown"
-            className={
-              collapsed ? "wpn-list__chevron wpn-list__chevron--closed" : "wpn-list__chevron"
-            }
-          />
-          <span className="wpn-list__pin">#{annotation.number}</span>
-          <span className="wpn-list__group-label">{label}</span>
-        </button>
-        <span className="wpn-list__group-count">{entries.length}</span>
-      </div>
-      {collapsed ? null : (
-        <ul className="wpn-list__group-items">
-          {entries.map((entry) => (
-            <CommentRow
-              key={entry.comment.id}
-              entry={entry}
-              active={selectedId === entry.annotation.id}
-              onSelect={onSelect}
-            />
-          ))}
-        </ul>
-      )}
-    </li>
-  );
-});
-
 export function AnnotationListPanel() {
   const { annotations, config, loading, error, retry } = useAnnotationData();
   const { selectedId, revealAnnotation, setListOpen } = useAnnotationUi();
+  const currentUserId = config.currentUser.id;
 
   const openAnnotation = useCallback(
     (annotationId: string) => {
@@ -164,12 +42,7 @@ export function AnnotationListPanel() {
   );
 
   const [filters, setFilters] = useState<CommentFilters>(DEFAULT_COMMENT_FILTERS);
-  const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
-  const [grouped, setGrouped] = usePersistentState(
-    `wpn-ui:${config.projectId}:commentsGrouped`,
-    true,
-    isBoolean,
-  );
+  const [expandedReplies, setExpandedReplies] = useState<Set<string> | null>(null);
   const [expanded, setExpanded] = usePersistentState(
     `wpn-ui:${config.projectId}:commentsExpanded`,
     false,
@@ -222,29 +95,37 @@ export function AnnotationListPanel() {
     };
   }, [resizing]);
 
-  const allEntries = useMemo(() => toEntries(annotations), [annotations]);
-  const entries = useMemo(
-    () => filterEntries(allEntries, filters, config.currentUser.id),
-    [allEntries, filters, config.currentUser.id],
+  const allThreads = useMemo(() => toThreads(annotations), [annotations]);
+  const threads = useMemo(
+    () => filterThreads(allThreads, filters, currentUserId),
+    [allThreads, filters, currentUserId],
   );
-  const groups = useMemo(() => groupByAnnotation(entries), [entries]);
-  const authors = useMemo(() => authorOptions(allEntries), [allEntries]);
-  const statuses = useMemo(() => statusOptions(allEntries), [allEntries]);
+  const authors = useMemo(() => authorOptions(allThreads), [allThreads]);
+  const statuses = useMemo(() => statusOptions(allThreads), [allThreads]);
   const active = filtersActive(filters);
 
   const update = <K extends keyof CommentFilters>(key: K, value: CommentFilters[K]) =>
     setFilters((current) => ({ ...current, [key]: value }));
 
-  const toggleGroup = (annotationId: string) =>
-    setCollapsedGroups((current) => {
-      const next = new Set(current);
-      if (next.has(annotationId)) {
-        next.delete(annotationId);
-      } else {
-        next.add(annotationId);
-      }
-      return next;
-    });
+  const firstThreadId = threads[0]?.annotation.id;
+  const openReplies = useMemo(
+    () => expandedReplies ?? new Set(firstThreadId ? [firstThreadId] : []),
+    [expandedReplies, firstThreadId],
+  );
+
+  const toggleReplies = useCallback(
+    (annotationId: string) =>
+      setExpandedReplies((current) => {
+        const next = new Set(current ?? openReplies);
+        if (next.has(annotationId)) {
+          next.delete(annotationId);
+        } else {
+          next.add(annotationId);
+        }
+        return next;
+      }),
+    [openReplies],
+  );
 
   return (
     <div
@@ -270,20 +151,9 @@ export function AnnotationListPanel() {
       <div className="wpn-panel__header">
         <span className="wpn-panel__title">
           Comments
-          <span className="wpn-list__count">{entries.length}</span>
+          <span className="wpn-list__count">{threads.length}</span>
         </span>
         <div className="wpn-list-panel__header-actions">
-          <Tooltip label={grouped ? "Show as flat list" : "Group by pin"} placement="bottom">
-            <button
-              type="button"
-              className={grouped ? "wpn-icon-btn wpn-icon-btn--on" : "wpn-icon-btn"}
-              aria-label={grouped ? "Show as flat list" : "Group by pin"}
-              aria-pressed={grouped}
-              onClick={() => setGrouped(!grouped)}
-            >
-              <Icon name="epic" />
-            </button>
-          </Tooltip>
           <Tooltip label={loading ? "Refreshing..." : "Refresh"} placement="bottom">
             <button
               type="button"
@@ -396,35 +266,27 @@ export function AnnotationListPanel() {
           </button>
         </div>
       ) : null}
-      {entries.length === 0 && !loading && !error ? (
+      {threads.length === 0 && !loading && !error ? (
         <p className="wpn-muted">
-          {allEntries.length === 0
+          {allThreads.length === 0
             ? "No comments on this page."
             : "No comments match these filters."}
         </p>
       ) : null}
 
       {error ? null : (
-        <ul className="wpn-list">
-          {grouped
-            ? [...groups.entries()].map(([annotationId, groupEntries]) => (
-                <AnnotationGroup
-                  key={annotationId}
-                  entries={groupEntries}
-                  selectedId={selectedId}
-                  collapsed={collapsedGroups.has(annotationId)}
-                  onToggle={() => toggleGroup(annotationId)}
-                  onSelect={openAnnotation}
-                />
-              ))
-            : entries.map((entry) => (
-                <CommentRow
-                  key={`${entry.annotation.id}:${entry.comment.id}`}
-                  entry={entry}
-                  active={selectedId === entry.annotation.id}
-                  onSelect={openAnnotation}
-                />
-              ))}
+        <ul className="wpn-list wpn-thread-list">
+          {threads.map((thread) => (
+            <ThreadCard
+              key={thread.annotation.id}
+              thread={thread}
+              active={selectedId === thread.annotation.id}
+              currentUserId={currentUserId}
+              repliesCollapsed={!openReplies.has(thread.annotation.id)}
+              onToggleReplies={toggleReplies}
+              onSelect={openAnnotation}
+            />
+          ))}
         </ul>
       )}
 

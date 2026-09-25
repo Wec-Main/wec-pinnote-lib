@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { AnnotationAnchor } from "../types/annotation.types";
 import type { DraftFlowPin, FlowPin } from "../types/flowPin.types";
 import { createFlowPin, deleteFlowPin, fetchFlowPins } from "../services/flowApi";
@@ -40,6 +40,8 @@ export function useFlowPins(options: UseFlowPinsOptions): FlowPinsState {
   const { apiBaseUrl, projectId, pageKey, getAuthToken, sessionKey, enabled } = options;
   const getToken = useTokenGetter(getAuthToken);
   const [flowPins, setFlowPins] = useState<FlowPin[]>([]);
+  const flowPinsRef = useRef(flowPins);
+  flowPinsRef.current = flowPins;
   const [flowPinsError, setFlowPinsError] = useState<string | null>(null);
   const [reloadToken, setReloadToken] = useState(0);
   const [flowPinsVisible, setFlowPinsVisible] = usePersistentState(
@@ -114,9 +116,19 @@ export function useFlowPins(options: UseFlowPinsOptions): FlowPinsState {
 
   const removeFlowPin = useCallback(
     async (flowPinId: string) => {
-      await deleteFlowPin(apiBaseUrl, await getToken(), flowPinId);
+      const removed = flowPinsRef.current.find((item) => item.id === flowPinId);
       setFlowPins((current) => current.filter((item) => item.id !== flowPinId));
       setSelectedFlowPinId((current) => (current === flowPinId ? null : current));
+      try {
+        await deleteFlowPin(apiBaseUrl, await getToken(), flowPinId);
+      } catch (err) {
+        if (removed) {
+          setFlowPins((current) =>
+            current.some((item) => item.id === flowPinId) ? current : [...current, removed],
+          );
+        }
+        throw err;
+      }
     },
     [apiBaseUrl, getToken],
   );

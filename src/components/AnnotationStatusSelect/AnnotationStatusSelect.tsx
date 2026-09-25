@@ -1,7 +1,14 @@
-import { useEffect, useId, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from "react";
+import {
+  useEffect,
+  useId,
+  useRef,
+  useState,
+  type KeyboardEvent as ReactKeyboardEvent,
+} from "react";
 import type { AnnotationStatus } from "../../types/annotation.types";
 import { ANNOTATION_STATUS_OPTIONS, statusLabel } from "../../utils/status";
 import { useEscapeKey } from "../../hooks/useEscapeKey";
+import { Icon } from "../primitives";
 
 interface AnnotationStatusSelectProps {
   value: AnnotationStatus;
@@ -67,7 +74,8 @@ export function AnnotationStatusSelect({ value, onChange, disabled }: Annotation
     if (event.key === "ArrowUp") {
       event.preventDefault();
       setActiveIndex(
-        (current) => (current - 1 + ANNOTATION_STATUS_OPTIONS.length) % ANNOTATION_STATUS_OPTIONS.length,
+        (current) =>
+          (current - 1 + ANNOTATION_STATUS_OPTIONS.length) % ANNOTATION_STATUS_OPTIONS.length,
       );
       return;
     }
@@ -112,11 +120,17 @@ export function AnnotationStatusSelect({ value, onChange, disabled }: Annotation
         <div
           className="wpn-status__menu"
           role="listbox"
+          aria-label="Change status"
           tabIndex={0}
-          aria-activedescendant={activeOption ? `${optionIdPrefix}-${activeOption.value}` : undefined}
+          aria-activedescendant={
+            activeOption ? `${optionIdPrefix}-${activeOption.value}` : undefined
+          }
           onKeyDown={handleListKeyDown}
           ref={(element) => element?.focus()}
         >
+          <div className="wpn-status__menu-title" aria-hidden="true">
+            Change status
+          </div>
           {ANNOTATION_STATUS_OPTIONS.map((option, index) => (
             <button
               key={option.value}
@@ -132,7 +146,11 @@ export function AnnotationStatusSelect({ value, onChange, disabled }: Annotation
               onClick={() => commit(index)}
             >
               <span className="wpn-status__dot" />
-              {option.label}
+              <span className="wpn-status__option-copy">
+                <span className="wpn-status__option-label">{option.label}</span>
+                <span className="wpn-status__option-description">{option.description}</span>
+              </span>
+              {option.value === value ? <Icon name="check" className="wpn-status__check" /> : null}
             </button>
           ))}
         </div>

@@ -72,6 +72,7 @@ export function ConfirmDialog({
             disabled={busy}
             onClick={onCancel}
           >
+            <Icon name="x" size={14} />
             Cancel
           </button>
           <button
@@ -81,6 +82,7 @@ export function ConfirmDialog({
             disabled={busy}
             onClick={onConfirm}
           >
+            <Icon name={icon} size={14} />
             {busy ? "Working…" : confirmLabel}
           </button>
         </div>

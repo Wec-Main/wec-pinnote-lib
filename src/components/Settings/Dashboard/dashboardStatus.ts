@@ -48,12 +48,7 @@ export function hasTrendActivity(days: readonly TrendDay[]): boolean {
 }
 
 export type DashboardSection =
-  | "summary"
-  | "pages"
-  | "trends"
-  | "topPages"
-  | "topUsers"
-  | "visitLog";
+  "summary" | "pages" | "trends" | "topPages" | "topUsers" | "visitLog";
 
 export const ALL_DASHBOARD_SECTIONS: readonly DashboardSection[] = [
   "summary",

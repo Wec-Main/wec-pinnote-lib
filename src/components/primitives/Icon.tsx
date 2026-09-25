@@ -23,6 +23,7 @@ export type IconName =
   | "epic"
   | "flow"
   | "comment"
+  | "reply"
   | "history"
   | "refresh"
   | "eye"
@@ -151,6 +152,7 @@ const PATHS: Record<IconName, ReactElement> = {
   comment: (
     <path d="M20 14.5a2.5 2.5 0 0 1-2.5 2.5H8l-4 3.5V6.5A2.5 2.5 0 0 1 6.5 4h11A2.5 2.5 0 0 1 20 6.5Z" />
   ),
+  reply: <path d="M9.5 6 4 11.5 9.5 17M4 11.5h9.5a6.5 6.5 0 0 1 6.5 6.5v1" />,
   history: (
     <>
       <path d="M3.5 12a8.5 8.5 0 1 0 2.6-6.1" />

@@ -24,6 +24,7 @@ export interface AnnotationAnchor {
 export interface AnnotationComment {
   id: string;
   message: string;
+  replyToId?: string;
   createdBy: AnnotationUser;
   createdAt: string;
   updatedAt: string;
@@ -53,8 +54,11 @@ export interface CreateAnnotationRequest {
   status?: AnnotationStatus;
 }
 
+export const COMMENT_MAX_LENGTH = 5000;
+
 export interface CreateCommentRequest {
   message: string;
+  replyToId?: string;
   authorId?: string;
 }
 

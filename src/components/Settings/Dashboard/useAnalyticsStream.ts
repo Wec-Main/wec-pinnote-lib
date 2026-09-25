@@ -1,5 +1,8 @@
 import { useEffect, useRef, useState } from "react";
-import { fetchAnalyticsStreamTicket, type AnalyticsStreamScope } from "../../../services/analyticsApi";
+import {
+  fetchAnalyticsStreamTicket,
+  type AnalyticsStreamScope,
+} from "../../../services/analyticsApi";
 import { AnnotationApiError } from "../../../types/annotation.types";
 import {
   INITIAL_RECONNECT_DELAY_MS,

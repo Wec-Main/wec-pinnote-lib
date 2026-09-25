@@ -2,11 +2,10 @@ import { describe, expect, it } from "vitest";
 import {
   DEFAULT_COMMENT_FILTERS,
   authorOptions,
-  filterEntries,
+  filterThreads,
   filtersActive,
-  groupByAnnotation,
   statusOptions,
-  toEntries,
+  toThreads,
   type CommentFilters,
 } from "../src/components/AnnotationListPanel/commentFilters";
 import type { Annotation, AnnotationStatus } from "../src/types/annotation.types";
@@ -73,73 +72,67 @@ const doneAnnotation = annotation("a2", 2, "completed", [
   },
 ]);
 
-const all = toEntries([openAnnotation, doneAnnotation]);
+const all = toThreads([openAnnotation, doneAnnotation]);
 
 function withFilters(overrides: Partial<CommentFilters>): CommentFilters {
   return { ...DEFAULT_COMMENT_FILTERS, ...overrides };
 }
 
-describe("toEntries", () => {
-  it("flattens every comment and marks replies by position", () => {
-    expect(all).toHaveLength(3);
-    expect(all[0]?.replyIndex).toBe(0);
-    expect(all[1]?.replyIndex).toBe(1);
-    expect(all[0]?.replyCount).toBe(2);
+function pinIds(filters: CommentFilters, currentUserId = "u1"): string[] {
+  return filterThreads(all, filters, currentUserId).map((thread) => thread.annotation.id);
+}
+
+describe("toThreads", () => {
+  it("puts the first comment as the parent and the rest as replies", () => {
+    expect(all).toHaveLength(2);
+    expect(all[0]?.root.id).toBe("c1");
+    expect(all[0]?.replies.map((reply) => reply.id)).toEqual(["c2"]);
+    expect(all[1]?.replies).toEqual([]);
   });
 
-  it("humanizes the element identifier", () => {
+  it("tracks the latest comment time and humanizes the element identifier", () => {
+    expect(all[0]?.lastActivityAt).toBe("2026-01-02T10:00:00.000Z");
     expect(all[0]?.label).toBe("hero banner");
+  });
+
+  it("skips annotations without comments", () => {
+    expect(toThreads([annotation("a3", 3, "open", [])])).toEqual([]);
   });
 });
 
-describe("filterEntries", () => {
-  it("sorts newest first by default", () => {
-    const result = filterEntries(all, DEFAULT_COMMENT_FILTERS, "u1");
-
-    expect(result.map((entry) => entry.comment.id)).toEqual(["c3", "c2", "c1"]);
+describe("filterThreads", () => {
+  it("sorts by latest activity by default", () => {
+    expect(pinIds(DEFAULT_COMMENT_FILTERS)).toEqual(["a2", "a1"]);
   });
 
   it("sorts oldest first and by pin number", () => {
-    expect(
-      filterEntries(all, withFilters({ sort: "oldest" }), "u1").map((entry) => entry.comment.id),
-    ).toEqual(["c1", "c2", "c3"]);
-    expect(
-      filterEntries(all, withFilters({ sort: "pin" }), "u1").map((entry) => entry.comment.id),
-    ).toEqual(["c1", "c2", "c3"]);
+    expect(pinIds(withFilters({ sort: "oldest" }))).toEqual(["a1", "a2"]);
+    expect(pinIds(withFilters({ sort: "pin" }))).toEqual(["a1", "a2"]);
   });
 
   it("splits resolved from unresolved by annotation status", () => {
-    expect(filterEntries(all, withFilters({ resolution: "open" }), "u1")).toHaveLength(2);
-    expect(filterEntries(all, withFilters({ resolution: "resolved" }), "u1")).toHaveLength(1);
+    expect(pinIds(withFilters({ resolution: "open" }))).toEqual(["a1"]);
+    expect(pinIds(withFilters({ resolution: "resolved" }))).toEqual(["a2"]);
   });
 
-  it("filters by author id rather than display name", () => {
-    const result = filterEntries(all, withFilters({ author: "u2" }), "u1");
-
-    expect(result.map((entry) => entry.comment.id)).toEqual(["c3", "c2"]);
+  it("keeps a thread when any of its comments matches the author", () => {
+    expect(pinIds(withFilters({ author: "u2" }))).toEqual(["a2", "a1"]);
   });
 
-  it("limits to the current user when mineOnly is set", () => {
-    const result = filterEntries(all, withFilters({ mineOnly: true }), "u1");
-
-    expect(result.map((entry) => entry.comment.id)).toEqual(["c1"]);
+  it("limits to threads the current user took part in when mineOnly is set", () => {
+    expect(pinIds(withFilters({ mineOnly: true }))).toEqual(["a1"]);
   });
 
-  it("filters by annotation status", () => {
-    expect(filterEntries(all, withFilters({ status: "completed" }), "u1")).toHaveLength(1);
+  it("filters by annotation status and combines filters conjunctively", () => {
+    expect(pinIds(withFilters({ status: "completed" }))).toEqual(["a2"]);
+    expect(pinIds(withFilters({ author: "u2", resolution: "open" }))).toEqual(["a1"]);
   });
 
-  it("combines filters conjunctively", () => {
-    const result = filterEntries(all, withFilters({ author: "u2", resolution: "open" }), "u1");
+  it("does not mutate the threads it is given", () => {
+    const order = all.map((thread) => thread.annotation.id);
+    filterThreads(all, withFilters({ sort: "oldest" }), "u1");
 
-    expect(result.map((entry) => entry.comment.id)).toEqual(["c2"]);
-  });
-
-  it("does not mutate the entries it is given", () => {
-    const order = all.map((entry) => entry.comment.id);
-    filterEntries(all, withFilters({ sort: "oldest" }), "u1");
-
-    expect(all.map((entry) => entry.comment.id)).toEqual(order);
+    expect(all.map((thread) => thread.annotation.id)).toEqual(order);
   });
 });
 
@@ -167,14 +160,5 @@ describe("option builders", () => {
       { value: "open", label: "Open" },
       { value: "completed", label: "Completed" },
     ]);
-  });
-});
-
-describe("groupByAnnotation", () => {
-  it("keeps comments of one annotation together in filtered order", () => {
-    const groups = groupByAnnotation(filterEntries(all, DEFAULT_COMMENT_FILTERS, "u1"));
-
-    expect([...groups.keys()]).toEqual(["a2", "a1"]);
-    expect(groups.get("a1")?.map((entry) => entry.comment.id)).toEqual(["c2", "c1"]);
   });
 });

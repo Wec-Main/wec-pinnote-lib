@@ -113,6 +113,7 @@ export function AnnotationLayer() {
     flowPinDraft,
     selectedFlowPinId,
     selectFlowPin,
+    removeFlowPin,
     listOpen,
     epicFlowOpen,
     flowOpen,
@@ -122,16 +123,30 @@ export function AnnotationLayer() {
     cancelDiscardPrompt,
   } = useAnnotationUi();
   const { authenticated } = useAnnotationAuth();
-  const [tagError, setTagError] = useState<string | null>(null);
+  const [layerError, setLayerError] = useState<string | null>(null);
 
   const handleRemoveTag = useCallback(
     (id: string) => {
-      setTagError(null);
+      setLayerError(null);
       removeAnnotationTag(id).catch((err: unknown) => {
-        setTagError(err instanceof Error && err.message ? err.message : "Could not remove that tag");
+        setLayerError(
+          err instanceof Error && err.message ? err.message : "Could not remove that tag",
+        );
       });
     },
     [removeAnnotationTag],
+  );
+
+  const handleRemoveFlowPin = useCallback(
+    (id: string) => {
+      setLayerError(null);
+      removeFlowPin(id).catch((err: unknown) => {
+        setLayerError(
+          err instanceof Error && err.message ? err.message : "Could not delete this flow",
+        );
+      });
+    },
+    [removeFlowPin],
   );
 
   const handleSelectFlowPin = useCallback(
@@ -307,6 +322,7 @@ export function AnnotationLayer() {
           flowPin={selectedFlowPin}
           originX={selectedFlowPinOrigin.x}
           originY={selectedFlowPinOrigin.y}
+          onDelete={handleRemoveFlowPin}
         />
       ) : null}
       {draft && draftPosition ? (
@@ -363,15 +379,15 @@ export function AnnotationLayer() {
           onConfirm={confirmDiscard}
         />
       ) : null}
-      {actionError || tagError ? (
+      {actionError || layerError ? (
         <div className="wpn-toast" role="alert">
-          <span>{actionError ?? tagError}</span>
+          <span>{actionError ?? layerError}</span>
           <button
             type="button"
             className="wpn-icon-btn"
             onClick={() => {
               clearActionError();
-              setTagError(null);
+              setLayerError(null);
             }}
             aria-label="Dismiss"
           >

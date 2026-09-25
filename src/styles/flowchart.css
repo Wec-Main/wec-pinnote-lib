@@ -609,6 +609,8 @@ select.wpn-flowchart-ui__input {
 .wpn-flowchart-node__body {
   display: flex;
   align-items: center;
+  justify-content: center;
+  text-align: center;
   gap: 10px;
   width: 100%;
   min-width: 0;
@@ -624,8 +626,6 @@ select.wpn-flowchart-ui__input {
 }
 
 .wpn-flowchart-node__body-centered {
-  justify-content: center;
-  text-align: center;
   gap: 8px;
 }
 
@@ -655,12 +655,8 @@ select.wpn-flowchart-ui__input {
 }
 
 .wpn-flowchart-node__text {
-  flex: 1 1 auto;
-  min-width: 0;
-}
-
-.wpn-flowchart-node__body-centered .wpn-flowchart-node__text {
   flex: 0 1 auto;
+  min-width: 0;
 }
 
 .wpn-flowchart-node__label {

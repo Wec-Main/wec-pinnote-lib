@@ -31,7 +31,7 @@ export interface AnnotationDataContextValue {
   actionError: string | null;
   clearActionError: () => void;
   createAnnotation: (request: CreateAnnotationRequest) => Promise<Annotation>;
-  addComment: (annotationId: string, message: string) => Promise<void>;
+  addComment: (annotationId: string, message: string, replyToId?: string) => Promise<void>;
   editComment: (annotationId: string, commentId: string, message: string) => Promise<void>;
   removeComment: (annotationId: string, commentId: string) => Promise<void>;
   setStatus: (annotationId: string, status: AnnotationStatus) => Promise<void>;

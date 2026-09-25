@@ -81,10 +81,7 @@ export function ColorPicker({
         onClick={() => (open ? close() : openPicker())}
       >
         <span
-          className={[
-            "wpn-color-picker__swatch",
-            value ? "" : "wpn-color-picker__swatch--none",
-          ]
+          className={["wpn-color-picker__swatch", value ? "" : "wpn-color-picker__swatch--none"]
             .filter(Boolean)
             .join(" ")}
           style={value ? { backgroundColor: value } : undefined}

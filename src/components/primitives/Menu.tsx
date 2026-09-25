@@ -48,10 +48,7 @@ export interface MenuSubmenuItem {
 }
 
 export type MenuItemDefinition =
-  | MenuActionItem
-  | MenuCheckboxItem
-  | MenuSeparatorItem
-  | MenuSubmenuItem;
+  MenuActionItem | MenuCheckboxItem | MenuSeparatorItem | MenuSubmenuItem;
 
 export interface MenuDefinition {
   id: string;
@@ -344,4 +341,3 @@ export function Menu({ menu }: MenuProps) {
     </div>
   );
 }
-

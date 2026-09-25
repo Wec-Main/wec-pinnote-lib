@@ -431,8 +431,7 @@ export function AnnotationProvider({ config, children }: AnnotationProviderProps
   }, [modeEnabled, resolved.enabled]);
 
   const startDraft = useCallback((anchor: AnnotationAnchor, label: string) => {
-    const number =
-      annotationsRef.current.reduce((max, item) => Math.max(max, item.number), 0) + 1;
+    const number = annotationsRef.current.reduce((max, item) => Math.max(max, item.number), 0) + 1;
     draftMessageRef.current = "";
     setSelectedId(null);
     setDraft({
@@ -484,18 +483,25 @@ export function AnnotationProvider({ config, children }: AnnotationProviderProps
       if (!current) {
         return;
       }
-      const created = await createAnnotation({
-        projectId,
-        pageKey,
-        anchor: current.anchor,
-        comment: {
-          message,
-          authorId: currentUserId,
-        },
-        status,
-      });
+      const typedMessage = draftMessageRef.current;
       clearDraft();
-      setSelectedId(created.id);
+      try {
+        const created = await createAnnotation({
+          projectId,
+          pageKey,
+          anchor: current.anchor,
+          comment: {
+            message,
+            authorId: currentUserId,
+          },
+          status,
+        });
+        setSelectedId(created.id);
+      } catch (err) {
+        draftMessageRef.current = typedMessage;
+        setDraft((existing) => existing ?? { ...current, message: typedMessage });
+        throw err;
+      }
     },
     [clearDraft, createAnnotation, currentUserId, pageKey, projectId],
   );

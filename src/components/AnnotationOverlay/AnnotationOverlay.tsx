@@ -76,7 +76,11 @@ export function AnnotationOverlay() {
   useEffect(() => {
     if (placing) {
       setAnnouncement(
-        flowPinModeEnabled ? "Flow placement mode enabled" : tagModeEnabled ? "Tagging mode enabled" : "Annotation mode enabled",
+        flowPinModeEnabled
+          ? "Flow placement mode enabled"
+          : tagModeEnabled
+            ? "Tagging mode enabled"
+            : "Annotation mode enabled",
       );
     } else {
       setAnnouncement((current) => (current ? "Annotation mode disabled" : current));
@@ -111,7 +115,14 @@ export function AnnotationOverlay() {
         startDraft(anchor, label);
       }
     },
-    [flowPinModeEnabled, pendingDraft, startDraft, startFlowPinDraft, startTagDraft, tagModeEnabled],
+    [
+      flowPinModeEnabled,
+      pendingDraft,
+      startDraft,
+      startFlowPinDraft,
+      startTagDraft,
+      tagModeEnabled,
+    ],
   );
 
   useEffect(() => {

@@ -1,13 +1,30 @@
 import { useCallback, useEffect, useState } from "react";
-import type { Annotation, AnnotationComment, AnnotationUser } from "../../types/annotation.types";
+import {
+  COMMENT_MAX_LENGTH,
+  type Annotation,
+  type AnnotationComment,
+  type AnnotationUser,
+} from "../../types/annotation.types";
 import { formatTimestamp, getInitials } from "../../utils/format";
 import { canDeleteComment, canEditComment } from "../../utils/boardPermissions";
+import {
+  encodeMentions,
+  mentionsToPlainText,
+  splitMentions,
+  type MentionCandidate,
+} from "../../utils/mentions";
+import { useMentionCandidates } from "../../hooks/useMentionCandidates";
+import { CommentMessage } from "../CommentMessage";
+import { CommentQuote } from "../CommentQuote";
+import { MentionTextarea } from "../MentionTextarea";
+import { Icon } from "../primitives";
 
 interface AnnotationThreadProps {
   annotation: Annotation;
   currentUser: AnnotationUser;
   onEdit: (commentId: string, message: string) => Promise<void>;
-  onDelete: (commentId: string) => Promise<void>;
+  onDelete: (comment: AnnotationComment) => void;
+  onReply: (comment: AnnotationComment) => void;
   onEditingChange?: (editing: boolean) => void;
 }
 
@@ -20,27 +37,55 @@ function Avatar({ user }: { user: AnnotationUser }) {
 
 function CommentItem({
   comment,
+  quoted,
+  candidates,
   currentUser,
   onEdit,
   onDelete,
+  onReply,
   onEditingChange,
 }: {
   comment: AnnotationComment;
+  quoted: AnnotationComment | undefined;
+  candidates: MentionCandidate[];
   currentUser: AnnotationUser;
   onEdit: (commentId: string, message: string) => Promise<void>;
-  onDelete: (commentId: string) => Promise<void>;
+  onDelete: (comment: AnnotationComment) => void;
+  onReply: (comment: AnnotationComment) => void;
   onEditingChange?: (commentId: string, editing: boolean) => void;
 }) {
   const canEdit = canEditComment(comment, currentUser);
   const canDelete = canDeleteComment(comment, currentUser);
   const [editing, setEditing] = useState(false);
-  const [value, setValue] = useState(comment.message);
-  const [confirmDelete, setConfirmDelete] = useState(false);
+  const plainMessage = mentionsToPlainText(comment.message);
+  const [value, setValue] = useState(plainMessage);
 
   useEffect(() => {
-    onEditingChange?.(comment.id, editing && value.trim() !== comment.message.trim());
+    onEditingChange?.(comment.id, editing && value.trim() !== plainMessage.trim());
     return () => onEditingChange?.(comment.id, false);
-  }, [comment.id, comment.message, editing, onEditingChange, value]);
+  }, [comment.id, plainMessage, editing, onEditingChange, value]);
+
+  const cancelEdit = () => {
+    setEditing(false);
+    setValue(plainMessage);
+  };
+
+  const saveEdit = () => {
+    const trimmed = value.trim();
+    if (!trimmed) {
+      return;
+    }
+    const previouslyMentioned = splitMentions(comment.message).flatMap((segment) =>
+      segment.kind === "mention" ? [{ id: segment.userId, name: segment.name }] : [],
+    );
+    setEditing(false);
+    onEdit(comment.id, encodeMentions(trimmed, [...candidates, ...previouslyMentioned])).catch(
+      () => {
+        setValue(trimmed);
+        setEditing(true);
+      },
+    );
+  };
 
   return (
     <article className="wpn-comment">
@@ -49,8 +94,16 @@ function CommentItem({
         <div className="wpn-comment__meta">
           <strong>{comment.createdBy.name}</strong>
           <time dateTime={comment.createdAt}>{formatTimestamp(comment.createdAt)}</time>
-          {(canEdit || canDelete) && !editing ? (
+          {editing ? null : (
             <div className="wpn-comment__actions wpn-comment__actions--inline">
+              <button
+                type="button"
+                className="wpn-link wpn-link--icon"
+                aria-label="Reply"
+                onClick={() => onReply(comment)}
+              >
+                <Icon name="reply" className="wpn-action-icon" />
+              </button>
               {canEdit ? (
                 <button
                   type="button"
@@ -70,29 +123,12 @@ function CommentItem({
                   </svg>
                 </button>
               ) : null}
-              {!canDelete ? null : confirmDelete ? (
-                <>
-                  <button
-                    type="button"
-                    className="wpn-link wpn-link--chip wpn-link--danger"
-                    onClick={() => onDelete(comment.id).catch(() => undefined)}
-                  >
-                    Confirm
-                  </button>
-                  <button
-                    type="button"
-                    className="wpn-link wpn-link--chip"
-                    onClick={() => setConfirmDelete(false)}
-                  >
-                    Cancel
-                  </button>
-                </>
-              ) : (
+              {canDelete ? (
                 <button
                   type="button"
                   className="wpn-link wpn-link--icon wpn-link--danger"
                   aria-label="Delete"
-                  onClick={() => setConfirmDelete(true)}
+                  onClick={() => onDelete(comment)}
                 >
                   <svg viewBox="0 0 16 16" className="wpn-action-icon" aria-hidden="true">
                     <path
@@ -104,47 +140,47 @@ function CommentItem({
                     />
                   </svg>
                 </button>
-              )}
+              ) : null}
             </div>
-          ) : null}
+          )}
         </div>
         {editing ? (
           <div className="wpn-comment__edit">
-            <textarea
+            <MentionTextarea
               className="wpn-input"
               value={value}
-              onChange={(event) => setValue(event.target.value)}
-              aria-label="Edit comment"
+              onChange={setValue}
+              candidates={candidates}
+              ariaLabel="Edit comment"
               rows={2}
+              maxLength={COMMENT_MAX_LENGTH}
+              autoFocus
+              onEnter={saveEdit}
+              onEscape={cancelEdit}
             />
             <div className="wpn-comment__actions">
-              <button
-                type="button"
-                className="wpn-link wpn-link--chip"
-                onClick={() => {
-                  setEditing(false);
-                  setValue(comment.message);
-                }}
-              >
+              <button type="button" className="wpn-link wpn-link--chip" onClick={cancelEdit}>
+                <Icon name="close" className="wpn-link__icon" />
                 Cancel
               </button>
               <button
                 type="button"
                 className="wpn-link wpn-link--chip wpn-link--save"
                 disabled={!value.trim()}
-                onClick={() => {
-                  onEdit(comment.id, value.trim()).then(
-                    () => setEditing(false),
-                    () => undefined,
-                  );
-                }}
+                onClick={saveEdit}
               >
+                <Icon name="check" className="wpn-link__icon" />
                 Save
               </button>
             </div>
           </div>
         ) : (
-          <p className="wpn-comment__message">{comment.message}</p>
+          <>
+            {comment.replyToId ? <CommentQuote comment={quoted} /> : null}
+            <p className="wpn-comment__message">
+              <CommentMessage message={comment.message} currentUserId={currentUser.id} />
+            </p>
+          </>
         )}
       </div>
     </article>
@@ -156,9 +192,11 @@ export function AnnotationThread({
   currentUser,
   onEdit,
   onDelete,
+  onReply,
   onEditingChange,
 }: AnnotationThreadProps) {
   const [dirtyEditIds, setDirtyEditIds] = useState<Set<string>>(new Set());
+  const candidates = useMentionCandidates();
 
   useEffect(() => {
     onEditingChange?.(dirtyEditIds.size > 0);
@@ -186,9 +224,12 @@ export function AnnotationThread({
         <CommentItem
           key={comment.id}
           comment={comment}
+          quoted={annotation.comments.find((item) => item.id === comment.replyToId)}
+          candidates={candidates}
           currentUser={currentUser}
           onEdit={onEdit}
           onDelete={onDelete}
+          onReply={onReply}
           onEditingChange={setCommentEditing}
         />
       ))}

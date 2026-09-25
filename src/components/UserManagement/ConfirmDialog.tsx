@@ -75,6 +75,7 @@ export function ConfirmDialog({
             onClick={onCancel}
             disabled={busy}
           >
+            <Icon name="close" className="wpn-btn__icon" />
             {cancelLabel}
           </button>
           <button

@@ -6,12 +6,12 @@ export type CommentSort = "newest" | "oldest" | "pin" | "author";
 
 export type CommentResolution = "all" | "open" | "resolved";
 
-export interface CommentEntry {
+export interface CommentThread {
   annotation: Annotation;
-  comment: AnnotationComment;
   label: string;
-  replyIndex: number;
-  replyCount: number;
+  root: AnnotationComment;
+  replies: AnnotationComment[];
+  lastActivityAt: string;
 }
 
 export interface CommentFilters {
@@ -31,7 +31,7 @@ export const DEFAULT_COMMENT_FILTERS: CommentFilters = {
 };
 
 export const SORT_OPTIONS: SelectOption[] = [
-  { value: "newest", label: "Newest first" },
+  { value: "newest", label: "Latest activity" },
   { value: "oldest", label: "Oldest first" },
   { value: "pin", label: "Pin number" },
   { value: "author", label: "Author A–Z" },
@@ -47,80 +47,77 @@ export function elementLabel(annotation: Annotation): string {
   return annotation.anchor.elementIdentifier.replace(/[-_]/g, " ");
 }
 
-export function toEntries(annotations: Annotation[]): CommentEntry[] {
-  return annotations.flatMap((annotation) =>
-    annotation.comments.map((comment, index) => ({
-      annotation,
-      comment,
-      label: elementLabel(annotation),
-      replyIndex: index,
-      replyCount: annotation.comments.length,
-    })),
-  );
+export function toThreads(annotations: Annotation[]): CommentThread[] {
+  return annotations.flatMap((annotation) => {
+    const [root, ...replies] = annotation.comments;
+    if (!root) {
+      return [];
+    }
+    const lastActivityAt = annotation.comments.reduce(
+      (latest, comment) => (comment.createdAt > latest ? comment.createdAt : latest),
+      root.createdAt,
+    );
+    return [{ annotation, label: elementLabel(annotation), root, replies, lastActivityAt }];
+  });
 }
 
-export function authorOptions(entries: CommentEntry[]): SelectOption[] {
+function threadComments(thread: CommentThread): AnnotationComment[] {
+  return [thread.root, ...thread.replies];
+}
+
+export function authorOptions(threads: CommentThread[]): SelectOption[] {
   const byId = new Map<string, string>();
-  for (const entry of entries) {
-    byId.set(entry.comment.createdBy.id, entry.comment.createdBy.name);
+  for (const comment of threads.flatMap(threadComments)) {
+    byId.set(comment.createdBy.id, comment.createdBy.name);
   }
   return [...byId.entries()]
     .map(([value, label]) => ({ value, label }))
     .sort((left, right) => left.label.localeCompare(right.label));
 }
 
-export function statusOptions(entries: CommentEntry[]): SelectOption[] {
-  const seen = new Set<AnnotationStatus>();
-  for (const entry of entries) {
-    seen.add(entry.annotation.status);
-  }
+export function statusOptions(threads: CommentThread[]): SelectOption[] {
+  const seen = new Set<AnnotationStatus>(threads.map((thread) => thread.annotation.status));
   return ANNOTATION_STATUS_OPTIONS.filter((option) => seen.has(option.value)).map((option) => ({
     value: option.value,
     label: option.label,
   }));
 }
 
-function matchesResolution(entry: CommentEntry, resolution: CommentResolution): boolean {
+function matchesResolution(thread: CommentThread, resolution: CommentResolution): boolean {
   if (resolution === "all") {
     return true;
   }
-  const done = isDoneStatus(entry.annotation.status);
+  const done = isDoneStatus(thread.annotation.status);
   return resolution === "resolved" ? done : !done;
 }
 
-function compare(left: CommentEntry, right: CommentEntry, sort: CommentSort): number {
-  if (sort === "oldest") {
-    return left.comment.createdAt.localeCompare(right.comment.createdAt);
-  }
-  if (sort === "pin") {
-    return (
-      left.annotation.number - right.annotation.number ||
-      left.comment.createdAt.localeCompare(right.comment.createdAt)
-    );
-  }
-  if (sort === "author") {
-    return (
-      left.comment.createdBy.name.localeCompare(right.comment.createdBy.name) ||
-      right.comment.createdAt.localeCompare(left.comment.createdAt)
-    );
-  }
-  return right.comment.createdAt.localeCompare(left.comment.createdAt);
+function hasCommentBy(thread: CommentThread, userId: string): boolean {
+  return threadComments(thread).some((comment) => comment.createdBy.id === userId);
 }
 
-export function filterEntries(
-  entries: CommentEntry[],
+const COMPARATORS: Record<CommentSort, (left: CommentThread, right: CommentThread) => number> = {
+  newest: (left, right) => right.lastActivityAt.localeCompare(left.lastActivityAt),
+  oldest: (left, right) => left.root.createdAt.localeCompare(right.root.createdAt),
+  pin: (left, right) => left.annotation.number - right.annotation.number,
+  author: (left, right) =>
+    left.root.createdBy.name.localeCompare(right.root.createdBy.name) ||
+    right.lastActivityAt.localeCompare(left.lastActivityAt),
+};
+
+export function filterThreads(
+  threads: CommentThread[],
   filters: CommentFilters,
   currentUserId: string,
-): CommentEntry[] {
-  return entries
+): CommentThread[] {
+  return threads
     .filter(
-      (entry) =>
-        matchesResolution(entry, filters.resolution) &&
-        (!filters.status || entry.annotation.status === filters.status) &&
-        (!filters.author || entry.comment.createdBy.id === filters.author) &&
-        (!filters.mineOnly || entry.comment.createdBy.id === currentUserId),
+      (thread) =>
+        matchesResolution(thread, filters.resolution) &&
+        (!filters.status || thread.annotation.status === filters.status) &&
+        (!filters.author || hasCommentBy(thread, filters.author)) &&
+        (!filters.mineOnly || hasCommentBy(thread, currentUserId)),
     )
-    .sort((left, right) => compare(left, right, filters.sort));
+    .sort(COMPARATORS[filters.sort]);
 }
 
 export function filtersActive(filters: CommentFilters): boolean {
@@ -131,17 +128,4 @@ export function filtersActive(filters: CommentFilters): boolean {
     filters.mineOnly ||
     filters.sort !== DEFAULT_COMMENT_FILTERS.sort
   );
-}
-
-export function groupByAnnotation(entries: CommentEntry[]): Map<string, CommentEntry[]> {
-  const groups = new Map<string, CommentEntry[]>();
-  for (const entry of entries) {
-    const bucket = groups.get(entry.annotation.id);
-    if (bucket) {
-      bucket.push(entry);
-    } else {
-      groups.set(entry.annotation.id, [entry]);
-    }
-  }
-  return groups;
 }

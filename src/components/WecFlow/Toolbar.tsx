@@ -70,7 +70,6 @@ export const Toolbar = memo(function Toolbar({
   );
   const fileRef = useRef<HTMLInputElement>(null);
   const [pending, setPending] = useState<PendingCommit | null>(null);
-  const [busy, setBusy] = useState(false);
   const [publishErrors, setPublishErrors] = useState(0);
   const notify = (m: string, k: NoticeKind) => onNotify?.(m, k);
 
@@ -110,20 +109,16 @@ export const Toolbar = memo(function Toolbar({
   };
 
   const commit = async () => {
-    const handler = pending === "publish" ? onPublish : onSave;
-    if (!pending || !handler) return;
-    setBusy(true);
+    const action = pending;
+    const handler = action === "publish" ? onPublish : onSave;
+    if (!action || !handler) return;
+    setPending(null);
     try {
       await handler(engine.toJSON());
-      notify(pending === "publish" ? `"${flowName}" published` : `"${flowName}" saved`, "success");
-      setPending(null);
+      notify(action === "publish" ? `"${flowName}" published` : `"${flowName}" saved`, "success");
     } catch (e) {
-      notify(
-        e instanceof Error && e.message ? e.message : `Could not ${pending} the flow`,
-        "error",
-      );
-    } finally {
-      setBusy(false);
+      notify(e instanceof Error && e.message ? e.message : `Could not ${action} the flow`, "error");
+      setPending(action);
     }
   };
 
@@ -268,7 +263,6 @@ export const Toolbar = memo(function Toolbar({
           title="Save flow?"
           icon="save"
           confirmLabel="Save"
-          busy={busy}
           onConfirm={() => void commit()}
           onCancel={() => setPending(null)}
         >
@@ -283,7 +277,6 @@ export const Toolbar = memo(function Toolbar({
           title="Publish flow?"
           icon="publish"
           confirmLabel="Publish"
-          busy={busy}
           warning={
             publishErrors > 0
               ? `Validation found ${plural(publishErrors, "error")}. You can still publish, or cancel and fix them first.`

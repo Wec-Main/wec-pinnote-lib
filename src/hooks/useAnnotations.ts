@@ -329,13 +329,14 @@ export function useAnnotationCollection({
   );
 
   const addComment = useCallback(
-    async (annotationId: string, message: string) => {
+    async (annotationId: string, message: string, replyToId?: string) => {
       const tempId = createClientId("comment");
       const now = new Date().toISOString();
       const requestingUser = currentUserRef.current;
       const optimistic: AnnotationComment = {
         id: tempId,
         message,
+        replyToId,
         createdBy: requestingUser,
         createdAt: now,
         updatedAt: now,
@@ -368,6 +369,7 @@ export function useAnnotationCollection({
           annotationId,
           {
             message,
+            replyToId,
             authorId: requestingUser.id,
           },
           controller.signal,

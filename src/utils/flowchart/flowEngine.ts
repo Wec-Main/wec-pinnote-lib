@@ -35,6 +35,7 @@ import {
   type AlignmentGuide,
   type DistributeAxis,
 } from "./alignment";
+import { FIT_VIEW_TOP_OFFSET } from "./constants";
 import { createId } from "./id";
 import {
   checkConnection,
@@ -880,10 +881,12 @@ export class FlowEngine {
       this.minZoom,
       options.maxZoom ?? 1.25,
     );
+    const topAligned = Math.min(padding, FIT_VIEW_TOP_OFFSET) - bounds.y * zoom;
+    const centered = s.canvasSize.height / 2 - (bounds.y + bounds.height / 2) * zoom;
     this.setViewport({
       zoom,
       x: s.canvasSize.width / 2 - (bounds.x + bounds.width / 2) * zoom,
-      y: s.canvasSize.height / 2 - (bounds.y + bounds.height / 2) * zoom,
+      y: Math.min(topAligned, centered),
     });
   }
 

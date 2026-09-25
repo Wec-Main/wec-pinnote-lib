@@ -106,7 +106,6 @@ export function AnnotationToolbar() {
     return () => window.removeEventListener("resize", onResize);
   }, [position, setPosition]);
 
-
   const onDragStart = (event: ReactPointerEvent<HTMLElement>) => {
     const el = toolbarRef.current;
     if (!el) {
@@ -367,9 +366,7 @@ export function AnnotationToolbar() {
           {openToolbarButton}
           {launcherShortcuts}
         </>
-      ) : (
-        openToolbarButton
-      )}
+      ) : null}
     </div>
   );
 
@@ -503,7 +500,13 @@ export function AnnotationToolbar() {
               <>
                 <span className="wpn-toolbar__divider" aria-hidden="true" />
                 <Tooltip
-                  label={loggedOut ? "Log in first" : flowPinModeEnabled ? "Stop placing flows" : "Place a flow"}
+                  label={
+                    loggedOut
+                      ? "Log in first"
+                      : flowPinModeEnabled
+                        ? "Stop placing flows"
+                        : "Place a flow"
+                  }
                   placement="bottom"
                 >
                   <button
@@ -526,7 +529,10 @@ export function AnnotationToolbar() {
                 <Tooltip label={flowPinsVisible ? "Hide flows" : "Show flows"} placement="bottom">
                   <button
                     type="button"
-                    className={["wpn-toolbar__eye", flowPinsVisible ? "" : "wpn-toolbar__eye--hidden"]
+                    className={[
+                      "wpn-toolbar__eye",
+                      flowPinsVisible ? "" : "wpn-toolbar__eye--hidden",
+                    ]
                       .filter(Boolean)
                       .join(" ")}
                     aria-pressed={!flowPinsVisible}

@@ -1,8 +1,16 @@
 import { useRef, useState, type FormEvent } from "react";
 import { useAnnotationData, useAnnotationUi } from "../../context/AnnotationContext";
 import { useFloatingPanel } from "../../hooks/useAnnotationPosition";
-import type { AnnotationStatus, DraftAnnotation } from "../../types/annotation.types";
+import {
+  COMMENT_MAX_LENGTH,
+  type AnnotationStatus,
+  type DraftAnnotation,
+} from "../../types/annotation.types";
+import { useMentionCandidates } from "../../hooks/useMentionCandidates";
+import { encodeMentions } from "../../utils/mentions";
 import { AnnotationStatusSelect } from "../AnnotationStatusSelect";
+import { ComposerHint } from "../ComposerHint";
+import { MentionTextarea } from "../MentionTextarea";
 import { Icons } from "../../assets/icons";
 import { Tooltip } from "../primitives";
 
@@ -33,24 +41,30 @@ function DraftComposer({ draft, x, y }: DraftComposerProps) {
   const [submitting, setSubmitting] = useState(false);
   const [editingLabel, setEditingLabel] = useState(false);
   const [labelValue, setLabelValue] = useState("");
+  const [focused, setFocused] = useState(false);
+  const candidates = useMentionCandidates();
 
   const changeMessage = (next: string) => {
     setMessage(next);
     updateDraftMessage(next);
   };
 
-  const onSubmit = async (event: FormEvent) => {
-    event.preventDefault();
+  const send = async () => {
     const trimmed = message.trim();
     if (!trimmed || submitting) {
       return;
     }
     setSubmitting(true);
     try {
-      await submitDraft(trimmed, status);
+      await submitDraft(encodeMentions(trimmed, candidates), status);
     } catch {
       setSubmitting(false);
     }
+  };
+
+  const onSubmit = (event: FormEvent) => {
+    event.preventDefault();
+    void send();
   };
 
   const startEditingLabel = () => {
@@ -134,15 +148,21 @@ function DraftComposer({ draft, x, y }: DraftComposerProps) {
         </Tooltip>
       </div>
       <form onSubmit={onSubmit}>
-        <textarea
-          className="wpn-input"
+        <MentionTextarea
+          className="wpn-input wpn-composer__field"
           value={message}
-          onChange={(event) => changeMessage(event.target.value)}
-          placeholder="Add your comment..."
-          aria-label="Comment"
+          onChange={changeMessage}
+          candidates={candidates}
+          placeholder="Add your comment... Type @ to mention someone"
+          ariaLabel="Comment"
           rows={3}
+          maxLength={COMMENT_MAX_LENGTH}
+          menuPlacement="below"
           autoFocus
+          onEnter={() => void send()}
+          onFocusChange={setFocused}
         />
+        {focused || message ? <ComposerHint length={message.length} /> : null}
         <div className="wpn-panel__composer">
           <div className="wpn-panel__toolbar">
             <div className="wpn-thread-panel__brand">

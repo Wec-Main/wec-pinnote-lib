@@ -10,7 +10,8 @@ interface DashboardStatusGateProps {
 }
 
 const UNAVAILABLE_TITLE = "Analytics tables are not set up";
-const UNAVAILABLE_DETAIL = "Apply the analytics table scripts in db/tables/ on the API, then retry.";
+const UNAVAILABLE_DETAIL =
+  "Apply the analytics table scripts in db/tables/ on the API, then retry.";
 const ERROR_TITLE = "Unable to load analytics";
 const ERROR_FALLBACK_DETAIL = "Something went wrong while loading the dashboard.";
 
