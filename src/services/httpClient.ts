@@ -132,3 +132,13 @@ export async function requestNoContent(
   const response = await send(url, authToken, init, policy);
   await response.text().catch(() => "");
 }
+
+export async function requestBlob(
+  url: string,
+  authToken: string | undefined,
+  init?: RequestInit,
+  policy: RequestPolicy = {},
+): Promise<Blob> {
+  const response = await send(url, authToken, init, policy);
+  return response.blob();
+}

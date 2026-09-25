@@ -18,6 +18,7 @@ interface SearchableSelectProps {
   size?: "md" | "sm";
   id?: string;
   floating?: boolean;
+  searchable?: boolean;
 }
 
 export function SearchableSelect({
@@ -32,6 +33,7 @@ export function SearchableSelect({
   size = "md",
   id,
   floating = false,
+  searchable = true,
 }: SearchableSelectProps) {
   const {
     open,
@@ -74,6 +76,8 @@ export function SearchableSelect({
         label={selected?.label ?? ""}
         placeholder={placeholder}
         ariaLabel={ariaLabel}
+        listboxId={searchable ? undefined : listboxId}
+        activeDescendant={searchable ? undefined : activeDescendant}
         onToggle={() => (open ? setOpen(false) : openMenu())}
       />
       {clearable && selected ? (
@@ -90,7 +94,11 @@ export function SearchableSelect({
       {open ? (
         <div
           ref={menuRef}
-          className={["wpn-select__menu", floating ? "wpn-select__menu--floating" : ""]
+          className={[
+            "wpn-select__menu",
+            floating ? "wpn-select__menu--floating" : "",
+            searchable ? "" : "wpn-select__menu--fit",
+          ]
             .filter(Boolean)
             .join(" ")}
           style={
@@ -101,15 +109,17 @@ export function SearchableSelect({
               : undefined
           }
         >
-          <SelectSearchField
-            inputRef={inputRef}
-            value={query}
-            placeholder={searchPlaceholder}
-            ariaLabel={`Search ${ariaLabel}`}
-            listboxId={listboxId}
-            activeDescendant={activeDescendant}
-            onChange={onInputChange}
-          />
+          {searchable ? (
+            <SelectSearchField
+              inputRef={inputRef}
+              value={query}
+              placeholder={searchPlaceholder}
+              ariaLabel={`Search ${ariaLabel}`}
+              listboxId={listboxId}
+              activeDescendant={activeDescendant}
+              onChange={onInputChange}
+            />
+          ) : null}
           <ul className="wpn-select__list" role="listbox" id={listboxId} aria-label={ariaLabel}>
             {filtered.length === 0 ? (
               <li className="wpn-select__empty">{emptyMessage}</li>

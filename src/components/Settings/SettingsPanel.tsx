@@ -6,6 +6,7 @@ import { OrganizationsTab } from "./OrganizationsTab";
 import { ProjectsTab } from "./ProjectsTab";
 import { TagsTab } from "./TagsTab";
 import { AuditHistoryPanel } from "../AuditHistory";
+import { DashboardTab } from "./Dashboard/DashboardTab";
 import { visibleSettingsTabs, type SettingsTab } from "./settingsTabs";
 import { roleLabel } from "../../data/userManagementOptions";
 import { getInitials } from "../../utils/format";
@@ -117,6 +118,7 @@ export function SettingsPanel() {
         {activeTab === "projects" ? <ProjectsTab /> : null}
         {activeTab === "tags" ? <TagsTab /> : null}
         {activeTab === "audit" ? <AuditHistoryPanel embedded /> : null}
+        {activeTab === "dashboard" ? <DashboardTab /> : null}
       </section>
     </div>
   );

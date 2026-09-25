@@ -34,6 +34,33 @@ export { useEpicFlowApi } from "./hooks/useEpicFlowApi";
 export type { Epic, UserStory } from "./types/epicFlow.types";
 export { fetchAuditPage } from "./services/auditApi";
 export {
+  fetchAnalyticsSummary,
+  fetchAnalyticsPages,
+  fetchAnalyticsTrends,
+  fetchAnalyticsUsers,
+  fetchAnalyticsVisits,
+  downloadAnalyticsVisitsCsv,
+} from "./services/analyticsApi";
+export type {
+  AnalyticsFilters,
+  AnalyticsSummary,
+  AnnotationStatusCounts,
+  PageVisitRow as AnalyticsPageVisitRow,
+  PageVisitPage,
+  PagesQuery as AnalyticsPagesQuery,
+  TrendDay,
+  AnalyticsTrends,
+  TopUserRecord,
+  TopUsersPage,
+  UsersQuery as AnalyticsUsersQuery,
+  VisitRecord,
+  VisitsPage,
+  VisitsQuery as AnalyticsVisitsQuery,
+  ExportVisitsQuery as AnalyticsExportVisitsQuery,
+} from "./types/analytics.types";
+export { rangeForPreset, validateCustomRange } from "./utils/analyticsRange";
+export type { RangePreset, DateRange } from "./utils/analyticsRange";
+export {
   createUser,
   deleteUser,
   fetchUsers,

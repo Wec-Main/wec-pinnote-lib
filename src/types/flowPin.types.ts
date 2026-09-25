@@ -1,5 +1,5 @@
 import type { AnnotationAnchor } from "./annotation.types";
-import type { FlowJSON } from "../components/WecFlow/flowchart";
+import type { FlowJSON } from "./flowchart.types";
 
 export interface FlowPin {
   id: string;

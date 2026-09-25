@@ -7,7 +7,7 @@ import type {
   FlowSummary,
   FlowVersionRecord,
 } from "../types/flowPin.types";
-import type { FlowJSON } from "../components/WecFlow/flowchart";
+import type { FlowJSON } from "../types/flowchart.types";
 
 function flowPath(flowId: string, suffix: string): string {
   return `/flows/${encodeURIComponent(flowId)}${suffix}`;

@@ -102,6 +102,21 @@ Optional config:
 | `showPinsWhenIdle` | `true`       | Keep pins visible when annotation mode is off          |
 | `showResolved`     | `true`       | Show completed/closed pins                             |
 | `apiClient`        | REST client  | Advanced/demo override. The library default is HTTP    |
+| `trackPageVisits`  | `true`       | Set `false` to turn off page-visit tracking            |
+
+### Page-visit tracking
+
+While a user is signed in (built-in session or host `getAuthToken`), the provider records one visit
+per page key: the path without query string or hash, the page title, the referrer's origin and path,
+when the view started, visible time on the page, maximum scroll depth, viewport size, browser
+language, timezone and a per-tab session id. A view ends when the page key changes, the tab is hidden
+or the page is unloaded. Visits are sent in small batches to `POST /analytics/visits` every few
+seconds, with a heartbeat at least once a minute while the page is visible, and with
+`navigator.sendBeacon` when the tab is hidden or closed. Signed-out users are never tracked, and no
+`/analytics` request is made for them.
+
+Set `trackPageVisits: false` to disable collection entirely. How the API stores this data is
+described in the privacy note of the API README.
 
 ## Authentication
 

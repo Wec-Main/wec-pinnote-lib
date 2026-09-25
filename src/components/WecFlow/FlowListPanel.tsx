@@ -135,9 +135,7 @@ export function FlowListPanel({ onOpen }: FlowListPanelProps) {
                     <td>
                       <AuthorBadge name={flow.createdByUser} />
                     </td>
-                    <td className="wpn-flow-table__meta">
-                      {formatTimestamp(flow.updatedAt)}
-                    </td>
+                    <td className="wpn-flow-table__meta">{formatTimestamp(flow.updatedAt)}</td>
                     <td>
                       <div className="wpn-flow-table__actions">
                         <Tooltip label="Edit flow" placement="bottom">

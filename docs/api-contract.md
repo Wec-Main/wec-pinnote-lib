@@ -1034,3 +1034,247 @@ the endpoint responds `503` before upgrading to a stream:
 This is the one response in the API that uses `{ "message": string }` instead of
 `{ "error": string, "details"?: unknown }` — the connection never reaches the point where the
 usual JSON error body would apply.
+
+# Analytics API contract
+
+Every endpoint below requires a `super_admin` actor except `POST /analytics/ingest-token` and
+`POST /analytics/visits`, which authenticate a page-visit tracker instead of a dashboard viewer.
+Analytics tables (`page_visits`, `login_events`, `user_presence`, `page_visit_daily`,
+`user_visit_daily`) live in the same database as every other table; a request fails only if those
+tables have not been applied yet.
+
+## Ingest token
+
+```http
+POST /analytics/ingest-token
+Authorization: Bearer <token>
+Content-Type: application/json
+
+{ "projectId": "proj_123" }
+```
+
+Requires a signed-in project member. Returns a short-lived token the tracker can carry in a
+`text/plain` body, where an `Authorization` header cannot travel:
+
+```json
+{ "token": "<jwt>", "expiresAt": "2026-09-24T10:10:00.000Z" }
+```
+
+The token is a `typ: "ingest"` JWT that expires in 600 seconds and is rejected by every other
+authentication check in the API (`extractUserId`, `verifyRefreshToken`).
+
+## Visit ingest
+
+```http
+POST /analytics/visits
+Content-Type: text/plain
+
+{ "token": "<jwt>", "visits": [ { "clientVisitId": "a1b2c3d4", "sessionId": "s1t2u3v4", "pageKey": "/board", "urlPath": "/board", "title": "Board", "referrer": null, "enteredAt": "2026-09-24T10:00:00.000Z", "durationMs": 4200, "maxScrollDepth": 80, "viewportWidth": 1440, "viewportHeight": 900, "language": "en-US", "timezone": "UTC", "continuation": false } ] }
+```
+
+The body is `text/plain`, not JSON, because a cross-origin `Authorization` header would force a
+CORS preflight that `navigator.sendBeacon` and an unload-time `fetch` cannot rely on. Up to 50
+visits and 64 KB per request. Identity, IP address and user agent are taken from the verified
+token and the request, never from the body. Responses:
+
+| Status | Meaning |
+|---|---|
+| 204 | Accepted; an empty `visits` array still refreshes presence |
+| 400 | Body is not valid JSON, or fails the visit schema |
+| 401 | Missing, invalid or expired ingest token |
+| 413 | Body exceeds 64 KB |
+| 415 | `Content-Type` is not `text/plain` |
+| 429 | More than 240 requests/minute from the caller's IP |
+
+## Summary
+
+```http
+GET /analytics/summary?organizationId={id}&projectId={id}&from=2026-08-25&to=2026-09-24
+```
+
+`from`/`to` are UTC `YYYY-MM-DD` dates, `to` inclusive, defaulting to the last 30 days, with a
+366-day maximum span.
+
+```json
+{
+  "range": { "from": "2026-08-25", "to": "2026-09-24" },
+  "users": { "total": 42 },
+  "activeNow": 3,
+  "activeUsers": { "dau": 12, "wau": 30, "mau": 40 },
+  "logins": { "total": 58, "unique": 20, "failed": 4 },
+  "comments": { "total": 15 },
+  "annotations": {
+    "total": 90,
+    "byStatus": { "open": 20, "re-open": 5, "dev-inprogress": 10, "completed": 40, "closed": 15 }
+  },
+  "visits": { "total": 320 }
+}
+```
+
+## Page visits
+
+```http
+GET /analytics/pages?organizationId={id}&projectId={id}&from=2026-08-25&to=2026-09-24&limit=50&offset=0
+```
+
+`limit` is 1–200 (default 50). Rows are ordered by visits descending, then project id, then page
+key; `total` is only computed on the first page (`offset=0`).
+
+```json
+{
+  "pages": [
+    { "projectId": "proj_123", "pageKey": "/board", "visits": 120, "totalDurationMs": 480000, "avgDurationMs": 4000 }
+  ],
+  "total": 34,
+  "limit": 50,
+  "offset": 0
+}
+```
+
+## Trends
+
+```http
+GET /analytics/trends?organizationId={id}&projectId={id}&from=2026-08-25&to=2026-09-24
+```
+
+One entry per UTC day in the range, zero-filled where a day has no rows.
+
+```json
+{
+  "days": [
+    { "day": "2026-08-25", "visits": 12, "logins": 3, "comments": 1 },
+    { "day": "2026-08-26", "visits": 0, "logins": 0, "comments": 0 }
+  ]
+}
+```
+
+## Top users
+
+```http
+GET /analytics/users?organizationId={id}&projectId={id}&from=2026-08-25&to=2026-09-24&limit=50&offset=0
+```
+
+`limit` is 1–200 (default 50). Rows are ordered by visits descending, then user id; `total` is
+only computed on the first page (`offset=0`).
+
+```json
+{
+  "users": [
+    { "userId": "6ba7b812-9dad-11d1-80b4-00c04fd430c8", "userName": "Sarath", "visits": 40, "activeDays": 6, "lastVisitDay": "2026-09-24" }
+  ],
+  "total": 12,
+  "limit": 50,
+  "offset": 0
+}
+```
+
+## Visit log
+
+```http
+GET /analytics/visits?organizationId={id}&projectId={id}&from=2026-08-25&to=2026-09-24&userId={id}&pageKey=/board&limit=50&offset=0
+```
+
+`userId` and `pageKey` are optional filters. `limit` is 1–200 (default 50); `limit=201` is a `400`.
+Rows are the raw visit log, ordered by `visitId` descending.
+
+```json
+{
+  "visits": [
+    {
+      "visitId": "482910",
+      "sessionId": "s1t2u3v4",
+      "userId": "6ba7b812-9dad-11d1-80b4-00c04fd430c8",
+      "userName": "Sarath",
+      "organizationId": "6ba7b811-9dad-11d1-80b4-00c04fd430c8",
+      "projectId": "proj_123",
+      "pageKey": "/board",
+      "urlPath": "/board",
+      "title": "Board",
+      "referrer": null,
+      "enteredAt": "2026-09-24T10:00:00.000Z",
+      "durationMs": 4200,
+      "maxScrollDepth": 80,
+      "viewportWidth": 1440,
+      "viewportHeight": 900,
+      "language": "en-US",
+      "timezone": "UTC",
+      "isContinuation": false,
+      "ipAddress": "203.0.113.4",
+      "userAgent": "Mozilla/5.0 ...",
+      "receivedAt": "2026-09-24T10:00:04.200Z"
+    }
+  ],
+  "total": 320,
+  "limit": 50,
+  "offset": 0
+}
+```
+
+## Visit log export
+
+```http
+GET /analytics/visits/export?organizationId={id}&projectId={id}&from=2026-08-25&to=2026-09-24&userId={id}&pageKey=/board
+```
+
+Same filters as the visit log, without pagination. Streams `text/csv; charset=utf-8` with
+`Content-Disposition: attachment; filename="page-visits-<from>-<to>.csv"` — a header row followed
+by every matching visit. Formula-leading cells are neutralized. The library's own client fetches
+this through `requestBlob`, since the response is a file rather than JSON, and records an
+`analytics.visits-exported` audit row before it starts streaming.
+
+## Analytics live updates (SSE)
+
+The dashboard opens a stream that says "something changed, refetch" rather than carrying rows.
+A connection takes two steps: mint a single-use ticket with the bearer token, then open the
+stream with that ticket in the query string, since `EventSource` cannot send headers.
+
+```http
+POST /analytics/events/ticket?organizationId={id}&projectId={id}
+```
+
+Both filters are optional and become the stream's scope; the date range is not part of it. A
+filter change mints a new ticket and opens a new stream.
+
+```json
+{ "ticket": "<opaque string>", "expiresInSeconds": 60 }
+```
+
+```http
+GET /analytics/events?ticket={ticket}
+```
+
+A ticket is redeemed once and expires after 60 seconds, so every reconnect mints a fresh one.
+The response is `text/event-stream`. It starts with a `retry:` hint and a `ready` event, then
+sends change events as they occur, with a `: keep-alive` comment every 25 seconds. Events carry
+no `id`, and there is no replay: a reconnect is followed by a full refetch.
+
+| Event | Data | Meaning |
+|---|---|---|
+| `ready` | `{}` | The stream is subscribed |
+| `analytics.changed` | `{ "kinds": ["visits", "logins"] }` | Data in the stream's scope changed |
+| `resync` | `{}` | Changes may have been missed; refetch everything |
+
+The server coalesces changes into one `analytics.changed` event per scope every 5 seconds at
+most. It sends `resync` after its database listener reconnects, when a slow client's buffer
+drains, or when too many changes arrive in one window. The client maps each kind to the
+dashboard sections it refetches:
+
+| Kind | Sections refetched |
+|---|---|
+| `visits` | Summary, page visits, trends, top pages, top users, visit log |
+| `presence` | Summary |
+| `logins` | Summary, trends |
+
+An unknown kind or malformed payload is ignored. A reconnect after the first successful open
+refetches every section.
+
+| Status | Route | Cause |
+|---|---|---|
+| `401` | both | Missing or invalid bearer token on the ticket request; missing, expired or already-used ticket on the stream |
+| `403` | both | The actor is not a `super_admin` |
+| `503` | stream | Subscriber capacity or the per-user limit of 5 connections is reached (`{ "message": "Live update capacity reached; retry shortly." }` or `{ "message": "Live update connection limit reached for this user." }`) |
+
+The library stops retrying after a `401`, `403` or `503` on the ticket request and shows "Live
+updates off" until the tab comes back online or becomes visible; any other failure retries with
+a backoff from 2 to 30 seconds. The stream carries no PII: events contain only change kinds,
+never a user id, name, IP address, page key or row data, and the ticket is never logged.

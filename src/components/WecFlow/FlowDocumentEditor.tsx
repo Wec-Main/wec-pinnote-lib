@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { FlowEditor } from "./flowchart";
+import { FlowEditor } from "./FlowEditor";
 import { FlowCanvasSkeleton } from "./FlowCanvasSkeleton";
 import { Icon, Spinner } from "../primitives";
 import type { FlowDocumentState, FlowSaveState } from "../../hooks/useFlowDocument";

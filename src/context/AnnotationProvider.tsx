@@ -1,12 +1,14 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import "../styles/annotation.css";
+import "../styles/flowchart.css";
 import { AnnotationErrorBoundary } from "../components/AnnotationErrorBoundary";
 import { AnnotationLayer } from "../components/AnnotationLayer";
 import { useAnnotationApi } from "../hooks/useAnnotationApi";
 import { useAuthSessions } from "../hooks/useAuthSessions";
 import { useAnnotationCollection } from "../hooks/useAnnotations";
 import { usePageKey } from "../hooks/usePageKey";
+import { usePageVisitTracker } from "../hooks/usePageVisitTracker";
 import type {
   AnnotationAnchor,
   AnnotationConfig,
@@ -32,6 +34,7 @@ import { useSharedFetch } from "../hooks/useSharedFetch";
 import { useTokenGetter } from "../hooks/useTokenGetter";
 import { fetchTags } from "../services/tagsApi";
 import { createClientId } from "../utils/format";
+import { isTrackingEnabled } from "../utils/pageVisitQueue";
 import type { ProjectTag } from "../types/tag.types";
 
 const DEFAULT_Z_INDEX = 2147483000;
@@ -226,6 +229,15 @@ export function AnnotationProvider({ config, children }: AnnotationProviderProps
     getAuthToken: activeConfig.getAuthToken,
     sessionKey,
     enabled: authenticated,
+  });
+
+  usePageVisitTracker({
+    apiBaseUrl: activeConfig.apiBaseUrl,
+    projectId,
+    pageKey,
+    enabled: isTrackingEnabled(resolved.trackPageVisits, authenticated),
+    getAuthToken: activeConfig.getAuthToken,
+    sessionKey,
   });
 
   const getProjectTagsToken = useTokenGetter(activeConfig.getAuthToken);

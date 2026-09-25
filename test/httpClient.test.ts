@@ -3,6 +3,7 @@ import {
   UNAUTHORIZED_EVENT,
   readErrorMessage,
   reportUnauthorized,
+  requestBlob,
 } from "../src/services/httpClient";
 
 const TOKEN = "signed.jwt.token";
@@ -57,5 +58,33 @@ describe("reportUnauthorized", () => {
     reportUnauthorized(500, TOKEN);
     reportUnauthorized(401, undefined);
     expect(received).toEqual([]);
+  });
+});
+
+describe("requestBlob", () => {
+  it("returns the response body as a Blob on 200", async () => {
+    const body = new Blob(["visitId,sessionId\n1,s1\n"], { type: "text/csv" });
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(new Response(body, { status: 200, headers: { "Content-Type": "text/csv" } })),
+    );
+
+    const result = await requestBlob("https://api.example.com/analytics/visits/export", TOKEN);
+
+    expect(result).toBeInstanceOf(Blob);
+    expect(await result.text()).toBe("visitId,sessionId\n1,s1\n");
+  });
+
+  it("throws and dispatches UNAUTHORIZED_EVENT on 401", async () => {
+    const received = stubWindow();
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401 })),
+    );
+
+    await expect(requestBlob("https://api.example.com/analytics/visits/export", TOKEN)).rejects.toMatchObject({
+      status: 401,
+    });
+    expect(received).toEqual([TOKEN]);
   });
 });

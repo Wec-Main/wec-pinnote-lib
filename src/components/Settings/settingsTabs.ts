@@ -2,7 +2,7 @@ import type { IconName } from "../primitives";
 import type { UserManagementRole } from "../../types/userManagement.types";
 import { canManageOrganizations, canManageTags } from "../../utils/permissions";
 
-export type SettingsTab = "users" | "organizations" | "projects" | "tags" | "audit";
+export type SettingsTab = "users" | "organizations" | "projects" | "tags" | "audit" | "dashboard";
 
 interface SettingsTabDefinition {
   id: SettingsTab;
@@ -16,6 +16,7 @@ const ALL_TABS: SettingsTabDefinition[] = [
   { id: "projects", label: "Projects", icon: "folder" },
   { id: "tags", label: "Tags", icon: "epic" },
   { id: "audit", label: "Audit history", icon: "history" },
+  { id: "dashboard", label: "Dashboard", icon: "layers" },
 ];
 
 export function visibleSettingsTabs(role: UserManagementRole): SettingsTabDefinition[] {

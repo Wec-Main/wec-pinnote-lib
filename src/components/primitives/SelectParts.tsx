@@ -9,6 +9,8 @@ interface SelectTriggerProps {
   placeholder: string;
   ariaLabel: string;
   disabled?: boolean;
+  listboxId?: string;
+  activeDescendant?: string;
   onToggle: () => void;
 }
 
@@ -20,6 +22,8 @@ export function SelectTrigger({
   placeholder,
   ariaLabel,
   disabled = false,
+  listboxId,
+  activeDescendant,
   onToggle,
 }: SelectTriggerProps) {
   return (
@@ -33,6 +37,8 @@ export function SelectTrigger({
       aria-haspopup="listbox"
       aria-expanded={open}
       aria-label={ariaLabel}
+      aria-controls={open ? listboxId : undefined}
+      aria-activedescendant={activeDescendant}
       disabled={disabled}
       onClick={onToggle}
     >

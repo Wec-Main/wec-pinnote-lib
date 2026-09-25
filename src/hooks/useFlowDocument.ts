@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { fetchFlowDocument, publishFlow, saveFlowDocument } from "../services/flowApi";
-import { parseFlow, type FlowJSON } from "../components/WecFlow/flowchart";
+import type { FlowJSON } from "../types/flowchart.types";
+import { parseFlow } from "../utils/flowchart/serialization";
 import { AnnotationApiError } from "../types/annotation.types";
 import { useTokenGetter } from "./useTokenGetter";
 

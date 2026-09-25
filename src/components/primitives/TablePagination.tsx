@@ -125,7 +125,7 @@ export function TablePagination({
           value={String(pageSize)}
           onChange={(next) => onPageSizeChange(Number(next))}
           ariaLabel="Rows per page"
-          searchPlaceholder="Search"
+          searchable={false}
           size="sm"
         />
       </div>

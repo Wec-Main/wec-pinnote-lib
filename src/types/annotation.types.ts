@@ -145,6 +145,7 @@ export interface AnnotationConfig extends AnnotationEventCallbacks {
   showResolved?: boolean;
   apiClient?: AnnotationApiClient;
   authClient?: AuthApiClient;
+  trackPageVisits?: boolean;
 }
 
 export interface ResolvedAnnotationConfig extends AnnotationConfig {
