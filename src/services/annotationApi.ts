@@ -9,7 +9,7 @@ import {
   type UpdateAnnotationRequest,
   type UpdateCommentRequest,
 } from "../types/annotation.types";
-import { buildUrl, request, requestNoContent, type QueryValue } from "./httpClient";
+import { buildUrl, request, requestNoContent, withUnauthorizedRetry, type QueryValue } from "./httpClient";
 import { isAnnotation } from "../utils/streamPayloadGuards";
 
 const PATHS = {
@@ -47,13 +47,14 @@ export function createAnnotationApi(
     path: string,
     options: { query?: Record<string, QueryValue>; body?: unknown; signal?: AbortSignal } = {},
   ): Promise<T> {
-    const token = config.getAuthToken ? await config.getAuthToken() : undefined;
     const url = buildUrl(config.apiBaseUrl, path, options.query);
-    return request<T>(url, token, {
-      method,
-      body: options.body === undefined ? undefined : JSON.stringify(options.body),
-      signal: options.signal,
-    });
+    return withUnauthorizedRetry(config.getAuthToken, (token) =>
+      request<T>(url, token, {
+        method,
+        body: options.body === undefined ? undefined : JSON.stringify(options.body),
+        signal: options.signal,
+      }),
+    );
   }
 
   async function callNoContent(
@@ -61,13 +62,14 @@ export function createAnnotationApi(
     path: string,
     options: { query?: Record<string, QueryValue>; body?: unknown; signal?: AbortSignal } = {},
   ): Promise<void> {
-    const token = config.getAuthToken ? await config.getAuthToken() : undefined;
     const url = buildUrl(config.apiBaseUrl, path, options.query);
-    return requestNoContent(url, token, {
-      method,
-      body: options.body === undefined ? undefined : JSON.stringify(options.body),
-      signal: options.signal,
-    });
+    return withUnauthorizedRetry(config.getAuthToken, (token) =>
+      requestNoContent(url, token, {
+        method,
+        body: options.body === undefined ? undefined : JSON.stringify(options.body),
+        signal: options.signal,
+      }),
+    );
   }
 
   return {

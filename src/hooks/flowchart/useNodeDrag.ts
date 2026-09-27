@@ -3,6 +3,8 @@ import type { Rect, XYPosition } from "../../types/flowchart.types";
 import { snapToAlignment } from "../../utils/flowchart/alignment";
 import { getBounds } from "../../utils/flowchart/geometry";
 import { useFlowContext } from "../../context/FlowContext";
+import { dropTargetEdgeStore } from "../../components/WecFlow/EdgeRenderer";
+import { useEdgeDropTarget } from "./useEdgeDropTarget";
 import { usePointerDrag } from "./usePointerDrag";
 
 const GUIDE_THRESHOLD_PX = 6;
@@ -11,6 +13,7 @@ const GUIDE_CANDIDATE_LIMIT = 200;
 export function useNodeDrag(nodeId: string) {
   const { engine, canvasRef } = useFlowContext();
   const startDrag = usePointerDrag();
+  const edgeDropAtPoint = useEdgeDropTarget();
 
   return useCallback(
     (e: React.PointerEvent) => {
@@ -34,6 +37,11 @@ export function useNodeDrag(nodeId: string) {
       const startBounds = getBounds(
         nodes.filter((n) => selectedNodeIds.has(n.id)).map((n) => engine.getNodeRect(n)),
       );
+
+      // A single node can be dropped onto a connection to be spliced into it.
+      // Its own edges stay untouched; the connection's ends rewire through it.
+      const draggingIds = new Set(Object.keys(starts));
+      const spliceCandidate = draggingIds.size === 1;
 
       startDrag(e, {
         onStart: () => engine.beginInteraction(),
@@ -59,17 +67,31 @@ export function useNodeDrag(nodeId: string) {
             positions[id] = useGuides ? next : engine.snap(next);
           }
           engine.setNodePositions(positions);
+          if (spliceCandidate) {
+            dropTargetEdgeStore.set(
+              edgeDropAtPoint(ev.clientX, ev.clientY, { excludeNodeIds: draggingIds }),
+            );
+          }
         },
-        onEnd: (_ev, moved) => {
+        onEnd: (ev, moved) => {
           engine.setGuides([]);
-          if (moved) engine.endInteraction();
+          const target = spliceCandidate
+            ? edgeDropAtPoint(ev.clientX, ev.clientY, { excludeNodeIds: draggingIds })
+            : null;
+          dropTargetEdgeStore.set(null);
+          if (!moved) return;
+          if (target) {
+            engine.insertExistingNodeOnEdge(target.edgeId, nodeId);
+          }
+          engine.endInteraction();
         },
         onCancel: (moved) => {
           engine.setGuides([]);
+          dropTargetEdgeStore.set(null);
           if (moved) engine.endInteraction();
         },
       });
     },
-    [engine, canvasRef, nodeId, startDrag],
+    [engine, canvasRef, edgeDropAtPoint, nodeId, startDrag],
   );
 }

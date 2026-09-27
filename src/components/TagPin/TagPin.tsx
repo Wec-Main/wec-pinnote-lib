@@ -1,4 +1,5 @@
 import { useCallback, useState } from "react";
+import { createPortal } from "react-dom";
 import { Icon, Tooltip } from "../primitives";
 import { usePointerDrag } from "../../hooks/flowchart/usePointerDrag";
 import { useAnnotationContext } from "../../context/AnnotationContext";
@@ -56,7 +57,7 @@ export function TagPin({
   canEdit = false,
   tagId,
 }: TagPinProps) {
-  const { projectTags } = useAnnotationContext();
+  const { config, projectTags } = useAnnotationContext();
   const startDrag = usePointerDrag();
   const [dragging, setDragging] = useState(false);
   const [editing, setEditing] = useState(false);
@@ -214,16 +215,21 @@ export function TagPin({
             />
           ))
         : null}
-      {editing ? (
-        <TagPicker
-          x={x}
-          y={y}
-          title={`Edit ${name}`}
-          initialTagId={initialTagId}
-          onSelectTag={handleTagPicked}
-          onCancel={() => setEditing(false)}
-        />
-      ) : null}
+      {editing
+        ? createPortal(
+            <div className="wpn-root wpn-tag-picker-portal" style={{ zIndex: config.zIndex }}>
+              <TagPicker
+                x={x}
+                y={y}
+                title={`Edit ${name}`}
+                initialTagId={initialTagId}
+                onSelectTag={handleTagPicked}
+                onCancel={() => setEditing(false)}
+              />
+            </div>,
+            document.body,
+          )
+        : null}
     </span>
   );
 }

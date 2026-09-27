@@ -684,6 +684,27 @@ export class FlowEngine {
     return true;
   }
 
+  /**
+   * Rewires an existing node into a connection: the edge is replaced by
+   * source -> node -> target. The node keeps its current position.
+   */
+  insertExistingNodeOnEdge(edgeId: string, nodeId: string): boolean {
+    const s = this.getState();
+    const edge = s.edgeLookup.get(edgeId);
+    if (!edge || !s.nodeLookup.has(nodeId)) return false;
+    if (edge.source === nodeId || edge.target === nodeId) return false;
+    this.removeEdges([edgeId]);
+    const first = this.addEdge(
+      { source: edge.source, sourceHandle: edge.sourceHandle, target: nodeId },
+      { type: edge.type, label: edge.label, animated: edge.animated },
+    );
+    const second = this.addEdge(
+      { source: nodeId, target: edge.target, targetHandle: edge.targetHandle },
+      { type: edge.type, animated: edge.animated },
+    );
+    return Boolean(first || second);
+  }
+
   insertNodeOnEdge(edgeId: string, type: string, at?: XYPosition): FlowNode | null {
     const s = this.getState();
     const edge = s.edgeLookup.get(edgeId);

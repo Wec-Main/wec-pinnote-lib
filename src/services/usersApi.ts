@@ -1,5 +1,7 @@
-import { buildUrl, request, requestNoContent } from "./httpClient";
+import { buildUrl, request, requestNoContent, withUnauthorizedRetry } from "./httpClient";
 import type { ManagedUser, ManagedUserDraft } from "../types/userManagement.types";
+
+type AuthTokenGetter = () => string | Promise<string>;
 
 export interface UserListQuery {
   projectId: string;
@@ -42,13 +44,14 @@ function usersQuery(query: UserListQuery): Record<string, string | undefined> {
 
 export function fetchUsers(
   apiBaseUrl: string,
-  authToken: string | undefined,
+  getAuthToken: AuthTokenGetter | undefined,
   query: UserListQuery,
   signal?: AbortSignal,
 ): Promise<UserPage> {
-  return request<UserPage>(buildUrl(apiBaseUrl, "/users", usersQuery(query)), authToken, {
-    signal,
-  });
+  const url = buildUrl(apiBaseUrl, "/users", usersQuery(query));
+  return withUnauthorizedRetry(getAuthToken, (token) =>
+    request<UserPage>(url, token, { signal }),
+  );
 }
 
 function toPayload(projectId: string, draft: ManagedUserDraft) {
@@ -63,65 +66,66 @@ function toUpdatePayload(projectId: string, draft: ManagedUserDraft) {
 
 export function createUser(
   apiBaseUrl: string,
-  authToken: string | undefined,
+  getAuthToken: AuthTokenGetter | undefined,
   projectId: string,
   draft: ManagedUserDraft,
   signal?: AbortSignal,
 ): Promise<CreatedUser> {
-  return request<CreatedUser>(buildUrl(apiBaseUrl, "/users"), authToken, {
-    method: "POST",
-    body: JSON.stringify(toPayload(projectId, draft)),
-    signal,
-  });
+  const url = buildUrl(apiBaseUrl, "/users");
+  return withUnauthorizedRetry(getAuthToken, (token) =>
+    request<CreatedUser>(url, token, {
+      method: "POST",
+      body: JSON.stringify(toPayload(projectId, draft)),
+      signal,
+    }),
+  );
 }
 
 export function updateUser(
   apiBaseUrl: string,
-  authToken: string | undefined,
+  getAuthToken: AuthTokenGetter | undefined,
   projectId: string,
   userId: string,
   draft: ManagedUserDraft,
   signal?: AbortSignal,
 ): Promise<ManagedUser> {
-  return request<ManagedUser>(
-    buildUrl(apiBaseUrl, `/users/${encodeURIComponent(userId)}`),
-    authToken,
-    {
+  const url = buildUrl(apiBaseUrl, `/users/${encodeURIComponent(userId)}`);
+  return withUnauthorizedRetry(getAuthToken, (token) =>
+    request<ManagedUser>(url, token, {
       method: "PUT",
       body: JSON.stringify(toUpdatePayload(projectId, draft)),
       signal,
-    },
+    }),
   );
 }
 
 export function deleteUser(
   apiBaseUrl: string,
-  authToken: string | undefined,
+  getAuthToken: AuthTokenGetter | undefined,
   projectId: string,
   userId: string,
   signal?: AbortSignal,
 ): Promise<void> {
-  return requestNoContent(
-    buildUrl(apiBaseUrl, `/users/${encodeURIComponent(userId)}`, { projectId }),
-    authToken,
-    {
-      method: "DELETE",
-      signal,
-    },
+  const url = buildUrl(apiBaseUrl, `/users/${encodeURIComponent(userId)}`, { projectId });
+  return withUnauthorizedRetry(getAuthToken, (token) =>
+    requestNoContent(url, token, { method: "DELETE", signal }),
   );
 }
 
 export function resetUserPassword(
   apiBaseUrl: string,
-  authToken: string | undefined,
+  getAuthToken: AuthTokenGetter | undefined,
   projectId: string,
   userId: string,
   password?: string,
   signal?: AbortSignal,
 ): Promise<PasswordReset> {
-  return request<PasswordReset>(
-    buildUrl(apiBaseUrl, `/users/${encodeURIComponent(userId)}/password-reset`),
-    authToken,
-    { method: "POST", body: JSON.stringify({ projectId, password }), signal },
+  const url = buildUrl(apiBaseUrl, `/users/${encodeURIComponent(userId)}/password-reset`);
+  return withUnauthorizedRetry(getAuthToken, (token) =>
+    request<PasswordReset>(url, token, {
+      method: "POST",
+      body: JSON.stringify({ projectId, password }),
+      signal,
+    }),
   );
 }

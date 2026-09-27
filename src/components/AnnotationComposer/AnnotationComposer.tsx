@@ -1,6 +1,7 @@
 import { useRef, useState, type FormEvent } from "react";
 import { useAnnotationData, useAnnotationUi } from "../../context/AnnotationContext";
 import { useFloatingPanel } from "../../hooks/useAnnotationPosition";
+import { usePointerDrag } from "../../hooks/flowchart/usePointerDrag";
 import {
   COMMENT_MAX_LENGTH,
   type AnnotationStatus,
@@ -13,6 +14,10 @@ import { ComposerHint, ComposerHintInfo } from "../ComposerHint";
 import { MentionTextarea } from "../MentionTextarea";
 import { Icons } from "../../assets/icons";
 import { Tooltip } from "../primitives";
+
+const DEFAULT_COMPOSER_WIDTH = 460;
+const MIN_COMPOSER_WIDTH = 320;
+const MAX_COMPOSER_WIDTH_MARGIN = 32;
 
 interface AnnotationComposerProps {
   x: number;
@@ -43,7 +48,23 @@ function DraftComposer({ draft, x, y }: DraftComposerProps) {
   const [labelValue, setLabelValue] = useState("");
   const [focused, setFocused] = useState(false);
   const [hovered, setHovered] = useState(false);
+  const [width, setWidth] = useState<number | null>(null);
+  const startDrag = usePointerDrag();
   const candidates = useMentionCandidates();
+
+  const startWidthDrag = (event: React.PointerEvent) => {
+    if (event.button !== 0) {
+      return;
+    }
+    event.stopPropagation();
+    const startWidth = panelRef.current?.offsetWidth ?? DEFAULT_COMPOSER_WIDTH;
+    const maxWidth = window.innerWidth - MAX_COMPOSER_WIDTH_MARGIN;
+    startDrag(event, {
+      onMove: (_ev, delta) => {
+        setWidth(Math.min(maxWidth, Math.max(MIN_COMPOSER_WIDTH, startWidth + delta.x)));
+      },
+    });
+  };
 
   const changeMessage = (next: string) => {
     setMessage(next);
@@ -82,8 +103,13 @@ function DraftComposer({ draft, x, y }: DraftComposerProps) {
     <div
       ref={panelRef}
       className="wpn-panel wpn-composer"
-      style={{ left: placement.left, top: placement.top }}
+      style={{ left: placement.left, top: placement.top, width: width ?? undefined }}
     >
+      <div
+        className="wpn-composer__resize-e"
+        role="presentation"
+        onPointerDown={startWidthDrag}
+      />
       <div className="wpn-panel__header">
         <span className="wpn-panel__title-group">
           {editingLabel ? (

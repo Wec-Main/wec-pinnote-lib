@@ -51,7 +51,7 @@ function errorMessage(error: unknown): string {
 export function UserManagementPanel() {
   const { config, activeAccount, reloadLoginOptions } = useAnnotationContext();
   const actorId = activeAccount?.id;
-  const authToken = activeAccount?.token;
+  const getAuthToken = config.getAuthToken;
   const actorRole = activeAccount?.roleId ?? "developer";
   const selfOnly = userScopeFor(actorRole) === "self";
   const mayCreate = canCreateUsers(actorRole);
@@ -91,7 +91,7 @@ export function UserManagementPanel() {
 
     fetchUsers(
       config.apiBaseUrl,
-      authToken,
+      getAuthToken,
       {
         projectId: config.projectId,
         search: searchQuery || undefined,
@@ -121,7 +121,8 @@ export function UserManagementPanel() {
   }, [
     config.apiBaseUrl,
     config.projectId,
-    authToken,
+    getAuthToken,
+    actorId,
     searchQuery,
     roleFilter,
     statusFilter,
@@ -176,7 +177,7 @@ export function UserManagementPanel() {
     setNotice(null);
     setFieldErrors(null);
     try {
-      await updateUser(config.apiBaseUrl, authToken, config.projectId, editTarget.id, draft);
+      await updateUser(config.apiBaseUrl, getAuthToken, config.projectId, editTarget.id, draft);
       setNotice(`${draft.firstName} ${draft.lastName} updated.`);
       setFormOpen(false);
       setEditTarget(null);
@@ -198,7 +199,7 @@ export function UserManagementPanel() {
     try {
       const result = await resetUserPassword(
         config.apiBaseUrl,
-        authToken,
+        getAuthToken,
         config.projectId,
         resetTarget.id,
         password,
@@ -229,11 +230,11 @@ export function UserManagementPanel() {
     try {
       if (pending.kind === "delete") {
         const { user } = pending;
-        await deleteUser(config.apiBaseUrl, authToken, config.projectId, user.id);
+        await deleteUser(config.apiBaseUrl, getAuthToken, config.projectId, user.id);
         setNotice(`${user.firstName} ${user.lastName} deleted.`);
       } else {
         const { draft } = pending;
-        const created = await createUser(config.apiBaseUrl, authToken, config.projectId, draft);
+        const created = await createUser(config.apiBaseUrl, getAuthToken, config.projectId, draft);
         setNotice(`${draft.firstName} ${draft.lastName} created.`);
         if (created.generatedPassword) {
           setGeneratedPassword({

@@ -811,7 +811,33 @@ body.wpn-mode-active {
 
 .wpn-thread-panel,
 .wpn-composer {
-  width: 360px;
+  width: 460px;
+}
+
+.wpn-composer__resize-e {
+  position: absolute;
+  top: 0;
+  right: -6px;
+  bottom: 0;
+  width: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: ew-resize;
+  touch-action: none;
+  z-index: 4;
+}
+
+.wpn-composer__resize-e::before {
+  content: "";
+  width: 4px;
+  height: 36px;
+  border-radius: 3px;
+  background: rgba(255, 255, 255, 0.22);
+}
+
+.wpn-composer__resize-e:hover::before {
+  background: rgba(255, 255, 255, 0.4);
 }
 
 .wpn-thread-panel .wpn-panel__header,
@@ -1359,9 +1385,9 @@ body.wpn-mode-active {
   padding: 9px 11px;
   font-size: 12px;
   border-radius: 12px;
-  resize: none;
-  min-height: 56px;
-  max-height: 180px;
+  resize: vertical;
+  min-height: 160px;
+  max-height: min(480px, calc(100vh - 160px));
   overflow-y: auto;
 }
 
@@ -5187,6 +5213,12 @@ body.wpn-epicflow-resizing {
   pointer-events: none;
 }
 
+.wpn-tag-picker-portal {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+}
+
 .wpn-login-dialog {
   width: min(348px, calc(100vw - 32px));
   max-height: none;
@@ -6577,6 +6609,22 @@ body.wpn-epicflow-resizing {
 .wpn-overlay--paused {
   pointer-events: none;
   cursor: default;
+}
+
+.wpn-refocus-grace {
+  position: fixed;
+  top: 12px;
+  left: 12px;
+  z-index: 2147483001;
+  padding: 6px 12px;
+  border-radius: 8px;
+  background: rgba(15, 23, 42, 0.88);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.3;
+  box-shadow: 0 8px 22px rgba(2, 6, 23, 0.35);
+  pointer-events: none;
 }
 
 .wpn-tag-pin {

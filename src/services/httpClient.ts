@@ -148,3 +148,23 @@ export async function requestBlob(
   const response = await send(url, authToken, init, policy);
   return response.blob();
 }
+
+function isUnauthorizedError(error: unknown): boolean {
+  return error instanceof AnnotationApiError && error.status === UNAUTHORIZED_STATUS;
+}
+
+export async function withUnauthorizedRetry<T>(
+  getAuthToken: (() => string | Promise<string>) | undefined,
+  attempt: (token: string | undefined) => Promise<T>,
+): Promise<T> {
+  const token = getAuthToken ? await getAuthToken() : undefined;
+  try {
+    return await attempt(token);
+  } catch (err) {
+    if (!isUnauthorizedError(err) || !getAuthToken) {
+      throw err;
+    }
+    const retryToken = await getAuthToken();
+    return attempt(retryToken);
+  }
+}

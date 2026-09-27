@@ -304,6 +304,16 @@ export function AnnotationProvider({ config, children }: AnnotationProviderProps
     [cancelTagDraft, setFlowPinHookModeEnabled, setModeEnabled, setTagHookModeEnabled],
   );
 
+  const cancelTagDraftAndMode = useCallback(() => {
+    cancelTagDraft();
+    setTagHookModeEnabled(false);
+  }, [cancelTagDraft, setTagHookModeEnabled]);
+
+  const cancelFlowPinDraftAndMode = useCallback(() => {
+    cancelFlowPinDraft();
+    setFlowPinHookModeEnabled(false);
+  }, [cancelFlowPinDraft, setFlowPinHookModeEnabled]);
+
   const draftRef = useRef(draft);
   draftRef.current = draft;
   const draftMessageRef = useRef("");
@@ -501,6 +511,7 @@ export function AnnotationProvider({ config, children }: AnnotationProviderProps
   const cancelDraft = useCallback(() => {
     clearDraft();
     setDiscardPrompt(null);
+    setModeEnabledState(false);
   }, [clearDraft]);
 
   const requestCancelDraft = useCallback(() => {
@@ -703,14 +714,14 @@ export function AnnotationProvider({ config, children }: AnnotationProviderProps
       setTagsVisible,
       tagDraft,
       startTagDraft,
-      cancelTagDraft,
+      cancelTagDraft: cancelTagDraftAndMode,
       flowPinModeEnabled,
       setFlowPinModeEnabled,
       flowPinsVisible,
       setFlowPinsVisible,
       flowPinDraft,
       startFlowPinDraft,
-      cancelFlowPinDraft,
+      cancelFlowPinDraft: cancelFlowPinDraftAndMode,
       submitFlowPinDraft,
       removeFlowPin,
       selectedFlowPinId,
@@ -749,14 +760,14 @@ export function AnnotationProvider({ config, children }: AnnotationProviderProps
       setTagsVisible,
       tagDraft,
       startTagDraft,
-      cancelTagDraft,
+      cancelTagDraftAndMode,
       flowPinModeEnabled,
       setFlowPinModeEnabled,
       flowPinsVisible,
       setFlowPinsVisible,
       flowPinDraft,
       startFlowPinDraft,
-      cancelFlowPinDraft,
+      cancelFlowPinDraftAndMode,
       submitFlowPinDraft,
       removeFlowPin,
       selectedFlowPinId,

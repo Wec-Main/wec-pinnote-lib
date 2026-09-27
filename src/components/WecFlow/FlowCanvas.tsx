@@ -3,17 +3,8 @@ import { useFlowContext, useFlowState } from "../../context/FlowContext";
 import { useKeyboardShortcuts } from "../../hooks/flowchart/useKeyboardShortcuts";
 import { usePointerDrag } from "../../hooks/flowchart/usePointerDrag";
 import { NODE_DRAG_MIME } from "../../utils/flowchart/constants";
-import {
-  findHandle,
-  flowToScreen,
-  getHandlePosition,
-  rectFromPoints,
-} from "../../utils/flowchart/geometry";
-import { getStepPoints } from "../../utils/flowchart/edgePaths";
-import {
-  findEdgeDropTarget,
-  type EdgeSegment,
-} from "../../utils/flowchart/edgeDropTarget";
+import { rectFromPoints } from "../../utils/flowchart/geometry";
+import { useEdgeDropTarget } from "../../hooks/flowchart/useEdgeDropTarget";
 import { cx } from "../../utils/flowchart/shallow";
 import { ContextMenu, type ContextMenuRequest, type ContextMenuTarget } from "./ContextMenu";
 import {
@@ -22,7 +13,6 @@ import {
   EdgeLabelRenderer,
   EdgeRenderer,
   useDropTargetEdge,
-  type EdgeDropTarget,
 } from "./EdgeRenderer";
 import { NodeRenderer } from "./NodeRenderer";
 import { Icon } from "./FlowIcons";
@@ -40,8 +30,6 @@ export interface FlowCanvasProps {
 
   children?: ReactNode;
 }
-
-const EDGE_DROP_TOLERANCE_PX = 28;
 
 /** "+" badge shown on the connection a dragged node would be inserted into. */
 const EdgeDropIndicator = memo(function EdgeDropIndicator() {
@@ -166,6 +154,7 @@ export function FlowCanvas({
   children,
 }: FlowCanvasProps) {
   const { engine, canvasRef, clientToCanvas, clientToFlow } = useFlowContext();
+  const edgeDropAtPoint = useEdgeDropTarget();
   const readOnly = useFlowState((s) => s.readOnly);
   const [mode, setMode] = useState<CanvasMode>("pan");
   const [panning, setPanning] = useState(false);
@@ -297,44 +286,6 @@ export function FlowCanvas({
     }
     onSpaceKey(e);
     if (keyboardShortcuts) onKeyDown(e);
-  };
-
-  // Works purely from graph state: during an HTML5 drag the pointer is over the
-  // drag image, so DOM hit-testing at the cursor cannot be relied on here.
-  const edgeDropAtPoint = (clientX: number, clientY: number): EdgeDropTarget | null => {
-    const state = engine.getState();
-    const segments: EdgeSegment[] = [];
-    for (const edge of state.edges) {
-      const sourceNode = state.nodeLookup.get(edge.source);
-      const targetNode = state.nodeLookup.get(edge.target);
-      if (!sourceNode || !targetNode) continue;
-      const sourceDef = engine.getDefinition(sourceNode.type);
-      const targetDef = engine.getDefinition(targetNode.type);
-      const sourceHandle =
-        findHandle(sourceDef, "source", edge.sourceHandle) ?? findHandle(sourceDef, "source");
-      const targetHandle =
-        findHandle(targetDef, "target", edge.targetHandle) ?? findHandle(targetDef, "target");
-      if (!sourceHandle || !targetHandle) continue;
-      const input = {
-        source: getHandlePosition(sourceNode, sourceDef, sourceHandle),
-        sourceSide: sourceHandle.side,
-        target: getHandlePosition(targetNode, targetDef, targetHandle),
-        targetSide: targetHandle.side,
-        bend: edge.bend,
-      };
-      const type = edge.type ?? state.defaultEdgeType;
-      segments.push({
-        edgeId: edge.id,
-        points: type === "step" ? getStepPoints(input) : [input.source, input.target],
-      });
-    }
-    const nodeRects = state.nodes.map((node) => engine.getNodeRect(node));
-    const point = clientToFlow({ x: clientX, y: clientY });
-    const zoom = state.viewport.zoom || 1;
-    const hit = findEdgeDropTarget(point, segments, nodeRects, EDGE_DROP_TOLERANCE_PX / zoom);
-    if (!hit) return null;
-    const canvasPoint = flowToScreen(hit.point, state.viewport);
-    return { edgeId: hit.edgeId, distance: hit.distance, x: canvasPoint.x, y: canvasPoint.y };
   };
 
   const onDragOver = (e: React.DragEvent) => {

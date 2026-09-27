@@ -61,6 +61,8 @@ export const MentionTextarea = forwardRef<MentionTextareaHandle, MentionTextarea
     const fieldRef = useRef<HTMLTextAreaElement>(null);
     const pendingCaret = useRef<number | null>(autoFocus ? value.length : null);
     const autoFocusRef = useRef(Boolean(autoFocus));
+    const resizedManuallyRef = useRef(false);
+    const settingHeightRef = useRef(false);
     const [mention, setMention] = useState<MentionQuery | null>(null);
     const [activeIndex, setActiveIndex] = useState(0);
     const listboxId = useId();
@@ -78,8 +80,12 @@ export const MentionTextarea = forwardRef<MentionTextareaHandle, MentionTextarea
       if (!field) {
         return;
       }
-      field.style.height = "auto";
-      field.style.height = `${field.scrollHeight}px`;
+      if (!resizedManuallyRef.current) {
+        settingHeightRef.current = true;
+        field.style.height = "auto";
+        field.style.height = `${field.scrollHeight}px`;
+        settingHeightRef.current = false;
+      }
       if (pendingCaret.current !== null) {
         if (autoFocusRef.current) {
           autoFocusRef.current = false;
@@ -89,6 +95,20 @@ export const MentionTextarea = forwardRef<MentionTextareaHandle, MentionTextarea
         pendingCaret.current = null;
       }
     }, [value]);
+
+    useLayoutEffect(() => {
+      const field = fieldRef.current;
+      if (!field || typeof ResizeObserver === "undefined") {
+        return;
+      }
+      const observer = new ResizeObserver(() => {
+        if (!settingHeightRef.current) {
+          resizedManuallyRef.current = true;
+        }
+      });
+      observer.observe(field);
+      return () => observer.disconnect();
+    }, []);
 
     const syncMention = (text: string, caret: number) => {
       const next = findMentionQuery(text, caret);

@@ -5,14 +5,26 @@ import {
   useState,
   type PointerEvent as ReactPointerEvent,
 } from "react";
+import { createPortal } from "react-dom";
 import { useAnnotationUi } from "../../context/AnnotationContext";
 import { useEscapeKey } from "../../hooks/useEscapeKey";
+import { useRefocusGrace } from "../../hooks/useRefocusGrace";
 import {
   createElementAnchor,
   findAnnotatableElement,
   isAnnotatableTarget,
 } from "../../utils/elementAnchor";
 import { getElementLabel, isLibraryElement } from "../../utils/elementResolver";
+
+function RefocusGraceBadge({ remainingMs }: { remainingMs: number }) {
+  const seconds = Math.ceil(remainingMs / 1000);
+  return createPortal(
+    <div className="wpn-refocus-grace" role="status" aria-live="polite">
+      Selection paused &middot; {seconds}s
+    </div>,
+    document.body,
+  );
+}
 
 function hitElement(clientX: number, clientY: number, overlay: HTMLElement): Element | null {
   const stack = document.elementsFromPoint(clientX, clientY);
@@ -51,6 +63,8 @@ export function AnnotationOverlay() {
   } = useAnnotationUi();
   const placing = modeEnabled || tagModeEnabled || flowPinModeEnabled;
   const pendingDraft = draft ?? tagDraft ?? flowPinDraft;
+  const graceRemainingMs = useRefocusGrace(placing);
+  const suspended = graceRemainingMs > 0;
   const [highlight, setHighlight] = useState<DOMRect | null>(null);
   const [announcement, setAnnouncement] = useState("");
   const overlayRef = useRef<HTMLDivElement>(null);
@@ -99,7 +113,7 @@ export function AnnotationOverlay() {
   const createFromPoint = useCallback(
     (clientX: number, clientY: number) => {
       const overlay = overlayRef.current;
-      if (!overlay || pendingDraft || draftLock.current) {
+      if (!overlay || pendingDraft || draftLock.current || suspended) {
         return;
       }
       const hit = hitElement(clientX, clientY, overlay);
@@ -125,11 +139,12 @@ export function AnnotationOverlay() {
       startFlowPinDraft,
       startTagDraft,
       tagModeEnabled,
+      suspended,
     ],
   );
 
   useEffect(() => {
-    if (!placing) {
+    if (!placing || suspended) {
       setHighlight(null);
       return;
     }
@@ -169,7 +184,7 @@ export function AnnotationOverlay() {
       document.removeEventListener("submit", blockHostEvent, true);
       document.removeEventListener("keydown", onKeyDown, true);
     };
-  }, [createFromPoint, placing]);
+  }, [createFromPoint, placing, suspended]);
 
   const onPointerMove = (event: ReactPointerEvent<HTMLDivElement>) => {
     if (frameRef.current || pendingDraft || draftLock.current) {
@@ -238,7 +253,7 @@ export function AnnotationOverlay() {
           "wpn-overlay",
           tagModeEnabled ? "wpn-overlay--tag" : "",
           flowPinModeEnabled ? "wpn-overlay--flow" : "",
-          pendingDraft ? "wpn-overlay--paused" : "",
+          pendingDraft || suspended ? "wpn-overlay--paused" : "",
         ]
           .filter(Boolean)
           .join(" ")}
@@ -256,6 +271,7 @@ export function AnnotationOverlay() {
           />
         ) : null}
       </div>
+      {suspended ? <RefocusGraceBadge remainingMs={graceRemainingMs} /> : null}
     </>
   );
 }

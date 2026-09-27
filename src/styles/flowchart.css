@@ -1810,7 +1810,7 @@ select.wpn-flowchart-ui__input {
   position: relative;
   display: flex;
   flex-direction: column;
-  width: 300px;
+  width: 420px;
   min-height: 0;
   overflow-y: auto;
   font-family: var(--wpn-font);

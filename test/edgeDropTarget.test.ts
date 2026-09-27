@@ -7,19 +7,21 @@ import {
 
 const horizontal: EdgeSegment = {
   edgeId: "e1",
-  source: { x: 0, y: 0 },
-  target: { x: 100, y: 0 },
+  points: [
+    { x: 0, y: 0 },
+    { x: 100, y: 0 },
+  ],
 };
 
 describe("closestPointOnSegment", () => {
   it("projects a point onto the middle of the segment", () => {
-    const hit = closestPointOnSegment({ x: 50, y: 10 }, horizontal.source, horizontal.target);
+    const hit = closestPointOnSegment({ x: 50, y: 10 }, { x: 0, y: 0 }, { x: 100, y: 0 });
     expect(hit.point).toEqual({ x: 50, y: 0 });
     expect(hit.distance).toBe(10);
   });
 
   it("clamps to the endpoints rather than extending the line", () => {
-    const hit = closestPointOnSegment({ x: -40, y: 0 }, horizontal.source, horizontal.target);
+    const hit = closestPointOnSegment({ x: -40, y: 0 }, { x: 0, y: 0 }, { x: 100, y: 0 });
     expect(hit.point).toEqual({ x: 0, y: 0 });
     expect(hit.distance).toBe(40);
   });
@@ -42,7 +44,13 @@ describe("findEdgeDropTarget", () => {
   });
 
   it("prefers the nearest of several edges", () => {
-    const far: EdgeSegment = { edgeId: "e2", source: { x: 0, y: 20 }, target: { x: 100, y: 20 } };
+    const far: EdgeSegment = {
+      edgeId: "e2",
+      points: [
+        { x: 0, y: 20 },
+        { x: 100, y: 20 },
+      ],
+    };
     const hit = findEdgeDropTarget({ x: 50, y: 16 }, [horizontal, far], [], 24);
     expect(hit?.edgeId).toBe("e2");
   });
@@ -55,5 +63,24 @@ describe("findEdgeDropTarget", () => {
       24,
     );
     expect(overNode).toBeNull();
+  });
+});
+
+describe("findEdgeDropTarget with multi-segment (step) edges", () => {
+  it("matches the vertical leg of an L-shaped route", () => {
+    const stepped: EdgeSegment = {
+      edgeId: "e3",
+      points: [
+        { x: 0, y: 0 },
+        { x: 0, y: 80 },
+        { x: 60, y: 80 },
+      ],
+    };
+    const onVertical = findEdgeDropTarget({ x: 6, y: 40 }, [stepped], [], 24);
+    expect(onVertical?.edgeId).toBe("e3");
+    expect(onVertical?.point).toEqual({ x: 0, y: 40 });
+
+    const insideCorner = findEdgeDropTarget({ x: 40, y: 40 }, [stepped], [], 24);
+    expect(insideCorner).toBeNull();
   });
 });
