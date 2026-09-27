@@ -51,10 +51,6 @@ export function canEditUser(
 
 export const canDeleteUser = managesOther;
 
-/**
- * Role and status are privileges, so they stay read-only unless the actor
- * manages the target outright. Editing yourself never grants them.
- */
 export function canChangePrivileges(
   actorRole: UserManagementRole,
   actorUserId: string,

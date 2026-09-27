@@ -6,7 +6,6 @@ import { getBounds } from "../../utils/flowchart/geometry";
 const WIDTH = 200;
 const HEIGHT = 130;
 
-/** Overview of the whole flow. Click or drag inside it to move the viewport. */
 export const MiniMap = memo(function MiniMap() {
   const engine = useFlowEngine();
   const nodes = useFlowState((s) => s.nodes);
@@ -54,16 +53,18 @@ export const MiniMap = memo(function MiniMap() {
   const onPointerDown = (e: React.PointerEvent) => {
     e.stopPropagation();
     moveTo(e.clientX, e.clientY);
-    // Keep the mapping fixed during the drag, otherwise the map would re-fit under the pointer.
+
     const frozen = { vbX, vbY, vbW, vbH };
-    const r = svgRef.current!.getBoundingClientRect();
     startDrag(e, {
       threshold: 0,
-      onMove: (ev) =>
+      onMove: (ev) => {
+        const r = svgRef.current?.getBoundingClientRect();
+        if (!r) return;
         engine.centerOn({
           x: frozen.vbX + ((ev.clientX - r.left) / r.width) * frozen.vbW,
           y: frozen.vbY + ((ev.clientY - r.top) / r.height) * frozen.vbH,
-        }),
+        });
+      },
     });
   };
 

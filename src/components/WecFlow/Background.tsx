@@ -3,7 +3,6 @@ import { useFlowState } from "../../context/FlowContext";
 
 export type BackgroundVariant = "dots" | "lines" | "none";
 
-/** Grid pattern that moves and scales with the viewport. */
 export const Background = memo(function Background({
   variant = "dots",
 }: {
@@ -14,8 +13,8 @@ export const Background = memo(function Background({
   const id = `fb-grid${useId().replace(/[^a-zA-Z0-9_-]/g, "")}`;
   if (variant === "none") return null;
 
-  // Show a coarser grid when zoomed far out to keep the pattern readable.
   let gap = gridSize * viewport.zoom;
+  if (!(gap > 0)) return null;
   while (gap < 10) gap *= 2;
   const x = viewport.x % gap;
   const y = viewport.y % gap;

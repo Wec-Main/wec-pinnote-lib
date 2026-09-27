@@ -18,6 +18,7 @@ interface UseFlowDocumentOptions {
   sessionKey: string | null;
   flowId: string | null;
   onSaved?: (flowName: string) => void;
+  onSaveFailed?: (flowId: string, message: string) => void;
 }
 
 export interface FlowDocumentState {
@@ -38,6 +39,7 @@ interface SaveTarget {
   apiBaseUrl: string;
   flowId: string;
   onSaved: ((flowName: string) => void) | undefined;
+  onSaveFailed: ((flowId: string, message: string) => void) | undefined;
 }
 
 interface PendingSave {
@@ -76,9 +78,12 @@ export function useFlowDocument(options: UseFlowDocumentOptions): FlowDocumentSt
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pendingRef = useRef<PendingSave | null>(null);
   const lastSentRef = useRef<string | null>(null);
+  const loadGenerationRef = useRef(0);
 
   useEffect(() => {
     loadedFlowIdRef.current = null;
+    loadGenerationRef.current += 1;
+    const generation = loadGenerationRef.current;
     if (!flowId) {
       setStatus("loading");
       return;
@@ -88,6 +93,9 @@ export function useFlowDocument(options: UseFlowDocumentOptions): FlowDocumentSt
     getToken()
       .then((authToken) => fetchFlowDocument(apiBaseUrl, authToken, flowId, controller.signal))
       .then((record) => {
+        if (generation !== loadGenerationRef.current) {
+          return;
+        }
         revisionsRef.current.set(flowId, record.revision);
         loadedFlowIdRef.current = flowId;
         const loaded = parseFlow(record.document);
@@ -115,11 +123,18 @@ export function useFlowDocument(options: UseFlowDocumentOptions): FlowDocumentSt
       return null;
     }
     const current = optionsRef.current;
-    return { apiBaseUrl: current.apiBaseUrl, flowId: loadedFlowId, onSaved: current.onSaved };
+    return {
+      apiBaseUrl: current.apiBaseUrl,
+      flowId: loadedFlowId,
+      onSaved: current.onSaved,
+      onSaveFailed: current.onSaveFailed,
+    };
   }, []);
 
   const persist = useCallback((target: SaveTarget, flow: FlowJSON): Promise<void> => {
-    const isShown = () => loadedFlowIdRef.current === target.flowId;
+    const generation = loadGenerationRef.current;
+    const isCurrent = () => generation === loadGenerationRef.current;
+    const isShown = () => isCurrent() && loadedFlowIdRef.current === target.flowId;
     lastSentRef.current = JSON.stringify(flow);
     const run = chainRef.current.then(async () => {
       if (isShown()) {
@@ -133,7 +148,9 @@ export function useFlowDocument(options: UseFlowDocumentOptions): FlowDocumentSt
         revisionsRef.current.get(target.flowId) ?? 0,
         flow,
       );
-      revisionsRef.current.set(target.flowId, saved.revision);
+      if (isCurrent()) {
+        revisionsRef.current.set(target.flowId, saved.revision);
+      }
       if (isShown()) {
         setSaveError(null);
         setSaveState(pendingRef.current ? "pending" : "saved");
@@ -143,12 +160,15 @@ export function useFlowDocument(options: UseFlowDocumentOptions): FlowDocumentSt
     });
     chainRef.current = run.catch(() => undefined);
     return run.catch((err: unknown) => {
+      const message = describeError(err);
       if (isShown()) {
         lastSentRef.current = null;
-        setSaveError(describeError(err));
+        setSaveError(message);
         setSaveState("error");
+      } else {
+        target.onSaveFailed?.(target.flowId, message);
       }
-      throw new Error(describeError(err), { cause: err });
+      throw new Error(message, { cause: err });
     });
   }, [getToken]);
 
@@ -195,12 +215,14 @@ export function useFlowDocument(options: UseFlowDocumentOptions): FlowDocumentSt
 
   const publish = useCallback(
     async (flow: FlowJSON) => {
-      const target = currentTarget();
+      const before = currentTarget();
       await save(flow);
-      if (target) {
-        const authToken = await getToken();
-        await publishFlow(target.apiBaseUrl, authToken, target.flowId);
+      const after = currentTarget();
+      if (!before || !after || before.flowId !== after.flowId) {
+        return;
       }
+      const authToken = await getToken();
+      await publishFlow(after.apiBaseUrl, authToken, after.flowId);
     },
     [currentTarget, getToken, save],
   );
@@ -210,6 +232,7 @@ export function useFlowDocument(options: UseFlowDocumentOptions): FlowDocumentSt
   const reload = useCallback(() => {
     clearTimer();
     pendingRef.current = null;
+    loadGenerationRef.current += 1;
     setReloadToken((token) => token + 1);
   }, [clearTimer]);
 

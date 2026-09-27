@@ -103,7 +103,7 @@ export function FlowListPanel({ onOpen }: FlowListPanelProps) {
 
       {loading ? (
         <p className="wpn-flow-list__empty">Loading flows…</p>
-      ) : list.length === 0 ? (
+      ) : error ? null : list.length === 0 ? (
         <p className="wpn-flow-list__empty">
           No flows yet. Create one to start mapping out a flow chart.
         </p>
@@ -141,16 +141,14 @@ export function FlowListPanel({ onOpen }: FlowListPanelProps) {
                           </button>
                         </Tooltip>
                         {canDeleteBoardItem(flow.createdById, config.currentUser) ? (
-                          <Tooltip label="Delete flow" placement="bottom">
-                            <button
-                              type="button"
-                              className="wpn-icon-btn wpn-icon-btn--danger"
-                              aria-label="Delete flow"
-                              onClick={() => setPendingDelete(flow)}
-                            >
-                              <Icon name="trash" />
-                            </button>
-                          </Tooltip>
+                          <button
+                            type="button"
+                            className="wpn-btn wpn-btn--ghost wpn-flow-table__delete"
+                            onClick={() => setPendingDelete(flow)}
+                          >
+                            <Icon name="trash" className="wpn-btn__icon" />
+                            Delete
+                          </button>
                         ) : null}
                         <button
                           type="button"
@@ -232,6 +230,7 @@ export function FlowListPanel({ onOpen }: FlowListPanelProps) {
 
       {formModal ? (
         <FlowFormModal
+          key={formModal.mode === "edit" ? formModal.flow.id : "create"}
           mode={formModal.mode}
           initialFlow={formModal.mode === "edit" ? formModal.flow : undefined}
           busy={busy}

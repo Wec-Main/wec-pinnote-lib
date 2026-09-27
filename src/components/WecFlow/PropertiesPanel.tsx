@@ -8,19 +8,14 @@ import { lineStyleOptions } from "./lineStyles";
 
 export interface PropertiesPanelProps {
   className?: string;
+  style?: CSSProperties;
   onClose?: () => void;
-  /** Whether the panel is collapsed to a thin strip. */
-  minimized?: boolean;
-  /** Toggles `minimized`. Omit to hide the minimize control. */
-  onToggleMinimize?: () => void;
 }
 
-/** Right-hand inspector: edits whatever is selected (node, edge, multi-selection or the flow itself). */
 export const PropertiesPanel = memo(function PropertiesPanel({
   className,
+  style,
   onClose,
-  minimized = false,
-  onToggleMinimize,
 }: PropertiesPanelProps) {
   const [nodeIds, edgeIds] = useFlowState(
     (s) => [[...s.selectedNodeIds], [...s.selectedEdgeIds]] as const,
@@ -38,25 +33,10 @@ export const PropertiesPanel = memo(function PropertiesPanel({
   else content = <FlowOverview />;
   return (
     <aside
-      className={cx(
-        "wpn-flowchart-properties__panel",
-        minimized && "wpn-flowchart-properties__panel-minimized",
-        className,
-      )}
+      className={cx("wpn-flowchart-properties__panel", className)}
+      style={style}
     >
       <div className="wpn-flowchart-properties__header-controls">
-        {onToggleMinimize && (
-          <button
-            type="button"
-            className="wpn-flowchart-properties__minimize"
-            aria-label={minimized ? "Maximize panel" : "Minimize panel"}
-            aria-pressed={minimized}
-            title={minimized ? "Maximize panel" : "Minimize panel"}
-            onClick={onToggleMinimize}
-          >
-            <Icon name={minimized ? "expand" : "collapse"} size={14} />
-          </button>
-        )}
         {onClose && (
           <button
             type="button"
@@ -69,19 +49,17 @@ export const PropertiesPanel = memo(function PropertiesPanel({
           </button>
         )}
       </div>
-      {!minimized && content}
+      {content}
     </aside>
   );
 });
 
 function PanelHeader({
   title,
-  subtitle,
   color,
   icon,
 }: {
   title: string;
-  subtitle?: string;
   color?: string;
   icon: React.ReactNode;
 }) {
@@ -93,13 +71,10 @@ function PanelHeader({
       <span className="wpn-flowchart-properties__header-icon">{icon}</span>
       <div className="wpn-flowchart-properties__header-text">
         <div className="wpn-flowchart-properties__header-title">{title}</div>
-        {subtitle && <div className="wpn-flowchart-properties__header-subtitle">{subtitle}</div>}
       </div>
     </div>
   );
 }
-
-// ------------------------------------------------------------------- node
 
 function CollapsibleSection({
   title,
@@ -111,14 +86,16 @@ function CollapsibleSection({
   const [open, setOpen] = useState(true);
   return (
     <section className="wpn-flowchart-ui__section">
-      <button
-        type="button"
-        className="wpn-flowchart-ui__section-toggle"
-        onClick={() => setOpen(!open)}
-      >
-        <Icon name={open ? "collapse" : "expand"} size={13} />
-        <h3 className="wpn-flowchart-ui__section-title">{title}</h3>
-      </button>
+      <h3 className="wpn-flowchart-ui__section-title">
+        <button
+          type="button"
+          className="wpn-flowchart-ui__section-toggle"
+          aria-expanded={open}
+          onClick={() => setOpen(!open)}
+        >
+          {title}
+        </button>
+      </h3>
       {open && <div className="wpn-flowchart-ui__section-content">{children}</div>}
     </section>
   );
@@ -133,16 +110,17 @@ function NodeProperties({ nodeId }: { nodeId: string }) {
     shallowEqual,
   );
   const session = useEditSession();
-  if (!node) return null;
+  if (!node) {
+    return <p className="wpn-flowchart-ui__empty">This item no longer exists.</p>;
+  }
   const def = engine.getDefinition(node.type);
 
   return (
     <>
       <PanelHeader
         title={def.label}
-        subtitle={def.description}
         color={def.color}
-        icon={<NodeIcon icon={def.icon} size={16} />}
+        icon={<NodeIcon icon={def.icon} size={14} />}
       />
 
       {!!issues?.length && (
@@ -161,7 +139,7 @@ function NodeProperties({ nodeId }: { nodeId: string }) {
         </div>
       )}
 
-      <CollapsibleSection title="General">
+      <section className="wpn-flowchart-ui__section">
         <label className="wpn-flowchart-ui__field">
           <span className="wpn-flowchart-ui__field-label">Label</span>
           <input
@@ -184,12 +162,10 @@ function NodeProperties({ nodeId }: { nodeId: string }) {
             {...session}
           />
         </label>
-      </CollapsibleSection>
+      </section>
     </>
   );
 }
-
-// ------------------------------------------------------------------- edge
 
 const edgeTypes: { value: EdgePathType | "default"; label: string; icon: IconName }[] = [
   { value: "default", label: "Default", icon: "flow" },
@@ -213,8 +189,7 @@ function EdgeProperties({ edgeId }: { edgeId: string }) {
     <>
       <PanelHeader
         title="Connection"
-        subtitle={`${source?.data.label ?? edge.source} → ${target?.data.label ?? edge.target}`}
-        icon={<Icon name="curve" size={16} />}
+        icon={<Icon name="curve" size={14} />}
       />
       {!!issues?.length && (
         <div className="wpn-flowchart-properties__issues">
@@ -318,8 +293,6 @@ function EdgeProperties({ edgeId }: { edgeId: string }) {
   );
 }
 
-// -------------------------------------------------------- multi / overview
-
 function MultiSelection({
   nodeIds,
   edgeIds,
@@ -332,9 +305,8 @@ function MultiSelection({
   return (
     <>
       <PanelHeader
-        title="Multiple selection"
-        subtitle={`${nodeIds.length} nodes · ${edgeIds.length} connections`}
-        icon={<Icon name="select" size={16} />}
+        title={`${nodeIds.length} nodes · ${edgeIds.length} connections`}
+        icon={<Icon name="select" size={14} />}
       />
       <section className="wpn-flowchart-ui__section">
         <p className="wpn-flowchart-ui__muted">
@@ -375,8 +347,7 @@ function FlowOverview() {
     <>
       <PanelHeader
         title="Flow settings"
-        subtitle="Select a node or connection to edit it"
-        icon={<Icon name="flow" size={16} />}
+        icon={<Icon name="flow" size={14} />}
       />
       <section className="wpn-flowchart-ui__section">
         <label className="wpn-flowchart-ui__field">

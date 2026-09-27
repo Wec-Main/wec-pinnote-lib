@@ -49,7 +49,7 @@ describe("FlowEngine", () => {
     const a = engine.addNode({ type: "process", position: { x: 0, y: 200 } });
     const edge = engine.addEdge({ source: d.id, sourceHandle: "yes", target: a.id });
     expect(edge?.label).toBe("Yes");
-    expect(edge?.targetHandle).toBe("in");
+    expect(edge?.targetHandle).toBe("in-top");
   });
 
   it("rejects invalid connections", () => {
@@ -135,8 +135,11 @@ describe("FlowEngine", () => {
   it("interactive connection snaps to the nearest handle", () => {
     const { engine, start, proc } = simpleFlow();
     engine.startConnection({ nodeId: start.id, handleId: "out", kind: "source" }, { x: 90, y: 56 });
-    engine.updateConnection({ x: 112, y: 152 }); // near process "in" handle (110, 150)
-    expect(engine.getState().connection?.candidate).toEqual({ nodeId: proc.id, handleId: "in" });
+    engine.updateConnection({ x: 75, y: 152 }); // inside the process node, near its top edge
+    expect(engine.getState().connection?.candidate).toEqual({
+      nodeId: proc.id,
+      handleId: "in-top",
+    });
     expect(engine.getState().connection?.valid).toBe(true);
     const edge = engine.endConnection();
     expect(edge?.source).toBe(start.id);
@@ -251,5 +254,132 @@ describe("edge paths", () => {
     for (let i = 1; i < pts.length; i++) {
       expect(pts[i].x === pts[i - 1].x || pts[i].y === pts[i - 1].y).toBe(true);
     }
+  });
+});
+
+describe("regressions", () => {
+  it("gives pasted nodes their own meta object", () => {
+    const engine = new FlowEngine();
+    const node = engine.addNode({ type: "process", position: { x: 0, y: 0 } });
+    engine.updateNode(node.id, { data: { ...node.data, meta: { tags: ["a"] } } });
+    engine.selectNode(node.id);
+    engine.copySelection();
+    const [copy] = engine.paste();
+
+    const copied = engine.getNode(copy.id)!.data.meta as { tags: string[] };
+    copied.tags.push("b");
+
+    const original = engine.getNode(node.id)!.data.meta as { tags: string[] };
+    expect(original.tags).toEqual(["a"]);
+  });
+
+  it("clears an in-flight connection when another flow is loaded", () => {
+    const { engine, start } = simpleFlow();
+    engine.startConnection(
+      { nodeId: start.id, handleId: "out-bottom", kind: "source" },
+      { x: 10, y: 10 },
+    );
+    expect(engine.getState().connection).not.toBeNull();
+
+    engine.loadFlow({ nodes: [], edges: [] });
+    expect(engine.getState().connection).toBeNull();
+  });
+
+  it("restores the pre-drag graph when an interaction is cancelled", () => {
+    const { engine, proc } = simpleFlow();
+    const origin = { ...engine.getNode(proc.id)!.position };
+    const undoDepthBefore = engine.getState().canUndo;
+
+    engine.beginInteraction();
+    engine.setNodePositions({ [proc.id]: { x: 999, y: 999 } });
+    engine.cancelInteraction();
+
+    expect(engine.getNode(proc.id)!.position).toEqual(origin);
+    expect(engine.getState().canUndo).toBe(undoDepthBefore);
+
+    engine.undo();
+    expect(engine.getNode(proc.id)!.position).toEqual(origin);
+  });
+
+  it("keeps undo working after an interaction is abandoned", () => {
+    const { engine, proc } = simpleFlow();
+    engine.beginInteraction();
+    engine.cancelInteraction();
+
+    engine.updateNode(proc.id, { data: { ...proc.data, label: "Renamed" } });
+    engine.undo();
+
+    expect(engine.getNode(proc.id)!.data.label).toBe(proc.data.label);
+  });
+
+  it("rejects a document whose version is newer than this editor", () => {
+    expect(() => parseFlow({ version: 99, nodes: [], edges: [] })).toThrow(FlowParseError);
+  });
+
+  it("rejects duplicate edge ids on import", () => {
+    expect(() =>
+      parseFlow({
+        version: 1,
+        nodes: [
+          { id: "a", type: "start", position: { x: 0, y: 0 }, data: { label: "A", properties: {} } },
+          { id: "b", type: "end", position: { x: 0, y: 99 }, data: { label: "B", properties: {} } },
+        ],
+        edges: [
+          { id: "e1", source: "a", target: "b" },
+          { id: "e1", source: "b", target: "a" },
+        ],
+      }),
+    ).toThrow(FlowParseError);
+  });
+
+  it("keeps issue ids stable when an unrelated issue is resolved", () => {
+    const registry = new NodeTypeRegistry();
+    const orphan = {
+      id: "orphan",
+      type: "process",
+      position: { x: 0, y: 0 },
+      data: { label: "Orphan", properties: {} },
+    };
+    const withoutStart = validateFlow({ nodes: [orphan], edges: [] }, registry);
+    const before = withoutStart.issues.find((i) => i.code === "disconnected")!.id;
+
+    const withStart = validateFlow(
+      {
+        nodes: [
+          orphan,
+          { id: "s", type: "start", position: { x: 0, y: 0 }, data: { label: "S", properties: {} } },
+          { id: "e", type: "end", position: { x: 0, y: 9 }, data: { label: "E", properties: {} } },
+        ],
+        edges: [{ id: "e1", source: "s", target: "e" }],
+      },
+      registry,
+    );
+    const after = withStart.issues.find((i) => i.code === "disconnected")!.id;
+
+    expect(after).toBe(before);
+  });
+
+  it("reports an unknown node type once instead of cascading structural errors", () => {
+    const registry = new NodeTypeRegistry();
+    const result = validateFlow(
+      {
+        nodes: [
+          { id: "s", type: "start", position: { x: 0, y: 0 }, data: { label: "S", properties: {} } },
+          {
+            id: "t",
+            type: "terminator",
+            position: { x: 0, y: 99 },
+            data: { label: "T", properties: {} },
+          },
+        ],
+        edges: [{ id: "e1", source: "s", target: "t" }],
+      },
+      registry,
+    );
+
+    const errors = result.issues.filter((i) => i.severity === "error").map((i) => i.code);
+    expect(errors).toContain("unknown-type");
+    expect(errors).not.toContain("disconnected");
+    expect(result.issues.map((i) => i.code)).not.toContain("dead-end");
   });
 });

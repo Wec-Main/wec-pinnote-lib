@@ -463,6 +463,7 @@ body.wpn-mode-active {
   width: 14px;
   height: 14px;
   display: block;
+  stroke-width: 2.2;
 }
 
 .wpn-toolbar__epic {
@@ -548,9 +549,6 @@ body.wpn-mode-active {
   text-align: center;
 }
 
-.wpn-toolbar__eye--hidden {
-  opacity: 0.55;
-}
 
 .wpn-toolbar__list--active {
   background: var(--wpn-accent);
@@ -860,6 +858,68 @@ body.wpn-mode-active {
 .wpn-thread-panel .wpn-panel__title-input,
 .wpn-composer .wpn-panel__title-input {
   font-size: 13px;
+}
+
+.wpn-thread-panel .wpn-panel__header,
+.wpn-thread-panel .wpn-panel__title-group {
+  align-items: flex-start;
+}
+
+.wpn-thread-panel .wpn-panel__title {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  padding-top: 3px;
+  line-height: 1.4;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+.wpn-thread-panel .wpn-panel__title-input {
+  display: block;
+  max-height: 96px;
+  overflow-y: auto;
+  resize: none;
+  font-family: inherit;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+
+.wpn-comment__discard {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 6px;
+  padding: 6px 8px;
+  border-radius: 8px;
+  background: rgba(220, 38, 38, 0.12);
+  font-size: 12px;
+  color: #fecaca;
+}
+
+.wpn-comment__discard-actions {
+  display: flex;
+  gap: 6px;
+}
+
+.wpn-thread-panel__discard {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 16px;
+  border-bottom: 1px solid rgba(248, 113, 113, 0.25);
+  background: rgba(220, 38, 38, 0.12);
+  font-size: 12px;
+  color: #fecaca;
+}
+
+.wpn-thread-panel__discard-actions {
+  display: flex;
+  gap: 6px;
 }
 
 .wpn-composer .wpn-panel__title-group .wpn-link--icon {
@@ -2337,8 +2397,6 @@ body.wpn-epicflow-resizing {
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  padding-top: 8px;
-  border-top: 1px solid rgba(255, 255, 255, 0.08);
 }
 
 .wpn-epicflow-card__meta {
@@ -2635,17 +2693,6 @@ body.wpn-epicflow-resizing {
 .wpn-epicflow-modal__input:focus {
   border-color: #c4b5fd;
   box-shadow: 0 0 0 3px rgba(91, 77, 255, 0.2);
-}
-
-.wpn-epicflow-modal__readonly {
-  width: 100%;
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 8px;
-  background: rgba(255, 255, 255, 0.04);
-  color: rgba(255, 255, 255, 0.75);
-  font-size: 13px;
-  font-weight: 650;
-  padding: 9px 12px;
 }
 
 .wpn-epicflow-modal__textarea {
@@ -3353,9 +3400,19 @@ body.wpn-epicflow-resizing {
   gap: 4px;
 }
 
-.wpn-flow-table__open {
+.wpn-flow-table__open,
+.wpn-flow-table__delete {
   padding: 5px 10px;
   font-size: 12px;
+}
+
+.wpn-flow-table__delete {
+  color: var(--wpn-danger);
+}
+
+.wpn-flow-table__delete:hover {
+  color: #fff;
+  background: var(--wpn-danger);
 }
 
 .wpn-flow-stage {
@@ -3757,6 +3814,7 @@ body.wpn-epicflow-resizing {
   z-index: 2147483001;
   width: max-content;
   min-width: 190px;
+  max-width: min(320px, calc(100vw - 16px));
 }
 
 .wpn-select__menu--fit {
@@ -6516,6 +6574,11 @@ body.wpn-epicflow-resizing {
   cursor: cell;
 }
 
+.wpn-overlay--paused {
+  pointer-events: none;
+  cursor: default;
+}
+
 .wpn-tag-pin {
   position: fixed;
   transform: translate(-50%, -50%);
@@ -7075,6 +7138,35 @@ body.wpn-epicflow-resizing {
   box-shadow: var(--wpn-shadow, 0 18px 40px rgba(2, 6, 23, 0.55));
 }
 
+.wpn-menu__panel--countdown {
+  overflow: hidden;
+}
+
+.wpn-menu__panel--countdown::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 3px;
+  height: 100%;
+  background: var(--wpn-accent);
+  transform-origin: top;
+  animation: wpn-menu-countdown 5s linear forwards;
+}
+
+.wpn-menu__panel--countdown-paused::before {
+  animation-play-state: paused;
+}
+
+@keyframes wpn-menu-countdown {
+  from {
+    transform: scaleY(1);
+  }
+  to {
+    transform: scaleY(0);
+  }
+}
+
 .wpn-menu__separator {
   height: 1px;
   margin: 6px 4px;
@@ -7102,11 +7194,11 @@ body.wpn-epicflow-resizing {
 }
 
 .wpn-menu__item--active {
-  background: var(--wpn-accent-soft, rgba(91, 77, 255, 0.12));
+  background: rgba(255, 255, 255, 0.08);
 }
 
 .wpn-menu__item--active:hover:not(:disabled) {
-  background: var(--wpn-accent-soft, rgba(91, 77, 255, 0.12));
+  background: rgba(255, 255, 255, 0.08);
 }
 
 .wpn-menu__item--disabled {

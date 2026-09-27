@@ -72,15 +72,10 @@ function FlowEditorPane({ flowId }: { flowId: string }) {
 
 export function WecFlowPanel() {
   const { setFlowOpen } = useAnnotationContext();
-  const [minimized, setMinimized] = useState(false);
   const [openFlowId, setOpenFlowId] = useState<string | null>(null);
 
   return (
-    <div
-      className={["wpn-flow-panel", minimized ? "wpn-flow-panel--minimized" : ""]
-        .filter(Boolean)
-        .join(" ")}
-    >
+    <div className="wpn-flow-panel">
       <div className="wpn-flow-panel__header">
         <span className="wpn-flow-panel__brand">
           <span className="wpn-flow-panel__brand-icon">
@@ -108,16 +103,6 @@ export function WecFlowPanel() {
               </Tooltip>
             </>
           ) : null}
-          <Tooltip label={minimized ? "Maximize" : "Minimize"} placement="bottom">
-            <button
-              type="button"
-              className="wpn-icon-btn"
-              aria-label={minimized ? "Maximize Flow" : "Minimize Flow"}
-              onClick={() => setMinimized((current) => !current)}
-            >
-              <Icon name={minimized ? "expand" : "windowMinimize"} />
-            </button>
-          </Tooltip>
           <Tooltip label="Close" placement="bottom">
             <button
               type="button"

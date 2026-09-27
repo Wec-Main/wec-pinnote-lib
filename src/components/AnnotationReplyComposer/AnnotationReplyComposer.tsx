@@ -11,14 +11,17 @@ interface AnnotationReplyComposerProps {
   onSubmit: (message: string) => Promise<void>;
   replyTarget: AnnotationComment | null;
   onCancelReply: () => void;
+  onDraftChange?: (hasDraft: boolean) => void;
 }
 
 export function AnnotationReplyComposer({
   onSubmit,
   replyTarget,
   onCancelReply,
+  onDraftChange,
 }: AnnotationReplyComposerProps) {
   const [message, setMessage] = useState("");
+  const [sending, setSending] = useState(false);
   const [focused, setFocused] = useState(false);
   const fieldRef = useRef<MentionTextareaHandle>(null);
   const candidates = useMentionCandidates();
@@ -29,17 +32,25 @@ export function AnnotationReplyComposer({
     }
   }, [replyTarget]);
 
+  useEffect(() => {
+    onDraftChange?.(message.trim().length > 0);
+    return () => onDraftChange?.(false);
+  }, [message, onDraftChange]);
+
   const send = async () => {
     const trimmed = message.trim();
-    if (!trimmed) {
+    if (!trimmed || sending) {
       return;
     }
+    setSending(true);
     setMessage("");
     fieldRef.current?.focus();
     try {
       await onSubmit(encodeMentions(trimmed, candidates));
     } catch {
-      setMessage((current) => current || trimmed);
+      setMessage((current) => (current.trim() ? `${trimmed}\n${current}` : trimmed));
+    } finally {
+      setSending(false);
     }
   };
 
@@ -85,7 +96,7 @@ export function AnnotationReplyComposer({
               type="submit"
               className="wpn-reply__send"
               aria-label="Send reply"
-              disabled={!message.trim()}
+              disabled={!message.trim() || sending}
             >
               <svg viewBox="0 0 20 20" className="wpn-reply__arrow" aria-hidden="true">
                 <path

@@ -10,11 +10,11 @@ import type { XYPosition } from "../types/flowchart.types";
 
 export interface FlowContextValue {
   engine: FlowEngine;
-  /** The canvas DOM element; used to convert client coordinates to flow coordinates. */
+
   canvasRef: MutableRefObject<HTMLDivElement | null>;
-  /** Converts a client (viewport) pointer position to flow coordinates. */
+
   clientToFlow: (point: XYPosition) => XYPosition;
-  /** Converts a client pointer position to canvas-relative screen coordinates. */
+
   clientToCanvas: (point: XYPosition) => XYPosition;
 }
 
@@ -27,15 +27,10 @@ export function useFlowContext(): FlowContextValue {
   return ctx;
 }
 
-/** The FlowEngine of the surrounding provider: call its methods to change the flow. */
 export function useFlowEngine(): FlowEngine {
   return useFlowContext().engine;
 }
 
-/**
- * Subscribes to a slice of the flow state. The component re-renders only when
- * `equalityFn(previous, next)` is false.
- */
 export function useFlowState<T>(
   selector: (state: FlowState) => T,
   equalityFn: (a: T, b: T) => boolean = Object.is,

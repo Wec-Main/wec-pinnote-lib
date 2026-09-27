@@ -26,7 +26,6 @@ interface FlowPinPanelProps {
 export function FlowPinPanel({ flowPin, originX, originY, onDelete }: FlowPinPanelProps) {
   const { config, syncFlowPinName, selectFlowPin } = useAnnotationContext();
   const { hostAuthenticated, activeAccount } = useAnnotationAuth();
-  const [minimized, setMinimized] = useState(false);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const [closing, setClosing] = useState(false);
   const panelRef = useRef<HTMLDivElement>(null);
@@ -84,7 +83,6 @@ export function FlowPinPanel({ flowPin, originX, originY, onDelete }: FlowPinPan
         className={[
           "wpn-flow-panel",
           "wpn-flow-panel--from-pin",
-          minimized ? "wpn-flow-panel--minimized" : "",
           closing ? "wpn-flow-panel--closing" : "",
         ]
           .filter(Boolean)
@@ -99,26 +97,6 @@ export function FlowPinPanel({ flowPin, originX, originY, onDelete }: FlowPinPan
             <span className="wpn-panel__title">{flowPin.name}</span>
           </span>
           <div className="wpn-flow-panel__header-actions">
-            <Tooltip label="Delete this flow" placement="bottom">
-              <button
-                type="button"
-                className="wpn-icon-btn wpn-icon-btn--danger"
-                aria-label="Delete flow"
-                onClick={() => setConfirmingDelete(true)}
-              >
-                <Icon name="trash" />
-              </button>
-            </Tooltip>
-            <Tooltip label={minimized ? "Maximize" : "Minimize"} placement="bottom">
-              <button
-                type="button"
-                className="wpn-icon-btn"
-                aria-label={minimized ? "Maximize Flow" : "Minimize Flow"}
-                onClick={() => setMinimized((current) => !current)}
-              >
-                <Icon name={minimized ? "expand" : "windowMinimize"} />
-              </button>
-            </Tooltip>
             <Tooltip label="Close" placement="bottom">
               <button
                 type="button"
@@ -133,7 +111,11 @@ export function FlowPinPanel({ flowPin, originX, originY, onDelete }: FlowPinPan
         </div>
 
         <div className="wpn-flow-panel__body">
-          <FlowDocumentEditor flowDocument={flowDocument} signedIn={signedIn} />
+          <FlowDocumentEditor
+            flowDocument={flowDocument}
+            signedIn={signedIn}
+            onDelete={() => setConfirmingDelete(true)}
+          />
         </div>
       </div>
       {confirmingDelete ? (

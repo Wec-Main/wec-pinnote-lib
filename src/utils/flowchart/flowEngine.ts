@@ -58,16 +58,15 @@ export interface HandleRef {
   handleId: string;
 }
 
-/** Transient state while the user drags a new connection. */
 export interface ConnectionState {
   from: HandleRef & { kind: HandleKind };
-  /** Pointer position in flow coordinates. */
+
   pointer: XYPosition;
-  /** Handle the connection would snap to on release. */
+
   candidate: HandleRef | null;
   valid: boolean;
   reason?: string;
-  /** Edge whose dragged end is being moved; the connection then updates it instead of adding one. */
+
   reconnecting?: string;
 }
 
@@ -87,7 +86,7 @@ export interface FlowState {
   snapToGrid: boolean;
   gridSize: number;
   connection: ConnectionState | null;
-  /** Rubber-band selection rectangle in flow coordinates. */
+
   selectionRect: Rect | null;
   guides: AlignmentGuide[];
   validation: ValidationResult | null;
@@ -96,13 +95,12 @@ export interface FlowState {
   canUndo: boolean;
   canRedo: boolean;
   flowName: string;
-  /** Flow-level notes, not tied to any individual node. */
+
   flowNotes: string;
-  /** Bumped when node type definitions change so renderers refresh. */
+
   registryVersion: number;
 }
 
-/** Serializable description of every mutation; the hook point for collaboration / persistence. */
 export type FlowOperation =
   | { type: "addNode"; node: FlowNode }
   | { type: "updateNode"; node: FlowNode }
@@ -123,9 +121,9 @@ export interface FlowEngineEvents extends Record<string, unknown> {
 }
 
 export interface FlowEngineOptions {
-  /** Additional node types, or overrides of built-in ones (matched by `type`). */
+
   nodeTypes?: NodeTypeDefinition[];
-  /** Set to false to start from an empty registry instead of the built-in node types. */
+
   includeBuiltInNodeTypes?: boolean;
   initialFlow?: Partial<FlowJSON>;
   readOnly?: boolean;
@@ -135,7 +133,7 @@ export interface FlowEngineOptions {
   historyLimit?: number;
   minZoom?: number;
   maxZoom?: number;
-  /** Extra rule applied after the built-in connection checks. */
+
   isValidConnection?: ConnectionValidator;
   validationRules?: ValidationRule[];
 }
@@ -154,7 +152,7 @@ export type NodePatch = Partial<Omit<FlowNode, "id" | "data">> & { data?: Partia
 
 const EMPTY_SET: ReadonlySet<string> = new Set();
 const EMPTY_MAP: ReadonlyMap<string, IssueSeverity> = new Map();
-/** Screen-space radius (px) in which a dragged connection snaps to a handle. */
+
 const CONNECT_RADIUS = 28;
 
 const isEdgePathType = (value: unknown): value is EdgePathType =>
@@ -165,11 +163,6 @@ function savedEdgeType(meta: FlowJSON["meta"]): EdgePathType | undefined {
   return isEdgePathType(value) ? value : undefined;
 }
 
-/**
- * Framework-agnostic flow state engine. All business logic (mutations,
- * history, selection, viewport math, connection rules, validation) lives here;
- * React components only read state and call these methods.
- */
 export class FlowEngine {
   readonly store: Store<FlowState>;
   readonly registry: NodeTypeRegistry;
@@ -182,6 +175,7 @@ export class FlowEngine {
   private interactionStart: FlowSnapshot | null = null;
   private pendingFitView = false;
   private clipboard: FlowSnapshot | null = null;
+  private unsubscribeStore: (() => void) | null = null;
   private pasteCount = 0;
 
   constructor(options: FlowEngineOptions = {}) {
@@ -224,27 +218,37 @@ export class FlowEngine {
     });
     this.pendingFitView = !initial.viewport && nodes.length > 0;
 
-    // Emit high-level change events whenever the graph or selection changes.
     let prev = this.store.getState();
-    this.store.subscribe(() => {
+    this.unsubscribeStore = this.store.subscribe(() => {
       const s = this.store.getState();
-      if (s.nodes !== prev.nodes || s.edges !== prev.edges)
+      const before = prev;
+
+      prev = s;
+      if (s.nodes !== before.nodes || s.edges !== before.edges)
         this.events.emit("change", { nodes: s.nodes, edges: s.edges });
       if (
-        s.selectedNodeIds !== prev.selectedNodeIds ||
-        s.selectedEdgeIds !== prev.selectedEdgeIds
+        s.selectedNodeIds !== before.selectedNodeIds ||
+        s.selectedEdgeIds !== before.selectedEdgeIds
       ) {
         this.events.emit("selectionChange", {
           nodeIds: [...s.selectedNodeIds],
           edgeIds: [...s.selectedEdgeIds],
         });
       }
-      if (s.viewport !== prev.viewport) this.events.emit("viewportChange", s.viewport);
-      prev = s;
+      if (s.viewport !== before.viewport) this.events.emit("viewportChange", s.viewport);
     });
   }
 
-  // ---------------------------------------------------------------- queries
+  dispose(): void {
+    this.unsubscribeStore?.();
+    this.unsubscribeStore = null;
+    this.events.clear();
+    this.history.clear();
+    this.clipboard = null;
+    this.pasteCount = 0;
+    this.interactionDepth = 0;
+    this.interactionStart = null;
+  }
 
   getState = (): FlowState => this.store.getState();
   getNodes = (): FlowNode[] => this.getState().nodes;
@@ -264,8 +268,6 @@ export class FlowEngine {
   ): () => void {
     return this.events.on(event, handler);
   }
-
-  // -------------------------------------------------------------- internals
 
   private normalizeNode(input: NewNodeInput | FlowNode): FlowNode {
     const def = this.registry.get(input.type);
@@ -292,7 +294,6 @@ export class FlowEngine {
     return node;
   }
 
-  /** Replaces the graph, keeping derived state (lookup, selection, history flags) consistent. */
   private setGraph(nodes: FlowNode[], edges: FlowEdge[]): void {
     const s = this.getState();
     const nodeLookup = nodes === s.nodes ? s.nodeLookup : new Map(nodes.map((n) => [n.id, n]));
@@ -316,7 +317,6 @@ export class FlowEngine {
     });
   }
 
-  /** Applies a recorded mutation: pushes history (unless inside an interaction) and emits the operation. */
   private commit(nodes: FlowNode[], edges: FlowEdge[], op: FlowOperation): void {
     const s = this.getState();
     if (nodes === s.nodes && edges === s.edges) return;
@@ -325,10 +325,6 @@ export class FlowEngine {
     this.events.emit("operation", op);
   }
 
-  /**
-   * Groups every mutation until the matching `endInteraction()` into a single
-   * undo step (used for drags, resizes and text editing).
-   */
   beginInteraction(): void {
     if (this.interactionDepth++ === 0) this.interactionStart = this.getSnapshot();
   }
@@ -345,7 +341,13 @@ export class FlowEngine {
     }
   }
 
-  // ------------------------------------------------------------- node API
+  cancelInteraction(): void {
+    if (this.interactionDepth === 0) return;
+    this.interactionDepth = 0;
+    const start = this.interactionStart;
+    this.interactionStart = null;
+    if (start) this.setGraph(start.nodes, start.edges);
+  }
 
   addNode(input: NewNodeInput): FlowNode {
     const node = this.normalizeNode(input);
@@ -392,7 +394,6 @@ export class FlowEngine {
     this.updateNodeData(id, { properties: rest });
   }
 
-  /** Moves nodes to absolute positions (snapping is the caller's choice via `snap`). */
   setNodePositions(positions: Record<string, XYPosition>): void {
     const s = this.getState();
     const moves = new Map<string, XYPosition>();
@@ -412,7 +413,6 @@ export class FlowEngine {
     });
   }
 
-  /** Shifts a step edge's bend with its nodes when both ends move by the same offset. */
   private carryBend(
     edge: FlowEdge,
     sourceNode: FlowNode | undefined,
@@ -446,7 +446,6 @@ export class FlowEngine {
     );
   }
 
-  /** Copies nodes (and the edges between them) with an offset; selects the copies. */
   duplicateNodes(ids: string[], offset: XYPosition = { x: 40, y: 40 }): FlowNode[] {
     return this.insertCopies(this.subgraph(ids), offset);
   }
@@ -469,7 +468,6 @@ export class FlowEngine {
     return this.clipboard !== null;
   }
 
-  /** Pastes the clipboard, with its top-left at `at` (flow coordinates) or offset from the originals. */
   paste(at?: XYPosition): FlowNode[] {
     const clipboard = this.clipboard;
     if (!clipboard) return [];
@@ -518,14 +516,28 @@ export class FlowEngine {
     };
   }
 
+  private uniqueId(prefix: string, reserved?: Set<string>): string {
+    const s = this.getState();
+    let id = createId(prefix);
+    while (s.nodeLookup.has(id) || s.edgeLookup.has(id) || reserved?.has(id))
+      id = createId(prefix);
+    reserved?.add(id);
+    return id;
+  }
+
   private insertCopies(source: FlowSnapshot, offset: XYPosition): FlowNode[] {
     const idMap = new Map<string, string>();
+    const taken = new Set<string>();
     const copies = source.nodes.map((n) => {
       const copy: FlowNode = {
         ...n,
-        id: createId(n.type),
+        id: this.uniqueId(n.type, taken),
         position: { x: n.position.x + offset.x, y: n.position.y + offset.y },
-        data: { ...n.data, properties: { ...n.data.properties } },
+        data: {
+          ...n.data,
+          properties: { ...n.data.properties },
+          ...(n.data.meta ? { meta: structuredClone(n.data.meta) } : {}),
+        },
       };
       idMap.set(n.id, copy.id);
       return copy;
@@ -541,7 +553,15 @@ export class FlowEngine {
         offset,
       );
       return sourceId && targetId
-        ? [{ ...moved, id: createId("edge"), source: sourceId, target: targetId }]
+        ? [
+            {
+              ...moved,
+              id: this.uniqueId("edge", taken),
+              source: sourceId,
+              target: targetId,
+              ...(moved.data ? { data: structuredClone(moved.data) } : {}),
+            },
+          ]
         : [];
     });
     this.beginInteraction();
@@ -559,9 +579,6 @@ export class FlowEngine {
     return copies;
   }
 
-  // ------------------------------------------------------------- edge API
-
-  /** Checks built-in rules and the optional custom validator. */
   canConnect(conn: Connection, ignoreEdgeId?: string): ConnectionCheckResult {
     const s = this.getState();
     const ctx = { nodeLookup: s.nodeLookup, edges: s.edges, registry: this.registry, ignoreEdgeId };
@@ -570,7 +587,6 @@ export class FlowEngine {
     return this.options.isValidConnection(conn, ctx);
   }
 
-  /** Creates an edge if the connection is valid. Returns null otherwise. */
   addEdge(
     conn: Connection,
     extra: Partial<Omit<FlowEdge, "source" | "target">> = {},
@@ -582,9 +598,11 @@ export class FlowEngine {
     const sourceHandle = findHandle(sourceDef, "source", conn.sourceHandle)!.id;
     const targetHandle = findHandle(targetDef, "target", conn.targetHandle)!.id;
     const label = extra.label ?? sourceDef.defaultEdgeLabels?.[sourceHandle];
+    if (extra.id !== undefined && s.edgeLookup.has(extra.id))
+      throw new Error(`Edge id "${extra.id}" already exists`);
     const edge: FlowEdge = {
       ...extra,
-      id: extra.id ?? createId("edge"),
+      id: extra.id ?? this.uniqueId("edge"),
       source: conn.source,
       target: conn.target,
       sourceHandle,
@@ -617,7 +635,6 @@ export class FlowEngine {
     );
   }
 
-  /** Moves the middle segment of a step edge; `undefined` restores the automatic route. */
   setEdgeBend(id: string, bend: number | undefined): void {
     const s = this.getState();
     const current = s.edgeLookup.get(id);
@@ -631,7 +648,6 @@ export class FlowEngine {
     );
   }
 
-  /** Swaps an edge's direction when the reversed connection is allowed. */
   reverseEdge(id: string): boolean {
     const s = this.getState();
     const edge = s.edgeLookup.get(id);
@@ -668,7 +684,6 @@ export class FlowEngine {
     return true;
   }
 
-  /** Splits an edge with a new node placed at `at` (or halfway between the two ends). */
   insertNodeOnEdge(edgeId: string, type: string, at?: XYPosition): FlowNode | null {
     const s = this.getState();
     const edge = s.edgeLookup.get(edgeId);
@@ -701,14 +716,17 @@ export class FlowEngine {
     );
     this.endInteraction();
     if (!first && !second) {
-      this.undo();
+      const start = this.history.rollback();
+      if (start) {
+        this.setGraph(start.nodes, start.edges);
+        this.store.setState({ canUndo: this.history.canUndo, canRedo: this.history.canRedo });
+      }
       return null;
     }
     this.selectNode(node.id);
     return node;
   }
 
-  /** Adds a node of `type` next to `fromId` on the given side and connects the two. */
   addConnectedNode(fromId: string, side: HandleSide, type: string, gap = 80): FlowNode | null {
     const from = this.getNode(fromId);
     if (!from || this.getState().readOnly) return null;
@@ -752,7 +770,6 @@ export class FlowEngine {
     return (handles.find((h) => h.side === side) ?? handles[0])?.id;
   }
 
-  /** Deletes all selected nodes and edges as a single undo step. */
   deleteSelection(): void {
     const { selectedNodeIds, selectedEdgeIds } = this.getState();
     if (!selectedNodeIds.size && !selectedEdgeIds.size) return;
@@ -761,8 +778,6 @@ export class FlowEngine {
     if (selectedNodeIds.size) this.removeNodes([...selectedNodeIds]);
     this.endInteraction();
   }
-
-  // -------------------------------------------------------------- history
 
   undo(): void {
     if (this.interactionDepth > 0) return;
@@ -780,13 +795,10 @@ export class FlowEngine {
     this.events.emit("operation", { type: "redo" });
   }
 
-  // ------------------------------------------------------------ selection
-
   setSelection(nodeIds: Iterable<string>, edgeIds: Iterable<string> = []): void {
     this.store.setState({ selectedNodeIds: new Set(nodeIds), selectedEdgeIds: new Set(edgeIds) });
   }
 
-  /** Selects a node. With `additive` the node is toggled within the current selection. */
   selectNode(id: string, additive = false): void {
     const s = this.getState();
     if (!additive) {
@@ -822,7 +834,6 @@ export class FlowEngine {
     );
   }
 
-  /** Selects every node intersecting a flow-space rectangle. */
   selectInRect(rect: Rect, additive = false): void {
     const s = this.getState();
     const hits = s.nodes.filter((n) => rectsIntersect(rect, this.getNodeRect(n))).map((n) => n.id);
@@ -836,8 +847,6 @@ export class FlowEngine {
     this.store.setState({ selectionRect: rect });
   }
 
-  // ------------------------------------------------------------- viewport
-
   setViewport(v: Viewport): void {
     this.store.setState({
       viewport: { x: v.x, y: v.y, zoom: clamp(v.zoom, this.minZoom, this.maxZoom) },
@@ -849,7 +858,6 @@ export class FlowEngine {
     this.setViewport({ ...v, x: v.x + dx, y: v.y + dy });
   }
 
-  /** Zooms by `factor` keeping the given canvas-relative screen point fixed. */
   zoomAt(factor: number, point?: XYPosition): void {
     const { viewport: v, canvasSize } = this.getState();
     const p = point ?? { x: canvasSize.width / 2, y: canvasSize.height / 2 };
@@ -865,7 +873,6 @@ export class FlowEngine {
   zoomIn = () => this.zoomAt(1.2);
   zoomOut = () => this.zoomAt(1 / 1.2);
 
-  /** Fits the given nodes (default: all) into the canvas. */
   fitView(options: { padding?: number; nodeIds?: string[]; maxZoom?: number } = {}): void {
     const s = this.getState();
     if (!s.canvasSize.width || !s.canvasSize.height) {
@@ -898,7 +905,6 @@ export class FlowEngine {
     });
   }
 
-  /** Centers the viewport on a flow-space point. */
   centerOn(point: XYPosition, zoom = this.getState().viewport.zoom): void {
     const { canvasSize } = this.getState();
     this.setViewport({
@@ -916,22 +922,17 @@ export class FlowEngine {
     }
   }
 
-  /** Converts a canvas-relative screen point to flow coordinates. */
   screenToFlow = (p: XYPosition): XYPosition => screenToFlow(p, this.getState().viewport);
 
-  /** Applies grid snapping when enabled. */
   snap = (p: XYPosition): XYPosition => {
     const s = this.getState();
     return s.snapToGrid ? snapPosition(p, s.gridSize) : p;
   };
 
-  // ------------------------------------------------ interactive connections
-
   startConnection(from: HandleRef & { kind: HandleKind }, pointer: XYPosition): void {
     this.store.setState({ connection: { from, pointer, candidate: null, valid: false } });
   }
 
-  /** Starts dragging one end of an existing edge; the other end stays attached. */
   startReconnect(edgeId: string, end: EdgeEnd, pointer: XYPosition): void {
     const edge = this.getEdge(edgeId);
     if (!edge || this.getState().readOnly) return;
@@ -960,7 +961,6 @@ export class FlowEngine {
         };
   }
 
-  /** Finds the handle a connection being dragged to `pointer` would attach to. */
   findConnectionCandidate(pointer: XYPosition): HandleRef | null {
     const s = this.getState();
     const conn = s.connection;
@@ -975,7 +975,7 @@ export class FlowEngine {
       const rect = this.getNodeRect(node);
       const inside = pointInRect(pointer, rect);
       if (inside) hovered = node;
-      // Cheap rejection before looking at individual handles.
+
       if (
         !inside &&
         !rectsIntersect(rect, {
@@ -998,7 +998,7 @@ export class FlowEngine {
       }
     }
     if (best || !hovered) return best;
-    // Dropped on a node body: pick its closest valid handle.
+
     const def = this.registry.get(hovered.type);
     const options = def.handles
       .filter((h) => h.kind === wanted)
@@ -1045,7 +1045,6 @@ export class FlowEngine {
     });
   }
 
-  /** Completes the drag: creates the edge if the current candidate is valid. */
   endConnection(): FlowEdge | null {
     const conn = this.getState().connection;
     this.store.setState({ connection: null });
@@ -1069,9 +1068,6 @@ export class FlowEngine {
     this.store.setState({ connection: null });
   }
 
-  // ----------------------------------------------------------- flow level
-
-  /** Loads a flow, replacing the current one. By default history is reset. */
   loadFlow(flow: Partial<FlowJSON>, options: { recordHistory?: boolean } = {}): void {
     const nodes = (flow.nodes ?? []).map((n) => this.normalizeNode(n));
     const edges = flow.edges ?? [];
@@ -1082,9 +1078,14 @@ export class FlowEngine {
       this.setGraph(nodes, edges);
       this.events.emit("operation", { type: "load", flow: { nodes, edges } });
     }
+    this.clipboard = null;
+    this.pasteCount = 0;
     this.store.setState({
       selectedNodeIds: EMPTY_SET,
       selectedEdgeIds: EMPTY_SET,
+      connection: null,
+      selectionRect: null,
+      guides: [],
       validation: null,
       issueNodeIds: EMPTY_MAP,
       issueEdgeIds: EMPTY_MAP,
@@ -1096,7 +1097,6 @@ export class FlowEngine {
     else this.fitView();
   }
 
-  /** Clears the canvas. Recorded in history so it can be undone. */
   newFlow(name = "Untitled flow"): void {
     this.commit([], [], { type: "load", flow: { nodes: [], edges: [] } });
     this.clearValidation();
@@ -1131,8 +1131,6 @@ export class FlowEngine {
     this.events.emit("change", this.getSnapshot());
   }
 
-  // ----------------------------------------------------------- validation
-
   validate(
     rules: ValidationRule[] = this.options.validationRules ?? defaultValidationRules,
   ): ValidationResult {
@@ -1153,8 +1151,6 @@ export class FlowEngine {
     this.store.setState({ validation: null, issueNodeIds: EMPTY_MAP, issueEdgeIds: EMPTY_MAP });
   }
 
-  // -------------------------------------------------------------- settings
-
   setReadOnly(readOnly: boolean): void {
     this.store.setState({ readOnly, connection: null });
   }
@@ -1169,7 +1165,6 @@ export class FlowEngine {
     this.store.setState({ snapToGrid });
   }
 
-  /** Registers a node type at runtime (plugin hook). */
   registerNodeType(definition: NodeTypeDefinition): void {
     this.registry.register(definition);
     this.store.setState({ registryVersion: this.getState().registryVersion + 1 });

@@ -15,17 +15,33 @@ interface Props {
 
 type Status = "idle" | "active" | "connectable" | "valid" | "invalid";
 
-/** Connection point. Dragging from it starts a new connection. */
+function collapsedCounterpart(
+  definition: NodeTypeDefinition,
+  handle: HandleDefinition,
+): HandleDefinition | undefined {
+  if (handle.label || handle.kind !== "source") return undefined;
+  return definition.handles.find(
+    (other) => other.side === handle.side && !other.label && other.kind === "target",
+  );
+}
+
 export const Handle = memo(function Handle({ nodeId, handle, definition, width, height }: Props) {
   const { engine, clientToFlow } = useFlowContext();
   const startDrag = usePointerDrag();
+  const counterpart = collapsedCounterpart(definition, handle);
   const status = useFlowState((s): Status => {
     const c = s.connection;
     if (!c) return "idle";
-    if (c.candidate?.nodeId === nodeId && c.candidate.handleId === handle.id)
+    const matchesCandidate = (id: string) =>
+      c.candidate?.nodeId === nodeId && c.candidate.handleId === id;
+    if (matchesCandidate(handle.id) || (counterpart && matchesCandidate(counterpart.id)))
       return c.valid ? "valid" : "invalid";
     if (c.from.nodeId === nodeId && c.from.handleId === handle.id) return "active";
-    return c.from.kind !== handle.kind && c.from.nodeId !== nodeId ? "connectable" : "idle";
+    if (c.from.nodeId === nodeId) return "idle";
+    const acceptsFrom = (kind: typeof handle.kind) => c.from.kind !== kind;
+    return acceptsFrom(handle.kind) || (counterpart && acceptsFrom(counterpart.kind))
+      ? "connectable"
+      : "idle";
   });
 
   const onPointerDown = useCallback(
@@ -42,6 +58,7 @@ export const Handle = memo(function Handle({ nodeId, handle, definition, width, 
         threshold: 0,
         onMove: (ev) => engine.updateConnection(clientToFlow({ x: ev.clientX, y: ev.clientY })),
         onEnd: () => engine.endConnection(),
+        onCancel: () => engine.cancelConnection(),
       });
     },
     [engine, nodeId, handle.id, handle.kind, clientToFlow, startDrag],
@@ -59,7 +76,9 @@ export const Handle = memo(function Handle({ nodeId, handle, definition, width, 
       style={{ left: offset.x, top: offset.y }}
       data-handle-id={handle.id}
       data-handle-kind={handle.kind}
-      title={handle.label ?? (handle.kind === "source" ? "Output" : "Input")}
+      title={
+        handle.label ?? (counterpart ? "Connect" : handle.kind === "source" ? "Output" : "Input")
+      }
       onPointerDown={onPointerDown}
     >
       {handle.label && <span className="wpn-flowchart-node__handle-label">{handle.label}</span>}

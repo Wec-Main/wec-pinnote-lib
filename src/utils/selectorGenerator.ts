@@ -3,7 +3,7 @@ const UNSTABLE_ID_PATTERNS = [
   /^ember\d+/i,
   /^react-select/i,
   /^:r[0-9a-z]+/i,
-  // React 19's useId() format (":r0:" in React 18 became "_r_0_" in React 19).
+
   /^_r_[0-9a-z]+_$/i,
   /^[a-f0-9]{8,}$/i,
 ];
@@ -149,9 +149,7 @@ export function generateSelector(element: Element): {
 
   const selector = generatedPathSelector(element);
   return {
-    // Leave elementIdentifier blank rather than falling back to a raw (possibly
-    // framework-generated, e.g. React's useId "_r_0_") id — the caller fills in
-    // a human-readable label instead (see elementAnchor.ts).
+
     selector,
     elementIdentifier: annotationId ?? "",
   };

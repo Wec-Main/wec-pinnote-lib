@@ -6,15 +6,16 @@ import { NODE_DRAG_MIME } from "../../utils/flowchart/constants";
 import { NodeIcon } from "./FlowIcons";
 
 export interface SidebarProps {
-  /** Restrict / order the palette. Defaults to every registered node type. */
+
   nodeTypes?: string[];
   className?: string;
+  style?: CSSProperties;
 }
 
-/** Node palette: drag an item onto the canvas, or click it to add at the viewport center. */
 export const Sidebar = memo(function Sidebar({
   nodeTypes,
   className,
+  style,
 }: SidebarProps) {
   const engine = useFlowEngine();
   const readOnly = useFlowState((s) => s.readOnly);
@@ -37,7 +38,7 @@ export const Sidebar = memo(function Sidebar({
   const addAtCenter = (def: NodeTypeDefinition) => {
     const { canvasSize } = engine.getState();
     const c = engine.screenToFlow({ x: canvasSize.width / 2, y: canvasSize.height / 2 });
-    // Small jitter so repeated clicks don't stack nodes exactly on top of each other.
+
     const jitter = (engine.getNodes().length % 5) * 16;
     const node = engine.addNode({
       type: def.type,
@@ -55,8 +56,8 @@ export const Sidebar = memo(function Sidebar({
         "wpn-flowchart-sidebar__sidebar",
         className,
       )}
+      style={style}
     >
-      <div className="wpn-flowchart-sidebar__header"></div>
       <div className="wpn-flowchart-sidebar__list">
           {groups.map(([category, defs]) => (
             <div key={category} className="wpn-flowchart-sidebar__group">
@@ -84,7 +85,17 @@ export const Sidebar = memo(function Sidebar({
                   }}
                   onClick={() => !readOnly && addAtCenter(def)}
                   onKeyDown={(e) => {
-                    if (!readOnly && (e.key === "Enter" || e.key === " ")) {
+                    if (e.key === " ") {
+                      e.preventDefault();
+                      return;
+                    }
+                    if (!readOnly && e.key === "Enter") {
+                      e.preventDefault();
+                      addAtCenter(def);
+                    }
+                  }}
+                  onKeyUp={(e) => {
+                    if (!readOnly && e.key === " ") {
                       e.preventDefault();
                       addAtCenter(def);
                     }

@@ -1,5 +1,5 @@
 import { useRef, useState, type FormEvent } from "react";
-import { Icon, Spinner, Tooltip } from "../primitives";
+import { Icon, SearchableSelect, Spinner, Tooltip } from "../primitives";
 import { useEscapeKey } from "../../hooks/useEscapeKey";
 import { useFocusTrap } from "../../hooks/useFocusTrap";
 import { useScrimDismiss } from "../../hooks/useScrimDismiss";
@@ -11,15 +11,17 @@ const DESCRIPTION_MAX = 500;
 interface UserStoryFormModalProps {
   mode: "create" | "edit";
   epic: Epic;
+  epics: Epic[];
   initialStory?: UserStory;
   busy?: boolean;
   onClose: () => void;
-  onSubmit: (data: { title: string; description: string }) => void;
+  onSubmit: (data: { title: string; description: string; epicId: string }) => void;
 }
 
 export function UserStoryFormModal({
   mode,
   epic,
+  epics,
   initialStory,
   busy = false,
   onClose,
@@ -27,6 +29,7 @@ export function UserStoryFormModal({
 }: UserStoryFormModalProps) {
   const [title, setTitle] = useState(initialStory?.title ?? "");
   const [description, setDescription] = useState(initialStory?.description ?? "");
+  const [epicId, setEpicId] = useState(epic.id);
   const [touched, setTouched] = useState(false);
   const dialogRef = useRef<HTMLFormElement>(null);
   const titleInputRef = useRef<HTMLInputElement>(null);
@@ -53,7 +56,7 @@ export function UserStoryFormModal({
     if (!titleValid || !descriptionValid || busy) {
       return;
     }
-    onSubmit({ title: trimmedTitle, description: trimmedDescription });
+    onSubmit({ title: trimmedTitle, description: trimmedDescription, epicId });
   };
 
   return (
@@ -94,10 +97,14 @@ export function UserStoryFormModal({
           <div className="wpn-epicflow-modal__fields">
             <div className="wpn-epicflow-modal__field">
               <span className="wpn-epicflow-modal__label">Epic</span>
-              <div className="wpn-epicflow-modal__readonly">
-                <Icon name="epic" className="wpn-epicflow-modal__readonly-icon" />
-                {epic.title}
-              </div>
+              <SearchableSelect
+                options={epics.map((item) => ({ value: item.id, label: item.title }))}
+                value={epicId}
+                onChange={(next) => next && setEpicId(next)}
+                placeholder="Select an epic"
+                searchPlaceholder="Search epics"
+                ariaLabel="Epic for this user story"
+              />
             </div>
 
             <label className="wpn-epicflow-modal__field">
@@ -122,7 +129,7 @@ export function UserStoryFormModal({
 
             <label className="wpn-epicflow-modal__field">
               <span className="wpn-epicflow-modal__label">
-                Description <span className="wpn-epicflow-modal__required">*</span>
+                Notes <span className="wpn-epicflow-modal__required">*</span>
               </span>
               <textarea
                 className="wpn-epicflow-modal__input wpn-epicflow-modal__textarea"
@@ -136,7 +143,7 @@ export function UserStoryFormModal({
                 {description.length}/{DESCRIPTION_MAX}
               </span>
               {touched && !descriptionValid ? (
-                <span className="wpn-users-modal__error">A description is required.</span>
+                <span className="wpn-users-modal__error">Notes are required.</span>
               ) : null}
             </label>
           </div>

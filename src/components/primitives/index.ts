@@ -12,12 +12,13 @@ export { RefreshButton } from "./RefreshButton";
 export { Spinner } from "./Spinner";
 export { TableSkeleton } from "./TableSkeleton";
 export type { SkeletonCell } from "./TableSkeleton";
-export { Menu } from "./Menu";
+export { Menu, MenuPanel } from "./Menu";
 export type {
   MenuActionItem,
   MenuCheckboxItem,
   MenuDefinition,
   MenuItemDefinition,
+  MenuPanelProps,
   MenuSeparatorItem,
   MenuSubmenuItem,
 } from "./Menu";

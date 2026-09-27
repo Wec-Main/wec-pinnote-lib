@@ -13,10 +13,6 @@ export interface EdgeGeometry extends EdgePath {
   targetSide: HandleSide;
 }
 
-/**
- * Path of one edge. Re-computes only when the edge itself or one of its two
- * endpoint nodes changes, so dragging a node only re-renders its own edges.
- */
 export function useEdgeGeometry(edgeId: string): EdgeGeometry | null {
   const engine = useFlowEngine();
   const [edge, sourceNode, targetNode, defaultType] = useFlowState((s) => {

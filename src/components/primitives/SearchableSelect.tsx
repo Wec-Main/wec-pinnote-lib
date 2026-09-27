@@ -15,9 +15,9 @@ interface SearchableSelectProps {
   emptyMessage?: string;
   ariaLabel: string;
   clearable?: boolean;
+  clearValue?: string;
   size?: "md" | "sm";
   id?: string;
-  floating?: boolean;
   searchable?: boolean;
 }
 
@@ -30,9 +30,9 @@ export function SearchableSelect({
   emptyMessage = "No options found.",
   ariaLabel,
   clearable = false,
+  clearValue = "",
   size = "md",
   id,
-  floating = false,
   searchable = true,
 }: SearchableSelectProps) {
   const {
@@ -54,7 +54,7 @@ export function SearchableSelect({
   } = useComboboxList({ options, activeValue: value });
 
   const menuRef = useRef<HTMLDivElement>(null);
-  const floatingPosition = useFloatingPosition(rootRef, menuRef, floating && open, "bottom-start");
+  const floatingPosition = useFloatingPosition(rootRef, menuRef, open, "bottom-start");
 
   const selected = options.find((option) => option.value === value) ?? null;
 
@@ -79,34 +79,30 @@ export function SearchableSelect({
         listboxId={searchable ? undefined : listboxId}
         activeDescendant={searchable ? undefined : activeDescendant}
         onToggle={() => (open ? setOpen(false) : openMenu())}
+        onClear={
+          clearable && selected && value !== clearValue
+            ? () => {
+                onChange(clearValue);
+                setOpen(false);
+              }
+            : undefined
+        }
       />
-      {clearable && selected ? (
-        <button
-          type="button"
-          aria-label="Clear"
-          className="wpn-select__clear"
-          onClick={() => onChange("")}
-        >
-          <Icon name="close" className="wpn-select__clear-icon" />
-        </button>
-      ) : null}
 
       {open ? (
         <div
           ref={menuRef}
           className={[
             "wpn-select__menu",
-            floating ? "wpn-select__menu--floating" : "",
+            "wpn-select__menu--floating",
             searchable ? "" : "wpn-select__menu--fit",
           ]
             .filter(Boolean)
             .join(" ")}
           style={
-            floating
-              ? floatingPosition
-                ? { top: floatingPosition.top, left: floatingPosition.left }
-                : { visibility: "hidden" }
-              : undefined
+            floatingPosition
+              ? { top: floatingPosition.top, left: floatingPosition.left }
+              : { visibility: "hidden" }
           }
         >
           {searchable ? (

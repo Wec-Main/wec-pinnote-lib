@@ -13,10 +13,6 @@ const east = new Set<Handle>(["ne", "e", "se"]);
 const north = new Set<Handle>(["nw", "n", "ne"]);
 const south = new Set<Handle>(["sw", "s", "se"]);
 
-/**
- * Corner grips resize both dimensions at once; edge-midpoint grips (like
- * draw.io) resize only width (E/W) or only height (N/S).
- */
 export function ResizeHandles({
   nodeId,
   definition,
@@ -59,6 +55,9 @@ export function ResizeHandles({
           });
         },
         onEnd: (_ev, moved) => {
+          if (moved) engine.endInteraction();
+        },
+        onCancel: (moved) => {
           if (moved) engine.endInteraction();
         },
       });

@@ -86,7 +86,6 @@ function TypePicker({
   );
 }
 
-/** "+" buttons around a node that add and connect a new node on that side. */
 export const QuickAdd = memo(function QuickAdd({
   nodeId,
   definition,

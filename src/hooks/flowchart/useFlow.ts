@@ -8,7 +8,6 @@ export const useEdges = (): FlowEdge[] => useFlowState((s) => s.edges);
 export const useViewport = () => useFlowState((s) => s.viewport);
 export const useReadOnly = () => useFlowState((s) => s.readOnly);
 
-/** Currently selected nodes and edges. */
 export function useSelection() {
   const [nodeIds, edgeIds] = useFlowState(
     (s) => [s.selectedNodeIds, s.selectedEdgeIds] as const,

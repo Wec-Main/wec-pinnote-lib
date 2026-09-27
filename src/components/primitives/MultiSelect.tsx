@@ -1,5 +1,6 @@
-import { useMemo } from "react";
+import { useMemo, useRef } from "react";
 import { useComboboxList, type ComboboxOption } from "../../hooks/useComboboxList";
+import { useFloatingPosition } from "../../hooks/useFloatingPosition";
 import { Icon } from "./Icon";
 import { SelectSearchField, SelectTrigger } from "./SelectParts";
 import type { SelectOption } from "./SearchableSelect";
@@ -45,6 +46,9 @@ export function MultiSelect({
     onRootKeyDown,
   } = useComboboxList({ options, activeValue: null });
 
+  const menuRef = useRef<HTMLDivElement>(null);
+  const floatingPosition = useFloatingPosition(rootRef, menuRef, open, "bottom-start");
+
   const selectedSet = useMemo(() => new Set(values), [values]);
   const selected = options.filter((option) => selectedSet.has(option.value));
 
@@ -82,20 +86,25 @@ export function MultiSelect({
         placeholder={placeholder}
         ariaLabel={ariaLabel}
         onToggle={() => (open ? closeMenu() : openMenu())}
+        onClear={
+          selected.length > 0
+            ? () => {
+                onChange([]);
+                closeMenu();
+              }
+            : undefined
+        }
       />
-      {selected.length > 0 ? (
-        <button
-          type="button"
-          aria-label="Clear"
-          className="wpn-select__clear"
-          onClick={() => onChange([])}
-        >
-          <Icon name="close" className="wpn-select__clear-icon" />
-        </button>
-      ) : null}
-
       {open ? (
-        <div className="wpn-select__menu">
+        <div
+          ref={menuRef}
+          className="wpn-select__menu wpn-select__menu--floating"
+          style={
+            floatingPosition
+              ? { top: floatingPosition.top, left: floatingPosition.left }
+              : { visibility: "hidden" }
+          }
+        >
           <SelectSearchField
             inputRef={inputRef}
             value={query}

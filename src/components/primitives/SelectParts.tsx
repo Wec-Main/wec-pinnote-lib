@@ -12,6 +12,7 @@ interface SelectTriggerProps {
   listboxId?: string;
   activeDescendant?: string;
   onToggle: () => void;
+  onClear?: () => void;
 }
 
 export function SelectTrigger({
@@ -25,6 +26,7 @@ export function SelectTrigger({
   listboxId,
   activeDescendant,
   onToggle,
+  onClear,
 }: SelectTriggerProps) {
   return (
     <button
@@ -50,6 +52,20 @@ export function SelectTrigger({
         {label || placeholder}
       </span>
       <span className="wpn-select__indicators">
+        {onClear ? (
+          <span
+            role="button"
+            tabIndex={-1}
+            aria-label={`Clear ${ariaLabel}`}
+            className="wpn-select__clear"
+            onClick={(event) => {
+              event.stopPropagation();
+              onClear();
+            }}
+          >
+            <Icon name="close" className="wpn-select__clear-icon" />
+          </span>
+        ) : null}
         <Icon name="chevronDown" className="wpn-select__chevron" />
       </span>
     </button>

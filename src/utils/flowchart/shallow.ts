@@ -1,4 +1,4 @@
-/** Shallow equality for arrays / plain objects (one level deep, Object.is per item). */
+
 export function shallowEqual<T>(a: T, b: T): boolean {
   if (Object.is(a, b)) return true;
   if (typeof a !== "object" || typeof b !== "object" || a === null || b === null) return false;
@@ -17,6 +17,5 @@ export function shallowEqual<T>(a: T, b: T): boolean {
   return true;
 }
 
-/** Joins truthy class names. */
 export const cx = (...names: (string | false | null | undefined)[]) =>
   names.filter(Boolean).join(" ");

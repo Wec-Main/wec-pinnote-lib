@@ -8,7 +8,6 @@ import { usePointerDrag } from "./usePointerDrag";
 const GUIDE_THRESHOLD_PX = 6;
 const GUIDE_CANDIDATE_LIMIT = 200;
 
-/** Pointer-down handler that selects a node and drags it (and the rest of the selection). */
 export function useNodeDrag(nodeId: string) {
   const { engine, canvasRef } = useFlowContext();
   const startDrag = usePointerDrag();
@@ -62,6 +61,10 @@ export function useNodeDrag(nodeId: string) {
           engine.setNodePositions(positions);
         },
         onEnd: (_ev, moved) => {
+          engine.setGuides([]);
+          if (moved) engine.endInteraction();
+        },
+        onCancel: (moved) => {
           engine.setGuides([]);
           if (moved) engine.endInteraction();
         },

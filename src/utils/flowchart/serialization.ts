@@ -77,12 +77,6 @@ function parseEdge(raw: unknown, index: number): FlowEdge {
   return edge;
 }
 
-/**
- * Parses and structurally validates flow JSON (string or object). Throws a
- * FlowParseError with a readable message when the input is malformed.
- * Semantic problems (e.g. edges pointing at missing nodes) are left to the
- * Validator so that imperfect flows can still be opened and fixed.
- */
 export function parseFlow(input: string | unknown): FlowJSON {
   let raw: unknown = input;
   if (typeof input === "string") {
@@ -105,6 +99,16 @@ export function parseFlow(input: string | unknown): FlowJSON {
     seen.add(n.id);
   }
   const edges = ((raw.edges as unknown[] | undefined) ?? []).map(parseEdge);
+  const seenEdges = new Set<string>();
+  for (const e of edges) {
+    if (seenEdges.has(e.id)) throw new FlowParseError(`Duplicate edge id "${e.id}"`);
+    seenEdges.add(e.id);
+  }
+  if (isFiniteNumber(raw.version) && raw.version > FLOW_JSON_VERSION) {
+    throw new FlowParseError(
+      `Flow version ${raw.version} is newer than this editor supports (${FLOW_JSON_VERSION})`,
+    );
+  }
   const flow: FlowJSON = {
     version: isFiniteNumber(raw.version) ? raw.version : FLOW_JSON_VERSION,
     nodes,

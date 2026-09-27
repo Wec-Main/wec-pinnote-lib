@@ -105,9 +105,8 @@ describe("filterThreads", () => {
     expect(pinIds(DEFAULT_COMMENT_FILTERS)).toEqual(["a2", "a1"]);
   });
 
-  it("sorts oldest first and by pin number", () => {
+  it("sorts oldest first", () => {
     expect(pinIds(withFilters({ sort: "oldest" }))).toEqual(["a1", "a2"]);
-    expect(pinIds(withFilters({ sort: "pin" }))).toEqual(["a1", "a2"]);
   });
 
   it("splits resolved from unresolved by annotation status", () => {
@@ -143,7 +142,7 @@ describe("filtersActive", () => {
     expect(filtersActive(withFilters({ author: "u2" }))).toBe(true);
     expect(filtersActive(withFilters({ resolution: "resolved" }))).toBe(true);
     expect(filtersActive(withFilters({ mineOnly: true }))).toBe(true);
-    expect(filtersActive(withFilters({ sort: "pin" }))).toBe(true);
+    expect(filtersActive(withFilters({ sort: "oldest" }))).toBe(true);
   });
 });
 

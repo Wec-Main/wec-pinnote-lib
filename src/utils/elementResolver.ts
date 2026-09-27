@@ -2,9 +2,33 @@ import type { AnnotationAnchor } from "../types/annotation.types";
 import { cssEscape } from "./selectorGenerator";
 
 const LIBRARY_ROOT_CLASS = "wpn-root";
+const LABELABLE_SELECTOR =
+  "input, textarea, select, button, a, [role], [aria-label], h1, h2, h3, h4, h5, h6, label, p, span";
 
 export function isLibraryElement(target: EventTarget | null): boolean {
   return target instanceof Element && Boolean(target.closest(`.${LIBRARY_ROOT_CLASS}`));
+}
+
+function findByLabel(label: string): Element | null {
+  const candidates = document.querySelectorAll(LABELABLE_SELECTOR);
+  let match: Element | null = null;
+  for (const candidate of candidates) {
+    if (isLibraryElement(candidate)) {
+      continue;
+    }
+
+    if (label === candidate.tagName.toLowerCase()) {
+      continue;
+    }
+    if (getElementLabel(candidate) === label) {
+      if (match) {
+
+        return null;
+      }
+      match = candidate;
+    }
+  }
+  return match;
 }
 
 export function resolveElement(anchor: AnnotationAnchor): Element | null {
@@ -15,7 +39,7 @@ export function resolveElement(anchor: AnnotationAnchor): Element | null {
         return bySelector;
       }
     } catch {
-      // Invalid selectors fall through to identifier lookup.
+      // A stored selector can be invalid CSS; fall through to the other strategies.
     }
   }
 
@@ -32,6 +56,11 @@ export function resolveElement(anchor: AnnotationAnchor): Element | null {
       if (byId) {
         return byId;
       }
+    }
+
+    const byLabel = findByLabel(anchor.elementIdentifier);
+    if (byLabel) {
+      return byLabel;
     }
   }
 

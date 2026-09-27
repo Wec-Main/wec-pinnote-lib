@@ -102,9 +102,12 @@ export function useSseStream({
         resync();
         return;
       }
-      lastEventRef.current = { scope, eventId: parsed.eventId };
       if (parsed.truncated) {
         resync();
+        return;
+      }
+      lastEventRef.current = { scope, eventId: parsed.eventId };
+      if (parsed.projectId !== projectId || parsed.pageKey !== pageKey) {
         return;
       }
       onEventRef.current(parsed);
@@ -257,7 +260,6 @@ export function useSseStream({
         return;
       }
       clearReconnectTimer();
-      reconnectDelay = RECONNECT_DELAY_MS;
       void connect();
     };
 

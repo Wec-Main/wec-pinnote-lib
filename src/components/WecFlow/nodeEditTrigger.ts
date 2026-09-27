@@ -1,7 +1,6 @@
 import { useSyncExternalStore } from "react";
 import type { FlowEngine } from "../../utils/flowchart/flowEngine";
 
-/** Local, non-persisted signal for which node should open in inline label-edit mode. */
 const editStore = (() => {
   let current: string | null = null;
   const listeners = new Set<() => void>();
@@ -29,7 +28,6 @@ export function useNodeEditTarget(): [string | null, (id: string | null) => void
   return [id, editStore.set];
 }
 
-/** Opens every freshly created node in inline edit mode as soon as it appears on the canvas. */
 export function watchNodeCreationForInlineEdit(engine: FlowEngine): () => void {
   return engine.on("operation", (op) => {
     if (op.type === "addNode") editStore.set(op.node.id);

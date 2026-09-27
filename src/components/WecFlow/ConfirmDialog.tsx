@@ -1,5 +1,8 @@
-import { useEffect, useId, useRef, type ReactNode } from "react";
+import { useId, useRef, type ReactNode } from "react";
 import { cx } from "../../utils/flowchart/shallow";
+import { useEscapeKey } from "../../hooks/useEscapeKey";
+import { useFocusTrap } from "../../hooks/useFocusTrap";
+import { useScrimDismiss } from "../../hooks/useScrimDismiss";
 import { Icon, type IconName } from "./FlowIcons";
 
 export interface ConfirmDialogProps {
@@ -25,28 +28,24 @@ export function ConfirmDialog({
 }: ConfirmDialogProps) {
   const titleId = useId();
   const confirmRef = useRef<HTMLButtonElement>(null);
+  const dialogRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
-    confirmRef.current?.focus();
-  }, []);
-
-  const onKeyDown = (e: React.KeyboardEvent) => {
-    e.stopPropagation();
-    if (e.key === "Escape" && !busy) onCancel();
+  const dismiss = () => {
+    if (!busy) onCancel();
   };
 
+  useEscapeKey(dismiss);
+  useFocusTrap(dialogRef, confirmRef);
+  const scrimProps = useScrimDismiss(dismiss);
+
   return (
-    <div
-      className="wpn-flowchart-confirm__scrim"
-      onPointerDown={() => !busy && onCancel()}
-      onKeyDown={onKeyDown}
-    >
+    <div className="wpn-flowchart-confirm__scrim" {...scrimProps}>
       <div
+        ref={dialogRef}
         className="wpn-flowchart-confirm__dialog"
         role="alertdialog"
         aria-modal="true"
         aria-labelledby={titleId}
-        onPointerDown={(e) => e.stopPropagation()}
       >
         <div className="wpn-flowchart-confirm__header">
           <span className="wpn-flowchart-confirm__icon">

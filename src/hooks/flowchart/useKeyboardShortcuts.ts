@@ -6,10 +6,6 @@ const isEditable = (el: EventTarget | null) =>
   el instanceof HTMLElement &&
   (el.isContentEditable || ["INPUT", "TEXTAREA", "SELECT"].includes(el.tagName));
 
-/**
- * Keyboard handler for an editor root element (attach to `onKeyDown`).
- * Ignores events coming from form fields.
- */
 export function useKeyboardShortcuts() {
   const engine = useFlowEngine();
 

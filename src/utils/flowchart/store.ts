@@ -1,10 +1,5 @@
 export type Listener = () => void;
 
-/**
- * Minimal observable state container. React subscribes to it through
- * `useSyncExternalStore` with selectors, so components only re-render when
- * the slice they select actually changes.
- */
 export class Store<S extends object> {
   private state: S;
   private readonly listeners = new Set<Listener>();
@@ -26,7 +21,10 @@ export class Store<S extends object> {
     }
     if (!changed) return;
     this.state = { ...this.state, ...next };
-    this.listeners.forEach((l) => l());
+
+    for (const listener of [...this.listeners]) {
+      if (this.listeners.has(listener)) listener();
+    }
   };
 
   subscribe = (listener: Listener): (() => void) => {

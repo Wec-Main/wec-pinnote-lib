@@ -2,6 +2,9 @@ import { describe, expect, it } from "vitest";
 import { FlowEngine } from "../src/utils/flowchart/flowEngine";
 import { getStepBend, getStepPoints } from "../src/utils/flowchart/edgePaths";
 import { parseFlow } from "../src/utils/flowchart/serialization";
+import { checkConnection } from "../src/utils/flowchart/connectionRules";
+import { NodeTypeRegistry } from "../src/utils/flowchart/nodeTypes";
+import type { FlowEdge, FlowNode } from "../src/types/flowchart.types";
 
 function startProcessEnd() {
   const engine = new FlowEngine();
@@ -144,5 +147,40 @@ describe("bend follows moved nodes", () => {
     const { engine, a, b } = bentFlow();
     engine.duplicateNodes([a.id, b.id], { x: 0, y: 500 });
     expect(engine.getEdges().map((e) => e.bend)).toEqual([150, 650]);
+  });
+});
+
+describe("duplicate connection detection", () => {
+  it("allows a distinct handle pair when the stored edge has no explicit handles", () => {
+    const registry = new NodeTypeRegistry();
+    const a: FlowNode = {
+      id: "a",
+      type: "process",
+      position: { x: 0, y: 0 },
+      data: { label: "A", properties: {} },
+    };
+    const b: FlowNode = {
+      id: "b",
+      type: "process",
+      position: { x: 0, y: 200 },
+      data: { label: "B", properties: {} },
+    };
+    const nodeLookup = new Map([
+      ["a", a],
+      ["b", b],
+    ]);
+    const legacyEdge: FlowEdge = { id: "e1", source: "a", target: "b" };
+
+    const distinct = checkConnection(
+      { source: "a", target: "b", sourceHandle: "out-right", targetHandle: "in-left" },
+      { nodeLookup, edges: [legacyEdge], registry },
+    );
+    expect(distinct.valid).toBe(true);
+
+    const sameAsStored = checkConnection(
+      { source: "a", target: "b", sourceHandle: "out-top", targetHandle: "in-top" },
+      { nodeLookup, edges: [legacyEdge], registry },
+    );
+    expect(sameAsStored.valid).toBe(false);
   });
 });

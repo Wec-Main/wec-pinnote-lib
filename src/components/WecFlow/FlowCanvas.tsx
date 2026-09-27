@@ -3,10 +3,21 @@ import { useFlowContext, useFlowState } from "../../context/FlowContext";
 import { useKeyboardShortcuts } from "../../hooks/flowchart/useKeyboardShortcuts";
 import { usePointerDrag } from "../../hooks/flowchart/usePointerDrag";
 import { NODE_DRAG_MIME } from "../../utils/flowchart/constants";
-import { rectFromPoints } from "../../utils/flowchart/geometry";
+import { flowToScreen, rectFromPoints } from "../../utils/flowchart/geometry";
+import {
+  findEdgeDropTarget,
+  type EdgeSegment,
+} from "../../utils/flowchart/edgeDropTarget";
 import { cx } from "../../utils/flowchart/shallow";
 import { ContextMenu, type ContextMenuRequest, type ContextMenuTarget } from "./ContextMenu";
-import { EdgeControlsLayer, EdgeLabelRenderer, EdgeRenderer } from "./EdgeRenderer";
+import {
+  dropTargetEdgeStore,
+  EdgeControlsLayer,
+  EdgeLabelRenderer,
+  EdgeRenderer,
+  useDropTargetEdge,
+  type EdgeDropTarget,
+} from "./EdgeRenderer";
 import { NodeRenderer } from "./NodeRenderer";
 import { Icon } from "./FlowIcons";
 import { Background, type BackgroundVariant } from "./Background";
@@ -17,14 +28,30 @@ export interface FlowCanvasProps {
   background?: BackgroundVariant;
   showMiniMap?: boolean;
   showControls?: boolean;
-  /** Handle keyboard shortcuts on the canvas itself (FlowEditor handles them on its root instead). */
+
   keyboardShortcuts?: boolean;
   className?: string;
-  /** Extra overlay content (rendered above the canvas, in screen space). */
+
   children?: ReactNode;
 }
 
-/** Transformed layer holding edges, labels and nodes in flow coordinates. */
+const EDGE_DROP_TOLERANCE_PX = 28;
+
+/** "+" badge shown on the connection a dragged node would be inserted into. */
+const EdgeDropIndicator = memo(function EdgeDropIndicator() {
+  const target = useDropTargetEdge();
+  if (!target) return null;
+  return (
+    <div
+      className="wpn-flowchart-canvas__edge-drop"
+      style={{ left: target.x, top: target.y }}
+      aria-hidden="true"
+    >
+      <Icon name="plus" size={12} />
+    </div>
+  );
+});
+
 const ViewportLayer = memo(function ViewportLayer() {
   const { x, y, zoom } = useFlowState((s) => s.viewport);
   return (
@@ -124,10 +151,6 @@ const ConnectionHint = memo(function ConnectionHint() {
   return reason ? <div className="wpn-flowchart-canvas__hint">{reason}</div> : null;
 });
 
-/**
- * The interactive canvas: infinite pan/zoom workspace with grid, nodes,
- * edges, rubber-band selection, drop target for the palette and minimap.
- */
 export function FlowCanvas({
   background = "dots",
   showMiniMap = true,
@@ -148,7 +171,6 @@ export function FlowCanvas({
   const startDrag = usePointerDrag();
   const onKeyDown = useKeyboardShortcuts();
 
-  // Track canvas size (needed for fit view, zoom centering and the minimap).
   useEffect(() => {
     const el = canvasRef.current;
     if (!el) return;
@@ -160,7 +182,16 @@ export function FlowCanvas({
     return () => ro.disconnect();
   }, [engine, canvasRef]);
 
-  // Wheel zoom (non-passive listener so we can prevent page scrolling).
+  useEffect(() => {
+    const release = () => setSpaceHeld(false);
+    window.addEventListener("blur", release);
+    document.addEventListener("visibilitychange", release);
+    return () => {
+      window.removeEventListener("blur", release);
+      document.removeEventListener("visibilitychange", release);
+    };
+  }, []);
+
   useEffect(() => {
     const el = canvasRef.current;
     if (!el) return;
@@ -198,19 +229,30 @@ export function FlowCanvas({
             engine.setSelectionRect(null);
             if (!moved && !additive) engine.clearSelection();
           },
+          onCancel: () => engine.setSelectionRect(null),
         });
         return;
       }
       if (e.button !== 0 && e.button !== 1) return;
       e.preventDefault();
-      const start = engine.getState().viewport;
+      let applied = { x: 0, y: 0 };
       startDrag(e, {
         onStart: () => setPanning(true),
-        onMove: (_ev, d) => engine.setViewport({ ...start, x: start.x + d.x, y: start.y + d.y }),
+        onMove: (_ev, d) => {
+
+          const current = engine.getState().viewport;
+          engine.setViewport({
+            ...current,
+            x: current.x + (d.x - applied.x),
+            y: current.y + (d.y - applied.y),
+          });
+          applied = d;
+        },
         onEnd: (_ev, moved) => {
           setPanning(false);
           if (!moved) engine.clearSelection();
         },
+        onCancel: () => setPanning(false),
       });
     },
     [engine, canvasRef, clientToFlow, mode, spaceHeld, startDrag],
@@ -241,18 +283,66 @@ export function FlowCanvas({
     setSpaceHeld(e.type === "keydown");
   };
 
+  const onCanvasKeyDown = (e: React.KeyboardEvent) => {
+
+    if (e.key === "Escape") {
+      startDrag.cancel();
+      engine.cancelInteraction();
+    }
+    onSpaceKey(e);
+    if (keyboardShortcuts) onKeyDown(e);
+  };
+
+  // Works purely from graph state: during an HTML5 drag the pointer is over the
+  // drag image, so DOM hit-testing at the cursor cannot be relied on here.
+  const edgeDropAtPoint = (clientX: number, clientY: number): EdgeDropTarget | null => {
+    const state = engine.getState();
+    const segments: EdgeSegment[] = [];
+    for (const edge of state.edges) {
+      const source = state.nodeLookup.get(edge.source);
+      const target = state.nodeLookup.get(edge.target);
+      if (!source || !target) continue;
+      const a = engine.getNodeRect(source);
+      const b = engine.getNodeRect(target);
+      segments.push({
+        edgeId: edge.id,
+        source: { x: a.x + a.width / 2, y: a.y + a.height / 2 },
+        target: { x: b.x + b.width / 2, y: b.y + b.height / 2 },
+      });
+    }
+    const nodeRects = state.nodes.map((node) => engine.getNodeRect(node));
+    const point = clientToFlow({ x: clientX, y: clientY });
+    const zoom = state.viewport.zoom || 1;
+    const hit = findEdgeDropTarget(point, segments, nodeRects, EDGE_DROP_TOLERANCE_PX / zoom);
+    if (!hit) return null;
+    const canvasPoint = flowToScreen(hit.point, state.viewport);
+    return { edgeId: hit.edgeId, distance: hit.distance, x: canvasPoint.x, y: canvasPoint.y };
+  };
+
   const onDragOver = (e: React.DragEvent) => {
     if (readOnly || !e.dataTransfer.types.includes(NODE_DRAG_MIME)) return;
     e.preventDefault();
     e.dataTransfer.dropEffect = "copy";
+    dropTargetEdgeStore.set(edgeDropAtPoint(e.clientX, e.clientY));
+  };
+
+  const onDragLeave = (e: React.DragEvent) => {
+    if (e.currentTarget.contains(e.relatedTarget as Node | null)) return;
+    dropTargetEdgeStore.set(null);
   };
 
   const onDrop = (e: React.DragEvent) => {
     const type = e.dataTransfer.getData(NODE_DRAG_MIME);
+    const target = edgeDropAtPoint(e.clientX, e.clientY);
+    dropTargetEdgeStore.set(null);
     if (readOnly || !type) return;
     e.preventDefault();
-    const def = engine.getDefinition(type);
     const p = clientToFlow({ x: e.clientX, y: e.clientY });
+    if (target && engine.insertNodeOnEdge(target.edgeId, type, p)) {
+      canvasRef.current?.focus({ preventScroll: true });
+      return;
+    }
+    const def = engine.getDefinition(type);
     const node = engine.addNode({
       type,
       position: engine.snap({
@@ -275,13 +365,11 @@ export function FlowCanvas({
       )}
       tabIndex={0}
       onPointerDown={onPointerDown}
-      onKeyDown={(e) => {
-        onSpaceKey(e);
-        if (keyboardShortcuts) onKeyDown(e);
-      }}
+      onKeyDown={onCanvasKeyDown}
       onKeyUp={onSpaceKey}
       onBlur={() => setSpaceHeld(false)}
       onDragOver={onDragOver}
+      onDragLeave={onDragLeave}
       onDrop={onDrop}
       onContextMenu={onContextMenu}
       onDoubleClick={onDoubleClick}
@@ -289,6 +377,7 @@ export function FlowCanvas({
       <Background variant={grid} />
       <ViewportLayer />
       <SelectionBox />
+      <EdgeDropIndicator />
       <EmptyState />
       <ConnectionHint />
       {showControls && (

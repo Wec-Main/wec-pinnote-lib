@@ -59,7 +59,8 @@ export const MentionTextarea = forwardRef<MentionTextareaHandle, MentionTextarea
     ref,
   ) {
     const fieldRef = useRef<HTMLTextAreaElement>(null);
-    const pendingCaret = useRef<number | null>(null);
+    const pendingCaret = useRef<number | null>(autoFocus ? value.length : null);
+    const autoFocusRef = useRef(Boolean(autoFocus));
     const [mention, setMention] = useState<MentionQuery | null>(null);
     const [activeIndex, setActiveIndex] = useState(0);
     const listboxId = useId();
@@ -69,7 +70,8 @@ export const MentionTextarea = forwardRef<MentionTextareaHandle, MentionTextarea
         mention ? filterMentionCandidates(candidates, mention.query).slice(0, MENU_LIMIT) : [],
       [candidates, mention],
     );
-    const menuOpen = mention !== null && matches.length > 0;
+    const mentionActive = mention !== null;
+    const menuOpen = mentionActive && matches.length > 0;
 
     useLayoutEffect(() => {
       const field = fieldRef.current;
@@ -79,6 +81,10 @@ export const MentionTextarea = forwardRef<MentionTextareaHandle, MentionTextarea
       field.style.height = "auto";
       field.style.height = `${field.scrollHeight}px`;
       if (pendingCaret.current !== null) {
+        if (autoFocusRef.current) {
+          autoFocusRef.current = false;
+          field.focus();
+        }
         field.setSelectionRange(pendingCaret.current, pendingCaret.current);
         pendingCaret.current = null;
       }
@@ -153,6 +159,11 @@ export const MentionTextarea = forwardRef<MentionTextareaHandle, MentionTextarea
           return;
         }
       }
+      if (mentionActive && !menuOpen && event.key === "Enter" && !event.shiftKey) {
+        event.preventDefault();
+        setMention(null);
+        return;
+      }
       if (event.key === "Enter" && !event.shiftKey && onEnter) {
         event.preventDefault();
         onEnter();
@@ -174,7 +185,6 @@ export const MentionTextarea = forwardRef<MentionTextareaHandle, MentionTextarea
           maxLength={maxLength}
           placeholder={placeholder}
           aria-label={ariaLabel}
-          autoFocus={autoFocus}
           role="combobox"
           aria-autocomplete="list"
           aria-expanded={menuOpen}

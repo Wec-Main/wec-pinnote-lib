@@ -7,7 +7,7 @@ const SKELETON_COLUMNS: ReadonlyArray<{ title: string; cards: number }> = [
 export function BoardSkeleton() {
   return (
     <div className="wpn-epicflow-panel__columns" aria-busy="true" aria-live="polite">
-      <span className="wpn-epicflow-skeleton__label">Loading EpicFlow…</span>
+      <span className="wpn-epicflow-skeleton__label">Loading Draft Board…</span>
       {SKELETON_COLUMNS.map((column) => (
         <div key={column.title} className="wpn-epicflow-pane" style={{ flexGrow: 1 }}>
           <div className="wpn-epicflow-column">

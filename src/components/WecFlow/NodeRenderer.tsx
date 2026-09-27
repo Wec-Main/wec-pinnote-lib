@@ -1,7 +1,7 @@
 import { memo, useEffect, type CSSProperties } from "react";
 import { useFlowEngine, useFlowState } from "../../context/FlowContext";
 import { useNodeDrag } from "../../hooks/flowchart/useNodeDrag";
-import { getNodeSize } from "../../utils/flowchart/geometry";
+import { getNodeSize, getRenderedHandles } from "../../utils/flowchart/geometry";
 import { cx, shallowEqual } from "../../utils/flowchart/shallow";
 import { DefaultNodeContent } from "./DefaultNodeContent";
 import { Handle } from "./Handle";
@@ -10,10 +10,6 @@ import { NodeShape } from "./NodeShape";
 import { QuickAdd } from "./QuickAdd";
 import { ResizeHandles } from "./ResizeHandles";
 
-/**
- * Renders one node. Subscribes only to its own node object, selection flag and
- * validation state, so unrelated changes never re-render it.
- */
 export const NodeItem = memo(function NodeItem({ id }: { id: string }) {
   const engine = useFlowEngine();
   const node = useFlowState((s) => s.nodeLookup.get(id));
@@ -65,7 +61,7 @@ export const NodeItem = memo(function NodeItem({ id }: { id: string }) {
         />
       </div>
       {!readOnly &&
-        def.handles.map((h) => (
+        getRenderedHandles(def).map((h) => (
           <Handle
             key={h.id}
             nodeId={id}
@@ -85,7 +81,6 @@ export const NodeItem = memo(function NodeItem({ id }: { id: string }) {
   );
 });
 
-/** Node layer: re-renders only when nodes are added, removed or reordered. */
 export const NodeRenderer = memo(function NodeRenderer() {
   const engine = useFlowEngine();
   const ids = useFlowState((s) => s.nodes.map((n) => n.id), shallowEqual);

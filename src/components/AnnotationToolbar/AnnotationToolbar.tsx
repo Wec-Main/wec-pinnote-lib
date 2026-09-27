@@ -4,15 +4,14 @@ import {
   useAnnotationData,
   useAnnotationUi,
 } from "../../context/AnnotationContext";
-import { AnnotationToggleButton } from "../AnnotationToggleButton";
+import { AnnotationModeButton, AnnotationVisibilityToggle } from "../AnnotationToggleButton";
 import { ToolbarAuthControl } from "../Auth";
 import { Icons } from "../../assets/icons";
 import { Icon, Tooltip } from "../primitives";
 import { isBoolean, usePersistentState } from "../../hooks/usePersistentState";
 
 const EDGE = 8;
-// Temporarily hidden from the launcher per product request; keep the Flow
-// feature (state, panel, API) intact so this can be flipped back on.
+
 const SHOW_FLOW_LAUNCHER_ICON = false;
 
 interface ToolbarPosition {
@@ -50,18 +49,6 @@ export function AnnotationToolbar() {
     userManagementOpen,
     setUserManagementOpen,
     setAuditHistoryOpen,
-    pinsVisible,
-    setPinsVisible,
-    tagModeEnabled,
-    setTagModeEnabled,
-    tagsVisible,
-    setTagsVisible,
-    tagDraft,
-    flowPinModeEnabled,
-    setFlowPinModeEnabled,
-    flowPinsVisible,
-    setFlowPinsVisible,
-    flowPinDraft,
     setModeEnabled,
     selectAnnotation,
     requestCancelDraft,
@@ -71,12 +58,25 @@ export function AnnotationToolbar() {
   const setToolbarRef = (node: HTMLElement | null) => {
     toolbarRef.current = node;
   };
+  const launcherRef = useRef<HTMLElement | null>(null);
+  const setLauncherRef = (node: HTMLElement | null) => {
+    launcherRef.current = node;
+  };
   const dragOffset = useRef({ x: 0, y: 0 });
   const dragOrigin = useRef({ x: 0, y: 0 });
   const dragging = useRef(false);
   const didDrag = useRef(false);
+  const dragTarget = useRef<{
+    element: HTMLElement;
+    commit: (next: ToolbarPosition) => void;
+  } | null>(null);
   const [position, setPosition] = usePersistentState<ToolbarPosition | null>(
     `wpn-ui:${config.projectId}:toolbarPosition`,
+    null,
+    isToolbarPosition,
+  );
+  const [launcherPosition, setLauncherPosition] = usePersistentState<ToolbarPosition | null>(
+    `wpn-ui:${config.projectId}:launcherPosition`,
     null,
     isToolbarPosition,
   );
@@ -98,35 +98,48 @@ export function AnnotationToolbar() {
 
   useEffect(() => {
     const onResize = () => {
-      const el = toolbarRef.current;
-      if (!el || !position) {
-        return;
+      const bar = toolbarRef.current;
+      if (bar && position) {
+        setPosition(clampPosition(position.x, position.y, bar.offsetWidth, bar.offsetHeight));
       }
-      setPosition(clampPosition(position.x, position.y, el.offsetWidth, el.offsetHeight));
+      const launcher = launcherRef.current;
+      if (launcher && launcherPosition) {
+        setLauncherPosition(
+          clampPosition(
+            launcherPosition.x,
+            launcherPosition.y,
+            launcher.offsetWidth,
+            launcher.offsetHeight,
+          ),
+        );
+      }
     };
     window.addEventListener("resize", onResize);
     return () => window.removeEventListener("resize", onResize);
-  }, [position, setPosition]);
+  }, [position, setPosition, launcherPosition, setLauncherPosition]);
 
-  const onDragStart = (event: ReactPointerEvent<HTMLElement>) => {
-    const el = toolbarRef.current;
-    if (!el) {
-      return;
-    }
-    event.preventDefault();
-    event.stopPropagation();
-    const rect = el.getBoundingClientRect();
-    dragging.current = true;
-    didDrag.current = false;
-    dragOrigin.current = { x: event.clientX, y: event.clientY };
-    dragOffset.current = { x: event.clientX - rect.left, y: event.clientY - rect.top };
-    setPosition({ x: rect.left, y: rect.top });
-    event.currentTarget.setPointerCapture(event.pointerId);
-  };
+  const startDragFor =
+    (elementRef: typeof toolbarRef, commit: (next: ToolbarPosition) => void) =>
+    (event: ReactPointerEvent<HTMLElement>) => {
+      const el = elementRef.current;
+      if (!el) {
+        return;
+      }
+      event.preventDefault();
+      event.stopPropagation();
+      const rect = el.getBoundingClientRect();
+      dragging.current = true;
+      didDrag.current = false;
+      dragTarget.current = { element: el, commit };
+      dragOrigin.current = { x: event.clientX, y: event.clientY };
+      dragOffset.current = { x: event.clientX - rect.left, y: event.clientY - rect.top };
+      commit({ x: rect.left, y: rect.top });
+      event.currentTarget.setPointerCapture(event.pointerId);
+    };
 
   const onDragMove = (event: ReactPointerEvent<HTMLElement>) => {
-    const el = toolbarRef.current;
-    if (!dragging.current || !el) {
+    const target = dragTarget.current;
+    if (!dragging.current || !target) {
       return;
     }
     if (
@@ -135,19 +148,23 @@ export function AnnotationToolbar() {
     ) {
       didDrag.current = true;
     }
-    setPosition(
+    target.commit(
       clampPosition(
         event.clientX - dragOffset.current.x,
         event.clientY - dragOffset.current.y,
-        el.offsetWidth,
-        el.offsetHeight,
+        target.element.offsetWidth,
+        target.element.offsetHeight,
       ),
     );
   };
 
   const onDragEnd = () => {
     dragging.current = false;
+    dragTarget.current = null;
   };
+
+  const onDragStart = startDragFor(toolbarRef, setPosition);
+  const onLauncherDragStart = startDragFor(launcherRef, setLauncherPosition);
 
   const toggleBar = () => {
     if (didDrag.current) {
@@ -165,15 +182,11 @@ export function AnnotationToolbar() {
     action();
   };
 
-  // Every panel behind these icons needs a signed-in actor, so a logged-out
-  // visitor keeps the icon but cannot open the panel.
   const loggedOut = !activeAccount;
-  const tagToggleActive = tagModeEnabled && !tagDraft;
-  const flowToggleActive = flowPinModeEnabled && !flowPinDraft;
 
   const launcherShortcuts = (
     <>
-      <Tooltip label={loggedOut ? "Log in first" : "EpicFlow"} placement="right">
+      <Tooltip label={loggedOut ? "Log in first" : "Draft Board"} placement="right">
         <button
           type="button"
           className={[
@@ -183,10 +196,10 @@ export function AnnotationToolbar() {
           ]
             .filter(Boolean)
             .join(" ")}
-          aria-label="Open EpicFlow"
+          aria-label="Open Draft Board"
           aria-pressed={epicFlowOpen}
           aria-disabled={loggedOut}
-          onPointerDown={onDragStart}
+          onPointerDown={onLauncherDragStart}
           onPointerMove={onDragMove}
           onPointerUp={onDragEnd}
           onPointerCancel={onDragEnd}
@@ -215,7 +228,7 @@ export function AnnotationToolbar() {
             aria-label="Open Flow"
             aria-pressed={flowOpen}
             aria-disabled={loggedOut}
-            onPointerDown={onDragStart}
+            onPointerDown={onLauncherDragStart}
             onPointerMove={onDragMove}
             onPointerUp={onDragEnd}
             onPointerCancel={onDragEnd}
@@ -247,7 +260,7 @@ export function AnnotationToolbar() {
           aria-label={userManagementOpen ? "Close settings" : "Open settings"}
           aria-pressed={userManagementOpen}
           aria-disabled={loggedOut}
-          onPointerDown={onDragStart}
+          onPointerDown={onLauncherDragStart}
           onPointerMove={onDragMove}
           onPointerUp={onDragEnd}
           onPointerCancel={onDragEnd}
@@ -266,9 +279,10 @@ export function AnnotationToolbar() {
   );
 
   const closeBar = () => {
-    // Drop back to the default bottom-left dock instead of computing a pixel
-    // position: the launcher's real size doesn't match a hardcoded guess, and
-    // computing it wrong is what made the launcher appear to "jump" on close.
+    if (didDrag.current) {
+      didDrag.current = false;
+      return;
+    }
     setPosition(null);
     setModeEnabled(false);
     setListOpen(false);
@@ -305,10 +319,10 @@ export function AnnotationToolbar() {
           .join(" ")}
         aria-label={barOpen ? "Close annotation toolbar" : "Open annotation toolbar"}
         aria-pressed={barOpen}
-        onPointerDown={barOpen ? undefined : onDragStart}
-        onPointerMove={barOpen ? undefined : onDragMove}
-        onPointerUp={barOpen ? undefined : onDragEnd}
-        onPointerCancel={barOpen ? undefined : onDragEnd}
+        onPointerDown={onLauncherDragStart}
+        onPointerMove={onDragMove}
+        onPointerUp={onDragEnd}
+        onPointerCancel={onDragEnd}
         onClick={barOpen ? closeBar : openToolbar}
       >
         <span className="wpn-launcher-item__icon-wrap">
@@ -318,24 +332,18 @@ export function AnnotationToolbar() {
     </Tooltip>
   );
 
-  // The launcher only follows a dragged `position` when it is the sole,
-  // explicitly-placed element (toolbar closed and the user has dragged it).
-  // Otherwise — toolbar open, or never dragged — it stays docked to its
-  // default bottom-left corner via CSS rather than a computed inline position.
-  const launcherPlaced = !barOpen && position;
   const launcher = (
     <div
-      ref={barOpen ? undefined : setToolbarRef}
+      ref={setLauncherRef}
       className={[
         "wpn-toolbar",
         "wpn-toolbar--launcher",
         launcherExpanded ? "" : "wpn-toolbar--launcher-collapsed",
-        launcherPlaced ? "wpn-toolbar--placed" : "wpn-toolbar--launcher-docked",
-        barOpen ? "wpn-toolbar--launcher-locked" : "",
+        launcherPosition ? "wpn-toolbar--placed" : "wpn-toolbar--launcher-docked",
       ]
         .filter(Boolean)
         .join(" ")}
-      style={launcherPlaced ? { left: position.x, top: position.y } : undefined}
+      style={launcherPosition ? { left: launcherPosition.x, top: launcherPosition.y } : undefined}
     >
       <Tooltip label={launcherExpanded ? "Collapse launcher" : "Expand launcher"} placement="right">
         <button
@@ -343,10 +351,10 @@ export function AnnotationToolbar() {
           className="wpn-launcher-item__logo-wrap"
           aria-label={launcherExpanded ? "Collapse launcher" : "Expand launcher"}
           aria-expanded={launcherExpanded}
-          onPointerDown={barOpen ? undefined : onDragStart}
-          onPointerMove={barOpen ? undefined : onDragMove}
-          onPointerUp={barOpen ? undefined : onDragEnd}
-          onPointerCancel={barOpen ? undefined : onDragEnd}
+          onPointerDown={onLauncherDragStart}
+          onPointerMove={onDragMove}
+          onPointerUp={onDragEnd}
+          onPointerCancel={onDragEnd}
           onClick={toggleLauncher}
         >
           <img src={Icons.wecLogo} alt="" className="wpn-launcher-item__logo" />
@@ -358,11 +366,11 @@ export function AnnotationToolbar() {
             <button
               type="button"
               className="wpn-toolbar__drag"
-              aria-label="Drag annotation toolbar"
-              onPointerDown={barOpen ? undefined : onDragStart}
-              onPointerMove={barOpen ? undefined : onDragMove}
-              onPointerUp={barOpen ? undefined : onDragEnd}
-              onPointerCancel={barOpen ? undefined : onDragEnd}
+              aria-label="Drag annotation launcher"
+              onPointerDown={onLauncherDragStart}
+              onPointerMove={onDragMove}
+              onPointerUp={onDragEnd}
+              onPointerCancel={onDragEnd}
             >
               <Icon name="drag" className="wpn-toolbar__drag-icon" />
             </button>
@@ -447,105 +455,12 @@ export function AnnotationToolbar() {
               </button>
             </Tooltip>
             <span className="wpn-toolbar__divider" aria-hidden="true" />
-            <AnnotationToggleButton />
-            <Tooltip label={pinsVisible ? "Hide pins" : "Show pins"} placement="bottom">
-              <button
-                type="button"
-                className={["wpn-toolbar__eye", pinsVisible ? "" : "wpn-toolbar__eye--hidden"]
-                  .filter(Boolean)
-                  .join(" ")}
-                aria-pressed={!pinsVisible}
-                aria-label={pinsVisible ? "Hide pins" : "Show pins"}
-                onClick={() => setPinsVisible(!pinsVisible)}
-              >
-                <Icon name={pinsVisible ? "eye" : "eyeOff"} className="wpn-toggle__icon" />
-              </button>
-            </Tooltip>
-            <span className="wpn-toolbar__divider" aria-hidden="true" />
-            <Tooltip
-              label={
-                loggedOut ? "Log in first" : tagModeEnabled ? "Stop tagging" : "Tag an element"
-              }
-              placement="bottom"
-            >
-              <button
-                type="button"
-                className={[
-                  "wpn-toggle",
-                  tagToggleActive ? "wpn-toggle--active" : "",
-                  loggedOut ? "wpn-toggle--blocked" : "",
-                ]
-                  .filter(Boolean)
-                  .join(" ")}
-                aria-pressed={tagToggleActive}
-                aria-disabled={loggedOut}
-                aria-label={tagModeEnabled ? "Stop tagging" : "Tag an element"}
-                onClick={() => setTagModeEnabled(!tagModeEnabled)}
-              >
-                <Icon name="tag" className="wpn-toggle__icon" />
-              </button>
-            </Tooltip>
-            <Tooltip label={tagsVisible ? "Hide tags" : "Show tags"} placement="bottom">
-              <button
-                type="button"
-                className={["wpn-toolbar__eye", tagsVisible ? "" : "wpn-toolbar__eye--hidden"]
-                  .filter(Boolean)
-                  .join(" ")}
-                aria-pressed={!tagsVisible}
-                aria-label={tagsVisible ? "Hide tags" : "Show tags"}
-                onClick={() => setTagsVisible(!tagsVisible)}
-              >
-                <Icon name={tagsVisible ? "eye" : "eyeOff"} className="wpn-toggle__icon" />
-              </button>
-            </Tooltip>
+            <AnnotationModeButton />
+            <AnnotationVisibilityToggle />
             {/* Comments only load for a signed-in actor, so refreshing and the
                 failure it would report are meaningless while logged out. */}
             {loggedOut ? null : (
               <>
-                <span className="wpn-toolbar__divider" aria-hidden="true" />
-                <Tooltip
-                  label={
-                    loggedOut
-                      ? "Log in first"
-                      : flowPinModeEnabled
-                        ? "Stop placing flows"
-                        : "Place a flow"
-                  }
-                  placement="bottom"
-                >
-                  <button
-                    type="button"
-                    className={[
-                      "wpn-toggle",
-                      flowToggleActive ? "wpn-toggle--active" : "",
-                      loggedOut ? "wpn-toggle--blocked" : "",
-                    ]
-                      .filter(Boolean)
-                      .join(" ")}
-                    aria-pressed={flowToggleActive}
-                    aria-disabled={loggedOut}
-                    aria-label={flowPinModeEnabled ? "Stop placing flows" : "Place a flow"}
-                    onClick={() => setFlowPinModeEnabled(!flowPinModeEnabled)}
-                  >
-                    <Icon name="flow" className="wpn-toggle__icon" />
-                  </button>
-                </Tooltip>
-                <Tooltip label={flowPinsVisible ? "Hide flows" : "Show flows"} placement="bottom">
-                  <button
-                    type="button"
-                    className={[
-                      "wpn-toolbar__eye",
-                      flowPinsVisible ? "" : "wpn-toolbar__eye--hidden",
-                    ]
-                      .filter(Boolean)
-                      .join(" ")}
-                    aria-pressed={!flowPinsVisible}
-                    aria-label={flowPinsVisible ? "Hide flows" : "Show flows"}
-                    onClick={() => setFlowPinsVisible(!flowPinsVisible)}
-                  >
-                    <Icon name={flowPinsVisible ? "eye" : "eyeOff"} className="wpn-toggle__icon" />
-                  </button>
-                </Tooltip>
                 <span className="wpn-toolbar__divider" aria-hidden="true" />
                 <Tooltip label={loading ? "Refreshing..." : "Refresh comments"} placement="bottom">
                   <button

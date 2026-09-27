@@ -12,7 +12,6 @@ import { lineStyleOptions } from "./lineStyles";
 
 const useEdgeIds = () => useFlowState((s) => s.edges.map((e) => e.id), shallowEqual);
 
-/** Local, non-persisted hover tracking shared between the SVG and HTML edge layers. */
 const hoverStore = (() => {
   let current: string | null = null;
   const listeners = new Set<() => void>();
@@ -33,6 +32,42 @@ const hoverStore = (() => {
 
 function useHoveredEdgeId(): string | null {
   return useSyncExternalStore(hoverStore.subscribe, hoverStore.getSnapshot, hoverStore.getSnapshot);
+}
+
+export interface EdgeDropTarget {
+  edgeId: string;
+  distance: number;
+  /** Insertion point on the line, in screen pixels. */
+  x: number;
+  y: number;
+}
+
+/** Edge currently under a palette drag, highlighted as the insert target. */
+export const dropTargetEdgeStore = (() => {
+  let current: EdgeDropTarget | null = null;
+  const listeners = new Set<() => void>();
+  return {
+    set(next: EdgeDropTarget | null) {
+      if (current?.edgeId === next?.edgeId && current?.x === next?.x && current?.y === next?.y) {
+        return;
+      }
+      current = next;
+      listeners.forEach((l) => l());
+    },
+    subscribe(listener: () => void) {
+      listeners.add(listener);
+      return () => listeners.delete(listener);
+    },
+    getSnapshot: () => current,
+  };
+})();
+
+export function useDropTargetEdge(): EdgeDropTarget | null {
+  return useSyncExternalStore(
+    dropTargetEdgeStore.subscribe,
+    dropTargetEdgeStore.getSnapshot,
+    dropTargetEdgeStore.getSnapshot,
+  );
 }
 
 function useEdgeSelect(id: string) {
@@ -59,6 +94,7 @@ const EdgeItem = memo(function EdgeItem({
   const selected = useFlowState((s) => s.selectedEdgeIds.has(id));
   const issue = useFlowState((s) => s.issueEdgeIds.get(id));
   const reconnecting = useFlowState((s) => s.connection?.reconnecting === id);
+  const dropTarget = useDropTargetEdge()?.edgeId === id;
   const onPointerDown = useEdgeSelect(id);
   if (!geometry) return null;
   const marker = selected ? "selected" : issue === "error" ? "error" : "default";
@@ -70,6 +106,7 @@ const EdgeItem = memo(function EdgeItem({
         issue && `wpn-flowchart-edge__issue-${issue}`,
         geometry.edge.animated && "wpn-flowchart-edge__animated",
         reconnecting && "wpn-flowchart-edge__reconnecting",
+        dropTarget && "wpn-flowchart-edge__drop-target",
       )}
       data-edge-id={id}
       onPointerEnter={() => hoverStore.set(id)}
@@ -85,7 +122,6 @@ const EdgeItem = memo(function EdgeItem({
   );
 });
 
-/** Line that follows the pointer while a connection is being dragged. */
 const ConnectionLine = memo(function ConnectionLine() {
   const engine = useFlowEngine();
   const conn = useFlowState((s) => s.connection);
@@ -136,7 +172,6 @@ const ConnectionLine = memo(function ConnectionLine() {
   );
 });
 
-/** SVG layer with every edge plus the in-progress connection line. */
 export const EdgeRenderer = memo(function EdgeRenderer() {
   const ids = useEdgeIds();
   const markerPrefix = `fb-arrow${useId().replace(/[^a-zA-Z0-9_-]/g, "")}`;
@@ -153,7 +188,7 @@ export const EdgeRenderer = memo(function EdgeRenderer() {
             refY="5"
             markerWidth="7"
             markerHeight="7"
-            orient="auto-start-reverse"
+            orient="auto"
           >
             <path d="M 0 0.5 L 9 5 L 0 9.5 z" />
           </marker>
@@ -167,9 +202,6 @@ export const EdgeRenderer = memo(function EdgeRenderer() {
   );
 });
 
-// --------------------------------------------------------------- labels
-
-/** Floating pill shown while hovering or selecting an edge, for one-click line-style switching. */
 const EdgeStyleMenu = memo(function EdgeStyleMenu({
   id,
   x,
@@ -266,7 +298,6 @@ const EdgeLabel = memo(function EdgeLabel({ id }: { id: string }) {
   );
 });
 
-/** HTML layer for edge labels (rendered above edges, below nodes). */
 export const EdgeLabelRenderer = memo(function EdgeLabelRenderer() {
   const ids = useEdgeIds();
   return (
@@ -277,8 +308,6 @@ export const EdgeLabelRenderer = memo(function EdgeLabelRenderer() {
     </div>
   );
 });
-
-// ------------------------------------------------------------- controls
 
 const LABEL_CLEARANCE = 56;
 
@@ -320,6 +349,7 @@ const EdgeControls = memo(function EdgeControls({ id }: { id: string }) {
         engine.setEdgeBend(id, Math.round(bend.axis === "y" ? p.y : p.x));
       },
       onEnd: () => engine.endInteraction(),
+      onCancel: () => engine.endInteraction(),
     });
   };
 
@@ -332,6 +362,7 @@ const EdgeControls = memo(function EdgeControls({ id }: { id: string }) {
       threshold: 0,
       onMove: (ev) => engine.updateConnection(pointerFlow(ev)),
       onEnd: () => engine.endConnection(),
+      onCancel: () => engine.cancelConnection(),
     });
   };
 
@@ -379,7 +410,6 @@ const EdgeControls = memo(function EdgeControls({ id }: { id: string }) {
   );
 });
 
-/** Interactive handles for selected edges: step bend and endpoint reconnection. Rendered above nodes. */
 export const EdgeControlsLayer = memo(function EdgeControlsLayer() {
   const ids = useFlowState((s) => [...s.selectedEdgeIds], shallowEqual);
   if (ids.length === 0) return null;

@@ -90,7 +90,10 @@ export function AnnotationOverlay() {
   useEffect(() => {
     if (!pendingDraft) {
       draftLock.current = false;
+      return;
     }
+    highlightRef.current = null;
+    setHighlight(null);
   }, [pendingDraft]);
 
   const createFromPoint = useCallback(
@@ -169,7 +172,7 @@ export function AnnotationOverlay() {
   }, [createFromPoint, placing]);
 
   const onPointerMove = (event: ReactPointerEvent<HTMLDivElement>) => {
-    if (frameRef.current) {
+    if (frameRef.current || pendingDraft || draftLock.current) {
       return;
     }
     const clientX = event.clientX;
@@ -235,6 +238,7 @@ export function AnnotationOverlay() {
           "wpn-overlay",
           tagModeEnabled ? "wpn-overlay--tag" : "",
           flowPinModeEnabled ? "wpn-overlay--flow" : "",
+          pendingDraft ? "wpn-overlay--paused" : "",
         ]
           .filter(Boolean)
           .join(" ")}

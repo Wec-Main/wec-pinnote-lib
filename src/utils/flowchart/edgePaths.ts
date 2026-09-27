@@ -15,14 +15,14 @@ export interface StepBend {
   axis: BendAxis;
   value: number;
   handle: XYPosition;
-  /** Extent of the bend segment along its own direction. */
+
   span: [number, number];
 }
 
 export interface EdgePath {
-  /** SVG path "d" attribute. */
+
   path: string;
-  /** Point where the label is placed. */
+
   labelX: number;
   labelY: number;
   bend?: StepBend;
@@ -45,7 +45,7 @@ export function getBezierPath({ source, sourceSide, target, targetSide }: EdgePa
   const tv = sideVector[targetSide];
   const c1 = { x: source.x + sv.x * offset, y: source.y + sv.y * offset };
   const c2 = { x: target.x + tv.x * offset, y: target.y + tv.y * offset };
-  // Point on a cubic bezier at t = 0.5.
+
   const labelX = (source.x + 3 * c1.x + 3 * c2.x + target.x) / 8;
   const labelY = (source.y + 3 * c1.y + 3 * c2.y + target.y) / 8;
   return {
@@ -66,7 +66,6 @@ function stepAnchors({ source, sourceSide, target, targetSide }: EdgePathInput, 
   };
 }
 
-/** The draggable middle segment of a step route: its axis, position and handle point. */
 export function getStepBend(input: EdgePathInput, gap = 24): StepBend {
   const { p1, p2 } = stepAnchors(input, gap);
   const targetVertical = isVertical(input.targetSide);
@@ -88,7 +87,6 @@ export function getStepBend(input: EdgePathInput, gap = 24): StepBend {
   };
 }
 
-/** Computes the corner points of an orthogonal (step) route. */
 export function getStepPoints(input: EdgePathInput, gap = 24): XYPosition[] {
   const { source, target } = input;
   const { p1, p2 } = stepAnchors(input, gap);
@@ -104,7 +102,7 @@ export function getStepPoints(input: EdgePathInput, gap = 24): XYPosition[] {
           { x: bend.value, y: p2.y },
         ];
   const points = [source, p1, ...middle, p2, target];
-  // Drop duplicate and collinear points so corners can be rounded cleanly.
+
   const cleaned: XYPosition[] = [];
   for (const p of points) {
     const last = cleaned[cleaned.length - 1];
@@ -128,6 +126,7 @@ interface StepSegment {
 function roundedCorner(incoming: StepSegment, outgoing: StepSegment, radius: number): string {
   const { from: prev, to: cur, length: inLen } = incoming;
   const { to: next, length: outLen } = outgoing;
+  if (inLen === 0 || outLen === 0) return ` L ${r(cur.x)},${r(cur.y)}`;
   const rad = Math.min(radius, inLen / 2, outLen / 2);
   const before = {
     x: cur.x - ((cur.x - prev.x) / inLen) * rad,

@@ -8,6 +8,7 @@ import { isBoolean } from "../utils/valueGuards";
 import { useTokenGetter } from "./useTokenGetter";
 
 const LOAD_ERROR_MESSAGE = "Could not load flows for this page";
+const SUBMIT_ERROR_MESSAGE = "Could not create the flow pin";
 
 interface UseFlowPinsOptions {
   apiBaseUrl: string;
@@ -71,6 +72,9 @@ export function useFlowPins(options: UseFlowPinsOptions): FlowPinsState {
     getToken()
       .then((token) => fetchFlowPins(apiBaseUrl, token, projectId, pageKey, controller.signal))
       .then((loaded) => {
+        if (controller.signal.aborted) {
+          return;
+        }
         setFlowPins(loaded);
         setFlowPinsError(null);
       })
@@ -102,12 +106,19 @@ export function useFlowPins(options: UseFlowPinsOptions): FlowPinsState {
       if (!flowPinDraft) {
         return;
       }
-      const created = await createFlowPin(apiBaseUrl, await getToken(), {
-        projectId,
-        pageKey,
-        name: name.trim() || flowPinDraft.label,
-        anchor: flowPinDraft.anchor,
-      });
+      let created;
+      try {
+        created = await createFlowPin(apiBaseUrl, await getToken(), {
+          projectId,
+          pageKey,
+          name: name.trim() || flowPinDraft.label,
+          anchor: flowPinDraft.anchor,
+        });
+      } catch (err) {
+        setFlowPinsError(SUBMIT_ERROR_MESSAGE);
+        throw err;
+      }
+      setFlowPinsError(null);
       setFlowPins((current) => [created, ...current]);
       setFlowPinDraft(null);
       setFlowPinModeEnabledState(false);

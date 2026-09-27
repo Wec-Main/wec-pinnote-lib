@@ -4,7 +4,6 @@ import type { NodeComponentProps } from "../../utils/flowchart/nodeTypes";
 import { cx } from "../../utils/flowchart/shallow";
 import { NodeIcon } from "./FlowIcons";
 
-/** Default body: icon badge, label and description, laid out according to the node shape. */
 export function DefaultNodeContent({
   node,
   definition,
@@ -58,7 +57,8 @@ export function DefaultNodeContent({
   }
 
   const showIcon =
-    definition.icon !== undefined && (definition.role === "start" || definition.role === "end");
+    definition.icon !== undefined &&
+    (definition.role === "start" || definition.role === "end" || definition.type === "integration");
 
   return (
     <div
@@ -75,11 +75,19 @@ export function DefaultNodeContent({
           <NodeIcon icon={definition.icon} size={compact ? 13 : 16} />
         </span>
       )}
-      {showDescription && (
-        <div className="wpn-flowchart-node__text">
-          <div className="wpn-flowchart-node__description">{node.data.description}</div>
+      <div className="wpn-flowchart-node__text">
+        <div
+          className={cx(
+            "wpn-flowchart-node__label",
+            !node.data.label && "wpn-flowchart-node__placeholder",
+          )}
+        >
+          {node.data.label || definition.label}
         </div>
-      )}
+        {showDescription && (
+          <div className="wpn-flowchart-node__description">{node.data.description}</div>
+        )}
+      </div>
     </div>
   );
 }

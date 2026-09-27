@@ -164,6 +164,11 @@ export function AnnotationProvider({ config, children }: AnnotationProviderProps
     [authenticated],
   );
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  useEffect(() => {
+    if (selectedId && !annotations.some((item) => item.id === selectedId)) {
+      setSelectedId(null);
+    }
+  }, [annotations, selectedId]);
   const [draft, setDraft] = useState<DraftAnnotation | null>(null);
   const [discardPrompt, setDiscardPrompt] = useState<DiscardPrompt | null>(null);
   const projectId = activeConfig.projectId;
@@ -233,7 +238,7 @@ export function AnnotationProvider({ config, children }: AnnotationProviderProps
     removeFlowPin,
     syncFlowPinName,
     selectedFlowPinId,
-    selectFlowPin,
+    selectFlowPin: selectFlowPinRaw,
   } = useFlowPins({
     apiBaseUrl: activeConfig.apiBaseUrl,
     projectId,
@@ -251,6 +256,17 @@ export function AnnotationProvider({ config, children }: AnnotationProviderProps
     getAuthToken: activeConfig.getAuthToken,
     sessionKey,
   });
+
+  const selectFlowPin = useCallback(
+    (id: string | null) => {
+      if (id) {
+        setListOpen(false);
+        setSelectedId(null);
+      }
+      selectFlowPinRaw(id);
+    },
+    [selectFlowPinRaw, setListOpen],
+  );
 
   const getProjectTagsToken = useTokenGetter(activeConfig.getAuthToken);
   const projectTagsKey =
@@ -349,49 +365,68 @@ export function AnnotationProvider({ config, children }: AnnotationProviderProps
     ],
   );
 
+  const closeOtherSurfaces = useCallback(
+    (keep: "list" | "epicFlow" | "flow" | "userManagement") => {
+      if (keep !== "list") {
+        setListOpen(false);
+      }
+      if (keep !== "epicFlow") {
+        setEpicFlowOpen(false);
+      }
+      if (keep !== "flow") {
+        setFlowOpen(false);
+      }
+      if (keep !== "userManagement") {
+        setUserManagementOpen(false);
+      }
+      setAuditHistoryOpen(false);
+      selectFlowPin(null);
+      setSelectedId(null);
+    },
+    [
+      selectFlowPin,
+      setAuditHistoryOpen,
+      setEpicFlowOpen,
+      setFlowOpen,
+      setListOpen,
+      setUserManagementOpen,
+    ],
+  );
   const openListExclusive = useCallback(
     (open: boolean) => {
       setListOpen(open);
       if (open) {
-        setEpicFlowOpen(false);
-        setFlowOpen(false);
-        setUserManagementOpen(false);
+        closeOtherSurfaces("list");
       }
     },
-    [setEpicFlowOpen, setFlowOpen, setListOpen, setUserManagementOpen],
+    [closeOtherSurfaces, setListOpen],
   );
   const openEpicFlowExclusive = useCallback(
     (open: boolean) => {
       setEpicFlowOpen(open);
       if (open) {
-        setListOpen(false);
-        setFlowOpen(false);
-        setUserManagementOpen(false);
+        closeOtherSurfaces("epicFlow");
       }
     },
-    [setEpicFlowOpen, setFlowOpen, setListOpen, setUserManagementOpen],
+    [closeOtherSurfaces, setEpicFlowOpen],
   );
   const openFlowExclusive = useCallback(
     (open: boolean) => {
       setFlowOpen(open);
       if (open) {
-        setListOpen(false);
-        setEpicFlowOpen(false);
-        setUserManagementOpen(false);
+        closeOtherSurfaces("flow");
       }
     },
-    [setEpicFlowOpen, setFlowOpen, setListOpen, setUserManagementOpen],
+    [closeOtherSurfaces, setFlowOpen],
   );
   const openUserManagementExclusive = useCallback(
     (open: boolean) => {
       setUserManagementOpen(open);
       if (open) {
-        setListOpen(false);
-        setEpicFlowOpen(false);
-        setFlowOpen(false);
+        closeOtherSurfaces("userManagement");
       }
     },
-    [setEpicFlowOpen, setFlowOpen, setListOpen, setUserManagementOpen],
+    [closeOtherSurfaces, setUserManagementOpen],
   );
 
   const [portalReady, setPortalReady] = useState(false);
@@ -445,18 +480,23 @@ export function AnnotationProvider({ config, children }: AnnotationProviderProps
     };
   }, [modeEnabled, resolved.enabled]);
 
-  const startDraft = useCallback((anchor: AnnotationAnchor, label: string) => {
-    const number = annotationsRef.current.reduce((max, item) => Math.max(max, item.number), 0) + 1;
-    draftMessageRef.current = "";
-    setSelectedId(null);
-    setDraft({
-      id: createClientId("draft"),
-      label,
-      anchor,
-      number,
-      message: "",
-    });
-  }, []);
+  const startDraft = useCallback(
+    (anchor: AnnotationAnchor, label: string) => {
+      const number = annotationsRef.current.reduce((max, item) => Math.max(max, item.number), 0) + 1;
+      draftMessageRef.current = "";
+      setSelectedId(null);
+      setListOpen(false);
+      selectFlowPin(null);
+      setDraft({
+        id: createClientId("draft"),
+        label,
+        anchor,
+        number,
+        message: "",
+      });
+    },
+    [selectFlowPin, setListOpen],
+  );
 
   const cancelDraft = useCallback(() => {
     clearDraft();
@@ -511,6 +551,7 @@ export function AnnotationProvider({ config, children }: AnnotationProviderProps
           },
           status,
         });
+        setModeEnabledState(false);
         setSelectedId(created.id);
         setPinsVisible(true);
       } catch (err) {
@@ -526,6 +567,10 @@ export function AnnotationProvider({ config, children }: AnnotationProviderProps
     (id: string | null) => {
       const proceed = () => {
         clearDraft();
+        if (id) {
+          setListOpen(false);
+          selectFlowPin(null);
+        }
         setSelectedId(id);
       };
       if (hasUnsavedDraft()) {
@@ -534,7 +579,7 @@ export function AnnotationProvider({ config, children }: AnnotationProviderProps
       }
       proceed();
     },
-    [clearDraft, hasUnsavedDraft],
+    [clearDraft, hasUnsavedDraft, selectFlowPin, setListOpen],
   );
 
   const revealAnnotation = useCallback(

@@ -8,7 +8,6 @@ interface Props {
   height: number;
 }
 
-/** SVG outline behind a node's content. Styling (fill/stroke/state) comes from CSS. */
 export const NodeShape = memo(function NodeShape({ shape, width: w, height: h }: Props) {
   let el;
   switch (shape) {

@@ -30,6 +30,8 @@ function upsertAnnotation(annotations: Annotation[], incoming: Annotation): Anno
 
 export interface StreamApplication {
   annotations: Annotation[];
+
+  needsResync?: boolean;
 }
 
 export function applyStreamEvent(annotations: Annotation[], event: StreamEvent): StreamApplication {
@@ -74,7 +76,7 @@ export function applyStreamEvent(annotations: Annotation[], event: StreamEvent):
       }
       const target = annotations.find((item) => item.id === annotationId);
       if (!target) {
-        return unchanged;
+        return { annotations, needsResync: true };
       }
       const nextComments = upsertComment(target.comments, comment);
       if (nextComments === target.comments) {

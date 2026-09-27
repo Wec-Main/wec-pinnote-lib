@@ -9,6 +9,7 @@ interface FlowDocumentEditorProps {
   signedIn: boolean;
   resolveError?: string | null;
   onRetry?: () => void;
+  onDelete?: () => void;
 }
 
 const SAVE_LABELS: Record<Exclude<FlowSaveState, "idle">, string> = {
@@ -62,6 +63,7 @@ export function FlowDocumentEditor({
   signedIn,
   resolveError,
   onRetry,
+  onDelete,
 }: FlowDocumentEditorProps) {
   const {
     status,
@@ -118,6 +120,7 @@ export function FlowDocumentEditor({
           onChange={scheduleSave}
           onSave={save}
           onPublish={publish}
+          onDelete={onDelete}
           brand={<></>}
         />
         <SaveIndicator state={saveState} savedCount={savedCount} />

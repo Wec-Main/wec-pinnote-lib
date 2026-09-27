@@ -49,7 +49,6 @@ export interface UserPreferences {
   tagsVisible: boolean;
 }
 
-/** A tag pin placed but not yet given a tag, held only in client state. */
 export interface DraftTagPin {
   id: string;
   anchor: AnnotationAnchor;

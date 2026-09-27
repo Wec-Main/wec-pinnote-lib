@@ -110,7 +110,7 @@ export function useResourceTable<T, Draft>({
         setLoaded(true);
       });
     return () => controller.abort();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+
   }, [query, reloadToken, ...deps]);
 
   const visible = items;

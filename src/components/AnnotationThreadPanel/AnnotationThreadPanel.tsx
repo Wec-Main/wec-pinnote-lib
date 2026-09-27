@@ -1,14 +1,33 @@
 import { useRef, useState } from "react";
 import { useAnnotationData, useAnnotationUi } from "../../context/AnnotationContext";
 import { useFloatingPanel } from "../../hooks/useAnnotationPosition";
+import { useEscapeKey } from "../../hooks/useEscapeKey";
 import { AnnotationReplyComposer } from "../AnnotationReplyComposer";
 import { AnnotationStatusSelect } from "../AnnotationStatusSelect";
 import { AnnotationThread } from "../AnnotationThread";
 import { Icons } from "../../assets/icons";
 import { Icon, Tooltip } from "../primitives";
 import { ConfirmDialog } from "../UserManagement/ConfirmDialog";
+import { canDeleteAnnotation } from "../../utils/boardPermissions";
 import { mentionsToPlainText } from "../../utils/mentions";
 import type { AnnotationComment } from "../../types/annotation.types";
+
+function fitTitleInputHeight(element: HTMLTextAreaElement | null) {
+  if (!element) {
+    return;
+  }
+  element.style.height = "auto";
+  element.style.height = `${element.scrollHeight}px`;
+}
+
+function focusTitleInputAtEnd(element: HTMLTextAreaElement | null) {
+  if (!element) {
+    return;
+  }
+  fitTitleInputHeight(element);
+  element.focus();
+  element.setSelectionRange(element.value.length, element.value.length);
+}
 
 interface AnnotationThreadPanelProps {
   annotationId: string;
@@ -30,6 +49,7 @@ export function AnnotationThreadPanel({
   const panelRef = useRef<HTMLDivElement>(null);
   const placement = useFloatingPanel(Boolean(annotation), x, y, panelRef);
   const [hasUnsavedEdit, setHasUnsavedEdit] = useState(false);
+  const [hasUnsentReply, setHasUnsentReply] = useState(false);
   const [confirmClose, setConfirmClose] = useState(false);
   const [replyTarget, setReplyTarget] = useState<AnnotationComment | null>(null);
   const [pendingDelete, setPendingDelete] = useState<AnnotationComment | null>(null);
@@ -37,6 +57,12 @@ export function AnnotationThreadPanel({
   const [titleOverride, setTitleOverride] = useState<string | null>(null);
   const [titleValue, setTitleValue] = useState("");
   const [infoOpen, setInfoOpen] = useState(false);
+
+  const closeRequestedRef = useRef<() => void>(() => undefined);
+  useEscapeKey(
+    () => closeRequestedRef.current(),
+    Boolean(annotation) && !editingTitle && !pendingDelete,
+  );
 
   if (!annotation) {
     return null;
@@ -57,12 +83,13 @@ export function AnnotationThreadPanel({
   };
 
   const requestClose = () => {
-    if (hasUnsavedEdit) {
+    if (hasUnsavedEdit || hasUnsentReply) {
       setConfirmClose(true);
       return;
     }
     selectAnnotation(null);
   };
+  closeRequestedRef.current = requestClose;
 
   const confirmDelete = (comment: AnnotationComment) => {
     setPendingDelete(null);
@@ -86,14 +113,21 @@ export function AnnotationThreadPanel({
         ref={panelRef}
         className="wpn-panel wpn-thread-panel"
         style={{ left: placement.left, top: placement.top }}
+        role="dialog"
+        aria-label={`Comment thread: ${title}`}
       >
         <div className="wpn-panel__header">
           <span className="wpn-panel__title-group">
             {editingTitle ? (
-              <input
+              <textarea
+                ref={focusTitleInputAtEnd}
                 className="wpn-panel__title-input"
+                rows={1}
                 value={titleValue}
-                onChange={(event) => setTitleValue(event.target.value)}
+                onChange={(event) => {
+                  setTitleValue(event.target.value);
+                  fitTitleInputHeight(event.target);
+                }}
                 onBlur={commitTitle}
                 onKeyDown={(event) => {
                   if (event.key === "Enter") {
@@ -103,20 +137,23 @@ export function AnnotationThreadPanel({
                     setEditingTitle(false);
                   }
                 }}
-                autoFocus
               />
             ) : (
-              <span className="wpn-panel__title">{title}</span>
+              <span className="wpn-panel__title" title={title}>
+                {title}
+              </span>
             )}
-            <button
-              type="button"
-              className="wpn-link wpn-link--icon"
-              aria-label={editingTitle ? "Save title" : "Edit title"}
-              onMouseDown={(event) => event.preventDefault()}
-              onClick={editingTitle ? commitTitle : startEditingTitle}
-            >
-              <Icon name={editingTitle ? "check" : "edit"} className="wpn-action-icon" />
-            </button>
+            <Tooltip label={editingTitle ? "Save title" : "Edit title"} placement="bottom">
+              <button
+                type="button"
+                className="wpn-link wpn-link--icon"
+                aria-label={editingTitle ? "Save title" : "Edit title"}
+                onMouseDown={(event) => event.preventDefault()}
+                onClick={editingTitle ? commitTitle : startEditingTitle}
+              >
+                <Icon name={editingTitle ? "check" : "edit"} className="wpn-action-icon" />
+              </button>
+            </Tooltip>
             <span
               className="wpn-thread-panel__info"
               onMouseEnter={() => setInfoOpen(true)}
@@ -146,15 +183,27 @@ export function AnnotationThreadPanel({
               ) : null}
             </span>
           </span>
-          {confirmClose ? (
-            <span className="wpn-panel__title-group">
-              <span className="wpn-muted">Discard unsaved edit?</span>
+          <Tooltip label="Close" placement="left">
+            <button
+              type="button"
+              className="wpn-icon-btn"
+              aria-label="Close thread"
+              onClick={requestClose}
+            >
+              ×
+            </button>
+          </Tooltip>
+        </div>
+        {confirmClose ? (
+          <div className="wpn-thread-panel__discard" role="alert">
+            <span>{hasUnsavedEdit ? "Discard unsaved edit?" : "Discard unsent reply?"}</span>
+            <span className="wpn-thread-panel__discard-actions">
               <button
                 type="button"
                 className="wpn-link wpn-link--chip"
                 onClick={() => setConfirmClose(false)}
               >
-                Cancel
+                Keep editing
               </button>
               <button
                 type="button"
@@ -167,19 +216,8 @@ export function AnnotationThreadPanel({
                 Discard
               </button>
             </span>
-          ) : (
-            <Tooltip label="Close" placement="left">
-              <button
-                type="button"
-                className="wpn-icon-btn"
-                aria-label="Close thread"
-                onClick={requestClose}
-              >
-                ×
-              </button>
-            </Tooltip>
-          )}
-        </div>
+          </div>
+        ) : null}
         {orphaned ? (
           <div className="wpn-orphaned">
             Original element is not on screen. Showing fallback position.
@@ -197,6 +235,7 @@ export function AnnotationThreadPanel({
           <AnnotationReplyComposer
             replyTarget={replyTarget}
             onCancelReply={() => setReplyTarget(null)}
+            onDraftChange={setHasUnsentReply}
             onSubmit={sendReply}
           />
           <div className="wpn-panel__toolbar">
@@ -208,6 +247,7 @@ export function AnnotationThreadPanel({
             <div className="wpn-panel__toolbar-end">
               <AnnotationStatusSelect
                 value={annotation.status}
+                disabled={!canDeleteAnnotation(annotation, config.currentUser)}
                 onChange={(status) => setStatus(annotation.id, status).catch(() => undefined)}
               />
             </div>
@@ -216,15 +256,19 @@ export function AnnotationThreadPanel({
       </div>
       {pendingDelete ? (
         <ConfirmDialog
-          title="Delete this comment?"
-          description="It will be removed from the thread for everyone. This cannot be undone."
+          title={annotation.comments.length === 1 ? "Delete this thread?" : "Delete this comment?"}
+          description={
+            annotation.comments.length === 1
+              ? "This is the only comment, so the pin will be removed from the page for everyone. This cannot be undone."
+              : "It will be removed from the thread for everyone. This cannot be undone."
+          }
           detail={
             <p>
               <strong>{pendingDelete.createdBy.name}:</strong>{" "}
               {mentionsToPlainText(pendingDelete.message)}
             </p>
           }
-          confirmLabel="Delete comment"
+          confirmLabel={annotation.comments.length === 1 ? "Delete thread" : "Delete comment"}
           destructive
           onCancel={() => setPendingDelete(null)}
           onConfirm={() => confirmDelete(pendingDelete)}

@@ -1,6 +1,5 @@
 type Handler<T> = (payload: T) => void;
 
-/** Tiny typed event emitter. */
 export class EventEmitter<Events extends Record<string, unknown>> {
   private handlers: { [K in keyof Events]?: Set<Handler<Events[K]>> } = {};
 
@@ -14,6 +13,15 @@ export class EventEmitter<Events extends Record<string, unknown>> {
   }
 
   emit<K extends keyof Events>(event: K, payload: Events[K]): void {
-    this.handlers[event]?.forEach((h) => h(payload));
+    const handlers = this.handlers[event];
+    if (!handlers) return;
+
+    for (const handler of [...handlers]) {
+      if (handlers.has(handler)) handler(payload);
+    }
+  }
+
+  clear(): void {
+    this.handlers = {};
   }
 }

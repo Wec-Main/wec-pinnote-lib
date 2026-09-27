@@ -276,10 +276,14 @@ export const ContextMenu = memo(function ContextMenu({
     window.addEventListener("pointerdown", onPointerDown, true);
     window.addEventListener("keydown", onKeyDown);
     window.addEventListener("blur", onClose);
+    window.addEventListener("wheel", onClose, true);
+    window.addEventListener("scroll", onClose, true);
     return () => {
       window.removeEventListener("pointerdown", onPointerDown, true);
       window.removeEventListener("keydown", onKeyDown);
       window.removeEventListener("blur", onClose);
+      window.removeEventListener("wheel", onClose, true);
+      window.removeEventListener("scroll", onClose, true);
     };
   }, [onClose]);
 

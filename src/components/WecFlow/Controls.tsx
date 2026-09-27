@@ -26,7 +26,6 @@ const gridLabel: Record<BackgroundVariant, string> = {
   none: "No grid",
 };
 
-/** Floating zoom / fit / mode / view controls. */
 export const Controls = memo(function Controls({
   mode,
   onModeChange,

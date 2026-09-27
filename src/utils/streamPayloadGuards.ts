@@ -99,7 +99,7 @@ export function parseStreamEnvelope(data: string): StreamEvent | null {
 }
 
 export function isNewer(incoming: string, existing: string): boolean {
-  return new Date(incoming).getTime() >= new Date(existing).getTime();
+  return new Date(incoming).getTime() > new Date(existing).getTime();
 }
 
 export function upsertById<T extends { id: string; updatedAt: string }>(

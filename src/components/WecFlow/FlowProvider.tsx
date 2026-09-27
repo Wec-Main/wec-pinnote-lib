@@ -4,15 +4,11 @@ import { FlowContext, type FlowContextValue } from "../../context/FlowContext";
 import type { XYPosition } from "../../types/flowchart.types";
 
 export interface FlowProviderProps extends FlowEngineOptions {
-  /** Use an existing engine (e.g. one created with `createFlowEngine`). Options are ignored then. */
+
   engine?: FlowEngine;
   children: ReactNode;
 }
 
-/**
- * Makes a FlowEngine available to every flow component and hook below it.
- * Lets you compose your own layout from FlowCanvas, Sidebar, Toolbar, etc.
- */
 export function FlowProvider({ engine, children, ...options }: FlowProviderProps) {
   const [instance] = useState(() => engine ?? new FlowEngine(options));
   const canvasRef = useRef<HTMLDivElement | null>(null);

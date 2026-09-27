@@ -38,7 +38,7 @@ const RESIZING_BODY_CLASS = "wpn-epicflow-resizing";
 function describeApiError(err: unknown): string {
   return err instanceof EpicFlowApiError
     ? err.message
-    : "Could not reach the EpicFlow API. Please try again.";
+    : "Could not reach the Draft Board API. Please try again.";
 }
 
 export function EpicFlowPanel() {
@@ -313,13 +313,21 @@ export function EpicFlowPanel() {
     }
   };
 
-  const handleSubmitStory = async (data: { title: string; description: string }) => {
+  const handleSubmitStory = async ({
+    epicId,
+    ...data
+  }: {
+    title: string;
+    description: string;
+    epicId: string;
+  }) => {
     setBusy(true);
     try {
       if (storyModal?.mode === "edit") {
         await api.updateUserStory(storyModal.story.id, data);
-      } else if (selectedEpicId) {
-        const created = await api.createUserStory(selectedEpicId, data);
+      } else if (epicId) {
+        const created = await api.createUserStory(epicId, data);
+        setSelectedEpicId(epicId);
         setSelectedUserStoryId(created.id);
       }
       await reloadAll();
@@ -394,7 +402,7 @@ export function EpicFlowPanel() {
       <div className="wpn-epicflow-panel__header">
         <span className="wpn-epicflow-panel__brand">
           <img src={Icons.epic} alt="" className="wpn-epicflow-panel__brand-icon" />
-          <span className="wpn-panel__title">EpicFlow</span>
+          <span className="wpn-panel__title">Draft Board</span>
         </span>
         <div className="wpn-epicflow-panel__header-actions">
           {connectionState === "reconnecting" ? (
@@ -422,7 +430,7 @@ export function EpicFlowPanel() {
             <button
               type="button"
               className="wpn-icon-btn"
-              aria-label={minimized ? "Maximize EpicFlow" : "Minimize EpicFlow"}
+              aria-label={minimized ? "Maximize Draft Board" : "Minimize Draft Board"}
               onClick={() => setMinimized((current) => !current)}
             >
               <Icon name={minimized ? "expand" : "windowMinimize"} />
@@ -432,7 +440,7 @@ export function EpicFlowPanel() {
             <button
               type="button"
               className="wpn-icon-btn wpn-icon-btn--danger"
-              aria-label="Close EpicFlow"
+              aria-label="Close Draft Board"
               onClick={() => setEpicFlowOpen(false)}
             >
               <Icon name="close" />
@@ -450,7 +458,7 @@ export function EpicFlowPanel() {
         }}
         placeholder="Search epics or user stories"
         trailing={
-          <RefreshButton label="Refresh EpicFlow" loading={refreshing} onRefresh={handleRefresh} />
+          <RefreshButton label="Refresh Draft Board" loading={refreshing} onRefresh={handleRefresh} />
         }
       />
       {loading ? (
@@ -527,6 +535,7 @@ export function EpicFlowPanel() {
         <UserStoryFormModal
           mode={storyModal.mode}
           epic={selectedEpic}
+          epics={epics}
           initialStory={storyModal.mode === "edit" ? storyModal.story : undefined}
           busy={busy}
           onClose={() => setStoryModal(null)}

@@ -203,6 +203,8 @@ export function AnnotationListPanel() {
             searchPlaceholder="Search"
             ariaLabel="Filter by resolution"
             size="sm"
+            clearable
+            clearValue="all"
           />
           <SearchableSelect
             options={statuses}
@@ -232,6 +234,8 @@ export function AnnotationListPanel() {
             searchPlaceholder="Search sort"
             ariaLabel="Sort comments"
             size="sm"
+            clearable
+            clearValue="newest"
           />
         </div>
         <div className="wpn-list-panel__filter-actions">

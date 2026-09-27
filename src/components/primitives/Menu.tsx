@@ -58,11 +58,14 @@ export interface MenuDefinition {
   items: MenuItemDefinition[];
 }
 
-interface MenuPanelProps {
+export interface MenuPanelProps {
   items: MenuItemDefinition[];
   placement: "bottom-start" | "right-start";
   anchorRef: RefObject<HTMLElement | null>;
   onRequestClose: () => void;
+  className?: string;
+
+  onInteract?: () => void;
 }
 
 function focusableIndexes(items: MenuItemDefinition[]): number[] {
@@ -122,7 +125,14 @@ function SubmenuItem({ item, isActive, open, onHover, onOpen, onRequestClose }: 
   );
 }
 
-function MenuPanel({ items, placement, anchorRef, onRequestClose }: MenuPanelProps) {
+export function MenuPanel({
+  items,
+  placement,
+  anchorRef,
+  onRequestClose,
+  className,
+  onInteract,
+}: MenuPanelProps) {
   const panelRef = useRef<HTMLDivElement>(null);
   const itemRefs = useRef(new Map<number, HTMLButtonElement>());
   const [activeIndex, setActiveIndex] = useState(() => focusableIndexes(items)[0] ?? -1);
@@ -174,6 +184,7 @@ function MenuPanel({ items, placement, anchorRef, onRequestClose }: MenuPanelPro
   };
 
   const handleKeyDown = (event: ReactKeyboardEvent<HTMLDivElement>) => {
+    onInteract?.();
     if (event.key === "ArrowDown") {
       event.preventDefault();
       moveActive(1);
@@ -197,19 +208,26 @@ function MenuPanel({ items, placement, anchorRef, onRequestClose }: MenuPanelPro
       }
       return;
     }
+    if (event.key === "Tab") {
+
+      event.preventDefault();
+      moveActive(event.shiftKey ? -1 : 1);
+      return;
+    }
     if ((event.key === "Enter" || event.key === " ") && active) {
       event.preventDefault();
       activateItem(active);
     }
   };
 
-  return (
+  const panelContent = (
     <div
       ref={panelRef}
-      className="wpn-menu__panel"
+      className={["wpn-menu__panel", className ?? ""].filter(Boolean).join(" ")}
       role="menu"
       style={position ? { top: position.top, left: position.left } : { visibility: "hidden" }}
       onKeyDown={handleKeyDown}
+      onPointerDown={onInteract}
     >
       {items.map((item, index) => {
         if (item.type === "separator") {
@@ -241,6 +259,7 @@ function MenuPanel({ items, placement, anchorRef, onRequestClose }: MenuPanelPro
               className={[
                 "wpn-menu__item",
                 isActive ? "wpn-menu__item--active" : "",
+                item.checked ? "wpn-menu__item--checked" : "",
                 item.disabled ? "wpn-menu__item--disabled" : "",
               ]
                 .filter(Boolean)
@@ -248,16 +267,23 @@ function MenuPanel({ items, placement, anchorRef, onRequestClose }: MenuPanelPro
               onPointerEnter={() => !item.disabled && setActiveIndex(index)}
               onClick={() => activateItem(item)}
             >
-              <Icon
-                name="check"
-                className={[
-                  "wpn-menu__item-check",
-                  item.checked ? "wpn-menu__item-check--visible" : "",
-                ]
-                  .filter(Boolean)
-                  .join(" ")}
-              />
+              {item.icon ? (
+                <Icon name={item.icon} className="wpn-menu__item-icon" />
+              ) : (
+                <Icon
+                  name="check"
+                  className={[
+                    "wpn-menu__item-check",
+                    item.checked ? "wpn-menu__item-check--visible" : "",
+                  ]
+                    .filter(Boolean)
+                    .join(" ")}
+                />
+              )}
               <span className="wpn-menu__item-label">{item.label}</span>
+              {item.icon && item.checked ? (
+                <Icon name="check" className="wpn-menu__item-check wpn-menu__item-check--visible" />
+              ) : null}
               {item.shortcut ? (
                 <span className="wpn-menu__item-shortcut">{item.shortcut}</span>
               ) : null}
@@ -296,6 +322,9 @@ function MenuPanel({ items, placement, anchorRef, onRequestClose }: MenuPanelPro
       })}
     </div>
   );
+
+  return panelContent;
+
 }
 
 interface MenuProps {

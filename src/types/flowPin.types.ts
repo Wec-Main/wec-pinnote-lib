@@ -14,7 +14,6 @@ export interface FlowPin {
   updatedAt: string;
 }
 
-/** A flow pin placed but not yet named, held only in client state. */
 export interface DraftFlowPin {
   id: string;
   anchor: AnnotationAnchor;
@@ -28,7 +27,6 @@ export interface FlowSummary {
   updatedAt: string;
 }
 
-/** A project-level flow, as listed/managed from the Flow browser. */
 export interface Flow {
   id: string;
   projectId: string;

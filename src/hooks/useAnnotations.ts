@@ -213,6 +213,7 @@ export function useAnnotationCollection({
   }, [api, authenticated, pageKey, projectId, reloadToken, reportError, sessionKey]);
 
   const retry = useCallback(() => {
+    setError(null);
     setReloadToken((value) => value + 1);
   }, []);
 
@@ -245,7 +246,13 @@ export function useAnnotationCollection({
   useEffect(() => abortWrites, [abortWrites]);
 
   const onStreamEvent = useCallback((event: StreamEvent) => {
-    setAnnotations((current) => applyStreamEvent(current, event).annotations);
+    setAnnotations((current) => {
+      const result = applyStreamEvent(current, event);
+      if (result.needsResync) {
+        queueMicrotask(() => setReloadToken((value) => value + 1));
+      }
+      return result.annotations;
+    });
   }, []);
 
   const connectionState = useAnnotationStream({
@@ -391,6 +398,7 @@ export function useAnnotationCollection({
       }
       const withLocalIdentity: AnnotationComment = { ...created, createdBy: requestingUser };
       pendingCommentIdsRef.current.delete(tempId);
+      const parentPresent = annotationsRef.current.some((item) => item.id === annotationId);
       setAnnotations((current) =>
         current.map((item) =>
           item.id === annotationId
@@ -398,9 +406,13 @@ export function useAnnotationCollection({
             : item,
         ),
       );
+      if (!parentPresent) {
+        retry();
+        return;
+      }
       eventsRef.current.onCommentAdd?.(annotationId, withLocalIdentity);
     },
-    [api, beginWrite, endWrite, reportActionError],
+    [api, beginWrite, endWrite, reportActionError, retry],
   );
 
   const editComment = useCallback(
@@ -422,9 +434,19 @@ export function useAnnotationCollection({
         ),
       );
       setActionError(null);
+      const requestingUser = currentUserRef.current;
+      const controller = beginWrite();
 
       try {
-        const updated = await api.updateComment(annotationId, commentId, { message });
+        const updated = await api.updateComment(
+          annotationId,
+          commentId,
+          { message },
+          controller.signal,
+        );
+        if (currentUserRef.current.id !== requestingUser.id) {
+          return;
+        }
         setAnnotations((current) =>
           current.map((item) =>
             item.id === annotationId
@@ -438,6 +460,9 @@ export function useAnnotationCollection({
           ),
         );
       } catch (err) {
+        if (isAbortError(err)) {
+          return;
+        }
         if (previous) {
           const restored = previous;
           setAnnotations((current) =>
@@ -455,9 +480,11 @@ export function useAnnotationCollection({
         }
         reportActionError(err);
         throw err;
+      } finally {
+        endWrite(controller);
       }
     },
-    [api, reportActionError],
+    [api, beginWrite, endWrite, reportActionError],
   );
 
   const removeAnnotation = useCallback(
@@ -465,20 +492,26 @@ export function useAnnotationCollection({
       const removed = annotationsRef.current.find((item) => item.id === annotationId);
       setAnnotations((current) => current.filter((item) => item.id !== annotationId));
       setActionError(null);
+      const controller = beginWrite();
 
       try {
-        await api.deleteAnnotation(annotationId);
+        await api.deleteAnnotation(annotationId, controller.signal);
       } catch (err) {
+        if (isAbortError(err)) {
+          return;
+        }
         if (removed) {
           const restored = removed;
           setAnnotations((current) => [...current, restored].sort((a, b) => a.number - b.number));
         }
         reportActionError(err);
         throw err;
+      } finally {
+        endWrite(controller);
       }
       eventsRef.current.onAnnotationDelete?.(annotationId);
     },
-    [api, reportActionError],
+    [api, beginWrite, endWrite, reportActionError],
   );
 
   const removeComment = useCallback(
@@ -496,10 +529,14 @@ export function useAnnotationCollection({
         ),
       );
       setActionError(null);
+      const controller = beginWrite();
 
       try {
-        await api.deleteComment(annotationId, commentId);
+        await api.deleteComment(annotationId, commentId, controller.signal);
       } catch (err) {
+        if (isAbortError(err)) {
+          return;
+        }
         if (removed) {
           const restored = removed;
           setAnnotations((current) =>
@@ -520,13 +557,15 @@ export function useAnnotationCollection({
         }
         reportActionError(err);
         throw err;
+      } finally {
+        endWrite(controller);
       }
 
       if (removed && remainingCount === 0) {
         await removeAnnotation(annotationId);
       }
     },
-    [api, removeAnnotation, reportActionError],
+    [api, beginWrite, endWrite, removeAnnotation, reportActionError],
   );
 
   const setStatus = useCallback(
@@ -538,11 +577,19 @@ export function useAnnotationCollection({
         current.map((item) => (item.id === annotationId ? { ...item, status } : item)),
       );
       setActionError(null);
+      const requestingUser = currentUserRef.current;
+      const controller = beginWrite();
 
       let updated: Annotation;
       try {
-        updated = await api.updateAnnotation(annotationId, { status });
+        updated = await api.updateAnnotation(annotationId, { status }, controller.signal);
+        if (currentUserRef.current.id !== requestingUser.id) {
+          return;
+        }
       } catch (err) {
+        if (isAbortError(err)) {
+          return;
+        }
         if (previousStatus) {
           const restored = previousStatus;
           setAnnotations((current) =>
@@ -553,6 +600,8 @@ export function useAnnotationCollection({
         }
         reportActionError(err);
         throw err;
+      } finally {
+        endWrite(controller);
       }
       setAnnotations((current) =>
         current.map((item) => (item.id === annotationId ? updated : item)),
@@ -560,7 +609,7 @@ export function useAnnotationCollection({
       eventsRef.current.onStatusChange?.(annotationId, updated.status);
       eventsRef.current.onAnnotationUpdate?.(updated);
     },
-    [api, reportActionError],
+    [api, beginWrite, endWrite, reportActionError],
   );
 
   const clearActionError = useCallback(() => setActionError(null), []);

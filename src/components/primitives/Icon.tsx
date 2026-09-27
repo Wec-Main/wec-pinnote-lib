@@ -21,6 +21,9 @@ export type IconName =
   | "users"
   | "pen"
   | "editNote"
+  | "commentAdd"
+  | "annotateCursor"
+  | "mapPin"
   | "epic"
   | "flow"
   | "comment"
@@ -160,6 +163,24 @@ const PATHS: Record<IconName, ReactElement> = {
   ),
   comment: (
     <path d="M20 14.5a2.5 2.5 0 0 1-2.5 2.5H8l-4 3.5V6.5A2.5 2.5 0 0 1 6.5 4h11A2.5 2.5 0 0 1 20 6.5Z" />
+  ),
+  commentAdd: (
+    <>
+      <path d="M20 14.5a2.5 2.5 0 0 1-2.5 2.5H8l-4 3.5V6.5A2.5 2.5 0 0 1 6.5 4h11A2.5 2.5 0 0 1 20 6.5Z" />
+      <path d="M12 7.5v6M9 10.5h6" />
+    </>
+  ),
+  annotateCursor: (
+    <>
+      <path d="M6 3.5 6 15.8 9.3 12.9 11.4 18 14 16.8 12 11.7 16.3 11.3Z" />
+      <circle cx="18.5" cy="18.5" r="3" />
+    </>
+  ),
+  mapPin: (
+    <>
+      <path d="M12 21.5S19 14.8 19 9.5a7 7 0 1 0-14 0c0 5.3 7 12 7 12Z" />
+      <circle cx="12" cy="9.5" r="2.6" />
+    </>
   ),
   reply: <path d="M9.5 6 4 11.5 9.5 17M4 11.5h9.5a6.5 6.5 0 0 1 6.5 6.5v1" />,
   history: (

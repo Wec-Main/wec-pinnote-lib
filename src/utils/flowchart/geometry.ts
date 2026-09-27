@@ -39,7 +39,6 @@ export function getBounds(rects: Rect[]): Rect | null {
   return { x: minX, y: minY, width: maxX - minX, height: maxY - minY };
 }
 
-/** Normalises a rectangle drawn between two arbitrary corner points. */
 export function rectFromPoints(a: XYPosition, b: XYPosition): Rect {
   return {
     x: Math.min(a.x, b.x),
@@ -64,32 +63,54 @@ export const snapPosition = (p: XYPosition, grid: number): XYPosition => ({
   y: Math.round(p.y / grid) * grid,
 });
 
-/** Horizontal inset of a parallelogram's slanted sides. */
 export const parallelogramSkew = (width: number) => Math.min(24, width * 0.12);
 
-/**
- * Position of a handle relative to its node's top-left corner. Handles that
- * share a side are distributed evenly along it.
- */
 export function getHandleOffset(
   def: NodeTypeDefinition,
   handle: HandleDefinition,
   width: number,
   height: number,
 ): XYPosition {
-  const siblings = def.handles.filter((h) => h.side === handle.side);
-  const t = (siblings.indexOf(handle) + 1) / (siblings.length + 1);
   const skew = def.shape === "parallelogram" ? parallelogramSkew(width) / 2 : 0;
+  const t = (() => {
+    const sideSiblings = def.handles.filter((h) => h.side === handle.side);
+    const hasUnlabeled = sideSiblings.some((h) => !h.label);
+    const slots = hasUnlabeled
+      ? [null, ...sideSiblings.filter((h) => h.label)]
+      : sideSiblings;
+    const slotIndex = handle.label ? slots.indexOf(handle) : 0;
+    return (slotIndex + 1) / (slots.length + 1);
+  })();
   switch (handle.side) {
     case "top":
-      return { x: width * t, y: 0 };
+      return def.shape === "diamond"
+        ? { x: width / 2, y: 0 }
+        : { x: width * t, y: 0 };
     case "bottom":
-      return { x: width * t, y: height };
+      return def.shape === "diamond"
+        ? { x: width / 2, y: height }
+        : { x: width * t, y: height };
     case "left":
-      return { x: skew, y: height * t };
+      return def.shape === "diamond"
+        ? { x: 0, y: height / 2 }
+        : { x: skew, y: height * t };
     case "right":
-      return { x: width - skew, y: height * t };
+      return def.shape === "diamond"
+        ? { x: width, y: height / 2 }
+        : { x: width - skew, y: height * t };
   }
+}
+
+export function getRenderedHandles(def: NodeTypeDefinition): HandleDefinition[] {
+  return def.handles.filter((handle) => {
+    if (handle.label || handle.kind === "source") {
+      return true;
+    }
+    const hasUnlabeledSource = def.handles.some(
+      (other) => other.side === handle.side && !other.label && other.kind === "source",
+    );
+    return !hasUnlabeledSource;
+  });
 }
 
 export function getHandlePosition(
@@ -102,7 +123,6 @@ export function getHandlePosition(
   return { x: node.position.x + offset.x, y: node.position.y + offset.y };
 }
 
-/** Resolves a handle by id, or the first handle of the requested kind. */
 export function findHandle(
   def: NodeTypeDefinition,
   kind: HandleDefinition["kind"],

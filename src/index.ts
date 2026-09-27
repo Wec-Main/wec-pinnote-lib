@@ -11,7 +11,11 @@ export { useAnnotationMode } from "./hooks/useAnnotationMode";
 export { useAnnotationApi } from "./hooks/useAnnotationApi";
 export { useAnnotationPositions, useFloatingPanel } from "./hooks/useAnnotationPosition";
 export { createAnnotationApi } from "./services/annotationApi";
-export { AnnotationToggleButton } from "./components/AnnotationToggleButton";
+export {
+  AnnotationToggleButton,
+  AnnotationModeButton,
+  AnnotationVisibilityToggle,
+} from "./components/AnnotationToggleButton";
 export { AnnotationListPanel } from "./components/AnnotationListPanel";
 export { AnnotationToolbar } from "./components/AnnotationToolbar";
 export { UserManagementPanel } from "./components/UserManagement";

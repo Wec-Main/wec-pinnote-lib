@@ -112,7 +112,7 @@ export function EpicFormModal({
 
             <label className="wpn-epicflow-modal__field">
               <span className="wpn-epicflow-modal__label">
-                Description <span className="wpn-epicflow-modal__required">*</span>
+                Notes <span className="wpn-epicflow-modal__required">*</span>
               </span>
               <textarea
                 className="wpn-epicflow-modal__input wpn-epicflow-modal__textarea"
@@ -126,7 +126,7 @@ export function EpicFormModal({
                 {description.length}/{DESCRIPTION_MAX}
               </span>
               {touched && !descriptionValid ? (
-                <span className="wpn-users-modal__error">A description is required.</span>
+                <span className="wpn-users-modal__error">Notes are required.</span>
               ) : null}
             </label>
           </div>

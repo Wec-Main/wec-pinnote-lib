@@ -246,31 +246,48 @@ export function AnnotationLayer() {
     [applyAnnotationTagLocal, commitAnnotationTagUpdate],
   );
 
+  const interactionActive = Boolean(
+    draft || tagDraft || flowPinDraft || selectedId || selectedFlowPinId,
+  );
+
   const visible = useMemo(() => {
     if (!authenticated || !pinsVisible || (!modeEnabled && !config.showPinsWhenIdle)) {
       return [];
     }
-    return annotations.filter(
+    const candidates = annotations.filter(
       (item) => config.showResolved || (item.status !== "completed" && item.status !== "closed"),
     );
+    if (!interactionActive) {
+      return candidates;
+    }
+    return candidates.filter((item) => item.id === selectedId);
   }, [
     authenticated,
     annotations,
     config.showPinsWhenIdle,
     config.showResolved,
+    interactionActive,
     modeEnabled,
     pinsVisible,
+    selectedId,
   ]);
 
-  const visibleTags = useMemo(
-    () => (authenticated && tagsVisible ? annotationTags : []),
-    [authenticated, annotationTags, tagsVisible],
-  );
+  const visibleTags = useMemo(() => {
+    if (!authenticated || !tagsVisible) {
+      return [];
+    }
+    return interactionActive ? [] : annotationTags;
+  }, [authenticated, annotationTags, interactionActive, tagsVisible]);
 
-  const visibleFlowPins = useMemo(
-    () => (authenticated && flowPinsVisible ? flowPins : []),
-    [authenticated, flowPins, flowPinsVisible],
-  );
+  const visibleFlowPins = useMemo(() => {
+    if (!authenticated || !flowPinsVisible) {
+      return [];
+    }
+    if (!interactionActive) {
+      return flowPins;
+    }
+    return flowPins.filter((item) => item.id === selectedFlowPinId);
+  }, [authenticated, flowPins, flowPinsVisible, interactionActive, selectedFlowPinId]);
 
   const selected = authenticated ? annotations.find((item) => item.id === selectedId) : undefined;
 

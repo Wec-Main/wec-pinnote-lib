@@ -11,22 +11,24 @@ export type NoticeKind = "info" | "success" | "error";
 export type FlowCommitHandler = (flow: FlowJSON) => void | Promise<void>;
 
 export interface ToolbarProps {
-  /** Brand / title area on the left. */
+
   brand?: ReactNode;
-  /** Called with user-facing feedback (import results, errors…). */
+
   onNotify?: (message: string, kind: NoticeKind) => void;
-  /** Override the default "download a .json file" export behaviour. */
+
   onExport?: (json: string) => void;
-  /** Shows a Save button; called after the user confirms. */
+
   onSave?: FlowCommitHandler;
-  /** Shows a Publish button; called after the user confirms. */
+
   onPublish?: FlowCommitHandler;
-  /** Extra buttons rendered before Save and Publish. */
+
   extraActions?: ReactNode;
+
+  onDelete?: () => void;
   className?: string;
 }
 
-type PendingCommit = "save" | "publish";
+type PendingCommit = "save" | "publish" | "delete";
 
 const slug = (s: string) =>
   s
@@ -48,7 +50,6 @@ function download(filename: string, text: string) {
 
 const plural = (count: number, word: string) => `${count} ${word}${count === 1 ? "" : "s"}`;
 
-/** Top toolbar: name, mode and history on the left; validation, files, save and publish on the right. */
 export const Toolbar = memo(function Toolbar({
   brand,
   onNotify,
@@ -56,6 +57,7 @@ export const Toolbar = memo(function Toolbar({
   onSave,
   onPublish,
   extraActions,
+  onDelete,
   className,
 }: ToolbarProps) {
   const engine = useFlowEngine();
@@ -69,7 +71,8 @@ export const Toolbar = memo(function Toolbar({
     shallowEqual,
   );
   const [pending, setPending] = useState<PendingCommit | null>(null);
-  const [publishErrors, setPublishErrors] = useState(0);
+  const [committing, setCommitting] = useState(false);
+  const [publishBlocked, setPublishBlocked] = useState<string | null>(null);
   const notify = (m: string, k: NoticeKind) => onNotify?.(m, k);
 
   const exportJson = () => {
@@ -85,21 +88,51 @@ export const Toolbar = memo(function Toolbar({
   };
 
   const requestPublish = () => {
-    setPublishErrors(engine.validate().errorCount);
+    const result = engine.validate();
+    const blockers = [
+      result.errorCount > 0 ? plural(result.errorCount, "error") : null,
+      result.warningCount > 0 ? plural(result.warningCount, "warning") : null,
+    ].filter(Boolean);
+    if (blockers.length > 0) {
+      setPublishBlocked(`Fix ${blockers.join(" and ")} before publishing.`);
+      notify(`Cannot publish: ${blockers.join(" and ")} found`, "error");
+      return;
+    }
+    setPublishBlocked(null);
     setPending("publish");
   };
 
   const commit = async () => {
     const action = pending;
+    if (!action || committing) return;
+    if (action === "delete") {
+      if (!onDelete) return;
+      setCommitting(true);
+      try {
+        await onDelete();
+        setPending(null);
+      } catch (e) {
+        notify(e instanceof Error && e.message ? e.message : "Could not delete the flow", "error");
+      } finally {
+        setCommitting(false);
+      }
+      return;
+    }
     const handler = action === "publish" ? onPublish : onSave;
-    if (!action || !handler) return;
-    setPending(null);
+    if (!handler) return;
+    setCommitting(true);
     try {
       await handler(engine.toJSON());
+      if (action === "publish") {
+        engine.setReadOnly(true);
+        engine.validate();
+      }
       notify(action === "publish" ? `"${flowName}" published` : `"${flowName}" saved`, "success");
+      setPending(null);
     } catch (e) {
       notify(e instanceof Error && e.message ? e.message : `Could not ${action} the flow`, "error");
-      setPending(action);
+    } finally {
+      setCommitting(false);
     }
   };
 
@@ -158,6 +191,16 @@ export const Toolbar = memo(function Toolbar({
         >
           <Icon name={readOnly ? "lock" : "unlock"} /> {readOnly ? "Read-only" : "Editing"}
         </button>
+        {onDelete && (
+          <button
+            type="button"
+            className={cx("wpn-flowchart-ui__btn", "wpn-flowchart-ui__btn-danger")}
+            onClick={() => setPending("delete")}
+            title="Delete this flow"
+          >
+            <Icon name="trash" /> Delete
+          </button>
+        )}
         <span className="wpn-flowchart-toolbar__divider" aria-hidden="true" />
       </div>
 
@@ -214,6 +257,7 @@ export const Toolbar = memo(function Toolbar({
           title="Save flow?"
           icon="save"
           confirmLabel="Save"
+          busy={committing}
           onConfirm={() => void commit()}
           onCancel={() => setPending(null)}
         >
@@ -228,17 +272,47 @@ export const Toolbar = memo(function Toolbar({
           title="Publish flow?"
           icon="publish"
           confirmLabel="Publish"
-          warning={
-            publishErrors > 0
-              ? `Validation found ${plural(publishErrors, "error")}. You can still publish, or cancel and fix them first.`
-              : undefined
-          }
+          busy={committing}
           onConfirm={() => void commit()}
           onCancel={() => setPending(null)}
         >
           <p>
             Publishing replaces the live version of <strong>{flowName}</strong> with this one (
-            {plural(nodeCount, "node")}, {plural(edgeCount, "connection")}).
+            {plural(nodeCount, "node")}, {plural(edgeCount, "connection")}). The flow becomes
+            read-only once published.
+          </p>
+        </ConfirmDialog>
+      )}
+      {pending === "delete" && (
+        <ConfirmDialog
+          title="Delete flow?"
+          icon="trash"
+          confirmLabel="Delete"
+          busy={committing}
+          onConfirm={() => void commit()}
+          onCancel={() => setPending(null)}
+        >
+          <p>
+            Delete <strong>{flowName}</strong> ({plural(nodeCount, "node")},{" "}
+            {plural(edgeCount, "connection")})? This cannot be undone.
+          </p>
+        </ConfirmDialog>
+      )}
+      {publishBlocked && (
+        <ConfirmDialog
+          title="Cannot publish"
+          icon="alert"
+          confirmLabel="View issues"
+          warning={publishBlocked}
+          onConfirm={() => {
+            setPublishBlocked(null);
+            validate();
+          }}
+          onCancel={() => setPublishBlocked(null)}
+        >
+          <p>
+            Publishing is blocked until <strong>{flowName}</strong> validates cleanly. Resolve every
+            error and warning, then publish again.
           </p>
         </ConfirmDialog>
       )}

@@ -30,13 +30,15 @@ export function applyEpicFlowStreamEvent(
 
     case "epic.deleted": {
       const { epicId } = payload as { epicId: string };
-      if (!epicId || !epics.some((item) => item.id === epicId)) {
+      if (!epicId) {
         return unchanged;
       }
-      return {
-        epics: epics.filter((item) => item.id !== epicId),
-        userStories: userStories.filter((item) => item.epicId !== epicId),
-      };
+      const remainingEpics = epics.filter((item) => item.id !== epicId);
+      const remainingStories = userStories.filter((item) => item.epicId !== epicId);
+      if (remainingEpics.length === epics.length && remainingStories.length === userStories.length) {
+        return unchanged;
+      }
+      return { epics: remainingEpics, userStories: remainingStories };
     }
 
     case "user_story.created":
@@ -50,13 +52,14 @@ export function applyEpicFlowStreamEvent(
 
     case "user_story.deleted": {
       const { userStoryId } = payload as { userStoryId: string };
-      if (!userStoryId || !userStories.some((item) => item.id === userStoryId)) {
+      if (!userStoryId) {
         return unchanged;
       }
-      return {
-        epics,
-        userStories: userStories.filter((item) => item.id !== userStoryId),
-      };
+      const remaining = userStories.filter((item) => item.id !== userStoryId);
+      if (remaining.length === userStories.length) {
+        return unchanged;
+      }
+      return { epics, userStories: remaining };
     }
 
     default:

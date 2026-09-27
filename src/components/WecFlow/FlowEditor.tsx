@@ -16,28 +16,31 @@ import { FlowCanvas } from "./FlowCanvas";
 import type { BackgroundVariant } from "./Background";
 import { FlowProvider } from "./FlowProvider";
 import { Icon } from "./FlowIcons";
+import { PanelResizeHandle } from "./PanelResizeHandle";
 import { PropertiesPanel } from "./PropertiesPanel";
 import { Sidebar } from "./Sidebar";
 import { Toolbar, type FlowCommitHandler, type NoticeKind } from "./Toolbar";
 import { ValidationPanel } from "./ValidationPanel";
 
 export interface FlowEditorProps extends FlowEngineOptions {
-  /** Use an existing engine. Otherwise one is created from the options (or taken from a surrounding FlowProvider). */
+
   engine?: FlowEngine;
-  /** Called (debounced to one call per frame) whenever nodes or edges change. */
+
   onChange?: (flow: FlowJSON) => void;
   showToolbar?: boolean;
   showSidebar?: boolean;
   showProperties?: boolean;
   showMiniMap?: boolean;
   background?: BackgroundVariant;
-  /** Custom brand element for the toolbar. */
+
   brand?: ReactNode;
   toolbarActions?: ReactNode;
-  /** Shows a Save button in the toolbar; called after the user confirms. */
+
   onSave?: FlowCommitHandler;
-  /** Shows a Publish button in the toolbar; called after the user confirms. */
+
   onPublish?: FlowCommitHandler;
+
+  onDelete?: () => void;
   className?: string;
   style?: CSSProperties;
 }
@@ -47,6 +50,11 @@ interface Notice {
   message: string;
   kind: NoticeKind;
 }
+
+const SIDEBAR_DEFAULT_WIDTH = 260;
+const PROPERTIES_DEFAULT_WIDTH = 300;
+const PANEL_MIN_WIDTH = 180;
+const PANEL_MAX_WIDTH = 560;
 
 function EditorLayout({
   onChange,
@@ -60,6 +68,7 @@ function EditorLayout({
   toolbarActions,
   onSave,
   onPublish,
+  onDelete,
   className,
   style,
 }: FlowEditorProps) {
@@ -68,9 +77,9 @@ function EditorLayout({
   const [notices, setNotices] = useState<Notice[]>([]);
   const noticeId = useRef(0);
   const [propertiesOpen, setPropertiesOpen] = useState(true);
-  const [propertiesMinimized, setPropertiesMinimized] = useState(false);
+  const [sidebarWidth, setSidebarWidth] = useState(SIDEBAR_DEFAULT_WIDTH);
+  const [propertiesWidth, setPropertiesWidth] = useState(PROPERTIES_DEFAULT_WIDTH);
 
-  // Keep the engine's read-only flag in sync with the prop (when controlled).
   useEffect(() => {
     if (readOnly !== undefined) engine.setReadOnly(readOnly);
   }, [engine, readOnly]);
@@ -92,13 +101,23 @@ function EditorLayout({
     };
   }, [engine]);
 
+  const noticeTimers = useRef(new Set<ReturnType<typeof setTimeout>>());
+  useEffect(() => {
+    const timers = noticeTimers.current;
+    return () => {
+      for (const timer of timers) clearTimeout(timer);
+      timers.clear();
+    };
+  }, []);
+
   const notify = useCallback((message: string, kind: NoticeKind) => {
     const id = ++noticeId.current;
     setNotices((n) => [...n.slice(-2), { id, message, kind }]);
-    setTimeout(
-      () => setNotices((n) => n.filter((x) => x.id !== id)),
-      kind === "error" ? 6000 : 3000,
-    );
+    const timer = setTimeout(() => {
+      noticeTimers.current.delete(timer);
+      setNotices((n) => n.filter((x) => x.id !== id));
+    }, kind === "error" ? 6000 : 3000);
+    noticeTimers.current.add(timer);
   }, []);
 
   return (
@@ -113,11 +132,24 @@ function EditorLayout({
           onNotify={notify}
           onSave={onSave}
           onPublish={onPublish}
+          onDelete={onDelete}
           extraActions={toolbarActions}
         />
       )}
       <div className="wpn-flowchart-editor__body">
-        {showSidebar && <Sidebar />}
+        {showSidebar && (
+          <>
+            <Sidebar style={{ width: sidebarWidth }} />
+            <PanelResizeHandle
+              side="left"
+              width={sidebarWidth}
+              minWidth={PANEL_MIN_WIDTH}
+              maxWidth={PANEL_MAX_WIDTH}
+              ariaLabel="Resize node panel"
+              onResize={setSidebarWidth}
+            />
+          </>
+        )}
         <main className="wpn-flowchart-editor__main">
           <FlowCanvas keyboardShortcuts={false} showMiniMap={showMiniMap} background={background}>
             <ValidationPanel />
@@ -149,27 +181,26 @@ function EditorLayout({
           )}
         </main>
         {showProperties && propertiesOpen && (
-          <PropertiesPanel
-            onClose={() => setPropertiesOpen(false)}
-            minimized={propertiesMinimized}
-            onToggleMinimize={() => setPropertiesMinimized((v) => !v)}
-          />
+          <>
+            <PanelResizeHandle
+              side="right"
+              width={propertiesWidth}
+              minWidth={PANEL_MIN_WIDTH}
+              maxWidth={PANEL_MAX_WIDTH}
+              ariaLabel="Resize properties panel"
+              onResize={setPropertiesWidth}
+            />
+            <PropertiesPanel
+              style={{ width: propertiesWidth }}
+              onClose={() => setPropertiesOpen(false)}
+            />
+          </>
         )}
       </div>
     </div>
   );
 }
 
-/**
- * Complete flowchart editor: toolbar, node palette, canvas, minimap,
- * validation and properties panel. Drop it in a sized container.
- *
- * ```tsx
- * <div style={{ height: 600 }}>
- *   <FlowEditor initialFlow={flow} onChange={save} />
- * </div>
- * ```
- */
 export function FlowEditor(props: FlowEditorProps) {
   const outer = useContext(FlowContext);
   if (outer && !props.engine) return <EditorLayout {...props} />;

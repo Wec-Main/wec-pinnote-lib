@@ -6,7 +6,7 @@ import {
   type AnnotationUser,
 } from "../../types/annotation.types";
 import { formatTimestamp, getInitials } from "../../utils/format";
-import { canDeleteComment, canEditComment } from "../../utils/boardPermissions";
+import { canDeleteAnnotation, canDeleteComment, canEditComment } from "../../utils/boardPermissions";
 import {
   encodeMentions,
   mentionsToPlainText,
@@ -17,7 +17,7 @@ import { useMentionCandidates } from "../../hooks/useMentionCandidates";
 import { CommentMessage } from "../CommentMessage";
 import { CommentQuote } from "../CommentQuote";
 import { MentionTextarea } from "../MentionTextarea";
-import { Icon } from "../primitives";
+import { Icon, Tooltip } from "../primitives";
 
 interface AnnotationThreadProps {
   annotation: Annotation;
@@ -40,6 +40,8 @@ function CommentItem({
   quoted,
   candidates,
   currentUser,
+  deletesAnnotation,
+  canDeleteAnnotation,
   onEdit,
   onDelete,
   onReply,
@@ -49,14 +51,18 @@ function CommentItem({
   quoted: AnnotationComment | undefined;
   candidates: MentionCandidate[];
   currentUser: AnnotationUser;
+  deletesAnnotation: boolean;
+  canDeleteAnnotation: boolean;
   onEdit: (commentId: string, message: string) => Promise<void>;
   onDelete: (comment: AnnotationComment) => void;
   onReply: (comment: AnnotationComment) => void;
   onEditingChange?: (commentId: string, editing: boolean) => void;
 }) {
   const canEdit = canEditComment(comment, currentUser);
-  const canDelete = canDeleteComment(comment, currentUser);
+  const canDelete =
+    canDeleteComment(comment, currentUser) && (!deletesAnnotation || canDeleteAnnotation);
   const [editing, setEditing] = useState(false);
+  const [confirmingDiscard, setConfirmingDiscard] = useState(false);
   const plainMessage = mentionsToPlainText(comment.message);
   const [value, setValue] = useState(plainMessage);
 
@@ -65,9 +71,18 @@ function CommentItem({
     return () => onEditingChange?.(comment.id, false);
   }, [comment.id, plainMessage, editing, onEditingChange, value]);
 
-  const cancelEdit = () => {
+  const discardEdit = () => {
+    setConfirmingDiscard(false);
     setEditing(false);
     setValue(plainMessage);
+  };
+
+  const cancelEdit = () => {
+    if (value.trim() !== plainMessage.trim()) {
+      setConfirmingDiscard(true);
+      return;
+    }
+    discardEdit();
   };
 
   const saveEdit = () => {
@@ -105,23 +120,25 @@ function CommentItem({
                 <Icon name="reply" className="wpn-action-icon" />
               </button>
               {canEdit ? (
-                <button
-                  type="button"
-                  className="wpn-link wpn-link--icon"
-                  aria-label="Edit"
-                  onClick={() => setEditing(true)}
-                >
-                  <svg viewBox="0 0 24 24" className="wpn-action-icon" aria-hidden="true">
-                    <path
-                      fill="none"
-                      stroke="currentColor"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth="1.8"
-                      d="M13.2 6.2 17.8 10.8M4 20l.9-4.5L14.6 6a1.5 1.5 0 0 1 2.1 0l1.3 1.3a1.5 1.5 0 0 1 0 2.1L8.5 19.1 4 20Z"
-                    />
-                  </svg>
-                </button>
+                <Tooltip label="Edit comment" placement="top">
+                  <button
+                    type="button"
+                    className="wpn-link wpn-link--icon"
+                    aria-label="Edit"
+                    onClick={() => setEditing(true)}
+                  >
+                    <svg viewBox="0 0 24 24" className="wpn-action-icon" aria-hidden="true">
+                      <path
+                        fill="none"
+                        stroke="currentColor"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth="1.8"
+                        d="M13.2 6.2 17.8 10.8M4 20l.9-4.5L14.6 6a1.5 1.5 0 0 1 2.1 0l1.3 1.3a1.5 1.5 0 0 1 0 2.1L8.5 19.1 4 20Z"
+                      />
+                    </svg>
+                  </button>
+                </Tooltip>
               ) : null}
               {canDelete ? (
                 <button
@@ -158,21 +175,43 @@ function CommentItem({
               onEnter={saveEdit}
               onEscape={cancelEdit}
             />
-            <div className="wpn-comment__actions">
-              <button type="button" className="wpn-link wpn-link--chip" onClick={cancelEdit}>
-                <Icon name="close" className="wpn-link__icon" />
-                Cancel
-              </button>
-              <button
-                type="button"
-                className="wpn-link wpn-link--chip wpn-link--save"
-                disabled={!value.trim()}
-                onClick={saveEdit}
-              >
-                <Icon name="check" className="wpn-link__icon" />
-                Save
-              </button>
-            </div>
+            {confirmingDiscard ? (
+              <div className="wpn-comment__discard" role="alert">
+                <span>Discard your changes?</span>
+                <span className="wpn-comment__discard-actions">
+                  <button
+                    type="button"
+                    className="wpn-link wpn-link--chip"
+                    onClick={() => setConfirmingDiscard(false)}
+                  >
+                    Keep editing
+                  </button>
+                  <button
+                    type="button"
+                    className="wpn-link wpn-link--chip wpn-link--danger"
+                    onClick={discardEdit}
+                  >
+                    Discard
+                  </button>
+                </span>
+              </div>
+            ) : (
+              <div className="wpn-comment__actions">
+                <button type="button" className="wpn-link wpn-link--chip" onClick={cancelEdit}>
+                  <Icon name="close" className="wpn-link__icon" />
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  className="wpn-link wpn-link--chip wpn-link--save"
+                  disabled={!value.trim()}
+                  onClick={saveEdit}
+                >
+                  <Icon name="check" className="wpn-link__icon" />
+                  Save
+                </button>
+              </div>
+            )}
           </div>
         ) : (
           <>
@@ -219,7 +258,7 @@ export function AnnotationThread({
   }, []);
 
   return (
-    <div className="wpn-thread">
+    <div className="wpn-thread" aria-live="polite" aria-relevant="additions">
       {annotation.comments.map((comment) => (
         <CommentItem
           key={comment.id}
@@ -227,6 +266,8 @@ export function AnnotationThread({
           quoted={annotation.comments.find((item) => item.id === comment.replyToId)}
           candidates={candidates}
           currentUser={currentUser}
+          deletesAnnotation={annotation.comments.length === 1}
+          canDeleteAnnotation={canDeleteAnnotation(annotation, currentUser)}
           onEdit={onEdit}
           onDelete={onDelete}
           onReply={onReply}

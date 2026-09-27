@@ -4,10 +4,6 @@ import type { ValidationIssue } from "../../utils/flowchart/validator";
 import { cx } from "../../utils/flowchart/shallow";
 import { Icon } from "./FlowIcons";
 
-/**
- * Shows the result of the last validation run. While open it re-validates
- * automatically (debounced) as the flow changes, so fixes are reflected live.
- */
 export const ValidationPanel = memo(function ValidationPanel() {
   const engine = useFlowEngine();
   const result = useFlowState((s) => s.validation);

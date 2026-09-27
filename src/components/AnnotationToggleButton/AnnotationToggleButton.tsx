@@ -18,8 +18,6 @@ export function AnnotationToggleButton({ className }: AnnotationToggleButtonProp
     }
   }, [loggedOut]);
 
-  // Refusing the click shakes the button instead of appending a label, so the
-  // toolbar never changes width; the tooltip already states why on hover.
   useEffect(() => {
     if (!nudge) {
       return;
@@ -62,7 +60,7 @@ export function AnnotationToggleButton({ className }: AnnotationToggleButtonProp
           setModeEnabled(!modeEnabled);
         }}
       >
-        <Icon name="editNote" className="wpn-toggle__icon" />
+        <Icon name="annotateCursor" className="wpn-toggle__icon" />
       </button>
     </Tooltip>
   );

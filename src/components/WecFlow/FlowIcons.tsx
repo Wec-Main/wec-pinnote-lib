@@ -114,7 +114,6 @@ export function Icon({
   );
 }
 
-/** Renders a node type icon: either a built-in icon name or any React node. */
 export function NodeIcon({ icon, size = 16 }: { icon: BuiltInIcon | ReactNode; size?: number }) {
   if (typeof icon === "string" && icon in paths)
     return <Icon name={icon as IconName} size={size} />;

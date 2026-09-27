@@ -2,7 +2,7 @@ import type { Annotation, AnnotationComment, AnnotationStatus } from "../../type
 import { ANNOTATION_STATUS_OPTIONS, isDoneStatus } from "../../utils/status";
 import type { SelectOption } from "../primitives";
 
-export type CommentSort = "newest" | "oldest" | "pin" | "author";
+export type CommentSort = "newest" | "oldest" | "author";
 
 export type CommentResolution = "all" | "open" | "resolved";
 
@@ -33,7 +33,6 @@ export const DEFAULT_COMMENT_FILTERS: CommentFilters = {
 export const SORT_OPTIONS: SelectOption[] = [
   { value: "newest", label: "Latest activity" },
   { value: "oldest", label: "Oldest first" },
-  { value: "pin", label: "Pin number" },
   { value: "author", label: "Author A–Z" },
 ];
 
@@ -98,7 +97,6 @@ function hasCommentBy(thread: CommentThread, userId: string): boolean {
 const COMPARATORS: Record<CommentSort, (left: CommentThread, right: CommentThread) => number> = {
   newest: (left, right) => right.lastActivityAt.localeCompare(left.lastActivityAt),
   oldest: (left, right) => left.root.createdAt.localeCompare(right.root.createdAt),
-  pin: (left, right) => left.annotation.number - right.annotation.number,
   author: (left, right) =>
     left.root.createdBy.name.localeCompare(right.root.createdBy.name) ||
     right.lastActivityAt.localeCompare(left.lastActivityAt),

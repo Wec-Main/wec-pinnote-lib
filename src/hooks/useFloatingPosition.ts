@@ -9,13 +9,26 @@ interface FloatingPositionResult {
 
 const VIEWPORT_MARGIN = 8;
 
+function measureAtContainingBlockOrigin(panel: HTMLElement) {
+  const previousTop = panel.style.top;
+  const previousLeft = panel.style.left;
+  panel.style.top = "0px";
+  panel.style.left = "0px";
+  const rect = panel.getBoundingClientRect();
+  panel.style.top = previousTop;
+  panel.style.left = previousLeft;
+  return rect;
+}
+
 function measure(
   anchor: HTMLElement,
   panel: HTMLElement,
   placement: FloatingPlacement,
 ): FloatingPositionResult {
   const anchorRect = anchor.getBoundingClientRect();
-  const panelRect = panel.getBoundingClientRect();
+  const panelRect = measureAtContainingBlockOrigin(panel);
+  const originX = panelRect.left;
+  const originY = panelRect.top;
   const viewportWidth = window.innerWidth;
   const viewportHeight = window.innerHeight;
 
@@ -28,18 +41,20 @@ function measure(
     const top = fitsBelow
       ? anchorRect.top
       : Math.max(VIEWPORT_MARGIN, viewportHeight - VIEWPORT_MARGIN - panelRect.height);
-    return { top, left };
+    return { top: top - originY, left: left - originX };
   }
 
-  const fitsBelow = anchorRect.bottom + panelRect.height <= viewportHeight - VIEWPORT_MARGIN;
-  const top = fitsBelow
-    ? anchorRect.bottom
+  const spaceBelow = viewportHeight - VIEWPORT_MARGIN - anchorRect.bottom;
+  const spaceAbove = anchorRect.top - VIEWPORT_MARGIN;
+  const openBelow = panelRect.height <= spaceBelow || spaceBelow >= spaceAbove;
+  const top = openBelow
+    ? Math.min(anchorRect.bottom, viewportHeight - VIEWPORT_MARGIN - panelRect.height)
     : Math.max(VIEWPORT_MARGIN, anchorRect.top - panelRect.height);
   const fitsLeftAligned = anchorRect.left + panelRect.width <= viewportWidth - VIEWPORT_MARGIN;
   const left = fitsLeftAligned
     ? anchorRect.left
     : Math.max(VIEWPORT_MARGIN, anchorRect.right - panelRect.width);
-  return { top, left };
+  return { top: Math.max(VIEWPORT_MARGIN, top) - originY, left: left - originX };
 }
 
 export function useFloatingPosition(
@@ -60,7 +75,10 @@ export function useFloatingPosition(
     if (!anchor || !panel) {
       return;
     }
-    setPosition(measure(anchor, panel, placement));
+    const update = () => setPosition(measure(anchor, panel, placement));
+    update();
+    window.addEventListener("resize", update);
+    return () => window.removeEventListener("resize", update);
   }, [open, placement, anchorRef, panelRef]);
 
   return position;

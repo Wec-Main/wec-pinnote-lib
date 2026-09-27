@@ -29,15 +29,16 @@ export interface ValidationContext {
   outgoing: ReadonlyMap<string, FlowEdge[]>;
 }
 
-/** A rule inspects the flow and returns zero or more issues (ids are assigned by the validator). */
 export type ValidationRule = (ctx: ValidationContext) => Omit<ValidationIssue, "id">[];
 
 const roleOf = (ctx: ValidationContext, node: FlowNode) =>
   ctx.registry.get(node.type).role ?? "default";
 const name = (n: FlowNode) => `"${n.data.label || n.id}"`;
 
+const known = (ctx: ValidationContext) => ctx.nodes.filter((n) => ctx.registry.has(n.type));
+
 export const startNodeRequired: ValidationRule = (ctx) => {
-  const starts = ctx.nodes.filter((n) => roleOf(ctx, n) === "start");
+  const starts = known(ctx).filter((n) => roleOf(ctx, n) === "start");
   if (starts.length === 0)
     return [{ code: "start-required", severity: "error", message: "The flow needs a Start node" }];
   if (starts.length > 1) {
@@ -54,7 +55,7 @@ export const startNodeRequired: ValidationRule = (ctx) => {
 };
 
 export const endNodeRequired: ValidationRule = (ctx) =>
-  ctx.nodes.some((n) => roleOf(ctx, n) === "end")
+  known(ctx).some((n) => roleOf(ctx, n) === "end")
     ? []
     : [{ code: "end-required", severity: "error", message: "The flow needs an End node" }];
 
@@ -68,9 +69,8 @@ export const disconnectedNodes: ValidationRule = (ctx) =>
       nodeIds: [n.id],
     }));
 
-/** Nodes that are connected but can't be reached from any start node. */
 export const unreachableNodes: ValidationRule = (ctx) => {
-  const starts = ctx.nodes.filter((n) => roleOf(ctx, n) === "start");
+  const starts = known(ctx).filter((n) => roleOf(ctx, n) === "start");
   if (starts.length === 0) return [];
   const seen = new Set<string>(starts.map((n) => n.id));
   const queue = [...seen];
@@ -95,9 +95,8 @@ export const unreachableNodes: ValidationRule = (ctx) => {
     }));
 };
 
-/** Nodes (other than End nodes) whose flow stops because they have no outgoing edge. */
 export const deadEnds: ValidationRule = (ctx) =>
-  ctx.nodes
+  known(ctx)
     .filter((n) => roleOf(ctx, n) !== "end" && ctx.registry.get(n.type).maxOutgoing !== 0)
     .filter((n) => ctx.incoming.get(n.id)?.length && !ctx.outgoing.get(n.id)?.length)
     .map((n) => ({
@@ -130,7 +129,7 @@ export const invalidConnections: ValidationRule = (ctx) => {
 };
 
 export const decisionBranches: ValidationRule = (ctx) =>
-  ctx.nodes
+  known(ctx)
     .filter((n) => ctx.registry.get(n.type).shape === "diamond")
     .filter((n) => (ctx.outgoing.get(n.id)?.length ?? 0) < 2)
     .map((n) => ({
@@ -145,7 +144,7 @@ export const unknownNodeTypes: ValidationRule = (ctx) =>
     .filter((n) => !ctx.registry.has(n.type))
     .map((n) => ({
       code: "unknown-type",
-      severity: "warning" as const,
+      severity: "error" as const,
       message: `${name(n)} uses unknown node type "${n.type}"`,
       nodeIds: [n.id],
     }));
@@ -174,16 +173,21 @@ function buildContext(flow: FlowSnapshot, registry: NodeTypeRegistry): Validatio
   return { nodes: flow.nodes, edges: flow.edges, registry, nodeLookup, incoming, outgoing };
 }
 
-/** Runs the given rules over a flow. Pure function: safe to call from anywhere (server, worker, tests). */
 export function validateFlow(
   flow: FlowSnapshot,
   registry: NodeTypeRegistry,
   rules: ValidationRule[] = defaultValidationRules,
 ): ValidationResult {
   const ctx = buildContext(flow, registry);
-  const issues = rules
-    .flatMap((rule) => rule(ctx))
-    .map((issue, i) => ({ ...issue, id: `${issue.code}-${i}` }));
+
+  const used = new Map<string, number>();
+  const issues = rules.flatMap((rule) => rule(ctx)).map((issue) => {
+    const subject = [...(issue.nodeIds ?? []), ...(issue.edgeIds ?? [])].sort().join("_");
+    const base = subject ? `${issue.code}-${subject}` : issue.code;
+    const seen = used.get(base) ?? 0;
+    used.set(base, seen + 1);
+    return { ...issue, id: seen === 0 ? base : `${base}-${seen}` };
+  });
   const errorCount = issues.filter((i) => i.severity === "error").length;
   return { valid: errorCount === 0, issues, errorCount, warningCount: issues.length - errorCount };
 }

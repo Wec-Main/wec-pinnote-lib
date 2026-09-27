@@ -11,7 +11,7 @@ export interface ConnectionContext {
   nodeLookup: ReadonlyMap<string, FlowNode>;
   edges: readonly FlowEdge[];
   registry: NodeTypeRegistry;
-  /** Edge to ignore when counting limits / duplicates (used when re-checking an existing edge). */
+
   ignoreEdgeId?: string;
 }
 
@@ -22,7 +22,6 @@ export type ConnectionValidator = (
 
 const invalid = (reason: string): ConnectionCheckResult => ({ valid: false, reason });
 
-/** Built-in structural rules every connection must satisfy. */
 export function checkConnection(conn: Connection, ctx: ConnectionContext): ConnectionCheckResult {
   const source = ctx.nodeLookup.get(conn.source);
   const target = ctx.nodeLookup.get(conn.target);
@@ -50,12 +49,17 @@ export function checkConnection(conn: Connection, ctx: ConnectionContext): Conne
   const outgoing = others.filter((e) => e.source === source.id);
   const incoming = others.filter((e) => e.target === target.id);
 
+  const storedSourceHandle = (e: FlowEdge) =>
+    e.sourceHandle ?? findHandle(sourceDef, "source")?.id;
+  const storedTargetHandle = (e: FlowEdge) =>
+    e.targetHandle ?? findHandle(targetDef, "target")?.id;
+
   if (
     outgoing.some(
       (e) =>
         e.target === target.id &&
-        (e.sourceHandle ?? srcHandleId) === srcHandleId &&
-        (e.targetHandle ?? tgtHandleId) === tgtHandleId,
+        storedSourceHandle(e) === srcHandleId &&
+        storedTargetHandle(e) === tgtHandleId,
     )
   ) {
     return invalid("These handles are already connected");

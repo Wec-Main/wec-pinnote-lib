@@ -133,6 +133,7 @@ export function useAnnotationTags(options: UseAnnotationTagsOptions): Annotation
       });
       setAnnotationTags((current) => [created, ...current]);
       setTagDraft(null);
+      setTagModeEnabled(false);
       if (!tagsVisibleRef.current) {
         setTagsVisible(true);
       }

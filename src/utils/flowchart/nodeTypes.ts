@@ -8,7 +8,6 @@ import type {
   PropertyValue,
 } from "../../types/flowchart.types";
 
-/** Visual outline drawn behind a node's content. */
 export type NodeShape =
   | "rounded"
   | "pill"
@@ -25,22 +24,20 @@ export type NodeShape =
   | "cloud"
   | "text";
 
-/** Semantic role used by the validator (lets plugins declare their own start/end nodes). */
 export type NodeRole = "start" | "end" | "default";
 
 export interface HandleDefinition {
   id: string;
   kind: HandleKind;
   side: HandleSide;
-  /** Short caption shown next to the handle (e.g. "Yes"). */
+
   label?: string;
-  /** Max edges attached to this handle. Undefined = unlimited. */
+
   maxConnections?: number;
 }
 
 export type PropertyFieldType = "text" | "textarea" | "number" | "boolean" | "select";
 
-/** Declarative description of a typed property shown in the properties panel. */
 export interface PropertyField {
   key: string;
   label: string;
@@ -56,9 +53,9 @@ export interface NodeComponentProps {
   selected: boolean;
   width: number;
   height: number;
-  /** True while the node's label is open for inline editing on the canvas. */
+
   editing?: boolean;
-  /** Call once inline editing should close (blur, Enter, Escape). */
+
   onEditDone?: () => void;
 }
 
@@ -87,18 +84,14 @@ export type BuiltInIcon =
   | "cylinderShape"
   | "cloudShape";
 
-/**
- * Everything the editor needs to know about a node type. Registering a new
- * definition is the plugin mechanism for custom nodes.
- */
 export interface NodeTypeDefinition {
   type: string;
   label: string;
   description?: string;
-  /** Palette group. */
+
   category?: string;
   role?: NodeRole;
-  /** Accent color (any CSS color). */
+
   color: string;
   icon?: BuiltInIcon | ReactNode;
   shape: NodeShape;
@@ -108,19 +101,24 @@ export interface NodeTypeDefinition {
   handles: HandleDefinition[];
   defaultData?: Partial<NodeData>;
   propertySchema?: PropertyField[];
-  /** Total incoming / outgoing edge limits. Undefined = unlimited. */
+
   maxIncoming?: number;
   maxOutgoing?: number;
-  /** Default label for edges leaving a given source handle (handleId -> label). */
+
   defaultEdgeLabels?: Record<string, string>;
-  /** Optional custom renderer for the node body. */
+
   component?: ComponentType<NodeComponentProps>;
 }
 
-const inOut = (extra: HandleDefinition[] = []): HandleDefinition[] => [
-  { id: "in", kind: "target", side: "top" },
-  { id: "out", kind: "source", side: "bottom" },
-  ...extra,
+const inOut = (): HandleDefinition[] => [
+  { id: "in-top", kind: "target", side: "top" },
+  { id: "out-top", kind: "source", side: "top" },
+  { id: "in-bottom", kind: "target", side: "bottom" },
+  { id: "out-bottom", kind: "source", side: "bottom" },
+  { id: "in-left", kind: "target", side: "left" },
+  { id: "out-left", kind: "source", side: "left" },
+  { id: "in-right", kind: "target", side: "right" },
+  { id: "out-right", kind: "source", side: "right" },
 ];
 
 export const builtInNodeTypes: NodeTypeDefinition[] = [
@@ -156,10 +154,7 @@ export const builtInNodeTypes: NodeTypeDefinition[] = [
     defaultSize: { width: 220, height: 76 },
     minSize: { width: 140, height: 56 },
     resizable: true,
-    handles: inOut([
-      { id: "in-left", kind: "target", side: "left" },
-      { id: "out-right", kind: "source", side: "right" },
-    ]),
+    handles: inOut(),
     defaultData: { label: "Process" },
   },
   {
@@ -174,10 +169,14 @@ export const builtInNodeTypes: NodeTypeDefinition[] = [
     minSize: { width: 140, height: 90 },
     resizable: true,
     handles: [
-      { id: "in", kind: "target", side: "top" },
+      { id: "in-top", kind: "target", side: "top" },
+      { id: "in-left", kind: "target", side: "left" },
+      { id: "in-right", kind: "target", side: "right" },
+      { id: "in-bottom", kind: "target", side: "bottom" },
       { id: "yes", kind: "source", side: "bottom", label: "Yes" },
       { id: "no", kind: "source", side: "right", label: "No" },
-      { id: "in-left", kind: "target", side: "left" },
+      { id: "out-top", kind: "source", side: "top" },
+      { id: "out-left", kind: "source", side: "left" },
     ],
     defaultEdgeLabels: { yes: "Yes", no: "No" },
     defaultData: { label: "Condition?" },
@@ -214,10 +213,7 @@ export const builtInNodeTypes: NodeTypeDefinition[] = [
     defaultSize: { width: 220, height: 76 },
     minSize: { width: 140, height: 56 },
     resizable: true,
-    handles: inOut([
-      { id: "in-left", kind: "target", side: "left" },
-      { id: "out-right", kind: "source", side: "right" },
-    ]),
+    handles: inOut(),
     defaultData: { label: "Sub Process" },
   },
   {
@@ -231,10 +227,7 @@ export const builtInNodeTypes: NodeTypeDefinition[] = [
     defaultSize: { width: 220, height: 76 },
     minSize: { width: 140, height: 56 },
     resizable: true,
-    handles: inOut([
-      { id: "in-left", kind: "target", side: "left" },
-      { id: "out-right", kind: "source", side: "right" },
-    ]),
+    handles: inOut(),
     defaultData: { label: "Integration" },
   },
   {
@@ -248,10 +241,7 @@ export const builtInNodeTypes: NodeTypeDefinition[] = [
     defaultSize: { width: 100, height: 100 },
     minSize: { width: 48, height: 48 },
     resizable: true,
-    handles: inOut([
-      { id: "in-left", kind: "target", side: "left" },
-      { id: "out-right", kind: "source", side: "right" },
-    ]),
+    handles: inOut(),
     defaultData: { label: "Circle" },
   },
   {
@@ -265,10 +255,7 @@ export const builtInNodeTypes: NodeTypeDefinition[] = [
     defaultSize: { width: 100, height: 100 },
     minSize: { width: 48, height: 48 },
     resizable: true,
-    handles: inOut([
-      { id: "in-left", kind: "target", side: "left" },
-      { id: "out-right", kind: "source", side: "right" },
-    ]),
+    handles: inOut(),
     defaultData: { label: "Square" },
   },
   {
@@ -282,10 +269,7 @@ export const builtInNodeTypes: NodeTypeDefinition[] = [
     defaultSize: { width: 140, height: 70 },
     minSize: { width: 48, height: 32 },
     resizable: true,
-    handles: inOut([
-      { id: "in-left", kind: "target", side: "left" },
-      { id: "out-right", kind: "source", side: "right" },
-    ]),
+    handles: inOut(),
     defaultData: { label: "Rectangle" },
   },
   {
@@ -299,10 +283,7 @@ export const builtInNodeTypes: NodeTypeDefinition[] = [
     defaultSize: { width: 140, height: 70 },
     minSize: { width: 48, height: 32 },
     resizable: true,
-    handles: inOut([
-      { id: "in-left", kind: "target", side: "left" },
-      { id: "out-right", kind: "source", side: "right" },
-    ]),
+    handles: inOut(),
     defaultData: { label: "Rounded Rectangle" },
   },
   {
@@ -316,10 +297,7 @@ export const builtInNodeTypes: NodeTypeDefinition[] = [
     defaultSize: { width: 140, height: 80 },
     minSize: { width: 48, height: 32 },
     resizable: true,
-    handles: inOut([
-      { id: "in-left", kind: "target", side: "left" },
-      { id: "out-right", kind: "source", side: "right" },
-    ]),
+    handles: inOut(),
     defaultData: { label: "Ellipse" },
   },
   {
@@ -333,10 +311,7 @@ export const builtInNodeTypes: NodeTypeDefinition[] = [
     defaultSize: { width: 120, height: 100 },
     minSize: { width: 48, height: 40 },
     resizable: true,
-    handles: inOut([
-      { id: "in-left", kind: "target", side: "left" },
-      { id: "out-right", kind: "source", side: "right" },
-    ]),
+    handles: inOut(),
     defaultData: { label: "Triangle" },
   },
   {
@@ -350,10 +325,7 @@ export const builtInNodeTypes: NodeTypeDefinition[] = [
     defaultSize: { width: 160, height: 80 },
     minSize: { width: 60, height: 40 },
     resizable: true,
-    handles: inOut([
-      { id: "in-left", kind: "target", side: "left" },
-      { id: "out-right", kind: "source", side: "right" },
-    ]),
+    handles: inOut(),
     defaultData: { label: "Hexagon" },
   },
   {
@@ -367,28 +339,8 @@ export const builtInNodeTypes: NodeTypeDefinition[] = [
     defaultSize: { width: 120, height: 100 },
     minSize: { width: 48, height: 48 },
     resizable: true,
-    handles: inOut([
-      { id: "in-left", kind: "target", side: "left" },
-      { id: "out-right", kind: "source", side: "right" },
-    ]),
+    handles: inOut(),
     defaultData: { label: "Cylinder" },
-  },
-  {
-    type: "cloud",
-    label: "Cloud",
-    description: "Generic cloud shape",
-    category: "General",
-    color: "#38bdf8",
-    icon: "cloudShape",
-    shape: "cloud",
-    defaultSize: { width: 160, height: 100 },
-    minSize: { width: 60, height: 40 },
-    resizable: true,
-    handles: inOut([
-      { id: "in-left", kind: "target", side: "left" },
-      { id: "out-right", kind: "source", side: "right" },
-    ]),
-    defaultData: { label: "Cloud" },
   },
   {
     type: "text",
@@ -401,15 +353,11 @@ export const builtInNodeTypes: NodeTypeDefinition[] = [
     defaultSize: { width: 120, height: 32 },
     minSize: { width: 32, height: 20 },
     resizable: true,
-    handles: inOut([
-      { id: "in-left", kind: "target", side: "left" },
-      { id: "out-right", kind: "source", side: "right" },
-    ]),
+    handles: inOut(),
     defaultData: { label: "Text" },
   },
 ];
 
-/** Used to render nodes whose type is not registered (e.g. imported from elsewhere). */
 export const fallbackNodeType: NodeTypeDefinition = {
   type: "__unknown__",
   label: "Unknown",
@@ -421,7 +369,6 @@ export const fallbackNodeType: NodeTypeDefinition = {
   handles: inOut(),
 };
 
-/** Lookup table of node type definitions. */
 export class NodeTypeRegistry {
   private readonly defs = new Map<string, NodeTypeDefinition>();
 
@@ -429,7 +376,6 @@ export class NodeTypeRegistry {
     definitions.forEach((d) => this.register(d));
   }
 
-  /** Registers (or replaces) a node type. */
   register(definition: NodeTypeDefinition): void {
     this.defs.set(definition.type, definition);
   }
@@ -442,7 +388,6 @@ export class NodeTypeRegistry {
     return this.defs.has(type);
   }
 
-  /** Returns the definition, or the fallback definition for unknown types. */
   get(type: string): NodeTypeDefinition {
     return this.defs.get(type) ?? fallbackNodeType;
   }
