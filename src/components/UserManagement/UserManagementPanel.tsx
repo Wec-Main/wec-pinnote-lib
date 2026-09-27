@@ -206,13 +206,13 @@ export function UserManagementPanel() {
       );
       setNotice(`Password reset for ${resetTarget.email} successfully.`);
       setResetTarget(null);
-      if (!password) {
-        setGeneratedPassword({
-          title: "Password reset",
-          description: `A new password was generated for ${resetTarget.firstName} ${resetTarget.lastName} (${resetTarget.email}).`,
-          password: result.password,
-        });
-      }
+      setGeneratedPassword({
+        title: "Password reset",
+        description: password
+          ? `The new password for ${resetTarget.firstName} ${resetTarget.lastName} (${resetTarget.email}) is set below.`
+          : `A new password was generated for ${resetTarget.firstName} ${resetTarget.lastName} (${resetTarget.email}).`,
+        password: result.password,
+      });
       reloadAll();
     } catch (err) {
       setNotice(errorMessage(err));
@@ -236,13 +236,13 @@ export function UserManagementPanel() {
         const { draft } = pending;
         const created = await createUser(config.apiBaseUrl, getAuthToken, config.projectId, draft);
         setNotice(`${draft.firstName} ${draft.lastName} created.`);
-        if (created.generatedPassword) {
-          setGeneratedPassword({
-            title: "User created",
-            description: `A temporary password was generated for ${draft.firstName} ${draft.lastName} (${draft.email}).`,
-            password: created.generatedPassword,
-          });
-        }
+        setGeneratedPassword({
+          title: "User created",
+          description: created.generatedPassword
+            ? `A temporary password was generated for ${draft.firstName} ${draft.lastName} (${draft.email}).`
+            : `The password for ${draft.firstName} ${draft.lastName} (${draft.email}) is set below.`,
+          password: created.generatedPassword ?? draft.password ?? "",
+        });
         setPage(1);
         setFormOpen(false);
         setEditTarget(null);
