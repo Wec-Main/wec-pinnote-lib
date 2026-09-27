@@ -14,6 +14,8 @@ import { AnnotationToolbar } from "./AnnotationToolbar";
 import { TagPicker, TagPin } from "./TagPin";
 import { FlowPinPanel, FlowPinPicker, FlowPinPin } from "./FlowPin";
 import { ConfirmDialog } from "./UserManagement/ConfirmDialog";
+import { canDeleteBoardItem } from "../utils/boardPermissions";
+import type { AnnotationTag, UpdateAnnotationTagInput } from "../types/annotationTag.types";
 
 const EpicFlowPanel = lazy(() =>
   import("./EpicFlow").then((module) => ({ default: module.EpicFlowPanel })),
@@ -31,31 +33,58 @@ function positionItemsKey(items: PositionedItem[]): string {
 
 interface TagPinListItemProps {
   id: string;
+  tagId: string;
   name: string;
   color: string;
   x: number;
   y: number;
+  width?: number;
+  height?: number;
   resolvedTarget: boolean;
-  onRemove: (id: string) => void;
+  canEdit: boolean;
+  onRemove?: (id: string) => void;
+  onGeometryChange: (
+    id: string,
+    geometry: { x: number; y: number; width: number; height: number },
+  ) => void;
+  onGeometryCommit: (
+    id: string,
+    geometry: { x: number; y: number; width: number; height: number },
+  ) => void;
+  onTagChange: (id: string, tag: { id: string; name: string; color: string }) => void;
 }
 
 const TagPinListItem = memo(function TagPinListItem({
   id,
+  tagId,
   name,
   color,
   x,
   y,
+  width,
+  height,
   resolvedTarget,
+  canEdit,
   onRemove,
+  onGeometryChange,
+  onGeometryCommit,
+  onTagChange,
 }: TagPinListItemProps) {
   return (
     <TagPin
+      tagId={tagId}
       name={name}
       color={color}
       x={x}
       y={y}
+      width={width}
+      height={height}
       resolvedTarget={resolvedTarget}
-      onRemove={() => onRemove(id)}
+      canEdit={canEdit}
+      onRemove={onRemove ? () => onRemove(id) : undefined}
+      onGeometryChange={(geometry) => onGeometryChange(id, geometry)}
+      onGeometryCommit={(geometry) => onGeometryCommit(id, geometry)}
+      onTagChange={(tag) => onTagChange(id, tag)}
     />
   );
 });
@@ -97,6 +126,8 @@ export function AnnotationLayer() {
     config,
     annotationTags,
     removeAnnotationTag,
+    applyAnnotationTagLocal,
+    commitAnnotationTagUpdate,
     flowPins,
     actionError,
     clearActionError,
@@ -125,17 +156,35 @@ export function AnnotationLayer() {
   const { authenticated } = useAnnotationAuth();
   const [layerError, setLayerError] = useState<string | null>(null);
 
-  const handleRemoveTag = useCallback(
+  const [pendingTagRemoval, setPendingTagRemoval] = useState<AnnotationTag | null>(null);
+  const [removingTag, setRemovingTag] = useState(false);
+
+  const requestRemoveTag = useCallback(
     (id: string) => {
-      setLayerError(null);
-      removeAnnotationTag(id).catch((err: unknown) => {
+      setPendingTagRemoval(annotationTags.find((tag) => tag.id === id) ?? null);
+    },
+    [annotationTags],
+  );
+
+  const cancelRemoveTag = useCallback(() => setPendingTagRemoval(null), []);
+
+  const confirmRemoveTag = useCallback(() => {
+    if (!pendingTagRemoval) {
+      return;
+    }
+    setLayerError(null);
+    setRemovingTag(true);
+    removeAnnotationTag(pendingTagRemoval.id)
+      .catch((err: unknown) => {
         setLayerError(
           err instanceof Error && err.message ? err.message : "Could not remove that tag",
         );
+      })
+      .finally(() => {
+        setRemovingTag(false);
+        setPendingTagRemoval(null);
       });
-    },
-    [removeAnnotationTag],
-  );
+  }, [pendingTagRemoval, removeAnnotationTag]);
 
   const handleRemoveFlowPin = useCallback(
     (id: string) => {
@@ -154,6 +203,47 @@ export function AnnotationLayer() {
       selectFlowPin(id);
     },
     [selectFlowPin],
+  );
+
+  const handleTagGeometryChange = useCallback(
+    (id: string, geometry: { x: number; y: number; width: number; height: number }) => {
+      applyAnnotationTagLocal(id, {
+        fallbackX: geometry.x,
+        fallbackY: geometry.y,
+        width: geometry.width,
+        height: geometry.height,
+      });
+    },
+    [applyAnnotationTagLocal],
+  );
+
+  const handleTagGeometryCommit = useCallback(
+    (id: string, geometry: { x: number; y: number; width: number; height: number }) => {
+      const input: UpdateAnnotationTagInput = {
+        fallbackX: geometry.x,
+        fallbackY: geometry.y,
+        width: geometry.width,
+        height: geometry.height,
+      };
+      commitAnnotationTagUpdate(id, input).catch((err: unknown) => {
+        setLayerError(
+          err instanceof Error && err.message ? err.message : "Could not move this tag",
+        );
+      });
+    },
+    [commitAnnotationTagUpdate],
+  );
+
+  const handleTagReassign = useCallback(
+    (id: string, tag: { id: string; name: string; color: string }) => {
+      applyAnnotationTagLocal(id, { tagId: tag.id, tagName: tag.name, tagColor: tag.color });
+      commitAnnotationTagUpdate(id, { tagId: tag.id }).catch((err: unknown) => {
+        setLayerError(
+          err instanceof Error && err.message ? err.message : "Could not update this tag",
+        );
+      });
+    },
+    [applyAnnotationTagLocal, commitAnnotationTagUpdate],
   );
 
   const visible = useMemo(() => {
@@ -279,16 +369,24 @@ export function AnnotationLayer() {
         if (!position) {
           return null;
         }
+        const canEditTag = canDeleteBoardItem(tag.createdById, config.currentUser);
         return (
           <TagPinListItem
             key={tag.id}
             id={tag.id}
+            tagId={tag.tagId}
             name={tag.tagName}
             color={tag.tagColor}
             x={position.x}
             y={position.y}
+            width={tag.width}
+            height={tag.height}
             resolvedTarget={position.resolved}
-            onRemove={handleRemoveTag}
+            canEdit={canEditTag}
+            onRemove={canEditTag ? requestRemoveTag : undefined}
+            onGeometryChange={handleTagGeometryChange}
+            onGeometryCommit={handleTagGeometryCommit}
+            onTagChange={handleTagReassign}
           />
         );
       })}
@@ -377,6 +475,17 @@ export function AnnotationLayer() {
           destructive
           onCancel={cancelDiscardPrompt}
           onConfirm={confirmDiscard}
+        />
+      ) : null}
+      {pendingTagRemoval ? (
+        <ConfirmDialog
+          title="Remove tag?"
+          description={`Remove the "${pendingTagRemoval.tagName}" tag from this element? This cannot be undone.`}
+          confirmLabel="Remove"
+          destructive
+          busy={removingTag}
+          onCancel={cancelRemoveTag}
+          onConfirm={confirmRemoveTag}
         />
       ) : null}
       {actionError || layerError ? (

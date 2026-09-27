@@ -68,6 +68,7 @@ const paths = {
   cylinderShape:
     "M4 6c0-1.1 3.6-2 8-2s8 .9 8 2v12c0 1.1-3.6 2-8 2s-8-.9-8-2z M4 6c0 1.1 3.6 2 8 2s8-.9 8-2",
   cloudShape: "M7 18a4 4 0 0 1-1-7.9 5 5 0 0 1 9.6-2A4.5 4.5 0 0 1 17 18z",
+  plug: "M9 2v5 M15 2v5 M6 7h12v4a6 6 0 0 1-6 6 6 6 0 0 1-6-6z M12 17v5",
 } as const;
 
 export type IconName = keyof typeof paths;

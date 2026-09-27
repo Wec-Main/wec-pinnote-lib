@@ -102,7 +102,7 @@ export type {
   AnnotationUiContextValue,
   AnnotationAuthContextValue,
 } from "./context/AnnotationContext";
-export type { AuthApiClient, AuthSession, LoginOption } from "./types/auth.types";
+export type { AuthApiClient, AuthSession, LoginOption, RefreshedTokens } from "./types/auth.types";
 export type { AuthSessionsValue } from "./hooks/useAuthSessions";
 export type { AuditPage, AuditQuery, AuditRecord, AuditScope } from "./types/audit.types";
 export type { CreatedUser, PasswordReset, UserListQuery, UserPage } from "./services/usersApi";

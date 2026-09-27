@@ -9,7 +9,7 @@ import {
 import { useMentionCandidates } from "../../hooks/useMentionCandidates";
 import { encodeMentions } from "../../utils/mentions";
 import { AnnotationStatusSelect } from "../AnnotationStatusSelect";
-import { ComposerHint } from "../ComposerHint";
+import { ComposerHint, ComposerHintInfo } from "../ComposerHint";
 import { MentionTextarea } from "../MentionTextarea";
 import { Icons } from "../../assets/icons";
 import { Tooltip } from "../primitives";
@@ -42,6 +42,7 @@ function DraftComposer({ draft, x, y }: DraftComposerProps) {
   const [editingLabel, setEditingLabel] = useState(false);
   const [labelValue, setLabelValue] = useState("");
   const [focused, setFocused] = useState(false);
+  const [hovered, setHovered] = useState(false);
   const candidates = useMentionCandidates();
 
   const changeMessage = (next: string) => {
@@ -104,6 +105,7 @@ function DraftComposer({ draft, x, y }: DraftComposerProps) {
           ) : (
             <span className="wpn-panel__title">{draft.label}</span>
           )}
+          <ComposerHintInfo />
           <button
             type="button"
             className="wpn-link wpn-link--icon"
@@ -147,7 +149,11 @@ function DraftComposer({ draft, x, y }: DraftComposerProps) {
           </button>
         </Tooltip>
       </div>
-      <form onSubmit={onSubmit}>
+      <form
+        onSubmit={onSubmit}
+        onMouseEnter={() => setHovered(true)}
+        onMouseLeave={() => setHovered(false)}
+      >
         <MentionTextarea
           className="wpn-input wpn-composer__field"
           value={message}
@@ -162,7 +168,7 @@ function DraftComposer({ draft, x, y }: DraftComposerProps) {
           onEnter={() => void send()}
           onFocusChange={setFocused}
         />
-        {focused || message ? <ComposerHint length={message.length} /> : null}
+        {focused || hovered ? <ComposerHint length={message.length} /> : null}
         <div className="wpn-panel__composer">
           <div className="wpn-panel__toolbar">
             <div className="wpn-thread-panel__brand">

@@ -1,7 +1,7 @@
-import { memo, useRef, useState, type ReactNode } from "react";
+import { memo, useState, type ReactNode } from "react";
 import { useFlowEngine, useFlowState } from "../../context/FlowContext";
 import type { FlowJSON } from "../../types/flowchart.types";
-import { FlowParseError, parseFlow, stringifyFlow } from "../../utils/flowchart/serialization";
+import { stringifyFlow } from "../../utils/flowchart/serialization";
 import { cx, shallowEqual } from "../../utils/flowchart/shallow";
 import { ConfirmDialog } from "./ConfirmDialog";
 import { Icon } from "./FlowIcons";
@@ -68,7 +68,6 @@ export const Toolbar = memo(function Toolbar({
     (s) => [s.nodes.length, s.edges.length] as const,
     shallowEqual,
   );
-  const fileRef = useRef<HTMLInputElement>(null);
   const [pending, setPending] = useState<PendingCommit | null>(null);
   const [publishErrors, setPublishErrors] = useState(0);
   const notify = (m: string, k: NoticeKind) => onNotify?.(m, k);
@@ -78,24 +77,6 @@ export const Toolbar = memo(function Toolbar({
     if (onExport) onExport(json);
     else download(`${slug(flowName)}.json`, json);
     notify("Flow exported as JSON", "success");
-  };
-
-  const importFile = async (file: File) => {
-    try {
-      const flow = parseFlow(await file.text());
-      engine.loadFlow(flow);
-      notify(
-        `Imported "${flow.meta?.name ?? file.name}" — ${flow.nodes.length} nodes, ${flow.edges.length} connections`,
-        "success",
-      );
-    } catch (e) {
-      notify(
-        e instanceof FlowParseError
-          ? `Import failed: ${e.message}`
-          : "Import failed: could not read file",
-        "error",
-      );
-    }
   };
 
   const validate = () => {
@@ -139,15 +120,6 @@ export const Toolbar = memo(function Toolbar({
           onChange={(e) => engine.setFlowName(e.target.value)}
         />
         <span className="wpn-flowchart-toolbar__divider" aria-hidden="true" />
-        <button
-          type="button"
-          className={cx("wpn-flowchart-ui__btn", "wpn-flowchart-ui__btn-ghost")}
-          disabled={readOnly}
-          onClick={() => engine.newFlow()}
-          title="Start a new, empty flow (can be undone)"
-        >
-          <Icon name="file" /> New Flow
-        </button>
         <button
           type="button"
           className={cx(
@@ -201,34 +173,13 @@ export const Toolbar = memo(function Toolbar({
             <span className="wpn-flowchart-toolbar__badge">{errorCount}</span>
           )}
         </button>
-        <span className="wpn-flowchart-toolbar__divider" aria-hidden="true" />
-        <button
-          type="button"
-          className={cx("wpn-flowchart-ui__btn", "wpn-flowchart-ui__btn-ghost")}
-          disabled={readOnly}
-          onClick={() => fileRef.current?.click()}
-          title="Load a flow from a JSON file"
-        >
-          <Icon name="upload" /> Import JSON
-        </button>
-        <input
-          ref={fileRef}
-          type="file"
-          accept="application/json,.json"
-          hidden
-          onChange={(e) => {
-            const file = e.target.files?.[0];
-            e.target.value = "";
-            if (file) void importFile(file);
-          }}
-        />
         <button
           type="button"
           className={cx("wpn-flowchart-ui__btn", "wpn-flowchart-ui__btn-ghost")}
           onClick={exportJson}
           title="Download the flow as JSON"
         >
-          <Icon name="download" /> Export JSON
+          <Icon name="download" /> Export
         </button>
         {extraActions}
         {(onSave || onPublish) && (

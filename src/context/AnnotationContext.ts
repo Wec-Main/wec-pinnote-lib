@@ -10,7 +10,11 @@ import type {
   DraftAnnotation,
   ResolvedAnnotationConfig,
 } from "../types/annotation.types";
-import type { AnnotationTag, DraftTagPin } from "../types/annotationTag.types";
+import type {
+  AnnotationTag,
+  DraftTagPin,
+  UpdateAnnotationTagInput,
+} from "../types/annotationTag.types";
 import type { ProjectTag } from "../types/tag.types";
 import type { DraftFlowPin, FlowPin } from "../types/flowPin.types";
 
@@ -41,6 +45,11 @@ export interface AnnotationDataContextValue {
   projectTags: ProjectTag[];
   submitTagDraft: (tagId: string) => Promise<void>;
   removeAnnotationTag: (annotationTagId: string) => Promise<void>;
+  applyAnnotationTagLocal: (annotationTagId: string, patch: Partial<AnnotationTag>) => void;
+  commitAnnotationTagUpdate: (
+    annotationTagId: string,
+    input: UpdateAnnotationTagInput,
+  ) => Promise<void>;
   flowPins: FlowPin[];
   syncFlowPinName: (flowPinId: string, name: string) => void;
 }

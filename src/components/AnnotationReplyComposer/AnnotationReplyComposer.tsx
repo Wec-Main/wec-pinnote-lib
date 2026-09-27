@@ -80,17 +80,6 @@ export function AnnotationReplyComposer({
           onFocusChange={setFocused}
         />
         <div className="wpn-reply__tools">
-          <Tooltip label="Mention someone" placement="top">
-            <button
-              type="button"
-              className="wpn-reply__tool"
-              aria-label="Mention someone"
-              onMouseDown={(event) => event.preventDefault()}
-              onClick={() => fieldRef.current?.startMention()}
-            >
-              @
-            </button>
-          </Tooltip>
           <Tooltip label="Send reply" placement="top">
             <button
               type="submit"

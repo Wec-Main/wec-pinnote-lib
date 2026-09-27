@@ -15,8 +15,11 @@ function makeToken(payload: unknown): string {
   return `header.${encodeSegment(payload)}.signature`;
 }
 
-const validToken = makeToken({ exp: Math.floor(Date.now() / 1000) + 3600 });
-const expiredToken = makeToken({ exp: Math.floor(Date.now() / 1000) - 3600 });
+const now = Math.floor(Date.now() / 1000);
+const validToken = makeToken({ iat: now, exp: now + 3600 });
+const expiredToken = makeToken({ iat: now - 7200, exp: now - 3600 });
+const validRefreshToken = makeToken({ sub: "u1", typ: "refresh", exp: now + 43200 });
+const expiredRefreshToken = makeToken({ sub: "u1", typ: "refresh", exp: now - 60 });
 
 const session = {
   id: "u1",
@@ -24,7 +27,7 @@ const session = {
   email: "ada@wec.ai",
   roleId: "contributor" as const,
   token: validToken,
-  refreshToken: makeToken({ sub: "u1", tokenVersion: 0, typ: "refresh" }),
+  refreshToken: validRefreshToken,
 };
 
 describe("isSession", () => {
@@ -51,8 +54,16 @@ describe("isSession", () => {
     expect(isSession({ ...session, token: "not-a-jwt-at-all" })).toBe(false);
   });
 
-  it("rejects a session whose token has expired", () => {
-    expect(isSession({ ...session, token: expiredToken })).toBe(false);
+  it("keeps a session whose access token expired while its refresh token is still valid", () => {
+    expect(isSession({ ...session, token: expiredToken })).toBe(true);
+  });
+
+  it("rejects a session whose refresh token has expired", () => {
+    expect(isSession({ ...session, refreshToken: expiredRefreshToken })).toBe(false);
+  });
+
+  it("rejects a session whose refresh token carries no expiry", () => {
+    expect(isSession({ ...session, refreshToken: makeToken({ sub: "u1" }) })).toBe(false);
   });
 
   it("rejects a session whose token payload is not valid base64url JSON", () => {
@@ -102,6 +113,24 @@ describe("normalizeStoredAuth", () => {
 
     expect(restored.accounts).toHaveLength(1);
     expect(restored.accounts[0].id).toBe("u1");
+  });
+
+  it("restores a session after the access token expired so it can be renewed silently", () => {
+    const restored = normalizeStoredAuth({
+      accounts: [{ ...session, token: expiredToken }],
+      activeId: "u1",
+    });
+
+    expect(restored.accounts).toHaveLength(1);
+  });
+
+  it("drops a session once its refresh token has expired", () => {
+    expect(
+      normalizeStoredAuth({
+        accounts: [{ ...session, refreshToken: expiredRefreshToken }],
+        activeId: "u1",
+      }).accounts,
+    ).toHaveLength(0);
   });
 
   it("never reports an active id that names no stored account", () => {

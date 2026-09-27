@@ -1,19 +1,26 @@
 import { useMemo, useState } from "react";
 import { useAnnotationContext } from "../../context/AnnotationContext";
 import { useComboboxList, type ComboboxOption } from "../../hooks/useComboboxList";
+import type { ProjectTag } from "../../types/tag.types";
 import { Icon } from "../primitives";
 import { SelectSearchField, SelectTrigger } from "../primitives/SelectParts";
 
 interface TagPickerProps {
   x: number;
   y: number;
+  title?: string;
+  initialTagId?: string | null;
+  onSelectTag?: (tag: ProjectTag) => void;
+  onCancel?: () => void;
 }
 
-export function TagPicker({ x, y }: TagPickerProps) {
+export function TagPicker({ x, y, title, initialTagId, onSelectTag, onCancel }: TagPickerProps) {
   const { projectTags, tagDraft, submitTagDraft, cancelTagDraft } = useAnnotationContext();
-  const [selectedTagId, setSelectedTagId] = useState<string | null>(null);
+  const isEditMode = Boolean(onSelectTag);
+  const [selectedTagId, setSelectedTagId] = useState<string | null>(initialTagId ?? null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const handleCancel = onCancel ?? cancelTagDraft;
 
   const options = useMemo<ComboboxOption[]>(
     () => projectTags.map((tag) => ({ value: tag.id, label: tag.name })),
@@ -55,6 +62,14 @@ export function TagPicker({ x, y }: TagPickerProps) {
     if (!selectedTagId) {
       return;
     }
+    const chosenTag = projectTags.find((tag) => tag.id === selectedTagId);
+    if (!chosenTag) {
+      return;
+    }
+    if (onSelectTag) {
+      onSelectTag(chosenTag);
+      return;
+    }
     setBusy(true);
     setError(null);
     submitTagDraft(selectedTagId)
@@ -70,8 +85,8 @@ export function TagPicker({ x, y }: TagPickerProps) {
       aria-label="Pick a tag"
     >
       <div className="wpn-tag-picker__header">
-        <span className="wpn-tag-picker__title">{tagDraft?.label ?? "Add tag"}</span>
-        <button type="button" className="wpn-icon-btn" aria-label="Cancel" onClick={cancelTagDraft}>
+        <span className="wpn-tag-picker__title">{title ?? tagDraft?.label ?? "Add tag"}</span>
+        <button type="button" className="wpn-icon-btn" aria-label="Cancel" onClick={handleCancel}>
           <Icon name="close" />
         </button>
       </div>
@@ -154,7 +169,7 @@ export function TagPicker({ x, y }: TagPickerProps) {
           type="button"
           className="wpn-btn wpn-btn--ghost"
           disabled={busy}
-          onClick={cancelTagDraft}
+          onClick={handleCancel}
         >
           Cancel
         </button>
@@ -164,7 +179,7 @@ export function TagPicker({ x, y }: TagPickerProps) {
           disabled={!selectedTagId || busy}
           onClick={addTag}
         >
-          Add tag
+          {isEditMode ? "Change tag" : "Add tag"}
         </button>
       </div>
     </div>

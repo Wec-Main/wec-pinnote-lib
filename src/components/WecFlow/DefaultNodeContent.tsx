@@ -75,14 +75,11 @@ export function DefaultNodeContent({
           <NodeIcon icon={definition.icon} size={compact ? 13 : 16} />
         </span>
       )}
-      <div className="wpn-flowchart-node__text">
-        <div className="wpn-flowchart-node__label" title={node.data.label}>
-          {node.data.label || <span className="wpn-flowchart-node__placeholder">Untitled</span>}
-        </div>
-        {showDescription && (
+      {showDescription && (
+        <div className="wpn-flowchart-node__text">
           <div className="wpn-flowchart-node__description">{node.data.description}</div>
-        )}
-      </div>
+        </div>
+      )}
     </div>
   );
 }

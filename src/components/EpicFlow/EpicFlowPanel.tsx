@@ -358,11 +358,22 @@ export function EpicFlowPanel() {
     }
   };
 
-  const handleEditFromNotes = () => {
-    if (notesTarget?.type === "epic") {
-      setEpicModal({ mode: "edit", epic: notesTarget.epic });
-    } else if (notesTarget?.type === "userStory") {
-      setStoryModal({ mode: "edit", story: notesTarget.story });
+  const handleSubmitFromNotes = async (data: { title: string; description: string }) => {
+    if (!notesTarget) {
+      return;
+    }
+    setBusy(true);
+    try {
+      if (notesTarget.type === "epic") {
+        await api.updateEpic(notesTarget.epic.id, data);
+      } else {
+        await api.updateUserStory(notesTarget.story.id, data);
+      }
+      await reloadAll();
+    } catch (err) {
+      setApiError(describeApiError(err));
+    } finally {
+      setBusy(false);
     }
   };
 
@@ -450,8 +461,9 @@ export function EpicFlowPanel() {
             <NotesPanel
               target={notesTarget}
               expanded
+              busy={busy}
               onToggleExpand={() => setNotesExpanded(false)}
-              onEdit={handleEditFromNotes}
+              onSubmit={(data) => void handleSubmitFromNotes(data)}
               onDelete={handleDeleteFromNotes}
             />
           </div>
@@ -492,8 +504,9 @@ export function EpicFlowPanel() {
             <NotesPanel
               target={notesTarget}
               expanded={false}
+              busy={busy}
               onToggleExpand={() => setNotesExpanded(true)}
-              onEdit={handleEditFromNotes}
+              onSubmit={(data) => void handleSubmitFromNotes(data)}
               onDelete={handleDeleteFromNotes}
             />
           </div>

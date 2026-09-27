@@ -20,6 +20,7 @@ export type IconName =
   | "key"
   | "users"
   | "pen"
+  | "editNote"
   | "epic"
   | "flow"
   | "comment"
@@ -133,6 +134,14 @@ const PATHS: Record<IconName, ReactElement> = {
     <>
       <path d="M4 20h4L19.5 8.5a2.1 2.1 0 0 0-3-3L5 17v3Z" />
       <path d="m14.5 6.5 3 3" />
+    </>
+  ),
+  editNote: (
+    <>
+      <path d="M5 4.5h9.5a1.5 1.5 0 0 1 1.5 1.5v6.2" />
+      <path d="M5 4.5v15L8.5 17H16" />
+      <path d="M14.6 12.2 20 6.8a1.5 1.5 0 0 0-2.1-2.1l-5.4 5.4-.6 2.7Z" />
+      <path d="M8 8.5h4" />
     </>
   ),
   epic: (

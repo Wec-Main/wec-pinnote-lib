@@ -1,4 +1,4 @@
-import { memo, type CSSProperties } from "react";
+import { memo, useState, type CSSProperties } from "react";
 import { useFlowEngine, useFlowState } from "../../context/FlowContext";
 import { useEditSession } from "../../hooks/flowchart/useEditSession";
 import type { EdgePathType } from "../../types/flowchart.types";
@@ -9,18 +9,18 @@ import { lineStyleOptions } from "./lineStyles";
 export interface PropertiesPanelProps {
   className?: string;
   onClose?: () => void;
-  /** Whether the panel currently fills the whole editor area. */
-  expanded?: boolean;
-  /** Toggles `expanded`. Omit to hide the expand control. */
-  onToggleExpand?: () => void;
+  /** Whether the panel is collapsed to a thin strip. */
+  minimized?: boolean;
+  /** Toggles `minimized`. Omit to hide the minimize control. */
+  onToggleMinimize?: () => void;
 }
 
 /** Right-hand inspector: edits whatever is selected (node, edge, multi-selection or the flow itself). */
 export const PropertiesPanel = memo(function PropertiesPanel({
   className,
   onClose,
-  expanded = false,
-  onToggleExpand,
+  minimized = false,
+  onToggleMinimize,
 }: PropertiesPanelProps) {
   const [nodeIds, edgeIds] = useFlowState(
     (s) => [[...s.selectedNodeIds], [...s.selectedEdgeIds]] as const,
@@ -40,34 +40,36 @@ export const PropertiesPanel = memo(function PropertiesPanel({
     <aside
       className={cx(
         "wpn-flowchart-properties__panel",
-        expanded && "wpn-flowchart-properties__panel-expanded",
+        minimized && "wpn-flowchart-properties__panel-minimized",
         className,
       )}
     >
-      {onToggleExpand && (
-        <button
-          type="button"
-          className="wpn-flowchart-properties__expand"
-          aria-label={expanded ? "Collapse panel" : "Expand panel"}
-          aria-pressed={expanded}
-          title={expanded ? "Collapse panel" : "Expand panel"}
-          onClick={onToggleExpand}
-        >
-          <Icon name={expanded ? "collapse" : "expand"} size={14} />
-        </button>
-      )}
-      {onClose && (
-        <button
-          type="button"
-          className="wpn-flowchart-properties__close"
-          aria-label="Close panel"
-          title="Close panel"
-          onClick={onClose}
-        >
-          <Icon name="x" size={14} />
-        </button>
-      )}
-      {content}
+      <div className="wpn-flowchart-properties__header-controls">
+        {onToggleMinimize && (
+          <button
+            type="button"
+            className="wpn-flowchart-properties__minimize"
+            aria-label={minimized ? "Maximize panel" : "Minimize panel"}
+            aria-pressed={minimized}
+            title={minimized ? "Maximize panel" : "Minimize panel"}
+            onClick={onToggleMinimize}
+          >
+            <Icon name={minimized ? "expand" : "collapse"} size={14} />
+          </button>
+        )}
+        {onClose && (
+          <button
+            type="button"
+            className="wpn-flowchart-properties__close"
+            aria-label="Close panel"
+            title="Close panel"
+            onClick={onClose}
+          >
+            <Icon name="x" size={14} />
+          </button>
+        )}
+      </div>
+      {!minimized && content}
     </aside>
   );
 });
@@ -98,6 +100,29 @@ function PanelHeader({
 }
 
 // ------------------------------------------------------------------- node
+
+function CollapsibleSection({
+  title,
+  children,
+}: {
+  title: string;
+  children: React.ReactNode;
+}) {
+  const [open, setOpen] = useState(true);
+  return (
+    <section className="wpn-flowchart-ui__section">
+      <button
+        type="button"
+        className="wpn-flowchart-ui__section-toggle"
+        onClick={() => setOpen(!open)}
+      >
+        <Icon name={open ? "collapse" : "expand"} size={13} />
+        <h3 className="wpn-flowchart-ui__section-title">{title}</h3>
+      </button>
+      {open && <div className="wpn-flowchart-ui__section-content">{children}</div>}
+    </section>
+  );
+}
 
 function NodeProperties({ nodeId }: { nodeId: string }) {
   const engine = useFlowEngine();
@@ -136,8 +161,7 @@ function NodeProperties({ nodeId }: { nodeId: string }) {
         </div>
       )}
 
-      <section className="wpn-flowchart-ui__section">
-        <h3 className="wpn-flowchart-ui__section-title">General</h3>
+      <CollapsibleSection title="General">
         <label className="wpn-flowchart-ui__field">
           <span className="wpn-flowchart-ui__field-label">Label</span>
           <input
@@ -148,11 +172,11 @@ function NodeProperties({ nodeId }: { nodeId: string }) {
             {...session}
           />
         </label>
-        <label className="wpn-flowchart-ui__field">
-          <span className="wpn-flowchart-ui__field-label">Description</span>
+        <label className="wpn-flowchart-ui__field wpn-flowchart-ui__field-grow">
+          <span className="wpn-flowchart-ui__field-label">Notes</span>
           <textarea
-            className="wpn-flowchart-ui__input"
-            style={{ minHeight: 220 }}
+            className="wpn-flowchart-ui__input wpn-flowchart-ui__input-grow"
+            style={{ minHeight: 320 }}
             value={node.data.description ?? ""}
             placeholder="What does this step do?"
             disabled={readOnly}
@@ -160,7 +184,7 @@ function NodeProperties({ nodeId }: { nodeId: string }) {
             {...session}
           />
         </label>
-      </section>
+      </CollapsibleSection>
     </>
   );
 }
@@ -207,7 +231,7 @@ function EdgeProperties({ edgeId }: { edgeId: string }) {
           ))}
         </div>
       )}
-      <section className="wpn-flowchart-ui__section">
+      <CollapsibleSection title="Styling">
         <label className="wpn-flowchart-ui__field">
           <span className="wpn-flowchart-ui__field-label">Label</span>
           <input
@@ -254,9 +278,8 @@ function EdgeProperties({ edgeId }: { edgeId: string }) {
             onChange={(e) => engine.updateEdge(edgeId, { animated: e.target.checked })}
           />
         </label>
-      </section>
-      <section className="wpn-flowchart-ui__section">
-        <h3 className="wpn-flowchart-ui__section-title">Endpoints</h3>
+      </CollapsibleSection>
+      <CollapsibleSection title="Endpoints">
         <button
           type="button"
           className="wpn-flowchart-properties__endpoint"
@@ -275,7 +298,7 @@ function EdgeProperties({ edgeId }: { edgeId: string }) {
           <strong>{target?.data.label ?? `Missing node (${edge.target})`}</strong>
           <code>{edge.targetHandle}</code>
         </button>
-      </section>
+      </CollapsibleSection>
       {!readOnly && (
         <section className={cx("wpn-flowchart-ui__section", "wpn-flowchart-properties__actions")}>
           <button
@@ -365,11 +388,11 @@ function FlowOverview() {
             onChange={(e) => engine.setFlowName(e.target.value)}
           />
         </label>
-        <label className="wpn-flowchart-ui__field">
+        <label className="wpn-flowchart-ui__field wpn-flowchart-ui__field-grow">
           <span className="wpn-flowchart-ui__field-label">Notes</span>
           <textarea
-            className="wpn-flowchart-ui__input"
-            style={{ minHeight: 220 }}
+            className="wpn-flowchart-ui__input wpn-flowchart-ui__input-grow"
+            style={{ minHeight: 320 }}
             value={notes}
             placeholder="Notes about this flow as a whole..."
             disabled={readOnly}

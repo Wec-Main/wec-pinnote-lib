@@ -75,6 +75,7 @@ export type BuiltInIcon =
   | "database"
   | "clock"
   | "subprocess"
+  | "plug"
   | "circleShape"
   | "squareShape"
   | "rectangleShape"
@@ -218,6 +219,23 @@ export const builtInNodeTypes: NodeTypeDefinition[] = [
       { id: "out-right", kind: "source", side: "right" },
     ]),
     defaultData: { label: "Sub Process" },
+  },
+  {
+    type: "integration",
+    label: "Integration",
+    description: "Connects to an external system or API",
+    category: "Flow control",
+    color: "#0891b2",
+    icon: "plug",
+    shape: "rounded",
+    defaultSize: { width: 220, height: 76 },
+    minSize: { width: 140, height: 56 },
+    resizable: true,
+    handles: inOut([
+      { id: "in-left", kind: "target", side: "left" },
+      { id: "out-right", kind: "source", side: "right" },
+    ]),
+    defaultData: { label: "Integration" },
   },
   {
     type: "circle",

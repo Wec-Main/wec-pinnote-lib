@@ -5,7 +5,7 @@ import { AnnotationReplyComposer } from "../AnnotationReplyComposer";
 import { AnnotationStatusSelect } from "../AnnotationStatusSelect";
 import { AnnotationThread } from "../AnnotationThread";
 import { Icons } from "../../assets/icons";
-import { Tooltip } from "../primitives";
+import { Icon, Tooltip } from "../primitives";
 import { ConfirmDialog } from "../UserManagement/ConfirmDialog";
 import { mentionsToPlainText } from "../../utils/mentions";
 import type { AnnotationComment } from "../../types/annotation.types";
@@ -33,12 +33,28 @@ export function AnnotationThreadPanel({
   const [confirmClose, setConfirmClose] = useState(false);
   const [replyTarget, setReplyTarget] = useState<AnnotationComment | null>(null);
   const [pendingDelete, setPendingDelete] = useState<AnnotationComment | null>(null);
+  const [editingTitle, setEditingTitle] = useState(false);
+  const [titleOverride, setTitleOverride] = useState<string | null>(null);
+  const [titleValue, setTitleValue] = useState("");
+  const [infoOpen, setInfoOpen] = useState(false);
 
   if (!annotation) {
     return null;
   }
 
-  const title = annotation.anchor.elementIdentifier.replace(/[-_]/g, " ");
+  const defaultTitle = annotation.anchor.elementIdentifier.replace(/[-_]/g, " ");
+  const title = titleOverride ?? defaultTitle;
+
+  const startEditingTitle = () => {
+    setTitleValue(title);
+    setEditingTitle(true);
+  };
+
+  const commitTitle = () => {
+    const trimmed = titleValue.trim();
+    setTitleOverride(trimmed || defaultTitle);
+    setEditingTitle(false);
+  };
 
   const requestClose = () => {
     if (hasUnsavedEdit) {
@@ -72,7 +88,64 @@ export function AnnotationThreadPanel({
         style={{ left: placement.left, top: placement.top }}
       >
         <div className="wpn-panel__header">
-          <span className="wpn-panel__title">{title}</span>
+          <span className="wpn-panel__title-group">
+            {editingTitle ? (
+              <input
+                className="wpn-panel__title-input"
+                value={titleValue}
+                onChange={(event) => setTitleValue(event.target.value)}
+                onBlur={commitTitle}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter") {
+                    event.preventDefault();
+                    commitTitle();
+                  } else if (event.key === "Escape") {
+                    setEditingTitle(false);
+                  }
+                }}
+                autoFocus
+              />
+            ) : (
+              <span className="wpn-panel__title">{title}</span>
+            )}
+            <button
+              type="button"
+              className="wpn-link wpn-link--icon"
+              aria-label={editingTitle ? "Save title" : "Edit title"}
+              onMouseDown={(event) => event.preventDefault()}
+              onClick={editingTitle ? commitTitle : startEditingTitle}
+            >
+              <Icon name={editingTitle ? "check" : "edit"} className="wpn-action-icon" />
+            </button>
+            <span
+              className="wpn-thread-panel__info"
+              onMouseEnter={() => setInfoOpen(true)}
+              onMouseLeave={() => setInfoOpen(false)}
+            >
+              <button
+                type="button"
+                className="wpn-link wpn-link--icon"
+                aria-label="Thread info"
+                onFocus={() => setInfoOpen(true)}
+                onBlur={() => setInfoOpen(false)}
+              >
+                <Icon name="info" className="wpn-action-icon" />
+              </button>
+              {infoOpen ? (
+                <span className="wpn-thread-panel__info-popover" role="tooltip">
+                  <span>
+                    <kbd>Enter</kbd> to send
+                  </span>
+                  <span>
+                    <kbd>Shift</kbd>+<kbd>Enter</kbd> new line
+                  </span>
+                  <span>
+                    <kbd>@</kbd> to mention
+                  </span>
+                </span>
+              ) : null}
+            </span>
+          </span>
           {confirmClose ? (
             <span className="wpn-panel__title-group">
               <span className="wpn-muted">Discard unsaved edit?</span>

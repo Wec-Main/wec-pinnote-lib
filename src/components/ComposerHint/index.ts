@@ -1,1 +1,1 @@
-export { ComposerHint } from "./ComposerHint";
+export { ComposerHint, ComposerHintInfo } from "./ComposerHint";

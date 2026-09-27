@@ -20,6 +20,11 @@ export interface AuthSession {
   refreshToken: string;
 }
 
+export interface RefreshedTokens {
+  token: string;
+  refreshToken?: string;
+}
+
 export interface AuthApiClient {
   listLoginOptions(projectId: string, signal?: AbortSignal): Promise<LoginOption[]>;
   login(
@@ -29,5 +34,5 @@ export interface AuthApiClient {
     signal?: AbortSignal,
   ): Promise<AuthSession>;
   logout(projectId: string, userId: string, signal?: AbortSignal, token?: string): Promise<void>;
-  refresh(projectId: string, refreshToken: string, signal?: AbortSignal): Promise<string>;
+  refresh(projectId: string, refreshToken: string, signal?: AbortSignal): Promise<RefreshedTokens>;
 }

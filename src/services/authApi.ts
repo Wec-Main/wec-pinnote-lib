@@ -1,6 +1,6 @@
 import { AnnotationApiError } from "../types/annotation.types";
 import { buildUrl, request, requestNoContent } from "./httpClient";
-import { isSession } from "../utils/authSession";
+import { hasExpiry, isSessionShape } from "../utils/authSession";
 import type { AuthApiClient, AuthSession, LoginOption } from "../types/auth.types";
 
 function loginFallbackMessage(status: number): string {
@@ -40,7 +40,7 @@ export function createAuthApi(apiBaseUrl: string): AuthApiClient {
         { reportUnauthorized: false, fallbackMessage: loginFallbackMessage },
       );
       const session = { ...payload.user, token: payload.token, refreshToken: payload.refreshToken };
-      if (!isSession(session)) {
+      if (!isSessionShape(session)) {
         throw new AnnotationApiError("Malformed login response", 200, null);
       }
       return session;
@@ -62,7 +62,7 @@ export function createAuthApi(apiBaseUrl: string): AuthApiClient {
 
     async refresh(projectId, refreshToken, signal) {
       const url = buildUrl(apiBaseUrl, "/auth/refresh");
-      const payload = await request<{ token: string }>(
+      const payload = await request<{ token: unknown; refreshToken?: unknown }>(
         url,
         undefined,
         {
@@ -72,10 +72,14 @@ export function createAuthApi(apiBaseUrl: string): AuthApiClient {
         },
         { reportUnauthorized: false },
       );
-      if (typeof payload.token !== "string" || payload.token.length === 0) {
+      if (typeof payload.token !== "string" || !hasExpiry(payload.token)) {
         throw new AnnotationApiError("Malformed refresh response", 200, null);
       }
-      return payload.token;
+      const rotated =
+        typeof payload.refreshToken === "string" && hasExpiry(payload.refreshToken)
+          ? payload.refreshToken
+          : undefined;
+      return { token: payload.token, ...(rotated ? { refreshToken: rotated } : {}) };
     },
   };
 }

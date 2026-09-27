@@ -5,8 +5,13 @@ import {
   fetchAnnotationTags,
   fetchPreferences,
   saveTagsVisible,
+  updateAnnotationTag,
 } from "../services/annotationTagsApi";
-import type { AnnotationTag, DraftTagPin } from "../types/annotationTag.types";
+import type {
+  AnnotationTag,
+  DraftTagPin,
+  UpdateAnnotationTagInput,
+} from "../types/annotationTag.types";
 import type { AnnotationAnchor } from "../types/annotation.types";
 import { createClientId } from "../utils/format";
 import { useTokenGetter } from "./useTokenGetter";
@@ -35,6 +40,11 @@ export interface AnnotationTagsState {
   submitTagDraft: (tagId: string) => Promise<void>;
   removeAnnotationTag: (annotationTagId: string) => Promise<void>;
   reloadAnnotationTags: () => void;
+  applyAnnotationTagLocal: (annotationTagId: string, patch: Partial<AnnotationTag>) => void;
+  commitAnnotationTagUpdate: (
+    annotationTagId: string,
+    input: UpdateAnnotationTagInput,
+  ) => Promise<void>;
 }
 
 export function useAnnotationTags(options: UseAnnotationTagsOptions): AnnotationTagsState {
@@ -123,8 +133,11 @@ export function useAnnotationTags(options: UseAnnotationTagsOptions): Annotation
       });
       setAnnotationTags((current) => [created, ...current]);
       setTagDraft(null);
+      if (!tagsVisibleRef.current) {
+        setTagsVisible(true);
+      }
     },
-    [apiBaseUrl, getToken, projectId, pageKey, tagDraft],
+    [apiBaseUrl, getToken, projectId, pageKey, tagDraft, setTagsVisible],
   );
 
   const removeAnnotationTag = useCallback(
@@ -133,6 +146,40 @@ export function useAnnotationTags(options: UseAnnotationTagsOptions): Annotation
       setAnnotationTags((current) => current.filter((item) => item.id !== annotationTagId));
     },
     [apiBaseUrl, getToken],
+  );
+
+  const applyAnnotationTagLocal = useCallback(
+    (annotationTagId: string, patch: Partial<AnnotationTag>) => {
+      setAnnotationTags((current) =>
+        current.map((item) => (item.id === annotationTagId ? { ...item, ...patch } : item)),
+      );
+    },
+    [],
+  );
+
+  const commitAnnotationTagUpdate = useCallback(
+    async (annotationTagId: string, input: UpdateAnnotationTagInput) => {
+      const previous = annotationTags.find((item) => item.id === annotationTagId);
+      try {
+        const updated = await updateAnnotationTag(
+          apiBaseUrl,
+          await getToken(),
+          annotationTagId,
+          input,
+        );
+        setAnnotationTags((current) =>
+          current.map((item) => (item.id === annotationTagId ? updated : item)),
+        );
+      } catch (error) {
+        if (previous) {
+          setAnnotationTags((current) =>
+            current.map((item) => (item.id === annotationTagId ? previous : item)),
+          );
+        }
+        throw error;
+      }
+    },
+    [apiBaseUrl, getToken, annotationTags],
   );
 
   return useMemo(
@@ -149,6 +196,8 @@ export function useAnnotationTags(options: UseAnnotationTagsOptions): Annotation
       submitTagDraft,
       removeAnnotationTag,
       reloadAnnotationTags,
+      applyAnnotationTagLocal,
+      commitAnnotationTagUpdate,
     }),
     [
       annotationTags,
@@ -162,6 +211,8 @@ export function useAnnotationTags(options: UseAnnotationTagsOptions): Annotation
       submitTagDraft,
       removeAnnotationTag,
       reloadAnnotationTags,
+      applyAnnotationTagLocal,
+      commitAnnotationTagUpdate,
     ],
   );
 }

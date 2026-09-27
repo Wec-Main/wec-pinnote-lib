@@ -74,9 +74,12 @@ export function UserFormModal({
   const [category, setCategory] = useState<UserManagementCategory>(user?.category ?? "internal");
   const [password, setPassword] = useState("");
   const [touched, setTouched] = useState(false);
-  const [projectIds, setProjectIds] = useState<string[]>(
-    () => user?.projects.map((project) => project.id) ?? [],
-  );
+  const [projectIds, setProjectIds] = useState<string[]>(() => {
+    if (user) {
+      return user.projects.map((project) => project.id);
+    }
+    return actorRole === "super_admin" ? [] : [config.projectId];
+  });
   const apiBaseUrl = config.apiBaseUrl;
   const authToken = activeAccount?.token;
   const organizationId = activeAccount?.organizationId;

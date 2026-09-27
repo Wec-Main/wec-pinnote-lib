@@ -3,12 +3,13 @@ import type { StreamConnectionState, StreamEvent, StreamEventType } from "../typ
 import { AnnotationApiError } from "../types/annotation.types";
 import { fetchSseTicket } from "../services/streamApi";
 import { normalizeApiBase } from "../services/httpClient";
-import { hasExpiry, isTokenUnexpired } from "../utils/authSession";
 import { parseStreamEnvelope } from "../utils/streamPayloadGuards";
 
 const RESYNC_COOLDOWN_MS = 5000;
 const RECONNECT_DELAY_MS = 2000;
 const MAX_RECONNECT_DELAY_MS = 30000;
+const TICKET_REFRESH_MARGIN_MS = 10000;
+const MIN_TICKET_REFRESH_DELAY_MS = 1000;
 
 export type StreamTokenGetter = () =>
   | string
@@ -38,12 +39,8 @@ function streamUrl(apiBaseUrl: string, ticket: string, lastEventId: string | und
   return url.toString();
 }
 
-function isAuthFailure(err: unknown): boolean {
-  return err instanceof AnnotationApiError && (err.status === 401 || err.status === 403);
-}
-
-function isExpiredToken(token: string): boolean {
-  return hasExpiry(token) && !isTokenUnexpired(token);
+function isForbidden(err: unknown): boolean {
+  return err instanceof AnnotationApiError && err.status === 403;
 }
 
 export function useSseStream({
@@ -85,6 +82,7 @@ export function useSseStream({
     let reconnectDelay = RECONNECT_DELAY_MS;
     let openedOnce = false;
     let ticketController: AbortController | null = null;
+    let ticketRefreshTimer: ReturnType<typeof setTimeout> | null = null;
 
     const resync = () => {
       const now = Date.now();
@@ -117,6 +115,31 @@ export function useSseStream({
         clearTimeout(reconnectTimer);
         reconnectTimer = null;
       }
+    };
+
+    const clearTicketRefreshTimer = () => {
+      if (ticketRefreshTimer) {
+        clearTimeout(ticketRefreshTimer);
+        ticketRefreshTimer = null;
+      }
+    };
+
+    const scheduleTicketRefresh = (expiresInSeconds: number) => {
+      clearTicketRefreshTimer();
+      const delay = Math.max(
+        expiresInSeconds * 1000 - TICKET_REFRESH_MARGIN_MS,
+        MIN_TICKET_REFRESH_DELAY_MS,
+      );
+      ticketRefreshTimer = setTimeout(() => {
+        ticketRefreshTimer = null;
+        if (stopped) {
+          return;
+        }
+        source?.close();
+        source = null;
+        reconnectDelay = RECONNECT_DELAY_MS;
+        void connect();
+      }, delay);
     };
 
     const scheduleReconnect = () => {
@@ -155,6 +178,7 @@ export function useSseStream({
         }
         next.close();
         source = null;
+        clearTicketRefreshTimer();
         scheduleReconnect();
       });
 
@@ -186,7 +210,7 @@ export function useSseStream({
         if (stopped) {
           return;
         }
-        if (!token || isExpiredToken(token)) {
+        if (!token) {
           setState("unauthenticated");
           return;
         }
@@ -194,14 +218,22 @@ export function useSseStream({
         const controller = new AbortController();
         ticketController = controller;
         let ticket: string;
+        let expiresInSeconds: number;
         try {
-          ticket = (await fetchSseTicket(apiBaseUrl, token, projectId, pageKey, controller.signal))
-            .ticket;
+          const issued = await fetchSseTicket(
+            apiBaseUrl,
+            token,
+            projectId,
+            pageKey,
+            controller.signal,
+          );
+          ticket = issued.ticket;
+          expiresInSeconds = issued.expiresInSeconds;
         } catch (err) {
           if (stopped) {
             return;
           }
-          if (isAuthFailure(err)) {
+          if (isForbidden(err)) {
             setState("unauthenticated");
             return;
           }
@@ -214,6 +246,7 @@ export function useSseStream({
           return;
         }
         openSource(ticket);
+        scheduleTicketRefresh(expiresInSeconds);
       } finally {
         connecting = false;
       }
@@ -241,6 +274,7 @@ export function useSseStream({
     return () => {
       stopped = true;
       clearReconnectTimer();
+      clearTicketRefreshTimer();
       ticketController?.abort();
       window.removeEventListener("online", reconnectNow);
       document.removeEventListener("visibilitychange", handleVisibilityChange);

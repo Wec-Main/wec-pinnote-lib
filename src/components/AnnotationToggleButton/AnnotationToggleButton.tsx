@@ -7,9 +7,10 @@ export interface AnnotationToggleButtonProps {
 }
 
 export function AnnotationToggleButton({ className }: AnnotationToggleButtonProps) {
-  const { modeEnabled, setModeEnabled, config, activeAccount } = useAnnotationContext();
+  const { modeEnabled, setModeEnabled, config, activeAccount, draft } = useAnnotationContext();
   const [nudge, setNudge] = useState(false);
   const loggedOut = !activeAccount;
+  const isActive = modeEnabled && !draft;
 
   useEffect(() => {
     if (!loggedOut) {
@@ -43,14 +44,14 @@ export function AnnotationToggleButton({ className }: AnnotationToggleButtonProp
         type="button"
         className={[
           "wpn-toggle",
-          modeEnabled ? "wpn-toggle--active" : "",
+          isActive ? "wpn-toggle--active" : "",
           loggedOut ? "wpn-toggle--blocked" : "",
           nudge ? "wpn-toggle--nudge" : "",
           className ?? "",
         ]
           .filter(Boolean)
           .join(" ")}
-        aria-pressed={modeEnabled}
+        aria-pressed={isActive}
         aria-disabled={loggedOut}
         aria-label={loggedOut ? "Log in to annotate" : "Toggle annotation mode"}
         onClick={() => {
@@ -61,7 +62,7 @@ export function AnnotationToggleButton({ className }: AnnotationToggleButtonProp
           setModeEnabled(!modeEnabled);
         }}
       >
-        <Icon name="pen" className="wpn-toggle__icon" />
+        <Icon name="editNote" className="wpn-toggle__icon" />
       </button>
     </Tooltip>
   );

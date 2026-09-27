@@ -99,14 +99,6 @@ export function FlowListPanel({ onOpen }: FlowListPanelProps) {
           Flows
           <span className="wpn-flow-list__count">{list.length}</span>
         </span>
-        <button
-          type="button"
-          className="wpn-btn wpn-btn--primary"
-          onClick={() => setFormModal({ mode: "create" })}
-        >
-          <Icon name="plus" className="wpn-btn__icon" />
-          New Flow
-        </button>
       </div>
 
       {loading ? (

@@ -6,7 +6,6 @@ import { NODE_DRAG_MIME } from "../../utils/flowchart/constants";
 import { NodeIcon } from "./FlowIcons";
 
 export interface SidebarProps {
-  title?: string;
   /** Restrict / order the palette. Defaults to every registered node type. */
   nodeTypes?: string[];
   className?: string;
@@ -14,7 +13,6 @@ export interface SidebarProps {
 
 /** Node palette: drag an item onto the canvas, or click it to add at the viewport center. */
 export const Sidebar = memo(function Sidebar({
-  title = "Nodes",
   nodeTypes,
   className,
 }: SidebarProps) {
@@ -52,64 +50,67 @@ export const Sidebar = memo(function Sidebar({
   };
 
   return (
-    <aside className={cx("wpn-flowchart-sidebar__sidebar", className)}>
-      <div className="wpn-flowchart-sidebar__header">
-        <h2 className="wpn-flowchart-sidebar__title">{title}</h2>
-      </div>
+    <aside
+      className={cx(
+        "wpn-flowchart-sidebar__sidebar",
+        className,
+      )}
+    >
+      <div className="wpn-flowchart-sidebar__header"></div>
       <div className="wpn-flowchart-sidebar__list">
-        {groups.map(([category, defs]) => (
-          <div key={category} className="wpn-flowchart-sidebar__group">
-            <div className="wpn-flowchart-ui__section-title">{category}</div>
-            {defs.map((def) => (
-              <div
-                key={def.type}
-                className={cx(
-                  "wpn-flowchart-sidebar__item",
-                  readOnly && "wpn-flowchart-sidebar__item-disabled",
-                )}
-                style={{ "--node-color": def.color } as CSSProperties}
-                draggable={!readOnly}
-                role="button"
-                tabIndex={readOnly ? -1 : 0}
-                aria-disabled={readOnly}
-                title={
-                  readOnly
-                    ? "Read-only mode"
-                    : `Drag onto the canvas or click to add a ${def.label} node`
-                }
-                onDragStart={(e) => {
-                  e.dataTransfer.setData(NODE_DRAG_MIME, def.type);
-                  e.dataTransfer.effectAllowed = "copy";
-                }}
-                onClick={() => !readOnly && addAtCenter(def)}
-                onKeyDown={(e) => {
-                  if (!readOnly && (e.key === "Enter" || e.key === " ")) {
-                    e.preventDefault();
-                    addAtCenter(def);
-                  }
-                }}
-              >
-                <span
+          {groups.map(([category, defs]) => (
+            <div key={category} className="wpn-flowchart-sidebar__group">
+              <div className="wpn-flowchart-ui__section-title">{category}</div>
+              {defs.map((def) => (
+                <div
+                  key={def.type}
                   className={cx(
-                    "wpn-flowchart-sidebar__icon",
-                    `wpn-flowchart-sidebar__icon-${def.shape}`,
+                    "wpn-flowchart-sidebar__item",
+                    readOnly && "wpn-flowchart-sidebar__item-disabled",
                   )}
+                  style={{ "--node-color": def.color } as CSSProperties}
+                  draggable={!readOnly}
+                  role="button"
+                  tabIndex={readOnly ? -1 : 0}
+                  aria-disabled={readOnly}
+                  title={
+                    readOnly
+                      ? "Read-only mode"
+                      : `Drag onto the canvas or click to add a ${def.label} node`
+                  }
+                  onDragStart={(e) => {
+                    e.dataTransfer.setData(NODE_DRAG_MIME, def.type);
+                    e.dataTransfer.effectAllowed = "copy";
+                  }}
+                  onClick={() => !readOnly && addAtCenter(def)}
+                  onKeyDown={(e) => {
+                    if (!readOnly && (e.key === "Enter" || e.key === " ")) {
+                      e.preventDefault();
+                      addAtCenter(def);
+                    }
+                  }}
                 >
-                  <NodeIcon icon={def.icon} size={15} />
-                </span>
-                <span className="wpn-flowchart-sidebar__item-text">
-                  <span className="wpn-flowchart-sidebar__item-label">{def.label}</span>
-                  {def.description && (
-                    <span className="wpn-flowchart-sidebar__item-desc">{def.description}</span>
-                  )}
-                </span>
-                <span className="wpn-flowchart-sidebar__grip" aria-hidden="true">
-                  ⋮⋮
-                </span>
-              </div>
-            ))}
-          </div>
-        ))}
+                  <span
+                    className={cx(
+                      "wpn-flowchart-sidebar__icon",
+                      `wpn-flowchart-sidebar__icon-${def.shape}`,
+                    )}
+                  >
+                    <NodeIcon icon={def.icon} size={15} />
+                  </span>
+                  <span className="wpn-flowchart-sidebar__item-text">
+                    <span className="wpn-flowchart-sidebar__item-label">{def.label}</span>
+                    {def.description && (
+                      <span className="wpn-flowchart-sidebar__item-desc">{def.description}</span>
+                    )}
+                  </span>
+                  <span className="wpn-flowchart-sidebar__grip" aria-hidden="true">
+                    ⋮⋮
+                  </span>
+                </div>
+              ))}
+            </div>
+          ))}
       </div>
     </aside>
   );

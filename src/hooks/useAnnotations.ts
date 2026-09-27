@@ -460,12 +460,34 @@ export function useAnnotationCollection({
     [api, reportActionError],
   );
 
+  const removeAnnotation = useCallback(
+    async (annotationId: string) => {
+      const removed = annotationsRef.current.find((item) => item.id === annotationId);
+      setAnnotations((current) => current.filter((item) => item.id !== annotationId));
+      setActionError(null);
+
+      try {
+        await api.deleteAnnotation(annotationId);
+      } catch (err) {
+        if (removed) {
+          const restored = removed;
+          setAnnotations((current) => [...current, restored].sort((a, b) => a.number - b.number));
+        }
+        reportActionError(err);
+        throw err;
+      }
+      eventsRef.current.onAnnotationDelete?.(annotationId);
+    },
+    [api, reportActionError],
+  );
+
   const removeComment = useCallback(
     async (annotationId: string, commentId: string) => {
       const commentsBefore =
         annotationsRef.current.find((item) => item.id === annotationId)?.comments ?? [];
       const removedIndex = commentsBefore.findIndex((comment) => comment.id === commentId);
       const removed = removedIndex >= 0 ? commentsBefore[removedIndex] : undefined;
+      const remainingCount = commentsBefore.length - (removed ? 1 : 0);
       setAnnotations((current) =>
         current.map((item) =>
           item.id === annotationId
@@ -499,8 +521,12 @@ export function useAnnotationCollection({
         reportActionError(err);
         throw err;
       }
+
+      if (removed && remainingCount === 0) {
+        await removeAnnotation(annotationId);
+      }
     },
-    [api, reportActionError],
+    [api, removeAnnotation, reportActionError],
   );
 
   const setStatus = useCallback(
@@ -533,27 +559,6 @@ export function useAnnotationCollection({
       );
       eventsRef.current.onStatusChange?.(annotationId, updated.status);
       eventsRef.current.onAnnotationUpdate?.(updated);
-    },
-    [api, reportActionError],
-  );
-
-  const removeAnnotation = useCallback(
-    async (annotationId: string) => {
-      const removed = annotationsRef.current.find((item) => item.id === annotationId);
-      setAnnotations((current) => current.filter((item) => item.id !== annotationId));
-      setActionError(null);
-
-      try {
-        await api.deleteAnnotation(annotationId);
-      } catch (err) {
-        if (removed) {
-          const restored = removed;
-          setAnnotations((current) => [...current, restored].sort((a, b) => a.number - b.number));
-        }
-        reportActionError(err);
-        throw err;
-      }
-      eventsRef.current.onAnnotationDelete?.(annotationId);
     },
     [api, reportActionError],
   );

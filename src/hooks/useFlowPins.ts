@@ -52,6 +52,8 @@ export function useFlowPins(options: UseFlowPinsOptions): FlowPinsState {
   const [flowPinModeEnabled, setFlowPinModeEnabledState] = useState(false);
   const [flowPinDraft, setFlowPinDraft] = useState<DraftFlowPin | null>(null);
   const [selectedFlowPinId, setSelectedFlowPinId] = useState<string | null>(null);
+  const flowPinsVisibleRef = useRef(flowPinsVisible);
+  flowPinsVisibleRef.current = flowPinsVisible;
 
   useEffect(() => {
     setFlowPins([]);
@@ -110,8 +112,11 @@ export function useFlowPins(options: UseFlowPinsOptions): FlowPinsState {
       setFlowPinDraft(null);
       setFlowPinModeEnabledState(false);
       setSelectedFlowPinId(created.id);
+      if (!flowPinsVisibleRef.current) {
+        setFlowPinsVisible(true);
+      }
     },
-    [apiBaseUrl, getToken, flowPinDraft, pageKey, projectId],
+    [apiBaseUrl, getToken, flowPinDraft, pageKey, projectId, setFlowPinsVisible],
   );
 
   const removeFlowPin = useCallback(

@@ -648,11 +648,14 @@ export class FlowEngine {
       "target",
       edge.targetHandle,
     )?.side;
+    const sourceHandle = this.handleOnSide(targetNode, "source", oldTargetSide);
+    const targetHandle = this.handleOnSide(sourceNode, "target", oldSourceSide);
+    if (!sourceHandle || !targetHandle) return false;
     const connection: Connection = {
       source: targetNode.id,
       target: sourceNode.id,
-      sourceHandle: this.handleOnSide(targetNode, "source", oldTargetSide),
-      targetHandle: this.handleOnSide(sourceNode, "target", oldSourceSide),
+      sourceHandle,
+      targetHandle,
     };
     if (!this.canConnect(connection, id).valid) return false;
     const { bend: _bend, ...rest } = edge;
@@ -724,11 +727,16 @@ export class FlowEngine {
     };
     this.beginInteraction();
     const node = this.addNode({ type, position: this.snap(placement[side]) });
+    const targetHandle = this.handleOnSide(node, "target", oppositeSide[side]);
+    if (!targetHandle) {
+      this.endInteraction();
+      return null;
+    }
     this.addEdge({
       source: from.id,
       sourceHandle: sourceHandle.id,
       target: node.id,
-      targetHandle: this.handleOnSide(node, "target", oppositeSide[side]),
+      targetHandle,
     });
     this.endInteraction();
     this.selectNode(node.id);
@@ -1045,7 +1053,7 @@ export class FlowEngine {
     const connection = this.connectionFor(conn.from, conn.candidate);
     if (!conn.reconnecting) return this.addEdge(connection);
     const edge = this.getEdge(conn.reconnecting);
-    if (!edge) return null;
+    if (!edge || !this.canConnect(connection, conn.reconnecting).valid) return null;
     const { bend: _bend, ...rest } = edge;
     const updated: FlowEdge = { ...rest, ...connection };
     const s = this.getState();

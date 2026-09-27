@@ -2,6 +2,7 @@ import { buildUrl, request, requestNoContent } from "./httpClient";
 import type {
   AnnotationTag,
   CreateAnnotationTagInput,
+  UpdateAnnotationTagInput,
   UserPreferences,
 } from "../types/annotationTag.types";
 
@@ -31,6 +32,24 @@ export function createAnnotationTag(
     body: JSON.stringify({ ...rest, ...anchor }),
     signal,
   });
+}
+
+export function updateAnnotationTag(
+  apiBaseUrl: string,
+  authToken: string | undefined,
+  annotationTagId: string,
+  input: UpdateAnnotationTagInput,
+  signal?: AbortSignal,
+): Promise<AnnotationTag> {
+  return request<AnnotationTag>(
+    buildUrl(apiBaseUrl, `/annotation-tags/${encodeURIComponent(annotationTagId)}`),
+    authToken,
+    {
+      method: "PATCH",
+      body: JSON.stringify(input),
+      signal,
+    },
+  );
 }
 
 export function deleteAnnotationTag(

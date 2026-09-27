@@ -67,6 +67,7 @@ export function AnnotationProvider({ config, children }: AnnotationProviderProps
     login,
     logout: revokeSession,
     switchAccount,
+    getAccessToken,
     revokeError,
     clearRevokeError,
   } = useAuthSessions(resolved.apiBaseUrl, resolved.projectId, resolved.authClient);
@@ -90,6 +91,7 @@ export function AnnotationProvider({ config, children }: AnnotationProviderProps
   const accountId = activeAccount?.id;
   const accountName = activeAccount?.name;
   const accountAvatarUrl = activeAccount?.avatarUrl;
+  const accountRole = activeAccount?.roleId;
   const activeUser = useMemo(() => {
     if (hostAuthenticated || accountId === undefined || accountName === undefined) {
       return resolved.currentUser;
@@ -98,11 +100,22 @@ export function AnnotationProvider({ config, children }: AnnotationProviderProps
       id: accountId,
       name: accountName,
       avatarUrl: accountAvatarUrl ?? resolved.currentUser.avatarUrl,
+      role: accountRole,
     };
-  }, [accountAvatarUrl, accountId, accountName, hostAuthenticated, resolved.currentUser]);
-  const accountTokenRef = useRef(activeAccount?.token);
-  accountTokenRef.current = activeAccount?.token;
-  const readAccountToken = useCallback(() => accountTokenRef.current ?? "", []);
+  }, [
+    accountAvatarUrl,
+    accountId,
+    accountName,
+    accountRole,
+    hostAuthenticated,
+    resolved.currentUser,
+  ]);
+  const accountIdRef = useRef(activeAccount?.id);
+  accountIdRef.current = activeAccount?.id;
+  const readAccountToken = useCallback(async () => {
+    const id = accountIdRef.current;
+    return (id ? await getAccessToken(id) : undefined) ?? "";
+  }, [getAccessToken]);
   const hasAccount = activeAccount !== null;
   const activeConfig = useMemo(
     () => ({
@@ -196,6 +209,8 @@ export function AnnotationProvider({ config, children }: AnnotationProviderProps
     cancelTagDraft,
     submitTagDraft,
     removeAnnotationTag,
+    applyAnnotationTagLocal,
+    commitAnnotationTagUpdate,
   } = useAnnotationTags({
     apiBaseUrl: activeConfig.apiBaseUrl,
     projectId,
@@ -497,13 +512,14 @@ export function AnnotationProvider({ config, children }: AnnotationProviderProps
           status,
         });
         setSelectedId(created.id);
+        setPinsVisible(true);
       } catch (err) {
         draftMessageRef.current = typedMessage;
         setDraft((existing) => existing ?? { ...current, message: typedMessage });
         throw err;
       }
     },
-    [clearDraft, createAnnotation, currentUserId, pageKey, projectId],
+    [clearDraft, createAnnotation, currentUserId, pageKey, projectId, setPinsVisible],
   );
 
   const selectAnnotation = useCallback(
@@ -584,6 +600,8 @@ export function AnnotationProvider({ config, children }: AnnotationProviderProps
       projectTags,
       submitTagDraft,
       removeAnnotationTag,
+      applyAnnotationTagLocal,
+      commitAnnotationTagUpdate,
       flowPins,
       syncFlowPinName,
     }),
@@ -609,6 +627,8 @@ export function AnnotationProvider({ config, children }: AnnotationProviderProps
       projectTags,
       submitTagDraft,
       removeAnnotationTag,
+      applyAnnotationTagLocal,
+      commitAnnotationTagUpdate,
       flowPins,
       syncFlowPinName,
     ],

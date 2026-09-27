@@ -56,10 +56,12 @@ export function AnnotationToolbar() {
     setTagModeEnabled,
     tagsVisible,
     setTagsVisible,
+    tagDraft,
     flowPinModeEnabled,
     setFlowPinModeEnabled,
     flowPinsVisible,
     setFlowPinsVisible,
+    flowPinDraft,
     setModeEnabled,
     selectAnnotation,
     requestCancelDraft,
@@ -166,6 +168,8 @@ export function AnnotationToolbar() {
   // Every panel behind these icons needs a signed-in actor, so a logged-out
   // visitor keeps the icon but cannot open the panel.
   const loggedOut = !activeAccount;
+  const tagToggleActive = tagModeEnabled && !tagDraft;
+  const flowToggleActive = flowPinModeEnabled && !flowPinDraft;
 
   const launcherShortcuts = (
     <>
@@ -468,12 +472,12 @@ export function AnnotationToolbar() {
                 type="button"
                 className={[
                   "wpn-toggle",
-                  tagModeEnabled ? "wpn-toggle--active" : "",
+                  tagToggleActive ? "wpn-toggle--active" : "",
                   loggedOut ? "wpn-toggle--blocked" : "",
                 ]
                   .filter(Boolean)
                   .join(" ")}
-                aria-pressed={tagModeEnabled}
+                aria-pressed={tagToggleActive}
                 aria-disabled={loggedOut}
                 aria-label={tagModeEnabled ? "Stop tagging" : "Tag an element"}
                 onClick={() => setTagModeEnabled(!tagModeEnabled)}
@@ -513,12 +517,12 @@ export function AnnotationToolbar() {
                     type="button"
                     className={[
                       "wpn-toggle",
-                      flowPinModeEnabled ? "wpn-toggle--active" : "",
+                      flowToggleActive ? "wpn-toggle--active" : "",
                       loggedOut ? "wpn-toggle--blocked" : "",
                     ]
                       .filter(Boolean)
                       .join(" ")}
-                    aria-pressed={flowPinModeEnabled}
+                    aria-pressed={flowToggleActive}
                     aria-disabled={loggedOut}
                     aria-label={flowPinModeEnabled ? "Stop placing flows" : "Place a flow"}
                     onClick={() => setFlowPinModeEnabled(!flowPinModeEnabled)}

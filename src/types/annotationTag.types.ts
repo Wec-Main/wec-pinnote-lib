@@ -1,5 +1,10 @@
 import type { AnnotationAnchor } from "./annotation.types";
 
+export const DEFAULT_TAG_PIN_WIDTH = 104;
+export const DEFAULT_TAG_PIN_HEIGHT = 26;
+export const MIN_TAG_PIN_WIDTH = 64;
+export const MIN_TAG_PIN_HEIGHT = 22;
+
 export interface AnnotationTag {
   id: string;
   organizationId: string;
@@ -16,6 +21,8 @@ export interface AnnotationTag {
   fallbackY: number;
   viewportWidth: number;
   viewportHeight: number;
+  width?: number;
+  height?: number;
   createdById: string | null;
   createdByName: string | null;
   createdAt: string;
@@ -27,6 +34,14 @@ export interface CreateAnnotationTagInput {
   pageKey: string;
   tagId: string;
   anchor: AnnotationAnchor;
+}
+
+export interface UpdateAnnotationTagInput {
+  tagId?: string;
+  fallbackX?: number;
+  fallbackY?: number;
+  width?: number;
+  height?: number;
 }
 
 export interface UserPreferences {

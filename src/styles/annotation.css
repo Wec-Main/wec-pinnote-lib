@@ -1248,6 +1248,40 @@ body.wpn-mode-active {
   font-weight: 700;
 }
 
+.wpn-thread-panel__info {
+  position: relative;
+  display: inline-flex;
+  flex: 0 0 auto;
+}
+
+.wpn-thread-panel__info-popover {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  z-index: 20;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 160px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: rgba(15, 23, 42, 0.94);
+  color: rgba(255, 255, 255, 0.85);
+  font-size: 11px;
+  line-height: 1.4;
+  box-shadow: 0 8px 20px rgba(15, 23, 42, 0.35);
+}
+
+.wpn-thread-panel__info-popover kbd {
+  padding: 0 4px;
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.08);
+  color: rgba(255, 255, 255, 0.9);
+  font-family: inherit;
+  font-size: 10px;
+}
+
 .wpn-panel__toolbar-end {
   display: flex;
   align-items: center;
@@ -6487,21 +6521,34 @@ body.wpn-epicflow-resizing {
   transform: translate(-50%, -50%);
   display: inline-flex;
   align-items: center;
-  max-width: 180px;
-  height: 22px;
-  padding: 0 9px;
+  min-width: 64px;
+  max-width: 240px;
+  height: 26px;
+  padding: 0 8px;
   border: 0;
-  border-radius: 999px;
+  border-radius: 5px;
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.28),
     0 1px 3px rgba(0, 0, 0, 0.35);
   color: #fff;
-  font-size: 11px;
+  font-size: 10px;
   font-weight: 600;
   line-height: 1;
-  cursor: pointer;
+  cursor: grab;
   pointer-events: auto;
   z-index: 2;
+}
+
+.wpn-tag-pin--dragging {
+  cursor: grabbing;
+}
+
+.wpn-tag-pin.wpn-tag-pin--editing {
+  cursor: default;
+}
+
+.wpn-tag-pin .wpn-tooltip {
+  min-width: 0;
 }
 
 .wpn-tag-pin__label {
@@ -6510,10 +6557,150 @@ body.wpn-epicflow-resizing {
   white-space: nowrap;
 }
 
+.wpn-tag-pin__toolbar {
+  position: absolute;
+  bottom: calc(100% + 6px);
+  left: 50%;
+  translate: -50% 0;
+  transform-origin: bottom center;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 3px;
+  background: #1f2430;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 7px;
+  box-shadow: 0 8px 22px rgba(2, 6, 23, 0.45);
+  opacity: 0;
+  visibility: hidden;
+  transform: scale(0.96);
+  transition:
+    opacity 120ms ease,
+    transform 120ms ease,
+    visibility 120ms;
+  pointer-events: none;
+  z-index: 3;
+}
+
+.wpn-tag-pin:hover .wpn-tag-pin__toolbar,
+.wpn-tag-pin__toolbar:focus-within {
+  opacity: 1;
+  visibility: visible;
+  transform: scale(1);
+  pointer-events: auto;
+}
+
+.wpn-tag-pin__edit,
+.wpn-tag-pin__remove {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: #f1f5f9;
+  cursor: pointer;
+}
+
+.wpn-tag-pin__edit svg,
+.wpn-tag-pin__remove svg {
+  width: 10px;
+  height: 10px;
+}
+
+.wpn-tag-pin__edit:hover,
+.wpn-tag-pin__remove:hover {
+  background: rgba(255, 255, 255, 0.14);
+}
+
+@media (hover: none) {
+  .wpn-tag-pin__toolbar {
+    opacity: 1;
+    visibility: visible;
+    transform: scale(1);
+    pointer-events: auto;
+  }
+}
+
 .wpn-tag-pin--orphaned {
   opacity: 0.6;
   outline: 1px dashed rgba(255, 255, 255, 0.7);
   outline-offset: 1px;
+}
+
+.wpn-tag-pin__resize {
+  position: absolute;
+  width: 10px;
+  height: 10px;
+  background: transparent;
+}
+
+.wpn-tag-pin__resize-nw,
+.wpn-tag-pin__resize-se {
+  cursor: nwse-resize;
+}
+
+.wpn-tag-pin__resize-ne,
+.wpn-tag-pin__resize-sw {
+  cursor: nesw-resize;
+}
+
+.wpn-tag-pin__resize-n,
+.wpn-tag-pin__resize-s {
+  cursor: ns-resize;
+}
+
+.wpn-tag-pin__resize-e,
+.wpn-tag-pin__resize-w {
+  cursor: ew-resize;
+}
+
+.wpn-tag-pin__resize-nw {
+  top: -5px;
+  left: -5px;
+}
+
+.wpn-tag-pin__resize-n {
+  top: -5px;
+  left: calc(50% - 5px);
+}
+
+.wpn-tag-pin__resize-ne {
+  top: -5px;
+  right: -5px;
+}
+
+.wpn-tag-pin__resize-e {
+  top: calc(50% - 5px);
+  right: -5px;
+}
+
+.wpn-tag-pin__resize-se {
+  bottom: -5px;
+  right: -5px;
+}
+
+.wpn-tag-pin__resize-s {
+  bottom: -5px;
+  left: calc(50% - 5px);
+}
+
+.wpn-tag-pin__resize-sw {
+  bottom: -5px;
+  left: -5px;
+}
+
+.wpn-tag-pin__resize-w {
+  top: calc(50% - 5px);
+  left: -5px;
+}
+
+.wpn-tag-pin:not(:hover):not(.wpn-tag-pin--editing) .wpn-tag-pin__resize {
+  display: none;
 }
 
 .wpn-tag-picker {

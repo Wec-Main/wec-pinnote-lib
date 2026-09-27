@@ -4,7 +4,7 @@ import { UNAUTHORIZED_EVENT, type UnauthorizedDetail } from "../services/httpCli
 import { useSharedFetch } from "./useSharedFetch";
 import { AnnotationApiError } from "../types/annotation.types";
 import type { AuthApiClient, AuthSession, LoginOption } from "../types/auth.types";
-import { isSession, tokenExpiry } from "../utils/authSession";
+import { isSession, isTokenUnexpired, tokenExpiry, tokenIssuedAt } from "../utils/authSession";
 
 export interface StoredAuth {
   accounts: AuthSession[];
@@ -19,17 +19,46 @@ interface RenewalTimer {
 const EMPTY: StoredAuth = { accounts: [], activeId: null };
 const RENEWAL_FRACTION = 0.8;
 const MIN_RENEWAL_DELAY_MS = 30 * 1000;
+const EXPIRY_MARGIN_MS = 30 * 1000;
 const RETRY_BASE_DELAY_MS = 5 * 1000;
 const MAX_RETRY_DELAY_MS = 5 * 60 * 1000;
 const MAX_TIMEOUT_MS = 2_147_483_647;
+const ACTIVITY_WINDOW_MS = 30 * 60 * 1000;
+const ACTIVITY_CHECK_INTERVAL_MS = 1000;
+const ACTIVITY_EVENTS = ["pointerdown", "keydown", "wheel", "touchstart", "focus"] as const;
 
 function storageKey(projectId: string): string {
   return `wpn-auth:${projectId}`;
 }
 
-function renewalDelay(exp: number): number {
-  const remaining = exp * 1000 - Date.now();
-  return Math.max(MIN_RENEWAL_DELAY_MS, remaining * RENEWAL_FRACTION);
+function renewalDueAt(token: string): number | undefined {
+  const exp = tokenExpiry(token);
+  if (exp === undefined) {
+    return undefined;
+  }
+  const iat = tokenIssuedAt(token);
+  const lifetime = iat !== undefined && iat < exp ? exp - iat : 0;
+  return (exp - lifetime * (1 - RENEWAL_FRACTION)) * 1000;
+}
+
+function renewalDelay(token: string): number | undefined {
+  const dueAt = renewalDueAt(token);
+  return dueAt === undefined ? undefined : Math.max(MIN_RENEWAL_DELAY_MS, dueAt - Date.now());
+}
+
+function isRenewalDue(token: string): boolean {
+  const dueAt = renewalDueAt(token);
+  return dueAt !== undefined && dueAt <= Date.now();
+}
+
+function isExpiringSoon(token: string): boolean {
+  const exp = tokenExpiry(token);
+  return exp === undefined || exp * 1000 - Date.now() <= EXPIRY_MARGIN_MS;
+}
+
+function refreshExpiryDelay(refreshToken: string): number {
+  const exp = tokenExpiry(refreshToken);
+  return exp === undefined ? 0 : Math.max(0, exp * 1000 - Date.now());
 }
 
 function retryDelay(attempt: number): number {
@@ -92,6 +121,7 @@ export interface AuthSessionsValue {
   login: (userId: string, password: string) => Promise<void>;
   logout: (userId: string) => Promise<void>;
   switchAccount: (userId: string) => void;
+  getAccessToken: (userId: string) => Promise<string | undefined>;
   revokeError: string | null;
   clearRevokeError: () => void;
 }
@@ -154,11 +184,29 @@ export function useAuthSessions(
     [persist],
   );
 
-  const renewingRef = useRef<Set<string>>(new Set());
+  const removeAccountSession = useCallback(
+    (userId: string, refreshToken: string) => {
+      persist((current) => {
+        const target = current.accounts.find((item) => item.id === userId);
+        if (!target || target.refreshToken !== refreshToken) {
+          return current;
+        }
+        const accounts = current.accounts.filter((item) => item.id !== userId);
+        return {
+          accounts,
+          activeId: current.activeId === userId ? (accounts[0]?.id ?? null) : current.activeId,
+        };
+      });
+    },
+    [persist],
+  );
+
+  const inflightRef = useRef<Map<string, Promise<string | undefined>>>(new Map());
   const timersRef = useRef<Map<string, RenewalTimer>>(new Map());
   const failuresRef = useRef<Map<string, number>>(new Map());
-  const issuedRef = useRef<Map<string, string>>(new Map());
-  const renewRef = useRef<(accountId: string) => Promise<void>>(() => Promise.resolve());
+  const renewedAtRef = useRef<Map<string, number>>(new Map());
+  const lastActivityRef = useRef(Date.now());
+  const renewalDueRef = useRef<(accountId: string) => void>(() => undefined);
 
   const armRenewal = useCallback((accountId: string, token: string, delay: number) => {
     const timers = timersRef.current;
@@ -169,73 +217,178 @@ export function useAuthSessions(
     const timer = setTimeout(
       () => {
         timers.delete(accountId);
-        void renewRef.current(accountId);
+        renewalDueRef.current(accountId);
       },
       Math.min(delay, MAX_TIMEOUT_MS),
     );
     timers.set(accountId, { token, timer });
   }, []);
 
-  const renewAccount = useCallback(
-    async (accountId: string) => {
-      const account = storedRef.current.accounts.find((item) => item.id === accountId);
-      if (!account || renewingRef.current.has(accountId)) {
-        return;
-      }
-      renewingRef.current.add(accountId);
+  const recentlyRenewed = useCallback((accountId: string) => {
+    const renewedAt = renewedAtRef.current.get(accountId);
+    return renewedAt !== undefined && Date.now() - renewedAt < MIN_RENEWAL_DELAY_MS;
+  }, []);
+
+  const currentAccount = useCallback(
+    (accountId: string) => storedRef.current.accounts.find((item) => item.id === accountId),
+    [],
+  );
+
+  const runRenewal = useCallback(
+    async (account: AuthSession): Promise<string | undefined> => {
+      const usedRefreshToken = account.refreshToken;
       try {
-        const token = await authApi.refresh(projectId, account.refreshToken);
-        failuresRef.current.delete(accountId);
-        issuedRef.current.set(accountId, token);
+        const renewed = await authApi.refresh(projectId, usedRefreshToken);
+        failuresRef.current.delete(account.id);
+        renewedAtRef.current.set(account.id, Date.now());
+        const latest = currentAccount(account.id);
+        if (!latest || latest.refreshToken !== usedRefreshToken) {
+          return latest?.token;
+        }
         persist((current) => ({
           ...current,
           accounts: current.accounts.map((item) =>
-            item.id === accountId ? { ...item, token } : item,
+            item.id === account.id
+              ? {
+                  ...item,
+                  token: renewed.token,
+                  refreshToken: renewed.refreshToken ?? item.refreshToken,
+                }
+              : item,
           ),
         }));
+        return renewed.token;
       } catch (err) {
         if (isUnauthorized(err)) {
-          removeAccount(accountId);
-          return;
+          removeAccountSession(account.id, usedRefreshToken);
+          return currentAccount(account.id)?.token;
         }
-        const attempt = (failuresRef.current.get(accountId) ?? 0) + 1;
-        failuresRef.current.set(accountId, attempt);
-        armRenewal(accountId, account.token, retryDelay(attempt));
-      } finally {
-        renewingRef.current.delete(accountId);
+        const attempt = (failuresRef.current.get(account.id) ?? 0) + 1;
+        failuresRef.current.set(account.id, attempt);
+        armRenewal(account.id, account.token, retryDelay(attempt));
+        return currentAccount(account.id)?.token;
       }
     },
-    [authApi, projectId, persist, removeAccount, armRenewal],
+    [authApi, projectId, persist, removeAccountSession, armRenewal, currentAccount],
+  );
+
+  const renewAccount = useCallback(
+    (accountId: string): Promise<string | undefined> => {
+      const inflight = inflightRef.current;
+      const pending = inflight.get(accountId);
+      if (pending) {
+        return pending;
+      }
+      const account = currentAccount(accountId);
+      if (!account) {
+        return Promise.resolve(undefined);
+      }
+      const run = runRenewal(account).finally(() => {
+        if (inflight.get(accountId) === run) {
+          inflight.delete(accountId);
+        }
+      });
+      inflight.set(accountId, run);
+      return run;
+    },
+    [currentAccount, runRenewal],
+  );
+
+  const getAccessToken = useCallback(
+    async (accountId: string): Promise<string | undefined> => {
+      const account = currentAccount(accountId);
+      if (!account) {
+        return undefined;
+      }
+      if (!isExpiringSoon(account.token) || recentlyRenewed(accountId)) {
+        return account.token;
+      }
+      return renewAccount(accountId);
+    },
+    [currentAccount, renewAccount, recentlyRenewed],
   );
 
   useEffect(() => {
-    renewRef.current = renewAccount;
-  }, [renewAccount]);
+    renewalDueRef.current = (accountId: string) => {
+      const account = currentAccount(accountId);
+      if (!account) {
+        return;
+      }
+      if (!isTokenUnexpired(account.refreshToken)) {
+        removeAccountSession(account.id, account.refreshToken);
+        return;
+      }
+      if (Date.now() - lastActivityRef.current < ACTIVITY_WINDOW_MS) {
+        void renewAccount(accountId);
+        return;
+      }
+      armRenewal(accountId, account.token, refreshExpiryDelay(account.refreshToken));
+    };
+  }, [currentAccount, removeAccountSession, renewAccount, armRenewal]);
+
+  useEffect(() => {
+    let lastCheck = 0;
+    const onActivity = () => {
+      const now = Date.now();
+      lastActivityRef.current = now;
+      if (now - lastCheck < ACTIVITY_CHECK_INTERVAL_MS) {
+        return;
+      }
+      lastCheck = now;
+      for (const account of storedRef.current.accounts) {
+        if (isRenewalDue(account.token) && !recentlyRenewed(account.id)) {
+          void renewAccount(account.id);
+        }
+      }
+    };
+    const onVisibilityChange = () => {
+      if (document.visibilityState === "visible") {
+        onActivity();
+      }
+    };
+    for (const type of ACTIVITY_EVENTS) {
+      window.addEventListener(type, onActivity, { capture: true, passive: true });
+    }
+    window.addEventListener("online", onActivity);
+    document.addEventListener("visibilitychange", onVisibilityChange);
+    return () => {
+      for (const type of ACTIVITY_EVENTS) {
+        window.removeEventListener(type, onActivity, { capture: true });
+      }
+      window.removeEventListener("online", onActivity);
+      document.removeEventListener("visibilitychange", onVisibilityChange);
+    };
+  }, [renewAccount, recentlyRenewed]);
 
   useEffect(() => {
     const onUnauthorized = (event: Event) => {
       const { token } = (event as CustomEvent<UnauthorizedDetail>).detail;
       const account = storedRef.current.accounts.find((item) => item.token === token);
-      if (!account || issuedRef.current.get(account.id) === token) {
+      if (!account) {
+        return;
+      }
+      if (recentlyRenewed(account.id)) {
         return;
       }
       void renewAccount(account.id);
     };
     window.addEventListener(UNAUTHORIZED_EVENT, onUnauthorized);
     return () => window.removeEventListener(UNAUTHORIZED_EVENT, onUnauthorized);
-  }, [renewAccount]);
+  }, [renewAccount, recentlyRenewed]);
 
   useEffect(() => {
     const timers = timersRef.current;
     const failures = failuresRef.current;
-    const issued = issuedRef.current;
+    const renewedAt = renewedAtRef.current;
+    const inflight = inflightRef.current;
     return () => {
       for (const entry of timers.values()) {
         clearTimeout(entry.timer);
       }
       timers.clear();
       failures.clear();
-      issued.clear();
+      renewedAt.clear();
+      inflight.clear();
     };
   }, [projectId]);
 
@@ -247,7 +400,7 @@ export function useAuthSessions(
         clearTimeout(entry.timer);
         timers.delete(id);
         failuresRef.current.delete(id);
-        issuedRef.current.delete(id);
+        renewedAtRef.current.delete(id);
       }
     }
 
@@ -255,13 +408,14 @@ export function useAuthSessions(
       if (timers.get(account.id)?.token === account.token) {
         continue;
       }
-      const exp = tokenExpiry(account.token);
-      if (exp === undefined) {
+      const delay = renewalDelay(account.token);
+      if (delay === undefined) {
         continue;
       }
-      armRenewal(account.id, account.token, renewalDelay(exp));
+      const renewNow = isRenewalDue(account.token) && !recentlyRenewed(account.id);
+      armRenewal(account.id, account.token, renewNow ? 0 : delay);
     }
-  }, [stored.accounts, armRenewal]);
+  }, [stored.accounts, armRenewal, recentlyRenewed]);
 
   const loginOptionsKey = `auth-users:${apiBaseUrl}:${projectId}`;
   const {
@@ -315,7 +469,7 @@ export function useAuthSessions(
         }
       }
       try {
-        const token = await authApi.refresh(projectId, account.refreshToken);
+        const { token } = await authApi.refresh(projectId, account.refreshToken);
         await authApi.logout(projectId, account.id, undefined, token);
       } catch (err) {
         if (!isUnauthorized(err)) {
@@ -373,6 +527,7 @@ export function useAuthSessions(
       login,
       logout,
       switchAccount,
+      getAccessToken,
       revokeError,
       clearRevokeError,
     }),
@@ -386,6 +541,7 @@ export function useAuthSessions(
       login,
       logout,
       switchAccount,
+      getAccessToken,
       revokeError,
       clearRevokeError,
     ],

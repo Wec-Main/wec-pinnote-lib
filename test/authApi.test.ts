@@ -40,3 +40,39 @@ describe("authApi.logout", () => {
     await expect(result).rejects.toMatchObject({ status: 401, message: "Authentication required" });
   });
 });
+
+function jwtWithExpiry(exp: number): string {
+  const payload = Buffer.from(JSON.stringify({ exp })).toString("base64url");
+  return `header.${payload}.signature`;
+}
+
+describe("authApi.refresh", () => {
+  const future = Math.floor(Date.now() / 1000) + 3600;
+
+  it("returns the rotated refresh token alongside the new access token", async () => {
+    const token = jwtWithExpiry(future);
+    const refreshToken = jwtWithExpiry(future + 3600);
+    stubFetch(200, JSON.stringify({ token, refreshToken }));
+
+    const result = await createAuthApi(API_BASE).refresh("fidelity-poc", "old-refresh");
+
+    expect(result).toEqual({ token, refreshToken });
+  });
+
+  it("keeps working against a server that does not rotate refresh tokens", async () => {
+    const token = jwtWithExpiry(future);
+    stubFetch(200, JSON.stringify({ token }));
+
+    const result = await createAuthApi(API_BASE).refresh("fidelity-poc", "old-refresh");
+
+    expect(result).toEqual({ token });
+  });
+
+  it("rejects a response whose access token is not a JWT", async () => {
+    stubFetch(200, JSON.stringify({ token: "opaque" }));
+
+    await expect(
+      createAuthApi(API_BASE).refresh("fidelity-poc", "old-refresh"),
+    ).rejects.toMatchObject({ message: "Malformed refresh response" });
+  });
+});

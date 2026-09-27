@@ -563,13 +563,35 @@ Response: `200` with the authenticated session.
     "roleId": "admin",
     "organizationId": "6ba7b811-9dad-11d1-80b4-00c04fd430c8",
     "avatarUrl": "https://example.com/a.png"
-  }
+  },
+  "token": "<access JWT>",
+  "refreshToken": "<refresh JWT>"
 }
 ```
 
-`401` with `"Incorrect password."` when the password does not match. The library signs its own
-placeholder bearer token from the resulting `user.id` (see the note at the top of this document);
-it does not receive a token from this endpoint.
+`401` with `"Incorrect password."` when the password does not match.
+
+### Refresh a session
+
+```http
+POST /auth/refresh
+```
+
+```json
+{ "projectId": "project-001", "refreshToken": "<refresh JWT>" }
+```
+
+Response: `200` with a new access token and a rotated refresh token; the client stores both.
+
+```json
+{ "token": "<access JWT>", "refreshToken": "<refresh JWT>" }
+```
+
+`401` when the refresh token is expired, revoked by a logout or user change, past the session's
+idle timeout, or past its maximum age since login. The client then drops the local session and
+shows the login picker. The client renews in the background while the user is active and on
+demand before any request whose access token is about to expire; a server that omits
+`refreshToken` keeps the previous one.
 
 ### Log out
 
