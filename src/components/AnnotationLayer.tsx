@@ -345,7 +345,7 @@ export function AnnotationLayer() {
       <AnnotationOverlay />
       {visible.map((annotation) => {
         const position = positions.get(annotation.id);
-        if (!position) {
+        if (!position || position.covered) {
           return null;
         }
         return (
@@ -366,7 +366,7 @@ export function AnnotationLayer() {
       })}
       {visibleTags.map((tag) => {
         const position = positions.get(tag.id);
-        if (!position) {
+        if (!position || position.covered) {
           return null;
         }
         const canEditTag = canDeleteBoardItem(tag.createdById, config.currentUser);
@@ -395,7 +395,7 @@ export function AnnotationLayer() {
       ) : null}
       {visibleFlowPins.map((flowPin) => {
         const position = positions.get(flowPin.id);
-        if (!position) {
+        if (!position || position.covered) {
           return null;
         }
         return (

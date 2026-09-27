@@ -15,24 +15,25 @@ export async function fetchTags(
   return payload.tags;
 }
 
-export function createTag(
+export async function createTag(
   apiBaseUrl: string,
   authToken: string | undefined,
   draft: TagDraft,
   signal?: AbortSignal,
-): Promise<ProjectTag> {
-  return request<ProjectTag>(buildUrl(apiBaseUrl, "/tags"), authToken, {
+): Promise<ProjectTag[]> {
+  const payload = await request<{ tags: ProjectTag[] }>(buildUrl(apiBaseUrl, "/tags"), authToken, {
     method: "POST",
     body: JSON.stringify(draft),
     signal,
   });
+  return payload.tags;
 }
 
 export function updateTag(
   apiBaseUrl: string,
   authToken: string | undefined,
   tagId: string,
-  draft: Omit<TagDraft, "projectId">,
+  draft: Omit<TagDraft, "projectIds">,
   signal?: AbortSignal,
 ): Promise<ProjectTag> {
   return request<ProjectTag>(

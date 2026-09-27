@@ -28,7 +28,7 @@ export interface ProjectTag {
 }
 
 export interface TagDraft {
-  projectId: string;
+  projectIds: string[];
   name: string;
   color: string;
   status: TagStatus;

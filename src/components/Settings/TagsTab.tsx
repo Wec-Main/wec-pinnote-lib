@@ -66,7 +66,7 @@ export function TagsTab() {
       ),
     create: (draft) => createTag(config.apiBaseUrl, authToken, draft),
     update: (id, draft) => {
-      const { projectId: _projectId, ...rest } = draft;
+      const { projectIds: _projectIds, ...rest } = draft;
       return updateTag(config.apiBaseUrl, authToken, id, rest);
     },
     remove: (id) => deleteTag(config.apiBaseUrl, authToken, id),

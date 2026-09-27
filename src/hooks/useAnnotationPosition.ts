@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type RefObject } from "react";
 import type { AnnotationAnchor } from "../types/annotation.types";
-import { resolveElement } from "../utils/elementResolver";
+import { isLibraryElement, resolveElement } from "../utils/elementResolver";
 import {
   computePinPosition,
   placePanel,
@@ -15,10 +15,48 @@ export interface PositionedItem {
 
 const MUTATION_DEBOUNCE_MS = 120;
 const MUTATION_MAX_WAIT_MS = 400;
-const LIBRARY_ROOT_SELECTOR = ".wpn-root";
 
-function isLibraryElement(node: Node): boolean {
-  return node instanceof Element && node.closest(LIBRARY_ROOT_SELECTOR) !== null;
+// A modal typically dims its whole backdrop with a large, translucent scrim
+// (covering the full viewport, or close to it) behind an opaque card. That
+// scrim shouldn't count as "covering" a pin on its own — a pin sitting on the
+// dimmed backdrop, away from the actual dialog card, is still visible to the
+// user and not actually obstructed. Only a near-opaque element should count
+// as truly blocking. CSS `opacity` dims everything an element paints
+// (including its own background fill), so the two combine multiplicatively.
+const OPAQUE_ALPHA_THRESHOLD = 0.9;
+
+function effectiveAlpha(element: Element): number {
+  const style = window.getComputedStyle(element);
+  const opacity = Number.parseFloat(style.opacity || "1") || 1;
+  const backgroundColor = style.backgroundColor;
+  if (backgroundColor === "transparent") {
+    return 0;
+  }
+  const match = /rgba?\([^)]*?(?:,\s*([\d.]+)\s*)?\)/.exec(backgroundColor);
+  const backgroundAlpha = !match || match[1] === undefined ? 1 : Number.parseFloat(match[1]);
+  return opacity * backgroundAlpha;
+}
+
+// A host app can render its own dialog on top of an annotated page at any
+// time, anywhere in the DOM (typically portaled to document.body, not
+// nested under the anchor). elementsFromPoint gives the real paint-order
+// stack at that pixel, which is the only reliable way to tell "is our pin's
+// anchor actually still on top here" regardless of the host's own z-index.
+function isCoveredByForeignElement(x: number, y: number, anchor: Element | null): boolean {
+  const stack = document.elementsFromPoint(x, y);
+  for (const element of stack) {
+    if (isLibraryElement(element)) {
+      continue;
+    }
+    if (anchor && (anchor === element || anchor.contains(element) || element.contains(anchor))) {
+      return false;
+    }
+    if (effectiveAlpha(element) < OPAQUE_ALPHA_THRESHOLD) {
+      continue;
+    }
+    return true;
+  }
+  return !anchor;
 }
 
 function resolveTargets(items: PositionedItem[]): Map<string, Element | null> {
@@ -89,15 +127,27 @@ export function useAnnotationPositions(items: PositionedItem[]): Map<string, Pin
     let scheduled = false;
     let debounceTimer = 0;
     let maxWaitTimer = 0;
-    const resolved = resolveTargets(items);
 
+    // Re-resolve anchors to live elements on every compute, rather than once
+    // up front: a host can unmount and remount the DOM behind an anchor (e.g.
+    // closing and reopening a dialog re-creates its inputs/buttons as brand
+    // new nodes). A cached one-time resolution would keep pointing at the
+    // old, now-detached element forever — getBoundingClientRect() on a
+    // detached node returns an all-zero rect, which both misplaces the pin
+    // and makes it look "covered" (nothing relates it to anything at 0,0).
     const compute = () => {
       scheduled = false;
       window.clearTimeout(maxWaitTimer);
       maxWaitTimer = 0;
+      const resolved = resolveTargets(items);
       const next = new Map<string, PinScreenPosition>();
       for (const item of items) {
-        next.set(item.id, computePinPosition(item.anchor, resolved.get(item.id) ?? null));
+        const anchorElement = resolved.get(item.id) ?? null;
+        const position = computePinPosition(item.anchor, anchorElement);
+        next.set(item.id, {
+          ...position,
+          covered: isCoveredByForeignElement(position.x, position.y, anchorElement),
+        });
       }
       setPositions((current) => (mapsEqual(current, next) ? current : next));
     };
@@ -126,7 +176,11 @@ export function useAnnotationPositions(items: PositionedItem[]): Map<string, Pin
       typeof ResizeObserver === "undefined" ? null : new ResizeObserver(schedule);
     resizeObserver?.observe(document.documentElement);
 
-    const observationTargets = collectObservationTargets(resolved);
+    // Only used to pick which nodes to watch for fine-grained resize/mutation
+    // signals below — compute() above never relies on this snapshot itself,
+    // so it going stale after a remount just means those specific observers
+    // go quiet; the document.body observer further down still catches it.
+    const observationTargets = collectObservationTargets(resolveTargets(items));
     for (const target of observationTargets) {
       resizeObserver?.observe(target);
     }
@@ -148,6 +202,21 @@ export function useAnnotationPositions(items: PositionedItem[]): Map<string, Pin
         attributeFilter: ["style", "class", "hidden"],
       });
     }
+    // A host dialog is usually mounted somewhere in document.body that isn't
+    // an ancestor of any anchor (e.g. a portal appended near the end of
+    // body), so the anchor-scoped observers above would never see it appear.
+    // Watch the whole body too, so opening/closing a host dialog anywhere
+    // re-runs the occlusion check above. Re-observing document.body replaces
+    // (rather than merges with) any options the loop above already set for
+    // it, so this uses the same full option set to avoid silently dropping
+    // attribute watching on body (a common place for a host to toggle a
+    // "modal open" class).
+    mutationObserver?.observe(document.body, {
+      childList: true,
+      subtree: true,
+      attributes: true,
+      attributeFilter: ["style", "class", "hidden"],
+    });
 
     return () => {
       window.cancelAnimationFrame(frame);
