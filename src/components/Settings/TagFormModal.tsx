@@ -1,5 +1,5 @@
 import { useId, useRef, useState, type FormEvent } from "react";
-import { Icon, SearchableSelect, Spinner, Tooltip } from "../primitives";
+import { Icon, MultiSelect, SearchableSelect, Spinner, Tooltip } from "../primitives";
 import { useEscapeKey } from "../../hooks/useEscapeKey";
 import { useScrimDismiss } from "../../hooks/useScrimDismiss";
 import { useFocusTrap } from "../../hooks/useFocusTrap";
@@ -34,7 +34,9 @@ export function TagFormModal({
   const nameInputRef = useRef<HTMLInputElement>(null);
   useFocusTrap(dialogRef, nameInputRef);
 
-  const [projectId, setProjectId] = useState(tag?.projectId ?? defaultProjectId ?? "");
+  const [projectIds, setProjectIds] = useState<string[]>(
+    tag ? [tag.projectId] : defaultProjectId ? [defaultProjectId] : [],
+  );
   const [name, setName] = useState(tag?.name ?? "");
   const [color, setColor] = useState<string>(tag?.color ?? TAG_COLORS[5]);
   const [status, setStatus] = useState<TagStatus>(tag?.status ?? "active");
@@ -47,9 +49,9 @@ export function TagFormModal({
   }));
 
   const nameValid = name.trim().length > 0;
-  const projectValid = projectId.length > 0;
+  const projectValid = projectIds.length > 0;
   const nameServerError = fieldErrors?.name?.[0];
-  const projectServerError = fieldErrors?.projectId?.[0];
+  const projectServerError = fieldErrors?.projectIds?.[0];
 
   const handleSubmit = (event: FormEvent) => {
     event.preventDefault();
@@ -57,7 +59,7 @@ export function TagFormModal({
     if (!nameValid || !projectValid || busy) {
       return;
     }
-    onSubmit({ projectId, name: name.trim(), color, status });
+    onSubmit({ projectIds, name: name.trim(), color, status });
   };
 
   return (
@@ -109,7 +111,8 @@ export function TagFormModal({
           <div className="wpn-epicflow-modal__row">
             <div className="wpn-epicflow-modal__field">
               <span className="wpn-epicflow-modal__label">
-                Project <span className="wpn-epicflow-modal__required">*</span>
+                {tag ? "Project" : "Projects"}{" "}
+                <span className="wpn-epicflow-modal__required">*</span>
               </span>
               {tag ? (
                 <>
@@ -127,17 +130,23 @@ export function TagFormModal({
                   </span>
                 </>
               ) : (
-                <SearchableSelect
+                <MultiSelect
                   options={projectOptions}
-                  value={projectId}
-                  onChange={setProjectId}
-                  ariaLabel="Project"
-                  placeholder="Select a project"
+                  values={projectIds}
+                  onChange={setProjectIds}
+                  ariaLabel="Projects"
+                  placeholder="Select projects"
+                  searchPlaceholder="Search projects"
                 />
               )}
               {(touched && !projectValid) || projectServerError ? (
                 <span className="wpn-users-modal__error">
-                  {projectServerError ?? "A project is required."}
+                  {projectServerError ?? "At least one project is required."}
+                </span>
+              ) : null}
+              {!tag && projectIds.length > 1 ? (
+                <span className="wpn-password-field__hint">
+                  Creates {projectIds.length} separate tags, one per project.
                 </span>
               ) : null}
             </div>

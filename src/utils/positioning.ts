@@ -5,6 +5,7 @@ export interface PinScreenPosition {
   x: number;
   y: number;
   resolved: boolean;
+  covered: boolean;
 }
 
 export type PanelSide = "right" | "left" | "bottom" | "top";
@@ -29,6 +30,7 @@ export function computePinPosition(
       x: rect.left + anchor.relativeX * rect.width,
       y: rect.top + anchor.relativeY * rect.height,
       resolved: true,
+      covered: false,
     };
   }
 
@@ -36,6 +38,7 @@ export function computePinPosition(
     x: anchor.fallbackX,
     y: anchor.fallbackY,
     resolved: false,
+    covered: false,
   };
 }
 
@@ -81,5 +84,5 @@ export function placePanel(
 }
 
 export function positionsEqual(a: PinScreenPosition, b: PinScreenPosition): boolean {
-  return a.x === b.x && a.y === b.y && a.resolved === b.resolved;
+  return a.x === b.x && a.y === b.y && a.resolved === b.resolved && a.covered === b.covered;
 }
