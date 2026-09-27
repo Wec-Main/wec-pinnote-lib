@@ -3,7 +3,13 @@ import { useFlowContext, useFlowState } from "../../context/FlowContext";
 import { useKeyboardShortcuts } from "../../hooks/flowchart/useKeyboardShortcuts";
 import { usePointerDrag } from "../../hooks/flowchart/usePointerDrag";
 import { NODE_DRAG_MIME } from "../../utils/flowchart/constants";
-import { flowToScreen, rectFromPoints } from "../../utils/flowchart/geometry";
+import {
+  findHandle,
+  flowToScreen,
+  getHandlePosition,
+  rectFromPoints,
+} from "../../utils/flowchart/geometry";
+import { getStepPoints } from "../../utils/flowchart/edgePaths";
 import {
   findEdgeDropTarget,
   type EdgeSegment,
@@ -299,15 +305,27 @@ export function FlowCanvas({
     const state = engine.getState();
     const segments: EdgeSegment[] = [];
     for (const edge of state.edges) {
-      const source = state.nodeLookup.get(edge.source);
-      const target = state.nodeLookup.get(edge.target);
-      if (!source || !target) continue;
-      const a = engine.getNodeRect(source);
-      const b = engine.getNodeRect(target);
+      const sourceNode = state.nodeLookup.get(edge.source);
+      const targetNode = state.nodeLookup.get(edge.target);
+      if (!sourceNode || !targetNode) continue;
+      const sourceDef = engine.getDefinition(sourceNode.type);
+      const targetDef = engine.getDefinition(targetNode.type);
+      const sourceHandle =
+        findHandle(sourceDef, "source", edge.sourceHandle) ?? findHandle(sourceDef, "source");
+      const targetHandle =
+        findHandle(targetDef, "target", edge.targetHandle) ?? findHandle(targetDef, "target");
+      if (!sourceHandle || !targetHandle) continue;
+      const input = {
+        source: getHandlePosition(sourceNode, sourceDef, sourceHandle),
+        sourceSide: sourceHandle.side,
+        target: getHandlePosition(targetNode, targetDef, targetHandle),
+        targetSide: targetHandle.side,
+        bend: edge.bend,
+      };
+      const type = edge.type ?? state.defaultEdgeType;
       segments.push({
         edgeId: edge.id,
-        source: { x: a.x + a.width / 2, y: a.y + a.height / 2 },
-        target: { x: b.x + b.width / 2, y: b.y + b.height / 2 },
+        points: type === "step" ? getStepPoints(input) : [input.source, input.target],
       });
     }
     const nodeRects = state.nodes.map((node) => engine.getNodeRect(node));
