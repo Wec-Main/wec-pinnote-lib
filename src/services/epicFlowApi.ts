@@ -28,17 +28,22 @@ export interface EpicFlowApiConfig {
 
 export interface CreateEpicRequest extends EpicFlowFormInput {
   projectId: string;
+  projectVersionId?: string;
 }
 
 export type CreateUserStoryRequest = EpicFlowFormInput;
 
 export interface EpicFlowApiClient {
-  getEpics(projectId: string, signal?: AbortSignal): Promise<Epic[]>;
+  getEpics(projectId: string, projectVersionId?: string, signal?: AbortSignal): Promise<Epic[]>;
   createEpic(data: CreateEpicRequest, signal?: AbortSignal): Promise<Epic>;
   updateEpic(epicId: string, data: EpicFlowFormInput, signal?: AbortSignal): Promise<Epic>;
   deleteEpic(epicId: string, signal?: AbortSignal): Promise<void>;
   getUserStoriesByEpic(epicId: string, signal?: AbortSignal): Promise<UserStory[]>;
-  getUserStoriesByProject(projectId: string, signal?: AbortSignal): Promise<UserStory[]>;
+  getUserStoriesByProject(
+    projectId: string,
+    projectVersionId?: string,
+    signal?: AbortSignal,
+  ): Promise<UserStory[]>;
   createUserStory(
     epicId: string,
     data: CreateUserStoryRequest,
@@ -90,8 +95,13 @@ export function createEpicFlowApi(config: EpicFlowApiConfig): EpicFlowApiClient 
   }
 
   return {
-    getEpics(projectId, signal) {
-      return call<Epic[]>({ method: "GET", path: "/epics", query: { projectId }, signal });
+    getEpics(projectId, projectVersionId, signal) {
+      return call<Epic[]>({
+        method: "GET",
+        path: "/epics",
+        query: { projectId, projectVersionId },
+        signal,
+      });
     },
 
     createEpic(data, signal) {
@@ -124,11 +134,11 @@ export function createEpicFlowApi(config: EpicFlowApiConfig): EpicFlowApiClient 
       });
     },
 
-    getUserStoriesByProject(projectId, signal) {
+    getUserStoriesByProject(projectId, projectVersionId, signal) {
       return call<UserStory[]>({
         method: "GET",
         path: "/user-stories",
-        query: { projectId },
+        query: { projectId, projectVersionId },
         signal,
       });
     },

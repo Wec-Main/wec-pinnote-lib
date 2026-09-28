@@ -73,9 +73,9 @@ export function createAnnotationApi(
   }
 
   return {
-    async listAnnotations({ projectId, pageKey }, signal) {
+    async listAnnotations({ projectId, pageKey, projectVersionId }, signal) {
       const payload = await call<unknown>("GET", PATHS.annotations, {
-        query: { projectId, pageKey },
+        query: { projectId, pageKey, projectVersionId },
         signal,
       });
       return parseListPayload(payload);

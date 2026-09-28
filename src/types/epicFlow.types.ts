@@ -4,6 +4,7 @@ export interface Epic {
   id: string;
   organizationId: string;
   projectId: string;
+  projectVersionId?: string;
   title: string;
   description: string;
   status: EpicFlowStatus;
@@ -20,6 +21,7 @@ export interface UserStory {
   id: string;
   organizationId: string;
   projectId: string;
+  projectVersionId?: string;
   epicId: string;
   title: string;
   description: string;

@@ -13,6 +13,7 @@ const SUBMIT_ERROR_MESSAGE = "Could not create the flow pin";
 interface UseFlowPinsOptions {
   apiBaseUrl: string;
   projectId: string;
+  projectVersionId?: string;
   pageKey: string;
   getAuthToken: (() => string | Promise<string>) | undefined;
   sessionKey: string | null;
@@ -38,7 +39,8 @@ export interface FlowPinsState {
 }
 
 export function useFlowPins(options: UseFlowPinsOptions): FlowPinsState {
-  const { apiBaseUrl, projectId, pageKey, getAuthToken, sessionKey, enabled } = options;
+  const { apiBaseUrl, projectId, projectVersionId, pageKey, getAuthToken, sessionKey, enabled } =
+    options;
   const getToken = useTokenGetter(getAuthToken);
   const [flowPins, setFlowPins] = useState<FlowPin[]>([]);
   const flowPinsRef = useRef(flowPins);
@@ -70,7 +72,9 @@ export function useFlowPins(options: UseFlowPinsOptions): FlowPinsState {
     }
     const controller = new AbortController();
     getToken()
-      .then((token) => fetchFlowPins(apiBaseUrl, token, projectId, pageKey, controller.signal))
+      .then((token) =>
+        fetchFlowPins(apiBaseUrl, token, projectId, pageKey, projectVersionId, controller.signal),
+      )
       .then((loaded) => {
         if (controller.signal.aborted) {
           return;
@@ -84,7 +88,16 @@ export function useFlowPins(options: UseFlowPinsOptions): FlowPinsState {
         }
       });
     return () => controller.abort();
-  }, [apiBaseUrl, getToken, sessionKey, projectId, pageKey, enabled, reloadToken]);
+  }, [
+    apiBaseUrl,
+    getToken,
+    sessionKey,
+    projectId,
+    projectVersionId,
+    pageKey,
+    enabled,
+    reloadToken,
+  ]);
 
   const reloadFlowPins = useCallback(() => setReloadToken((token) => token + 1), []);
 
@@ -110,6 +123,7 @@ export function useFlowPins(options: UseFlowPinsOptions): FlowPinsState {
       try {
         created = await createFlowPin(apiBaseUrl, await getToken(), {
           projectId,
+          projectVersionId,
           pageKey,
           name: name.trim() || flowPinDraft.label,
           anchor: flowPinDraft.anchor,
@@ -127,7 +141,7 @@ export function useFlowPins(options: UseFlowPinsOptions): FlowPinsState {
         setFlowPinsVisible(true);
       }
     },
-    [apiBaseUrl, getToken, flowPinDraft, pageKey, projectId, setFlowPinsVisible],
+    [apiBaseUrl, getToken, flowPinDraft, pageKey, projectId, projectVersionId, setFlowPinsVisible],
   );
 
   const removeFlowPin = useCallback(

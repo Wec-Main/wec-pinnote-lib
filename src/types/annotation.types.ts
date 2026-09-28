@@ -33,6 +33,7 @@ export interface AnnotationComment {
 export interface Annotation {
   id: string;
   projectId: string;
+  projectVersionId?: string;
   pageKey: string;
   number: number;
   anchor: AnnotationAnchor;
@@ -45,6 +46,7 @@ export interface Annotation {
 
 export interface CreateAnnotationRequest {
   projectId: string;
+  projectVersionId?: string;
   pageKey: string;
   anchor: AnnotationAnchor;
   comment: {
@@ -76,7 +78,7 @@ export interface AnnotationListResponse {
 
 export interface AnnotationApiClient {
   listAnnotations(
-    params: { projectId: string; pageKey: string },
+    params: { projectId: string; pageKey: string; projectVersionId?: string },
     signal?: AbortSignal,
   ): Promise<Annotation[]>;
   getAnnotation(annotationId: string, signal?: AbortSignal): Promise<Annotation>;
@@ -114,6 +116,7 @@ export interface AnnotationEventCallbacks {
 export interface AnnotationConfig extends AnnotationEventCallbacks {
   apiBaseUrl: string;
   projectId: string;
+  projectVersionId?: string;
   currentUser: AnnotationUser;
   getAuthToken?: () => string | Promise<string>;
   getPageKey?: () => string;

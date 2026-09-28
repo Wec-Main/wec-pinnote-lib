@@ -86,6 +86,7 @@ interface LoadScope {
   authenticated: boolean;
   pageKey: string;
   projectId: string;
+  projectVersionId: string | undefined;
   sessionKey: string;
 }
 
@@ -96,6 +97,7 @@ function sameScope(previous: LoadScope | null, next: LoadScope): boolean {
     previous.authenticated === next.authenticated &&
     previous.pageKey === next.pageKey &&
     previous.projectId === next.projectId &&
+    previous.projectVersionId === next.projectVersionId &&
     previous.sessionKey === next.sessionKey
   );
 }
@@ -103,6 +105,7 @@ function sameScope(previous: LoadScope | null, next: LoadScope): boolean {
 export interface AnnotationCollectionOptions {
   api: AnnotationApiClient;
   projectId: string;
+  projectVersionId?: string;
   pageKey: string;
   currentUser: AnnotationUser;
   authenticated: boolean;
@@ -115,6 +118,7 @@ export interface AnnotationCollectionOptions {
 export function useAnnotationCollection({
   api,
   projectId,
+  projectVersionId,
   pageKey,
   currentUser,
   authenticated,
@@ -159,7 +163,7 @@ export function useAnnotationCollection({
   useEffect(() => {
     const controller = new AbortController();
     let ignore = false;
-    const scope: LoadScope = { api, authenticated, pageKey, projectId, sessionKey };
+    const scope: LoadScope = { api, authenticated, pageKey, projectId, projectVersionId, sessionKey };
     const scopeChanged = !sameScope(loadScopeRef.current, scope);
     loadScopeRef.current = scope;
 
@@ -181,7 +185,7 @@ export function useAnnotationCollection({
     }
 
     api
-      .listAnnotations({ projectId, pageKey }, controller.signal)
+      .listAnnotations({ projectId, pageKey, projectVersionId }, controller.signal)
       .then((items) => {
         if (ignore) {
           return;
@@ -210,7 +214,16 @@ export function useAnnotationCollection({
       ignore = true;
       controller.abort();
     };
-  }, [api, authenticated, pageKey, projectId, reloadToken, reportError, sessionKey]);
+  }, [
+    api,
+    authenticated,
+    pageKey,
+    projectId,
+    projectVersionId,
+    reloadToken,
+    reportError,
+    sessionKey,
+  ]);
 
   const retry = useCallback(() => {
     setError(null);
@@ -279,6 +292,7 @@ export function useAnnotationCollection({
       const optimistic: Annotation = {
         id: tempId,
         projectId: request.projectId,
+        projectVersionId: request.projectVersionId,
         pageKey: request.pageKey,
         number: assignedNumber,
         anchor: request.anchor,

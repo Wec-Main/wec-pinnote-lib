@@ -21,6 +21,7 @@ export interface Project {
   name: string;
   description?: string;
   status: string;
+  currentProjectVersionId?: string;
   createdAt: string;
   updatedAt: string;
 }

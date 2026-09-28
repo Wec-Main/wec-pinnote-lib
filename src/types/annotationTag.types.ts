@@ -9,6 +9,7 @@ export interface AnnotationTag {
   id: string;
   organizationId: string;
   projectId: string;
+  projectVersionId?: string;
   pageKey: string;
   tagId: string;
   tagName: string;
@@ -31,6 +32,7 @@ export interface AnnotationTag {
 
 export interface CreateAnnotationTagInput {
   projectId: string;
+  projectVersionId?: string;
   pageKey: string;
   tagId: string;
   anchor: AnnotationAnchor;

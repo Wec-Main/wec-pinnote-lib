@@ -17,11 +17,12 @@ export function resolveDefaultFlow(
   apiBaseUrl: string,
   authToken: string | undefined,
   projectId: string,
+  projectVersionId?: string,
   signal?: AbortSignal,
 ): Promise<FlowSummary> {
   return request<FlowSummary>(buildUrl(apiBaseUrl, "/flows/default"), authToken, {
     method: "POST",
-    body: JSON.stringify({ projectId }),
+    body: JSON.stringify({ projectId, projectVersionId }),
     signal,
   });
 }
@@ -30,15 +31,18 @@ export function listFlows(
   apiBaseUrl: string,
   authToken: string | undefined,
   projectId: string,
+  projectVersionId?: string,
   signal?: AbortSignal,
 ): Promise<Flow[]> {
-  return request<Flow[]>(buildUrl(apiBaseUrl, "/flows", { projectId }), authToken, { signal });
+  return request<Flow[]>(buildUrl(apiBaseUrl, "/flows", { projectId, projectVersionId }), authToken, {
+    signal,
+  });
 }
 
 export function createFlow(
   apiBaseUrl: string,
   authToken: string | undefined,
-  input: { projectId: string; name: string; description?: string },
+  input: { projectId: string; projectVersionId?: string; name: string; description?: string },
 ): Promise<Flow> {
   return request<Flow>(buildUrl(apiBaseUrl, "/flows"), authToken, {
     method: "POST",
@@ -119,17 +123,26 @@ export function fetchFlowPins(
   authToken: string | undefined,
   projectId: string,
   pageKey: string,
+  projectVersionId?: string,
   signal?: AbortSignal,
 ): Promise<FlowPin[]> {
-  return request<FlowPin[]>(buildUrl(apiBaseUrl, "/flow-pins", { projectId, pageKey }), authToken, {
-    signal,
-  });
+  return request<FlowPin[]>(
+    buildUrl(apiBaseUrl, "/flow-pins", { projectId, pageKey, projectVersionId }),
+    authToken,
+    { signal },
+  );
 }
 
 export function createFlowPin(
   apiBaseUrl: string,
   authToken: string | undefined,
-  input: { projectId: string; pageKey: string; name: string; anchor: AnnotationAnchor },
+  input: {
+    projectId: string;
+    projectVersionId?: string;
+    pageKey: string;
+    name: string;
+    anchor: AnnotationAnchor;
+  },
 ): Promise<FlowPin> {
   const { anchor, ...rest } = input;
   return request<FlowPin>(buildUrl(apiBaseUrl, "/flow-pins"), authToken, {

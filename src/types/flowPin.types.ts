@@ -4,6 +4,7 @@ import type { FlowJSON } from "./flowchart.types";
 export interface FlowPin {
   id: string;
   projectId: string;
+  projectVersionId?: string;
   pageKey: string;
   flowId: string;
   name: string;
@@ -23,6 +24,7 @@ export interface DraftFlowPin {
 export interface FlowSummary {
   id: string;
   projectId: string;
+  projectVersionId?: string;
   name: string;
   updatedAt: string;
 }
@@ -30,6 +32,7 @@ export interface FlowSummary {
 export interface Flow {
   id: string;
   projectId: string;
+  projectVersionId?: string;
   name: string;
   description: string;
   status: string;

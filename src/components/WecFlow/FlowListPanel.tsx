@@ -22,12 +22,12 @@ interface FlowListPanelProps {
 }
 
 export function FlowListPanel({ onOpen }: FlowListPanelProps) {
-  const { config } = useAnnotationContext();
+  const { config, projectVersionId } = useAnnotationContext();
   const { hostAuthenticated, activeAccount } = useAnnotationAuth();
   const getToken = useTokenGetter(config.getAuthToken);
   const sessionKey = hostAuthenticated ? "host" : (activeAccount?.id ?? "");
   const flowsKey = sessionKey
-    ? `flows-list:${config.apiBaseUrl}:${sessionKey}:${config.projectId}`
+    ? `flows-list:${config.apiBaseUrl}:${sessionKey}:${config.projectId}:${projectVersionId ?? ""}`
     : null;
 
   const {
@@ -37,7 +37,7 @@ export function FlowListPanel({ onOpen }: FlowListPanelProps) {
     reload,
   } = useSharedFetch(flowsKey, (signal) =>
     getToken().then((authToken) =>
-      listFlows(config.apiBaseUrl, authToken, config.projectId, signal),
+      listFlows(config.apiBaseUrl, authToken, config.projectId, projectVersionId, signal),
     ),
   );
 
@@ -61,7 +61,11 @@ export function FlowListPanel({ onOpen }: FlowListPanelProps) {
       if (formModal?.mode === "edit") {
         await updateFlow(config.apiBaseUrl, authToken, formModal.flow.id, data);
       } else {
-        await createFlow(config.apiBaseUrl, authToken, { projectId: config.projectId, ...data });
+        await createFlow(config.apiBaseUrl, authToken, {
+          projectId: config.projectId,
+          projectVersionId,
+          ...data,
+        });
       }
       refresh();
       setFormModal(null);

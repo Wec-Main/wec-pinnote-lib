@@ -4,6 +4,7 @@ import { Icon, Tooltip } from "../primitives";
 import { UserManagementPanel } from "../UserManagement/UserManagementPanel";
 import { OrganizationsTab } from "./OrganizationsTab";
 import { ProjectsTab } from "./ProjectsTab";
+import { VersioningTab } from "./VersioningTab";
 import { TagsTab } from "./TagsTab";
 import { AuditHistoryPanel } from "../AuditHistory";
 import { DashboardTab } from "./Dashboard/DashboardTab";
@@ -116,6 +117,7 @@ export function SettingsPanel() {
         {activeTab === "users" ? <UserManagementPanel /> : null}
         {activeTab === "organizations" ? <OrganizationsTab /> : null}
         {activeTab === "projects" ? <ProjectsTab /> : null}
+        {activeTab === "versioning" ? <VersioningTab /> : null}
         {activeTab === "tags" ? <TagsTab /> : null}
         {activeTab === "audit" ? <AuditHistoryPanel embedded /> : null}
         {activeTab === "dashboard" ? <DashboardTab /> : null}

@@ -4657,6 +4657,59 @@ body.wpn-epicflow-resizing {
   color: #cbd5e1;
 }
 
+.wpn-users-pill--status-draft {
+  background: rgba(96, 165, 250, 0.14);
+  border-color: rgba(96, 165, 250, 0.32);
+  color: #93c5fd;
+}
+
+.wpn-users-pill--status-published {
+  background: rgba(52, 211, 153, 0.16);
+  border-color: rgba(52, 211, 153, 0.35);
+  color: #6ee7b7;
+}
+
+.wpn-versioning-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.wpn-versioning-header__copy {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.wpn-versioning-header__label {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: rgba(255, 255, 255, 0.5);
+}
+
+.wpn-versioning-header__name {
+  font-size: 15px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.92);
+}
+
+.wpn-versioning-header__actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.wpn-versioning-active-btn {
+  cursor: pointer;
+}
+
+.wpn-versioning-active-btn:hover {
+  background: rgba(148, 163, 184, 0.22);
+}
+
 .wpn-users-actions {
   display: flex;
   align-items: center;

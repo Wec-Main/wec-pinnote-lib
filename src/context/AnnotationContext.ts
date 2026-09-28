@@ -26,6 +26,14 @@ export interface DiscardPrompt {
 export interface AnnotationDataContextValue {
   config: ResolvedAnnotationConfig;
   api: AnnotationApiClient;
+  // The effective project version for every version-scoped fetch/create:
+  // config.projectVersionId (an explicit host override) when set, otherwise
+  // the project's live current_project_version_id, resolved fresh and
+  // re-resolved whenever reloadCurrentProjectVersion() runs — e.g. after
+  // Settings -> Versioning activates a different version. This is what a
+  // component should read instead of config.projectVersionId directly.
+  projectVersionId: string | undefined;
+  reloadCurrentProjectVersion: () => void;
   pageKey: string;
   annotations: Annotation[];
   loading: boolean;

@@ -32,7 +32,10 @@ import { useAnnotationTags } from "../hooks/useAnnotationTags";
 import { useFlowPins } from "../hooks/useFlowPins";
 import { useSharedFetch } from "../hooks/useSharedFetch";
 import { useTokenGetter } from "../hooks/useTokenGetter";
+import { fetchProject } from "../services/organizationsApi";
+import type { Project } from "../types/organization.types";
 import { fetchTags } from "../services/tagsApi";
+import { resolveEffectiveProjectVersionId } from "../utils/resolveEffectiveProjectVersionId";
 import { createClientId } from "../utils/format";
 import { isTrackingEnabled } from "../utils/pageVisitQueue";
 import type { ProjectTag } from "../types/tag.types";
@@ -127,6 +130,27 @@ export function AnnotationProvider({ config, children }: AnnotationProviderProps
   );
   const api = useAnnotationApi(activeConfig);
   const pageKey = usePageKey(activeConfig.getPageKey);
+
+  const projectId = activeConfig.projectId;
+  const getProjectVersionToken = useTokenGetter(activeConfig.getAuthToken);
+  const projectVersionKey =
+    authenticated && sessionKey
+      ? `project-current-version:${activeConfig.apiBaseUrl}:${sessionKey}:${projectId}`
+      : null;
+  const { data: liveProject, reload: reloadCurrentProjectVersion } = useSharedFetch<Project>(
+    projectVersionKey,
+    async (signal) =>
+      fetchProject(activeConfig.apiBaseUrl, await getProjectVersionToken(), projectId, signal),
+  );
+  // config.projectVersionId is an explicit host override (pin to one
+  // version); otherwise resolve to the project's live current version so
+  // Settings -> Versioning activating a different version propagates here
+  // without a page reload.
+  const projectVersionId = resolveEffectiveProjectVersionId(
+    activeConfig.projectVersionId,
+    liveProject?.currentProjectVersionId,
+  );
+
   const {
     annotations,
     loading,
@@ -143,7 +167,8 @@ export function AnnotationProvider({ config, children }: AnnotationProviderProps
     removeAnnotation,
   } = useAnnotationCollection({
     api,
-    projectId: activeConfig.projectId,
+    projectId,
+    projectVersionId,
     pageKey,
     currentUser: activeUser,
     authenticated: teardownActive,
@@ -171,7 +196,6 @@ export function AnnotationProvider({ config, children }: AnnotationProviderProps
   }, [annotations, selectedId]);
   const [draft, setDraft] = useState<DraftAnnotation | null>(null);
   const [discardPrompt, setDiscardPrompt] = useState<DiscardPrompt | null>(null);
-  const projectId = activeConfig.projectId;
   const [listOpen, setListOpen] = usePersistentState(
     `wpn-ui:${projectId}:listOpen`,
     false,
@@ -219,6 +243,7 @@ export function AnnotationProvider({ config, children }: AnnotationProviderProps
   } = useAnnotationTags({
     apiBaseUrl: activeConfig.apiBaseUrl,
     projectId,
+    projectVersionId,
     pageKey,
     getAuthToken: activeConfig.getAuthToken,
     sessionKey,
@@ -242,6 +267,7 @@ export function AnnotationProvider({ config, children }: AnnotationProviderProps
   } = useFlowPins({
     apiBaseUrl: activeConfig.apiBaseUrl,
     projectId,
+    projectVersionId,
     pageKey,
     getAuthToken: activeConfig.getAuthToken,
     sessionKey,
@@ -554,6 +580,7 @@ export function AnnotationProvider({ config, children }: AnnotationProviderProps
       try {
         const created = await createAnnotation({
           projectId,
+          projectVersionId,
           pageKey,
           anchor: current.anchor,
           comment: {
@@ -571,7 +598,15 @@ export function AnnotationProvider({ config, children }: AnnotationProviderProps
         throw err;
       }
     },
-    [clearDraft, createAnnotation, currentUserId, pageKey, projectId, setPinsVisible],
+    [
+      clearDraft,
+      createAnnotation,
+      currentUserId,
+      pageKey,
+      projectId,
+      projectVersionId,
+      setPinsVisible,
+    ],
   );
 
   const selectAnnotation = useCallback(
@@ -637,6 +672,8 @@ export function AnnotationProvider({ config, children }: AnnotationProviderProps
     () => ({
       config: activeConfig,
       api,
+      projectVersionId,
+      reloadCurrentProjectVersion,
       pageKey,
       annotations,
       loading,
@@ -664,6 +701,8 @@ export function AnnotationProvider({ config, children }: AnnotationProviderProps
     [
       activeConfig,
       api,
+      projectVersionId,
+      reloadCurrentProjectVersion,
       pageKey,
       annotations,
       loading,

@@ -21,6 +21,7 @@ const LOAD_ERROR_MESSAGE = "Could not load tags for this page";
 interface UseAnnotationTagsOptions {
   apiBaseUrl: string;
   projectId: string;
+  projectVersionId?: string;
   pageKey: string;
   getAuthToken: (() => string | Promise<string>) | undefined;
   sessionKey: string | null;
@@ -48,7 +49,8 @@ export interface AnnotationTagsState {
 }
 
 export function useAnnotationTags(options: UseAnnotationTagsOptions): AnnotationTagsState {
-  const { apiBaseUrl, projectId, pageKey, getAuthToken, sessionKey, enabled } = options;
+  const { apiBaseUrl, projectId, projectVersionId, pageKey, getAuthToken, sessionKey, enabled } =
+    options;
   const getToken = useTokenGetter(getAuthToken);
   const [annotationTags, setAnnotationTags] = useState<AnnotationTag[]>([]);
   const [annotationTagsError, setAnnotationTagsError] = useState<string | null>(null);
@@ -73,7 +75,14 @@ export function useAnnotationTags(options: UseAnnotationTagsOptions): Annotation
     const controller = new AbortController();
     getToken()
       .then((token) =>
-        fetchAnnotationTags(apiBaseUrl, token, projectId, pageKey, controller.signal),
+        fetchAnnotationTags(
+          apiBaseUrl,
+          token,
+          projectId,
+          pageKey,
+          projectVersionId,
+          controller.signal,
+        ),
       )
       .then((loaded) => {
         setAnnotationTags(loaded);
@@ -85,7 +94,16 @@ export function useAnnotationTags(options: UseAnnotationTagsOptions): Annotation
         }
       });
     return () => controller.abort();
-  }, [apiBaseUrl, getToken, sessionKey, projectId, pageKey, enabled, reloadToken]);
+  }, [
+    apiBaseUrl,
+    getToken,
+    sessionKey,
+    projectId,
+    projectVersionId,
+    pageKey,
+    enabled,
+    reloadToken,
+  ]);
 
   useEffect(() => {
     if (!enabled) {
@@ -127,6 +145,7 @@ export function useAnnotationTags(options: UseAnnotationTagsOptions): Annotation
       }
       const created = await createAnnotationTag(apiBaseUrl, await getToken(), {
         projectId,
+        projectVersionId,
         pageKey,
         tagId,
         anchor: tagDraft.anchor,
@@ -138,7 +157,7 @@ export function useAnnotationTags(options: UseAnnotationTagsOptions): Annotation
         setTagsVisible(true);
       }
     },
-    [apiBaseUrl, getToken, projectId, pageKey, tagDraft, setTagsVisible],
+    [apiBaseUrl, getToken, projectId, projectVersionId, pageKey, tagDraft, setTagsVisible],
   );
 
   const removeAnnotationTag = useCallback(

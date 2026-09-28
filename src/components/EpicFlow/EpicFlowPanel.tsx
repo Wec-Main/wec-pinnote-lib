@@ -42,7 +42,7 @@ function describeApiError(err: unknown): string {
 }
 
 export function EpicFlowPanel() {
-  const { config } = useAnnotationData();
+  const { config, projectVersionId } = useAnnotationData();
   const { setEpicFlowOpen } = useAnnotationUi();
   const { hostAuthenticated, activeAccount } = useAnnotationAuth();
   const api = useEpicFlowApi(config);
@@ -133,8 +133,8 @@ export function EpicFlowPanel() {
     async (signal?: AbortSignal) => {
       const generation = ++reloadGenerationRef.current;
       const [nextEpics, nextStories] = await Promise.all([
-        api.getEpics(config.projectId, signal),
-        api.getUserStoriesByProject(config.projectId, signal),
+        api.getEpics(config.projectId, projectVersionId, signal),
+        api.getUserStoriesByProject(config.projectId, projectVersionId, signal),
       ]);
       if (generation === reloadGenerationRef.current) {
         setEpics(nextEpics);
@@ -142,7 +142,7 @@ export function EpicFlowPanel() {
       }
       return { nextEpics, nextStories };
     },
-    [api, config.projectId],
+    [api, config.projectId, projectVersionId],
   );
 
   const handleRefresh = useCallback(() => {
@@ -283,7 +283,11 @@ export function EpicFlowPanel() {
       if (epicModal?.mode === "edit") {
         await api.updateEpic(epicModal.epic.id, data);
       } else {
-        const created = await api.createEpic({ ...data, projectId: config.projectId });
+        const created = await api.createEpic({
+          ...data,
+          projectId: config.projectId,
+          projectVersionId,
+        });
         setSelectedEpicId(created.id);
         setSelectedUserStoryId(null);
       }

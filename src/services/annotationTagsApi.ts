@@ -11,10 +11,11 @@ export function fetchAnnotationTags(
   authToken: string | undefined,
   projectId: string,
   pageKey: string,
+  projectVersionId?: string,
   signal?: AbortSignal,
 ): Promise<AnnotationTag[]> {
   return request<AnnotationTag[]>(
-    buildUrl(apiBaseUrl, "/annotation-tags", { projectId, pageKey }),
+    buildUrl(apiBaseUrl, "/annotation-tags", { projectId, pageKey, projectVersionId }),
     authToken,
     { signal },
   );
