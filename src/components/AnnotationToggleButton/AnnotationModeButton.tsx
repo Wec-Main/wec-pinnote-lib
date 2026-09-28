@@ -6,7 +6,8 @@ import { Icon, MenuPanel, Tooltip, type IconName, type MenuItemDefinition } from
 
 type AnnotationMode = "annotate" | "tag" | "flow";
 
-const MODE_CYCLE: (AnnotationMode | null)[] = [null, "annotate", "tag", "flow"];
+// "tag" is temporarily hidden from the mode menu and cycle order — see setMode/items below.
+const MODE_CYCLE: (AnnotationMode | null)[] = [null, "annotate", "flow"];
 
 const MODE_ICON: Record<AnnotationMode, IconName> = {
   annotate: "annotateCursor",
@@ -130,7 +131,7 @@ export function AnnotationModeButton() {
     return () => document.removeEventListener("keydown", handleKeyDown, true);
   }, []);
 
-  const items: MenuItemDefinition[] = (["annotate", "tag", "flow"] as const).map((mode) => ({
+  const items: MenuItemDefinition[] = (["annotate", /* "tag", */ "flow"] as const).map((mode) => ({
     type: "action",
     id: mode,
     label: MODE_LABEL[mode],
@@ -142,7 +143,7 @@ export function AnnotationModeButton() {
     ? "Select your name to start annotating"
     : isActive && activeMode
       ? `Stop ${MODE_STOP_LABEL[activeMode]}`
-      : "Annotate, tag, or place a flow";
+      : "Annotate or place a flow";
 
   return (
     <div className="wpn-menu" ref={rootRef}>
@@ -181,6 +182,20 @@ export function AnnotationModeButton() {
           />
         </button>
       </Tooltip>
+      {isActive ? (
+        <Tooltip label="Switch mode" placement="bottom">
+          <button
+            type="button"
+            className="wpn-toggle wpn-toggle--caret"
+            aria-haspopup="menu"
+            aria-expanded={open}
+            aria-label="Switch annotation mode"
+            onClick={() => setOpen((current) => !current)}
+          >
+            <Icon name="chevronDown" className="wpn-toggle__icon wpn-toggle__icon--sm" />
+          </button>
+        </Tooltip>
+      ) : null}
       {open ? (
         <MenuPanel
           items={items}

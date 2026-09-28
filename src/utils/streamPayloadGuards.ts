@@ -1,4 +1,9 @@
-import type { Annotation, AnnotationComment, AnnotationUser } from "../types/annotation.types";
+import type {
+  Annotation,
+  AnnotationAnchor,
+  AnnotationComment,
+  AnnotationUser,
+} from "../types/annotation.types";
 import type { Epic, UserStory } from "../types/epicFlow.types";
 import type { StreamEvent } from "../types/stream.types";
 
@@ -29,6 +34,20 @@ export function normalizeAnnotation(value: Record<string, unknown>): Record<stri
   return value.comments === undefined ? { ...value, comments: [] } : value;
 }
 
+function isAnchor(value: unknown): value is AnnotationAnchor {
+  return (
+    isRecord(value) &&
+    isNonEmptyString(value.selector) &&
+    isNonEmptyString(value.elementIdentifier) &&
+    Number.isFinite(value.relativeX) &&
+    Number.isFinite(value.relativeY) &&
+    Number.isFinite(value.fallbackX) &&
+    Number.isFinite(value.fallbackY) &&
+    Number.isFinite(value.viewportWidth) &&
+    Number.isFinite(value.viewportHeight)
+  );
+}
+
 export function isAnnotation(value: unknown): value is Annotation {
   if (!isRecord(value)) {
     return false;
@@ -39,7 +58,7 @@ export function isAnnotation(value: unknown): value is Annotation {
     isNonEmptyString(normalized.projectId) &&
     isNonEmptyString(normalized.pageKey) &&
     typeof normalized.number === "number" &&
-    isRecord(normalized.anchor) &&
+    isAnchor(normalized.anchor) &&
     typeof normalized.status === "string" &&
     isAnnotationUser(normalized.createdBy) &&
     isNonEmptyString(normalized.createdAt) &&
@@ -47,6 +66,14 @@ export function isAnnotation(value: unknown): value is Annotation {
     Array.isArray(normalized.comments) &&
     normalized.comments.every(isComment)
   );
+}
+
+export function toAnnotation(value: unknown): Annotation | null {
+  if (!isRecord(value)) {
+    return null;
+  }
+  const normalized = normalizeAnnotation(value);
+  return isAnnotation(normalized) ? normalized : null;
 }
 
 export function isEpic(value: unknown): value is Epic {

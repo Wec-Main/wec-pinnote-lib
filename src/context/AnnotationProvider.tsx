@@ -9,6 +9,8 @@ import { useAuthSessions } from "../hooks/useAuthSessions";
 import { useAnnotationCollection } from "../hooks/useAnnotations";
 import { usePageKey } from "../hooks/usePageKey";
 import { usePageVisitTracker } from "../hooks/usePageVisitTracker";
+import { AnnotationViewContext } from "./AnnotationViewContext";
+import { composeViewPageKey } from "../utils/pageKey";
 import type {
   AnnotationAnchor,
   AnnotationConfig,
@@ -129,7 +131,22 @@ export function AnnotationProvider({ config, children }: AnnotationProviderProps
     [activeUser, hasAccount, readAccountToken, resolved],
   );
   const api = useAnnotationApi(activeConfig);
-  const pageKey = usePageKey(activeConfig.getPageKey);
+  const basePageKey = usePageKey(activeConfig.getPageKey);
+  const [views, setViews] = useState<string[]>([]);
+  const registerView = useCallback((name: string) => {
+    setViews((current) => [...current, name]);
+    return () => {
+      setViews((current) => {
+        const index = current.lastIndexOf(name);
+        if (index === -1) {
+          return current;
+        }
+        return [...current.slice(0, index), ...current.slice(index + 1)];
+      });
+    };
+  }, []);
+  const viewContextValue = useMemo(() => ({ registerView }), [registerView]);
+  const pageKey = useMemo(() => composeViewPageKey(basePageKey, views), [basePageKey, views]);
 
   const projectId = activeConfig.projectId;
   const getProjectVersionToken = useTokenGetter(activeConfig.getAuthToken);
@@ -277,7 +294,7 @@ export function AnnotationProvider({ config, children }: AnnotationProviderProps
   usePageVisitTracker({
     apiBaseUrl: activeConfig.apiBaseUrl,
     projectId,
-    pageKey,
+    pageKey: basePageKey,
     enabled: isTrackingEnabled(resolved.trackPageVisits, authenticated),
     getAuthToken: activeConfig.getAuthToken,
     sessionKey,
@@ -523,15 +540,17 @@ export function AnnotationProvider({ config, children }: AnnotationProviderProps
       setSelectedId(null);
       setListOpen(false);
       selectFlowPin(null);
+      const pageName = document.title.trim() || pageKey;
       setDraft({
         id: createClientId("draft"),
         label,
+        path: `${pageName} > ${label}`,
         anchor,
         number,
         message: "",
       });
     },
-    [selectFlowPin, setListOpen],
+    [pageKey, selectFlowPin, setListOpen],
   );
 
   const cancelDraft = useCallback(() => {
@@ -553,15 +572,21 @@ export function AnnotationProvider({ config, children }: AnnotationProviderProps
     if (!trimmed) {
       return;
     }
-    setDraft((current) =>
-      current
-        ? {
-            ...current,
-            label: trimmed,
-            anchor: { ...current.anchor, elementIdentifier: trimmed },
-          }
-        : current,
-    );
+    setDraft((current) => {
+      if (!current) {
+        return current;
+      }
+      const pageName = current.path.split(" > ")[0] ?? trimmed;
+      return {
+        ...current,
+        label: trimmed,
+        path: `${pageName} > ${trimmed}`,
+      };
+    });
+  }, []);
+
+  const updateDraftPath = useCallback((path: string) => {
+    setDraft((current) => (current ? { ...current, path } : current));
   }, []);
 
   const updateDraftMessage = useCallback((message: string) => {
@@ -582,6 +607,7 @@ export function AnnotationProvider({ config, children }: AnnotationProviderProps
           projectId,
           projectVersionId,
           pageKey,
+          path: current.path,
           anchor: current.anchor,
           comment: {
             message,
@@ -641,13 +667,7 @@ export function AnnotationProvider({ config, children }: AnnotationProviderProps
         const element = resolveElement(annotation.anchor);
         if (element) {
           element.scrollIntoView({ behavior: "smooth", block: "center", inline: "nearest" });
-          return;
         }
-        window.scrollTo({
-          top: Math.max(0, annotation.anchor.fallbackY - window.innerHeight / 2),
-          left: 0,
-          behavior: "smooth",
-        });
       };
       if (hasUnsavedDraft()) {
         setDiscardPrompt({ kind: "draft", proceed });
@@ -739,6 +759,7 @@ export function AnnotationProvider({ config, children }: AnnotationProviderProps
       draft,
       startDraft,
       updateDraftLabel,
+      updateDraftPath,
       updateDraftMessage,
       cancelDraft,
       requestCancelDraft,
@@ -785,6 +806,7 @@ export function AnnotationProvider({ config, children }: AnnotationProviderProps
       draft,
       startDraft,
       updateDraftLabel,
+      updateDraftPath,
       updateDraftMessage,
       cancelDraft,
       requestCancelDraft,
@@ -861,7 +883,9 @@ export function AnnotationProvider({ config, children }: AnnotationProviderProps
     <AnnotationAuthContext.Provider value={authValue}>
       <AnnotationDataContext.Provider value={dataValue}>
         <AnnotationUiContext.Provider value={uiValue}>
-          {children}
+          <AnnotationViewContext.Provider value={viewContextValue}>
+            {children}
+          </AnnotationViewContext.Provider>
           {portalReady && activeConfig.enabled
             ? createPortal(
                 <AnnotationErrorBoundary>

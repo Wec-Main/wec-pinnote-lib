@@ -466,6 +466,15 @@ body.wpn-mode-active {
   stroke-width: 2.2;
 }
 
+.wpn-toggle--caret {
+  width: 18px;
+}
+
+.wpn-toggle__icon--sm {
+  width: 11px;
+  height: 11px;
+}
+
 .wpn-toolbar__epic {
   pointer-events: auto;
   display: grid;
@@ -1381,7 +1390,7 @@ body.wpn-mode-active {
   font-size: 11px;
 }
 
-.wpn-composer .wpn-input {
+.wpn-composer .wpn-composer__field {
   padding: 9px 11px;
   font-size: 12px;
   border-radius: 12px;
@@ -1389,6 +1398,42 @@ body.wpn-mode-active {
   min-height: 160px;
   max-height: min(480px, calc(100vh - 160px));
   overflow-y: auto;
+}
+
+.wpn-composer__path {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 0 2px 8px;
+}
+
+.wpn-composer__path-label {
+  font-size: 10px;
+  font-weight: 650;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  color: rgba(255, 255, 255, 0.55);
+}
+
+.wpn-composer__path-value {
+  height: 30px;
+  padding: 0 8px;
+  font-size: 12px;
+  font-family: inherit;
+  border-radius: 8px;
+  resize: none;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.wpn-composer__field-label {
+  font-size: 10px;
+  font-weight: 650;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  color: rgba(255, 255, 255, 0.55);
+  padding: 0 2px 4px;
 }
 
 .wpn-composer .wpn-composer-hint {
@@ -2230,6 +2275,12 @@ body.wpn-epicflow-resizing {
   font-weight: 700;
 }
 
+.wpn-epicflow-column__title--breadcrumb {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .wpn-epicflow-column__badge {
   display: grid;
   place-items: center;
@@ -2405,35 +2456,26 @@ body.wpn-epicflow-resizing {
   background: rgba(91, 77, 255, 0.3);
 }
 
-.wpn-epicflow-card__title {
-  font-size: 13px;
-  font-weight: 700;
-  line-height: 1.4;
-  overflow-wrap: anywhere;
-}
-
-.wpn-epicflow-card__desc {
-  color: rgba(255, 255, 255, 0.65);
-  font-size: 12px;
-  line-height: 1.5;
-}
-
-.wpn-epicflow-card__footer {
+.wpn-epicflow-card__row {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
 }
 
-.wpn-epicflow-card__meta {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 6px 14px;
+.wpn-epicflow-card__title {
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
   min-width: 0;
   flex: 1 1 auto;
-  color: rgba(255, 255, 255, 0.72);
-  font-size: 11px;
+}
+
+.wpn-epicflow-card__desc {
+  color: rgba(255, 255, 255, 0.65);
+  font-size: 12px;
+  line-height: 1.5;
 }
 
 .wpn-epicflow-card__author {
@@ -2466,21 +2508,6 @@ body.wpn-epicflow-resizing {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-}
-
-.wpn-epicflow-card__stat {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  flex-shrink: 0;
-  white-space: nowrap;
-}
-
-.wpn-epicflow-card__stat-icon {
-  width: 12px;
-  height: 12px;
-  flex-shrink: 0;
-  color: rgba(255, 255, 255, 0.55);
 }
 
 .wpn-epicflow-card__actions {
@@ -2587,16 +2614,99 @@ body.wpn-epicflow-resizing {
   padding: 4px 2px;
 }
 
+.wpn-epicflow-detail--editing {
+  height: 100%;
+  min-height: 0;
+}
+
+.wpn-epicflow-detail--editing .wpn-epicflow-modal__field:last-child {
+  flex: 1;
+  min-height: 0;
+}
+
+.wpn-epicflow-detail--editing .wpn-epicflow-modal__field:last-child textarea.wpn-epicflow-modal__textarea {
+  flex: 1;
+  min-height: 0;
+  resize: none;
+}
+
+.wpn-epicflow-detail__row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
 .wpn-epicflow-detail__title {
   font-size: 14px;
   font-weight: 700;
   color: #fff;
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 
 .wpn-epicflow-detail__desc {
   font-size: 12.5px;
   line-height: 1.6;
   color: rgba(255, 255, 255, 0.7);
+}
+
+.wpn-epicflow-detail__meta {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.wpn-epicflow-detail__meta-col {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
+.wpn-epicflow-detail__meta-col:first-child {
+  padding-right: 12px;
+  border-right: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.wpn-epicflow-detail__meta-item {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+
+.wpn-epicflow-detail__meta-label {
+  font-size: 9.5px;
+  font-weight: 650;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: rgba(255, 255, 255, 0.4);
+}
+
+.wpn-epicflow-detail__meta-item .wpn-epicflow-card__avatar {
+  width: 18px;
+  height: 18px;
+  font-size: 8px;
+}
+
+.wpn-epicflow-detail__meta-item .wpn-epicflow-card__author-name {
+  font-size: 11.5px;
+  color: rgba(255, 255, 255, 0.85);
+}
+
+.wpn-epicflow-detail__meta-date {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+  font-size: 10.5px;
+  color: rgba(255, 255, 255, 0.5);
+  white-space: nowrap;
 }
 
 .wpn-epicflow-modal-scrim {
@@ -4353,6 +4463,14 @@ body.wpn-epicflow-resizing {
 
 .wpn-users-table {
   table-layout: fixed;
+}
+
+.wpn-users-table__col-name {
+  width: 26%;
+}
+
+.wpn-users-table__col-actions {
+  width: 88px;
 }
 
 .wpn-users-table thead th {
@@ -6162,6 +6280,24 @@ body.wpn-epicflow-resizing {
 
 .wpn-thread-card--resolved .wpn-thread-card__comment {
   opacity: 0.7;
+}
+
+.wpn-thread-card--out-of-view .wpn-thread-card__head,
+.wpn-thread-card--out-of-view .wpn-thread-card__comment {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.wpn-thread-card__chip {
+  flex: none;
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.1);
+  color: rgba(255, 255, 255, 0.72);
+  font-size: 9px;
+  font-weight: 650;
+  text-transform: none;
+  white-space: nowrap;
 }
 
 .wpn-thread-card__head,

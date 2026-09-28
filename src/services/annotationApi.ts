@@ -10,7 +10,7 @@ import {
   type UpdateCommentRequest,
 } from "../types/annotation.types";
 import { buildUrl, request, requestNoContent, withUnauthorizedRetry, type QueryValue } from "./httpClient";
-import { isAnnotation } from "../utils/streamPayloadGuards";
+import { toAnnotation } from "../utils/streamPayloadGuards";
 
 const PATHS = {
   annotations: "/annotations",
@@ -31,12 +31,10 @@ function parseListPayload(payload: unknown): Annotation[] {
     throw new AnnotationApiError("Unexpected annotations list response", 500);
   }
 
-  return rawList.map((item) => {
-    if (!isAnnotation(item)) {
-      throw new AnnotationApiError("Unexpected annotation shape in list response", 500);
-    }
-    return item;
-  });
+  return rawList.reduce<Annotation[]>((accepted, item) => {
+    const annotation = toAnnotation(item);
+    return annotation ? [...accepted, annotation] : accepted;
+  }, []);
 }
 
 export function createAnnotationApi(

@@ -65,14 +65,12 @@ export const Toolbar = memo(function Toolbar({
   const canRedo = useFlowState((s) => s.canRedo);
   const readOnly = useFlowState((s) => s.readOnly);
   const flowName = useFlowState((s) => s.flowName);
-  const errorCount = useFlowState((s) => s.validation?.errorCount ?? null);
   const [nodeCount, edgeCount] = useFlowState(
     (s) => [s.nodes.length, s.edges.length] as const,
     shallowEqual,
   );
   const [pending, setPending] = useState<PendingCommit | null>(null);
   const [committing, setCommitting] = useState(false);
-  const [publishBlocked, setPublishBlocked] = useState<string | null>(null);
   const notify = (m: string, k: NoticeKind) => onNotify?.(m, k);
 
   const exportJson = () => {
@@ -82,23 +80,7 @@ export const Toolbar = memo(function Toolbar({
     notify("Flow exported as JSON", "success");
   };
 
-  const validate = () => {
-    const r = engine.validate();
-    if (r.valid && r.warningCount === 0) notify("Flow is valid", "success");
-  };
-
   const requestPublish = () => {
-    const result = engine.validate();
-    const blockers = [
-      result.errorCount > 0 ? plural(result.errorCount, "error") : null,
-      result.warningCount > 0 ? plural(result.warningCount, "warning") : null,
-    ].filter(Boolean);
-    if (blockers.length > 0) {
-      setPublishBlocked(`Fix ${blockers.join(" and ")} before publishing.`);
-      notify(`Cannot publish: ${blockers.join(" and ")} found`, "error");
-      return;
-    }
-    setPublishBlocked(null);
     setPending("publish");
   };
 
@@ -125,7 +107,6 @@ export const Toolbar = memo(function Toolbar({
       await handler(engine.toJSON());
       if (action === "publish") {
         engine.setReadOnly(true);
-        engine.validate();
       }
       notify(action === "publish" ? `"${flowName}" published` : `"${flowName}" saved`, "success");
       setPending(null);
@@ -208,17 +189,6 @@ export const Toolbar = memo(function Toolbar({
         <button
           type="button"
           className={cx("wpn-flowchart-ui__btn", "wpn-flowchart-ui__btn-ghost")}
-          onClick={validate}
-          title="Check the flow for problems"
-        >
-          <Icon name="check" /> Validate
-          {errorCount !== null && errorCount > 0 && (
-            <span className="wpn-flowchart-toolbar__badge">{errorCount}</span>
-          )}
-        </button>
-        <button
-          type="button"
-          className={cx("wpn-flowchart-ui__btn", "wpn-flowchart-ui__btn-ghost")}
           onClick={exportJson}
           title="Download the flow as JSON"
         >
@@ -295,24 +265,6 @@ export const Toolbar = memo(function Toolbar({
           <p>
             Delete <strong>{flowName}</strong> ({plural(nodeCount, "node")},{" "}
             {plural(edgeCount, "connection")})? This cannot be undone.
-          </p>
-        </ConfirmDialog>
-      )}
-      {publishBlocked && (
-        <ConfirmDialog
-          title="Cannot publish"
-          icon="alert"
-          confirmLabel="View issues"
-          warning={publishBlocked}
-          onConfirm={() => {
-            setPublishBlocked(null);
-            validate();
-          }}
-          onCancel={() => setPublishBlocked(null)}
-        >
-          <p>
-            Publishing is blocked until <strong>{flowName}</strong> validates cleanly. Resolve every
-            error and warning, then publish again.
           </p>
         </ConfirmDialog>
       )}

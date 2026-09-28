@@ -8,12 +8,10 @@ export function AnnotationVisibilityToggle() {
   const {
     activeAccount,
     annotations,
-    annotationTags,
     flowPins,
     pinsVisible,
     setPinsVisible,
     tagsVisible,
-    setTagsVisible,
     flowPinsVisible,
     setFlowPinsVisible,
   } = useAnnotationContext();
@@ -43,15 +41,16 @@ export function AnnotationVisibilityToggle() {
       shortcut: String(annotations.length),
       onToggle: setPinsVisible,
     },
-    {
-      type: "checkbox",
-      id: "tags",
-      label: "Tags",
-      icon: "tag",
-      checked: tagsVisible,
-      shortcut: String(annotationTags.length),
-      onToggle: setTagsVisible,
-    },
+    // Tags temporarily hidden from the visibility menu — see AnnotationModeButton.
+    // {
+    //   type: "checkbox",
+    //   id: "tags",
+    //   label: "Tags",
+    //   icon: "tag",
+    //   checked: tagsVisible,
+    //   shortcut: String(annotationTags.length),
+    //   onToggle: setTagsVisible,
+    // },
     {
       type: "checkbox",
       id: "flows",

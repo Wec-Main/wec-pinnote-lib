@@ -1,6 +1,7 @@
 import type { AnnotationAnchor } from "../types/annotation.types";
 import { generateSelector, isStableId } from "./selectorGenerator";
 import { getElementLabel } from "./elementResolver";
+import { ANNOTATION_SCOPE_ATTRIBUTE, scopeRootOf } from "./annotationScope";
 
 const SKIP_TAGS = new Set(["HTML", "BODY", "HEAD", "SCRIPT", "STYLE", "LINK", "META", "NOSCRIPT"]);
 
@@ -14,8 +15,10 @@ function clamp01(value: number): number {
 const STABLE_ID_CLIMB_LIMIT = 3;
 
 export function findAnnotatableElement(start: Element): Element {
+  const scopeRoot = scopeRootOf(start);
+
   let current: Element | null = start;
-  while (current && !SKIP_TAGS.has(current.tagName)) {
+  while (current && !SKIP_TAGS.has(current.tagName) && current !== scopeRoot) {
     if (current instanceof HTMLElement && current.dataset.annotationId) {
       return current;
     }
@@ -24,7 +27,12 @@ export function findAnnotatableElement(start: Element): Element {
 
   current = start;
   let hops = 0;
-  while (current && !SKIP_TAGS.has(current.tagName) && hops <= STABLE_ID_CLIMB_LIMIT) {
+  while (
+    current &&
+    !SKIP_TAGS.has(current.tagName) &&
+    current !== scopeRoot &&
+    hops <= STABLE_ID_CLIMB_LIMIT
+  ) {
     if (current.id && isStableId(current.id)) {
       return current;
     }
@@ -42,7 +50,12 @@ export function createElementAnchor(
 ): AnnotationAnchor {
   const target = findAnnotatableElement(element);
   const rect = target.getBoundingClientRect();
-  const { selector, elementIdentifier } = generateSelector(target);
+  const scopeRoot = scopeRootOf(target);
+  const scopeName = scopeRoot?.getAttribute(ANNOTATION_SCOPE_ATTRIBUTE);
+  const { selector, elementIdentifier } = generateSelector(
+    target,
+    scopeRoot && scopeName ? { name: scopeName, root: scopeRoot } : undefined,
+  );
   const width = rect.width || 1;
   const height = rect.height || 1;
 

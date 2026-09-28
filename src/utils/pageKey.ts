@@ -1,3 +1,10 @@
+export function composeViewPageKey(base: string, views: string[]): string {
+  if (views.length === 0) {
+    return base;
+  }
+  return `${base}::${views[views.length - 1]}`;
+}
+
 export function resolvePageKey(getPageKey?: () => string): string {
   if (getPageKey) {
     return getPageKey();

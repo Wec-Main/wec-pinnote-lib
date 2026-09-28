@@ -3,11 +3,12 @@ import { getInitials } from "../../utils/format";
 
 interface AuthorBadgeProps {
   name: string;
+  tooltipLabel?: string;
 }
 
-export function AuthorBadge({ name }: AuthorBadgeProps) {
+export function AuthorBadge({ name, tooltipLabel }: AuthorBadgeProps) {
   return (
-    <Tooltip label={`Created by ${name}`} placement="bottom">
+    <Tooltip label={tooltipLabel ?? `Created by ${name}`} placement="bottom">
       <span className="wpn-epicflow-card__author">
         <span className="wpn-epicflow-card__avatar" aria-hidden="true">
           {getInitials(name)}

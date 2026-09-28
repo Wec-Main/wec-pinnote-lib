@@ -12,6 +12,7 @@ interface ThreadCardProps {
   active: boolean;
   currentUserId: string;
   repliesCollapsed: boolean;
+  inView: boolean;
   onToggleReplies: (annotationId: string) => void;
   onSelect: (annotationId: string) => void;
 }
@@ -21,12 +22,14 @@ function ThreadComment({
   quoted,
   isReply,
   currentUserId,
+  disabled,
   onSelect,
 }: {
   comment: AnnotationComment;
   quoted: AnnotationComment | undefined;
   isReply: boolean;
   currentUserId: string;
+  disabled: boolean;
   onSelect: () => void;
 }) {
   const edited = comment.updatedAt !== comment.createdAt;
@@ -38,6 +41,8 @@ function ThreadComment({
           ? "wpn-thread-card__comment wpn-thread-card__comment--reply"
           : "wpn-thread-card__comment"
       }
+      disabled={disabled}
+      aria-disabled={disabled}
       onClick={onSelect}
     >
       {comment.createdBy.avatarUrl ? (
@@ -69,6 +74,7 @@ export const ThreadCard = memo(function ThreadCard({
   active,
   currentUserId,
   repliesCollapsed,
+  inView,
   onToggleReplies,
   onSelect,
 }: ThreadCardProps) {
@@ -85,13 +91,21 @@ export const ThreadCard = memo(function ThreadCard({
         "wpn-thread-card",
         active ? "wpn-thread-card--active" : "",
         isDoneStatus(annotation.status) ? "wpn-thread-card--resolved" : "",
+        inView ? "" : "wpn-thread-card--out-of-view",
       ]
         .filter(Boolean)
         .join(" ")}
     >
-      <button type="button" className="wpn-thread-card__head" onClick={select}>
+      <button
+        type="button"
+        className="wpn-thread-card__head"
+        disabled={!inView}
+        aria-disabled={!inView}
+        onClick={select}
+      >
         <span className="wpn-thread-card__pin">#{annotation.number}</span>
         <span className="wpn-thread-card__label">{label}</span>
+        {inView ? null : <span className="wpn-thread-card__chip">Not in this view</span>}
         <span className={`wpn-status-chip wpn-status-chip--sm wpn-tone--${annotation.status}`}>
           {statusLabel(annotation.status)}
         </span>
@@ -101,6 +115,7 @@ export const ThreadCard = memo(function ThreadCard({
         quoted={undefined}
         isReply={false}
         currentUserId={currentUserId}
+        disabled={!inView}
         onSelect={select}
       />
       {replies.length > 0 ? (
@@ -130,6 +145,7 @@ export const ThreadCard = memo(function ThreadCard({
                   quoted={findQuoted(reply)}
                   isReply
                   currentUserId={currentUserId}
+                  disabled={!inView}
                   onSelect={select}
                 />
               ))}

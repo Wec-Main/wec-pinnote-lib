@@ -71,6 +71,7 @@ export interface AnnotationUiContextValue {
   draft: DraftAnnotation | null;
   startDraft: (anchor: AnnotationAnchor, label: string) => void;
   updateDraftLabel: (label: string) => void;
+  updateDraftPath: (path: string) => void;
   updateDraftMessage: (message: string) => void;
   cancelDraft: () => void;
   requestCancelDraft: () => void;

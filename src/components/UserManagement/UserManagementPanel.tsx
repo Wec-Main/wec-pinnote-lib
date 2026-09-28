@@ -13,7 +13,6 @@ import {
 } from "../primitives";
 import {
   categoryLabel,
-  countryLabel,
   roleLabel,
   USER_CATEGORY_OPTIONS,
   USER_ROLE_OPTIONS,
@@ -376,12 +375,20 @@ export function UserManagementPanel() {
             .filter(Boolean)
             .join(" ")}
         >
+          <colgroup>
+            <col className="wpn-users-table__col-name" />
+            <col />
+            <col />
+            <col />
+            <col />
+            <col />
+            <col className="wpn-users-table__col-actions" />
+          </colgroup>
           <thead>
             <tr>
               <th scope="col">Name</th>
               <th scope="col">Role</th>
               <th scope="col">Project</th>
-              <th scope="col">Country</th>
               <th scope="col">Category</th>
               <th scope="col">Last active</th>
               <th scope="col">Status</th>
@@ -394,12 +401,12 @@ export function UserManagementPanel() {
             {loading && !loaded ? (
               <TableSkeleton
                 rows={Math.min(pageSize, 5)}
-                columns={["identity", "pill", "text", "text", "text", "text", "pill", "actions"]}
+                columns={["identity", "pill", "text", "text", "text", "pill", "actions"]}
                 label="Loading users..."
               />
             ) : loadError && users.length === 0 ? (
               <tr>
-                <td colSpan={8} className="wpn-users-table__empty">
+                <td colSpan={7} className="wpn-users-table__empty">
                   <span>{loadError}</span>
                   <button type="button" className="wpn-btn wpn-btn--ghost" onClick={reload}>
                     <Icon name="refresh" className="wpn-btn__icon" />
@@ -409,7 +416,7 @@ export function UserManagementPanel() {
               </tr>
             ) : users.length === 0 ? (
               <tr>
-                <td colSpan={8} className="wpn-users-table__empty">
+                <td colSpan={7} className="wpn-users-table__empty">
                   <Icon name="users" className="wpn-users-table__empty-icon" />
                   <span>No users match your search.</span>
                   {filtersActive ? (
@@ -453,9 +460,6 @@ export function UserManagementPanel() {
                         ))}
                       </span>
                     )}
-                  </td>
-                  <td>
-                    <span className="wpn-users-org__country">{countryLabel(user.countryCode)}</span>
                   </td>
                   <td>
                     {user.category ? (

@@ -488,7 +488,6 @@ export function EpicFlowPanel() {
               epics={filteredEpics}
               hasAnyEpics={epics.length > 0}
               selectedEpicId={selectedEpicId}
-              storyCounts={storyCounts}
               currentUser={config.currentUser}
               onSelect={selectEpic}
               onCreate={() => setEpicModal({ mode: "create" })}

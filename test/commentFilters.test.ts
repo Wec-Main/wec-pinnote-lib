@@ -95,6 +95,15 @@ describe("toThreads", () => {
     expect(all[0]?.label).toBe("hero banner");
   });
 
+  it("prefers the last segment of path over the element identifier when path is present", () => {
+    const withPath = {
+      ...openAnnotation,
+      id: "a4",
+      path: "Login Page > Username Field",
+    };
+    expect(toThreads([withPath])[0]?.label).toBe("Username Field");
+  });
+
   it("skips annotations without comments", () => {
     expect(toThreads([annotation("a3", 3, "open", [])])).toEqual([]);
   });

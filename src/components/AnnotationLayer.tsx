@@ -14,6 +14,7 @@ import { AnnotationToolbar } from "./AnnotationToolbar";
 import { TagPicker, TagPin } from "./TagPin";
 import { FlowPinPanel, FlowPinPicker, FlowPinPin } from "./FlowPin";
 import { ConfirmDialog } from "./UserManagement/ConfirmDialog";
+import { annotationLabel } from "../utils/annotationLabel";
 import { canDeleteBoardItem } from "../utils/boardPermissions";
 import type { AnnotationTag, UpdateAnnotationTagInput } from "../types/annotationTag.types";
 
@@ -371,7 +372,7 @@ export function AnnotationLayer() {
             id={annotation.id}
             number={annotation.number}
             status={annotation.status}
-            elementIdentifier={annotation.anchor.elementIdentifier}
+            elementIdentifier={annotationLabel(annotation)}
             commentsCount={annotation.comments.length}
             x={position.x}
             y={position.y}

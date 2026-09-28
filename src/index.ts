@@ -144,3 +144,5 @@ export {
   saveTagsVisible,
 } from "./services/annotationTagsApi";
 export { createTag, deleteTag, fetchTags, updateTag } from "./services/tagsApi";
+export { useAnnotationView } from "./hooks/useAnnotationView";
+export { ANNOTATION_SCOPE_ATTRIBUTE } from "./utils/annotationScope";

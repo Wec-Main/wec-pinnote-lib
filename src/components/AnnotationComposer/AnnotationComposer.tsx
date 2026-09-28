@@ -37,7 +37,8 @@ export function AnnotationComposer({ x, y }: AnnotationComposerProps) {
 }
 
 function DraftComposer({ draft, x, y }: DraftComposerProps) {
-  const { requestCancelDraft, updateDraftLabel, updateDraftMessage } = useAnnotationUi();
+  const { requestCancelDraft, updateDraftLabel, updateDraftPath, updateDraftMessage } =
+    useAnnotationUi();
   const { submitDraft } = useAnnotationData();
   const panelRef = useRef<HTMLDivElement>(null);
   const placement = useFloatingPanel(true, x, y, panelRef);
@@ -180,6 +181,19 @@ function DraftComposer({ draft, x, y }: DraftComposerProps) {
         onMouseEnter={() => setHovered(true)}
         onMouseLeave={() => setHovered(false)}
       >
+        <div className="wpn-composer__path">
+          <label className="wpn-composer__path-label" htmlFor="wpn-composer-path">
+            Path
+          </label>
+          <input
+            id="wpn-composer-path"
+            type="text"
+            className="wpn-input wpn-composer__path-value"
+            value={draft.path}
+            onChange={(event) => updateDraftPath(event.target.value)}
+          />
+        </div>
+        <span className="wpn-composer__field-label">Comment</span>
         <MentionTextarea
           className="wpn-input wpn-composer__field"
           value={message}
@@ -210,7 +224,7 @@ function DraftComposer({ draft, x, y }: DraftComposerProps) {
               <button
                 type="submit"
                 className="wpn-btn wpn-btn--primary"
-                disabled={!message.trim() || submitting}
+                disabled={!message.trim() || !draft.path.trim() || submitting}
               >
                 Add comment
               </button>

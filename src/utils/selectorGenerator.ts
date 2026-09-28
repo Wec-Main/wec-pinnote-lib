@@ -1,3 +1,5 @@
+import { scopedSelector } from "./annotationScope";
+
 const UNSTABLE_ID_PATTERNS = [
   /^:/,
   /^ember\d+/i,
@@ -6,6 +8,11 @@ const UNSTABLE_ID_PATTERNS = [
 
   /^_r_[0-9a-z]+_$/i,
   /^[a-f0-9]{8,}$/i,
+  /^radix-/i,
+  /^headlessui-/i,
+  /^mui-\d+/i,
+  /^«r/,
+  /:r[0-9a-z]+:/i,
 ];
 
 const STABLE_DATA_KEYS = ["annotation-id", "name", "field"];
@@ -50,20 +57,20 @@ function attributeSelector(element: Element, name: string): string | null {
   return `${element.tagName.toLowerCase()}[${name}="${cssEscape(value)}"]`;
 }
 
-function generatedPathSelector(element: Element): string {
+function generatedPathSelector(element: Element, root: ParentNode, stopAt: Element | null): string {
   const parts: string[] = [];
   let current: Element | null = element;
 
-  while (current && !SKIP_TAGS.has(current.tagName)) {
+  while (current && !SKIP_TAGS.has(current.tagName) && current !== stopAt) {
     const annotationId = dataAttributeSelector(current, "annotation-id");
-    if (annotationId && isUniqueSelector(annotationId)) {
+    if (annotationId && isUniqueSelector(annotationId, root)) {
       parts.unshift(annotationId);
       break;
     }
 
     if (current.id && isStableId(current.id)) {
       const idSelector = `#${cssEscape(current.id)}`;
-      if (isUniqueSelector(idSelector)) {
+      if (isUniqueSelector(idSelector, root)) {
         parts.unshift(idSelector);
         break;
       }
@@ -72,7 +79,7 @@ function generatedPathSelector(element: Element): string {
     const node: Element = current;
     const tag = node.tagName.toLowerCase();
     const parent: Element | null = node.parentElement;
-    if (!parent) {
+    if (!parent || parent === stopAt) {
       parts.unshift(tag);
       break;
     }
@@ -93,47 +100,54 @@ function generatedPathSelector(element: Element): string {
   return parts.join(" > ");
 }
 
-export function generateSelector(element: Element): {
+export function generateSelector(
+  element: Element,
+  scope?: { name: string; root: Element },
+): {
   selector: string;
   elementIdentifier: string;
 } {
+  const root: ParentNode = scope ? scope.root : document;
+  const stopAt = scope ? scope.root : null;
+  const wrap = (selector: string): string => (scope ? scopedSelector(scope.name, selector) : selector);
+
   const annotationId = element.getAttribute("data-annotation-id");
   if (annotationId) {
     const selector = `[data-annotation-id="${cssEscape(annotationId)}"]`;
-    if (isUniqueSelector(selector)) {
-      return { selector, elementIdentifier: annotationId };
+    if (isUniqueSelector(selector, root)) {
+      return { selector: wrap(selector), elementIdentifier: annotationId };
     }
   }
 
   if (element.id && isStableId(element.id)) {
     const selector = `#${cssEscape(element.id)}`;
-    if (isUniqueSelector(selector)) {
-      return { selector, elementIdentifier: element.id };
+    if (isUniqueSelector(selector, root)) {
+      return { selector: wrap(selector), elementIdentifier: element.id };
     }
   }
 
   for (const key of STABLE_DATA_KEYS) {
     const selector = dataAttributeSelector(element, key);
-    if (selector && isUniqueSelector(selector)) {
+    if (selector && isUniqueSelector(selector, root)) {
       return {
-        selector,
+        selector: wrap(selector),
         elementIdentifier: element.getAttribute(`data-${key}`) ?? selector,
       };
     }
   }
 
   const nameSelector = attributeSelector(element, "name");
-  if (nameSelector && isUniqueSelector(nameSelector)) {
+  if (nameSelector && isUniqueSelector(nameSelector, root)) {
     return {
-      selector: nameSelector,
+      selector: wrap(nameSelector),
       elementIdentifier: element.getAttribute("name") ?? nameSelector,
     };
   }
 
   const ariaSelector = attributeSelector(element, "aria-label");
-  if (ariaSelector && isUniqueSelector(ariaSelector)) {
+  if (ariaSelector && isUniqueSelector(ariaSelector, root)) {
     return {
-      selector: ariaSelector,
+      selector: wrap(ariaSelector),
       elementIdentifier: element.getAttribute("aria-label") ?? ariaSelector,
     };
   }
@@ -142,15 +156,14 @@ export function generateSelector(element: Element): {
   const name = element.getAttribute("name");
   if (type && name) {
     const combined = `${element.tagName.toLowerCase()}[type="${cssEscape(type)}"][name="${cssEscape(name)}"]`;
-    if (isUniqueSelector(combined)) {
-      return { selector: combined, elementIdentifier: name };
+    if (isUniqueSelector(combined, root)) {
+      return { selector: wrap(combined), elementIdentifier: name };
     }
   }
 
-  const selector = generatedPathSelector(element);
+  const selector = generatedPathSelector(element, root, stopAt);
   return {
-
-    selector,
+    selector: wrap(selector),
     elementIdentifier: annotationId ?? "",
   };
 }

@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type RefObject } from "react";
 import type { AnnotationAnchor } from "../types/annotation.types";
 import { isLibraryElement, resolveElement } from "../utils/elementResolver";
+import { ANNOTATION_SCOPE_ATTRIBUTE } from "../utils/annotationScope";
 import {
   computePinPosition,
   placePanel,
@@ -168,9 +169,17 @@ export function useAnnotationPositions(items: PositionedItem[]): Map<string, Pin
       }
     };
 
+    const scheduleFromTransitionEvent = (event: Event) => {
+      if (!isLibraryElement(event.target)) {
+        schedule();
+      }
+    };
+
     schedule();
     window.addEventListener("resize", schedule);
     window.addEventListener("scroll", schedule, { capture: true, passive: true });
+    document.addEventListener("transitionend", scheduleFromTransitionEvent, true);
+    document.addEventListener("animationend", scheduleFromTransitionEvent, true);
 
     const resizeObserver =
       typeof ResizeObserver === "undefined" ? null : new ResizeObserver(schedule);
@@ -199,7 +208,7 @@ export function useAnnotationPositions(items: PositionedItem[]): Map<string, Pin
         childList: true,
         subtree: true,
         attributes: true,
-        attributeFilter: ["style", "class", "hidden"],
+        attributeFilter: ["style", "class", "hidden", ANNOTATION_SCOPE_ATTRIBUTE],
       });
     }
     // A host dialog is usually mounted somewhere in document.body that isn't
@@ -215,7 +224,7 @@ export function useAnnotationPositions(items: PositionedItem[]): Map<string, Pin
       childList: true,
       subtree: true,
       attributes: true,
-      attributeFilter: ["style", "class", "hidden"],
+      attributeFilter: ["style", "class", "hidden", ANNOTATION_SCOPE_ATTRIBUTE],
     });
 
     return () => {
@@ -224,6 +233,8 @@ export function useAnnotationPositions(items: PositionedItem[]): Map<string, Pin
       window.clearTimeout(maxWaitTimer);
       window.removeEventListener("resize", schedule);
       window.removeEventListener("scroll", schedule, true);
+      document.removeEventListener("transitionend", scheduleFromTransitionEvent, true);
+      document.removeEventListener("animationend", scheduleFromTransitionEvent, true);
       resizeObserver?.disconnect();
       mutationObserver?.disconnect();
     };

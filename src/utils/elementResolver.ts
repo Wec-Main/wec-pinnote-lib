@@ -1,5 +1,6 @@
 import type { AnnotationAnchor } from "../types/annotation.types";
 import { cssEscape } from "./selectorGenerator";
+import { activeScopeRoot, findScopeRoot, isRendered, parseScopedSelector } from "./annotationScope";
 
 const LIBRARY_ROOT_CLASS = "wpn-root";
 const LABELABLE_SELECTOR =
@@ -9,56 +10,113 @@ export function isLibraryElement(target: EventTarget | null): boolean {
   return target instanceof Element && Boolean(target.closest(`.${LIBRARY_ROOT_CLASS}`));
 }
 
-function findByLabel(label: string): Element | null {
-  const candidates = document.querySelectorAll(LABELABLE_SELECTOR);
-  let match: Element | null = null;
-  for (const candidate of candidates) {
-    if (isLibraryElement(candidate)) {
-      continue;
-    }
+function dropNestedDuplicates(candidates: Element[]): Element[] {
+  return candidates.filter(
+    (candidate) => !candidates.some((other) => other !== candidate && other.contains(candidate)),
+  );
+}
 
-    if (label === candidate.tagName.toLowerCase()) {
-      continue;
-    }
-    if (getElementLabel(candidate) === label) {
-      if (match) {
+function pickAmong(candidates: Element[], label: string): Element | null {
+  const deduped = dropNestedDuplicates(candidates);
 
-        return null;
-      }
-      match = candidate;
-    }
+  if (deduped.length === 1) {
+    return deduped[0] ?? null;
   }
-  return match;
+
+  const rendered = deduped.filter(isRendered);
+  if (rendered.length === 1) {
+    return rendered[0] ?? null;
+  }
+
+  const labelMatches = (rendered.length > 0 ? rendered : deduped).filter(
+    (candidate) => getElementLabel(candidate) === label,
+  );
+  if (labelMatches.length === 1) {
+    return labelMatches[0] ?? null;
+  }
+
+  return null;
+}
+
+function findByLabel(label: string, root: ParentNode): Element | null {
+  const candidates = Array.from(root.querySelectorAll(LABELABLE_SELECTOR)).filter((candidate) => {
+    if (isLibraryElement(candidate)) {
+      return false;
+    }
+    if (label === candidate.tagName.toLowerCase()) {
+      return false;
+    }
+    return getElementLabel(candidate) === label;
+  });
+
+  const deduped = dropNestedDuplicates(candidates);
+  if (deduped.length === 0) {
+    return null;
+  }
+  if (deduped.length === 1) {
+    return deduped[0] ?? null;
+  }
+  return pickAmong(deduped, label);
 }
 
 export function resolveElement(anchor: AnnotationAnchor): Element | null {
-  if (anchor.selector) {
+  const active = activeScopeRoot(document);
+  const { scope, inner } = parseScopedSelector(anchor.selector);
+
+  if (scope) {
+    if (!active || active !== findScopeRoot(scope)) {
+      return null;
+    }
+    return resolveWithin(inner, active, anchor.elementIdentifier);
+  }
+
+  if (active) {
+    return null;
+  }
+
+  return resolveWithin(inner, document, anchor.elementIdentifier);
+}
+
+function resolveWithin(selector: string, root: ParentNode, elementIdentifier: string): Element | null {
+  if (selector) {
     try {
-      const bySelector = document.querySelector(anchor.selector);
-      if (bySelector) {
-        return bySelector;
+      const matches = Array.from(root.querySelectorAll(selector));
+      if (matches.length === 1) {
+        return matches[0] ?? null;
+      }
+      if (matches.length > 1) {
+        const picked = pickAmong(matches, elementIdentifier);
+        if (picked) {
+          return picked;
+        }
       }
     } catch {
       // A stored selector can be invalid CSS; fall through to the other strategies.
     }
   }
 
-  if (anchor.elementIdentifier) {
-    const byAnnotationId = document.querySelector(
-      `[data-annotation-id="${cssEscape(anchor.elementIdentifier)}"]`,
+  if (elementIdentifier) {
+    const byAnnotationId = root.querySelectorAll(
+      `[data-annotation-id="${cssEscape(elementIdentifier)}"]`,
     );
-    if (byAnnotationId) {
-      return byAnnotationId;
+    if (byAnnotationId.length === 1) {
+      return byAnnotationId[0] ?? null;
+    }
+    if (byAnnotationId.length > 1) {
+      const picked = pickAmong(Array.from(byAnnotationId), elementIdentifier);
+      if (picked) {
+        return picked;
+      }
     }
 
-    if (typeof CSS !== "undefined") {
-      const byId = document.getElementById(anchor.elementIdentifier);
+    if (root instanceof Document) {
+      const byId = root.getElementById(elementIdentifier);
       if (byId) {
         return byId;
       }
     }
 
-    const byLabel = findByLabel(anchor.elementIdentifier);
+    const byLabel = findByLabel(elementIdentifier, root);
     if (byLabel) {
       return byLabel;
     }

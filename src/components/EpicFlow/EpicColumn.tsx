@@ -1,17 +1,14 @@
 import { Icon, Tooltip } from "../primitives";
-import { AuthorBadge } from "./AuthorBadge";
 import { EPICFLOW_PAGE_SIZE, ShowMoreButton } from "./ShowMoreButton";
 import { useIncrementalList } from "../../hooks/useIncrementalList";
 import type { Epic } from "../../types/epicFlow.types";
 import type { AnnotationUser } from "../../types/annotation.types";
-import { formatTimestamp } from "../../utils/format";
 import { canDeleteBoardItem } from "../../utils/boardPermissions";
 
 interface EpicColumnProps {
   epics: Epic[];
   hasAnyEpics: boolean;
   selectedEpicId: string | null;
-  storyCounts: Record<string, number>;
   currentUser: AnnotationUser;
   onSelect: (epicId: string) => void;
   onCreate: () => void;
@@ -23,7 +20,6 @@ export function EpicColumn({
   epics,
   hasAnyEpics,
   selectedEpicId,
-  storyCounts,
   currentUser,
   onSelect,
   onCreate,
@@ -84,28 +80,8 @@ export function EpicColumn({
                   }
                 }}
               >
-                <span className="wpn-epicflow-card__title">{epic.title}</span>
-                <div className="wpn-epicflow-card__footer">
-                  <div className="wpn-epicflow-card__meta">
-                    <AuthorBadge name={epic.createdByUser} />
-                    <span
-                      className="wpn-epicflow-card__stat"
-                      title={`Created ${formatTimestamp(epic.createdAt)}`}
-                    >
-                      <Icon name="calendar" className="wpn-epicflow-card__stat-icon" />
-                      {formatTimestamp(epic.createdAt)}
-                    </span>
-                    <span
-                      className="wpn-epicflow-card__stat"
-                      title={`${storyCounts[epic.id] ?? 0} user ${
-                        (storyCounts[epic.id] ?? 0) === 1 ? "story" : "stories"
-                      }`}
-                    >
-                      <Icon name="users" className="wpn-epicflow-card__stat-icon" />
-                      {storyCounts[epic.id] ?? 0} user{" "}
-                      {(storyCounts[epic.id] ?? 0) === 1 ? "story" : "stories"}
-                    </span>
-                  </div>
+                <div className="wpn-epicflow-card__row">
+                  <span className="wpn-epicflow-card__title">{epic.title}</span>
                   <div className="wpn-epicflow-card__actions">
                     <Tooltip label="Edit epic" placement="bottom">
                       <button

@@ -142,6 +142,15 @@ The current page key comes from `getPageKey()`, or `window.location.pathname` if
 
 The library works with React Router, Next.js, TanStack Router, and custom routing because it does not depend on any router package: it re-reads the page key on `popstate`, `hashchange`, `history.pushState` and `history.replaceState`. When `pageKey` changes it aborts the previous request, clears the previous page, and fetches annotations for the new page.
 
+A screen that changes only in-memory state (a modal, a tab, a wizard step) does not change the pathname, so it keeps the same page key by default and shares its annotations with every other screen on that path. Call `useAnnotationView(name)` inside a screen that should isolate its own annotations from the rest of that page: while mounted, the effective page key becomes `<pageKey>::<name>`, and it reverts to the plain page key on unmount. Nesting views uses the innermost mounted name.
+
+```tsx
+function ForgotPasswordModal() {
+  useAnnotationView("forgot-password");
+  return <div>...</div>;
+}
+```
+
 ---
 
 ## DOM anchoring
@@ -163,6 +172,16 @@ For the most stable anchors, add:
 ```html
 <button data-annotation-id="login-submit">Login</button>
 ```
+
+Two screens that reuse the same markup (a shared modal component used for both a Reset Password and a Recover Username dialog, for example) can otherwise generate colliding selectors: the same relative path from a common ancestor matches the corresponding element in both. Mark each screen's root with the `data-annotation-scope` attribute (its name is exported as `ANNOTATION_SCOPE_ATTRIBUTE`) to scope both capture and resolution to that subtree:
+
+```html
+<div data-annotation-scope="login-forgot_password">...</div>
+```
+
+When one or more scoped elements are present and visible, only the topmost visible one is active: capture and resolution run against its subtree, and any pin anchored outside every currently active scope, or inside a different scope, does not resolve while that scope is active. An annotation whose element cannot be resolved does not render a pin; it appears in the comment list marked "Not in this view" instead. Adding this attribute is optional and additive — selectors captured with no scope present behave exactly as before.
+
+Elements inside a shadow root or an iframe cannot be captured or resolved; every lookup runs against the top-level document.
 
 ---
 

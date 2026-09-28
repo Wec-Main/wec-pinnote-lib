@@ -35,6 +35,7 @@ export interface Annotation {
   projectId: string;
   projectVersionId?: string;
   pageKey: string;
+  path?: string | null;
   number: number;
   anchor: AnnotationAnchor;
   status: AnnotationStatus;
@@ -48,6 +49,7 @@ export interface CreateAnnotationRequest {
   projectId: string;
   projectVersionId?: string;
   pageKey: string;
+  path?: string;
   anchor: AnnotationAnchor;
   comment: {
     message: string;
@@ -141,6 +143,7 @@ export interface ResolvedAnnotationConfig extends AnnotationConfig {
 export interface DraftAnnotation {
   id: string;
   label: string;
+  path: string;
   anchor: AnnotationAnchor;
   number: number;
   message: string;

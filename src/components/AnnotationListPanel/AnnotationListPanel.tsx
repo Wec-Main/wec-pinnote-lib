@@ -3,6 +3,7 @@ import { useAnnotationData, useAnnotationUi } from "../../context/AnnotationCont
 import { Icons } from "../../assets/icons";
 import { Icon, SearchableSelect, Tooltip } from "../primitives";
 import { usePersistentState } from "../../hooks/usePersistentState";
+import { useAnnotationPresence } from "../../hooks/useAnnotationPresence";
 import { isBoolean, isNumber } from "../../utils/valueGuards";
 import {
   DEFAULT_COMMENT_FILTERS,
@@ -95,6 +96,7 @@ export function AnnotationListPanel() {
     };
   }, [resizing]);
 
+  const presentIds = useAnnotationPresence(annotations);
   const allThreads = useMemo(() => toThreads(annotations), [annotations]);
   const threads = useMemo(
     () => filterThreads(allThreads, filters, currentUserId),
@@ -287,6 +289,7 @@ export function AnnotationListPanel() {
               active={selectedId === thread.annotation.id}
               currentUserId={currentUserId}
               repliesCollapsed={!openReplies.has(thread.annotation.id)}
+              inView={presentIds.has(thread.annotation.id)}
               onToggleReplies={toggleReplies}
               onSelect={openAnnotation}
             />

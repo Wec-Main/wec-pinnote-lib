@@ -58,3 +58,66 @@ describe("createAnnotationApi retry on 401", () => {
     expect(getAuthToken).toHaveBeenCalledTimes(1);
   });
 });
+
+function validAnchor() {
+  return {
+    selector: "#x",
+    elementIdentifier: "hero_banner",
+    relativeX: 0,
+    relativeY: 0,
+    fallbackX: 0,
+    fallbackY: 0,
+    viewportWidth: 1,
+    viewportHeight: 1,
+  };
+}
+
+function validAnnotation(id: string) {
+  return {
+    id,
+    projectId: "demo",
+    pageKey: "/home",
+    number: 1,
+    status: "open",
+    anchor: validAnchor(),
+    createdBy: { id: "u1", name: "Ada Lovelace" },
+    createdAt: "2026-01-01T00:00:00.000Z",
+    updatedAt: "2026-01-01T00:00:00.000Z",
+  };
+}
+
+describe("createAnnotationApi listAnnotations resilience", () => {
+  it("keeps valid items and drops a malformed one and one with a NaN anchor field", async () => {
+    const malformed = { id: "bad-1" };
+    const nanAnchor = { ...validAnnotation("bad-2"), anchor: { ...validAnchor(), relativeX: NaN } };
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(
+        jsonResponse(200, [validAnnotation("a1"), malformed, nanAnchor, validAnnotation("a2")]),
+      );
+    vi.stubGlobal("fetch", fetchMock);
+
+    const api = createAnnotationApi({
+      apiBaseUrl: "https://api.example.com",
+      getAuthToken: vi.fn().mockResolvedValue("token"),
+    });
+
+    const result = await api.listAnnotations({ projectId: "demo", pageKey: "/home" });
+
+    expect(result.map((annotation) => annotation.id)).toEqual(["a1", "a2"]);
+  });
+
+  it("defaults comments to an empty array when omitted", async () => {
+    const fetchMock = vi.fn().mockResolvedValueOnce(jsonResponse(200, [validAnnotation("a1")]));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const api = createAnnotationApi({
+      apiBaseUrl: "https://api.example.com",
+      getAuthToken: vi.fn().mockResolvedValue("token"),
+    });
+
+    const result = await api.listAnnotations({ projectId: "demo", pageKey: "/home" });
+
+    expect(result[0]?.comments).toEqual([]);
+  });
+});

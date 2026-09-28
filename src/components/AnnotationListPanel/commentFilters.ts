@@ -1,4 +1,5 @@
 import type { Annotation, AnnotationComment, AnnotationStatus } from "../../types/annotation.types";
+import { annotationLabel } from "../../utils/annotationLabel";
 import { ANNOTATION_STATUS_OPTIONS, isDoneStatus } from "../../utils/status";
 import type { SelectOption } from "../primitives";
 
@@ -43,7 +44,7 @@ export const RESOLUTION_OPTIONS: SelectOption[] = [
 ];
 
 export function elementLabel(annotation: Annotation): string {
-  return annotation.anchor.elementIdentifier.replace(/[-_]/g, " ");
+  return annotationLabel(annotation);
 }
 
 export function toThreads(annotations: Annotation[]): CommentThread[] {

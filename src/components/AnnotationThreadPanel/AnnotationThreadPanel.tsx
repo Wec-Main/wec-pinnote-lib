@@ -2,6 +2,7 @@ import { useRef, useState } from "react";
 import { useAnnotationData, useAnnotationUi } from "../../context/AnnotationContext";
 import { useFloatingPanel } from "../../hooks/useAnnotationPosition";
 import { useEscapeKey } from "../../hooks/useEscapeKey";
+import { annotationLabel } from "../../utils/annotationLabel";
 import { AnnotationReplyComposer } from "../AnnotationReplyComposer";
 import { AnnotationStatusSelect } from "../AnnotationStatusSelect";
 import { AnnotationThread } from "../AnnotationThread";
@@ -68,7 +69,7 @@ export function AnnotationThreadPanel({
     return null;
   }
 
-  const defaultTitle = annotation.anchor.elementIdentifier.replace(/[-_]/g, " ");
+  const defaultTitle = annotationLabel(annotation);
   const title = titleOverride ?? defaultTitle;
 
   const startEditingTitle = () => {
