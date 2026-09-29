@@ -7,6 +7,7 @@ import { AnnotationLayer } from "../components/AnnotationLayer";
 import { useAnnotationApi } from "../hooks/useAnnotationApi";
 import { useAuthSessions } from "../hooks/useAuthSessions";
 import { useAnnotationCollection } from "../hooks/useAnnotations";
+import { useAllProjectAnnotations } from "../hooks/useAllProjectAnnotations";
 import { usePageKey } from "../hooks/usePageKey";
 import { usePageVisitTracker } from "../hooks/usePageVisitTracker";
 import { AnnotationViewContext } from "./AnnotationViewContext";
@@ -194,6 +195,39 @@ export function AnnotationProvider({ config, children }: AnnotationProviderProps
     sessionKey: sessionKey ?? "",
     events: resolved,
   });
+
+  const {
+    annotations: allAnnotations,
+    loading: allAnnotationsLoading,
+    error: allAnnotationsError,
+    reload: reloadAllAnnotations,
+  } = useAllProjectAnnotations({
+    api,
+    apiBaseUrl: activeConfig.apiBaseUrl,
+    projectId,
+    projectVersionId,
+    authenticated: teardownActive,
+    sessionKey,
+  });
+
+  // The current page's own creates/edits/replies/deletes/status changes
+  // should show up in the project-wide count/list shortly after they
+  // succeed, without threading a reload call through every mutation
+  // callback. `annotations` (page-scoped) already changes reference on every
+  // successful mutation, so just piggyback on that; debounce since an
+  // optimistic update and its server confirmation both change the reference
+  // in quick succession.
+  const reloadAllAnnotationsRef = useRef(reloadAllAnnotations);
+  reloadAllAnnotationsRef.current = reloadAllAnnotations;
+  const isFirstAnnotationsRenderRef = useRef(true);
+  useEffect(() => {
+    if (isFirstAnnotationsRenderRef.current) {
+      isFirstAnnotationsRenderRef.current = false;
+      return;
+    }
+    const timer = window.setTimeout(() => reloadAllAnnotationsRef.current(), 400);
+    return () => window.clearTimeout(timer);
+  }, [annotations]);
 
   const [modeEnabled, setModeEnabledState] = useState(false);
   const setModeEnabled = useCallback(
@@ -700,6 +734,10 @@ export function AnnotationProvider({ config, children }: AnnotationProviderProps
       error,
       connectionState,
       retry,
+      allAnnotations,
+      allAnnotationsLoading,
+      allAnnotationsError,
+      reloadAllAnnotations,
       actionError,
       clearActionError,
       createAnnotation,
@@ -729,6 +767,10 @@ export function AnnotationProvider({ config, children }: AnnotationProviderProps
       error,
       connectionState,
       retry,
+      allAnnotations,
+      allAnnotationsLoading,
+      allAnnotationsError,
+      reloadAllAnnotations,
       actionError,
       clearActionError,
       createAnnotation,

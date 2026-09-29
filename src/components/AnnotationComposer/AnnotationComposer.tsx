@@ -104,7 +104,12 @@ function DraftComposer({ draft, x, y }: DraftComposerProps) {
     <div
       ref={panelRef}
       className="wpn-panel wpn-composer"
-      style={{ left: placement.left, top: placement.top, width: width ?? undefined }}
+      style={{
+        left: placement?.left ?? 0,
+        top: placement?.top ?? 0,
+        width: width ?? undefined,
+        visibility: placement ? "visible" : "hidden",
+      }}
     >
       <div
         className="wpn-composer__resize-e"

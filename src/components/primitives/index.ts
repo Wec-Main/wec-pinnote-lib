@@ -23,5 +23,6 @@ export type {
   MenuSubmenuItem,
 } from "./Menu";
 export { ColorPicker } from "./ColorPicker";
+export { Switch } from "./Switch";
 export { Tabs } from "./Tabs";
 export type { TabDefinition } from "./Tabs";

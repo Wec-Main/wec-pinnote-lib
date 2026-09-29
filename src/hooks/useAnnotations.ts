@@ -27,7 +27,7 @@ class StaleAccountError extends Error {
   }
 }
 
-function errorMessage(error: unknown): string {
+export function errorMessage(error: unknown): string {
   if (error instanceof AnnotationApiError) {
     return error.message;
   }

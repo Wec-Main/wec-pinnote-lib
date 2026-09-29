@@ -113,11 +113,16 @@ export function AnnotationThreadPanel({
       <div
         ref={panelRef}
         className="wpn-panel wpn-thread-panel"
-        style={{ left: placement.left, top: placement.top }}
+        style={{
+          left: placement?.left ?? 0,
+          top: placement?.top ?? 0,
+          visibility: placement ? "visible" : "hidden",
+        }}
         role="dialog"
         aria-label={`Comment thread: ${title}`}
       >
         <div className="wpn-panel__header">
+          <div className="wpn-panel__header-row">
           <span className="wpn-panel__title-group">
             {editingTitle ? (
               <textarea
@@ -194,6 +199,13 @@ export function AnnotationThreadPanel({
               ×
             </button>
           </Tooltip>
+          </div>
+          {annotation.path ? (
+            <div className="wpn-thread-panel__path" title={annotation.path}>
+              <span className="wpn-thread-panel__path-label">PATH: </span>
+              {annotation.path}
+            </div>
+          ) : null}
         </div>
         {confirmClose ? (
           <div className="wpn-thread-panel__discard" role="alert">

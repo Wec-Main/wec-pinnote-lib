@@ -1,4 +1,5 @@
 import type { AnnotationAnchor } from "../types/annotation.types";
+import { measureContentRect } from "./contentRect";
 import { resolveElement } from "./elementResolver";
 
 export interface PinScreenPosition {
@@ -25,7 +26,9 @@ export function computePinPosition(
   element: Element | null = resolveElement(anchor),
 ): PinScreenPosition {
   if (element) {
-    const rect = element.getBoundingClientRect();
+    const rect = anchor.contentRelative
+      ? (measureContentRect(element) ?? element.getBoundingClientRect())
+      : element.getBoundingClientRect();
     return {
       x: rect.left + anchor.relativeX * rect.width,
       y: rect.top + anchor.relativeY * rect.height,

@@ -119,6 +119,30 @@ export function updateProject(
   );
 }
 
+export interface ProjectVersionSettingsPatch {
+  annotationVersioningEnabled?: boolean;
+  tagVersioningEnabled?: boolean;
+  flowVersioningEnabled?: boolean;
+}
+
+export function updateProjectVersionSettings(
+  apiBaseUrl: string,
+  authToken: string | undefined,
+  projectId: string,
+  patch: ProjectVersionSettingsPatch,
+  signal?: AbortSignal,
+): Promise<Project> {
+  return request<Project>(
+    buildUrl(apiBaseUrl, `/projects/${encodeURIComponent(projectId)}/version-settings`),
+    authToken,
+    {
+      method: "PATCH",
+      body: JSON.stringify(patch),
+      signal,
+    },
+  );
+}
+
 export function deleteProject(
   apiBaseUrl: string,
   authToken: string | undefined,

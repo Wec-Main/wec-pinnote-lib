@@ -22,6 +22,7 @@ export interface AnnotationTag {
   fallbackY: number;
   viewportWidth: number;
   viewportHeight: number;
+  contentRelative?: boolean;
   width?: number;
   height?: number;
   createdById: string | null;

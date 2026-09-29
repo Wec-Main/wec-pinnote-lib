@@ -12,6 +12,7 @@ import { invalidateSharedFetch, useSharedFetch } from "../../hooks/useSharedFetc
 import {
   Icon,
   ListSearchBar,
+  ModalShell,
   RefreshButton,
   SearchableSelect,
   TableSkeleton,
@@ -19,6 +20,7 @@ import {
 } from "../primitives";
 import { ConfirmDialog } from "../UserManagement/ConfirmDialog";
 import { ProjectFormModal } from "./ProjectFormModal";
+import { ProjectVersionsPanel } from "./ProjectVersionsPanel";
 import { useResourceTable } from "./useResourceTable";
 
 export function ProjectsTab() {
@@ -26,6 +28,7 @@ export function ProjectsTab() {
   const authToken = activeAccount?.token;
 
   const [organizationFilter, setOrganizationFilter] = useState("");
+  const [versionsTarget, setVersionsTarget] = useState<Project | null>(null);
   const organizationsKey = `organizations:${config.apiBaseUrl}:${authToken ?? ""}`;
   const { data: organizations } = useSharedFetch<Organization[]>(organizationsKey, (signal) =>
     fetchOrganizations(config.apiBaseUrl, authToken, signal),
@@ -168,6 +171,7 @@ export function ProjectsTab() {
               <th>Project</th>
               <th>Organization</th>
               <th>Status</th>
+              <th className="wpn-users-table__version-settings-head">Version Settings</th>
               <th className="wpn-users-table__actions-head">Actions</th>
             </tr>
           </thead>
@@ -175,12 +179,12 @@ export function ProjectsTab() {
             {loading && !loaded ? (
               <TableSkeleton
                 rows={5}
-                columns={["identity", "text", "pill", "actions"]}
+                columns={["identity", "text", "pill", "actions", "actions"]}
                 label="Loading projects"
               />
             ) : loadError && projects.length === 0 ? (
               <tr>
-                <td colSpan={4} className="wpn-users-table__empty">
+                <td colSpan={5} className="wpn-users-table__empty">
                   <Icon name="alert" className="wpn-users-table__empty-icon" />
                   <span>{loadError}</span>
                   <button type="button" className="wpn-btn wpn-btn--ghost" onClick={reload}>
@@ -190,7 +194,7 @@ export function ProjectsTab() {
               </tr>
             ) : visible.length === 0 ? (
               <tr>
-                <td colSpan={4} className="wpn-users-table__empty">
+                <td colSpan={5} className="wpn-users-table__empty">
                   <Icon name="folder" className="wpn-users-table__empty-icon" />
                   <span>
                     {organizationList.length === 0
@@ -215,6 +219,18 @@ export function ProjectsTab() {
                     <span className={`wpn-users-pill wpn-users-pill--status-${project.status}`}>
                       {project.status}
                     </span>
+                  </td>
+                  <td className="wpn-users-table__version-settings-cell">
+                    <Tooltip label="Version settings" placement="left">
+                      <button
+                        type="button"
+                        className="wpn-icon-btn"
+                        aria-label={`Version settings for ${project.name}`}
+                        onClick={() => setVersionsTarget(project)}
+                      >
+                        <Icon name="settings" />
+                      </button>
+                    </Tooltip>
                   </td>
                   <td>
                     <div className="wpn-users-actions">
@@ -270,6 +286,20 @@ export function ProjectsTab() {
           onCancel={cancelDelete}
           onConfirm={confirmDelete}
         />
+      ) : null}
+
+      {versionsTarget ? (
+        <ModalShell
+          title={`${versionsTarget.name} — Versions`}
+          onClose={() => setVersionsTarget(null)}
+        >
+          <ProjectVersionsPanel
+            apiBaseUrl={config.apiBaseUrl}
+            authToken={authToken}
+            projectId={versionsTarget.id}
+            showVersionSettings
+          />
+        </ModalShell>
       ) : null}
     </div>
   );

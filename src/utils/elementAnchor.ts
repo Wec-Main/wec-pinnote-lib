@@ -2,8 +2,15 @@ import type { AnnotationAnchor } from "../types/annotation.types";
 import { generateSelector, isStableId } from "./selectorGenerator";
 import { getElementLabel } from "./elementResolver";
 import { ANNOTATION_SCOPE_ATTRIBUTE, scopeRootOf } from "./annotationScope";
+import { measureContentRect } from "./contentRect";
 
 const SKIP_TAGS = new Set(["HTML", "BODY", "HEAD", "SCRIPT", "STYLE", "LINK", "META", "NOSCRIPT"]);
+
+// A box is considered wider/taller than its content (i.e. alignment is
+// visibly positioning the content within it, rather than the content simply
+// filling the box) once the content rect drops below this fraction of the
+// element's own box in either dimension.
+const CONTENT_FIT_THRESHOLD = 0.9;
 
 function clamp01(value: number): number {
   if (Number.isNaN(value)) {
@@ -56,18 +63,27 @@ export function createElementAnchor(
     target,
     scopeRoot && scopeName ? { name: scopeName, root: scopeRoot } : undefined,
   );
-  const width = rect.width || 1;
-  const height = rect.height || 1;
+
+  const contentRect = measureContentRect(target);
+  const contentRelative = Boolean(
+    contentRect &&
+      (contentRect.width < rect.width * CONTENT_FIT_THRESHOLD ||
+        contentRect.height < rect.height * CONTENT_FIT_THRESHOLD),
+  );
+  const referenceRect = contentRelative && contentRect ? contentRect : rect;
+  const width = referenceRect.width || 1;
+  const height = referenceRect.height || 1;
 
   return {
     selector,
     elementIdentifier: elementIdentifier || getElementLabel(target),
-    relativeX: clamp01((clientX - rect.left) / width),
-    relativeY: clamp01((clientY - rect.top) / height),
+    relativeX: clamp01((clientX - referenceRect.left) / width),
+    relativeY: clamp01((clientY - referenceRect.top) / height),
     fallbackX: clientX,
     fallbackY: clientY,
     viewportWidth: window.innerWidth,
     viewportHeight: window.innerHeight,
+    ...(contentRelative ? { contentRelative: true } : {}),
   };
 }
 

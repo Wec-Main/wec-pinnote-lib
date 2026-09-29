@@ -40,6 +40,14 @@ export interface AnnotationDataContextValue {
   error: string | null;
   connectionState: StreamConnectionState;
   retry: () => void;
+  // Every annotation across the whole project, regardless of page — used by
+  // the toolbar comment count and the comments list panel. Refetched (not
+  // live-streamed); see reloadAllAnnotations. Pin rendering, drafting, and
+  // per-page live updates all continue to use `annotations` above.
+  allAnnotations: Annotation[];
+  allAnnotationsLoading: boolean;
+  allAnnotationsError: string | null;
+  reloadAllAnnotations: () => void;
   actionError: string | null;
   clearActionError: () => void;
   createAnnotation: (request: CreateAnnotationRequest) => Promise<Annotation>;

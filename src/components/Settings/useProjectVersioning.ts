@@ -1,5 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { fetchProject } from "../../services/organizationsApi";
+import {
+  fetchProject,
+  updateProjectVersionSettings,
+  type ProjectVersionSettingsPatch,
+} from "../../services/organizationsApi";
 import { createProjectVersionsApi } from "../../services/projectVersionsApi";
 import type { Project } from "../../types/organization.types";
 import type { ProjectVersion } from "../../types/projectVersion.types";
@@ -20,6 +24,7 @@ export interface ProjectVersioningState {
   addVersion: () => Promise<void>;
   publishVersion: (versionId: string) => Promise<void>;
   setActiveVersion: (versionId: string) => Promise<void>;
+  updateVersionSettings: (patch: ProjectVersionSettingsPatch) => Promise<void>;
 }
 
 export function useProjectVersioning(
@@ -153,6 +158,22 @@ export function useProjectVersioning(
     [api, projectId, showNotice, reload, onVersionChanged],
   );
 
+  const updateVersionSettings = useCallback(
+    async (patch: ProjectVersionSettingsPatch) => {
+      setBusy(true);
+      try {
+        await updateProjectVersionSettings(apiBaseUrl, authToken, projectId, patch);
+        showNotice("Version settings updated.");
+        reload();
+      } catch (err) {
+        showNotice(errorMessage(err));
+      } finally {
+        setBusy(false);
+      }
+    },
+    [apiBaseUrl, authToken, projectId, showNotice, reload],
+  );
+
   return useMemo(
     () => ({
       project,
@@ -167,6 +188,7 @@ export function useProjectVersioning(
       addVersion,
       publishVersion,
       setActiveVersion,
+      updateVersionSettings,
     }),
     [
       project,
@@ -181,6 +203,7 @@ export function useProjectVersioning(
       addVersion,
       publishVersion,
       setActiveVersion,
+      updateVersionSettings,
     ],
   );
 }

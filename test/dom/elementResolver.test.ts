@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from "vitest";
-import { resolveElement } from "../../src/utils/elementResolver";
+import { getElementLabel, resolveElement } from "../../src/utils/elementResolver";
 import { generateSelector } from "../../src/utils/selectorGenerator";
 import { ANNOTATION_SCOPE_ATTRIBUTE } from "../../src/utils/annotationScope";
 import type { AnnotationAnchor } from "../../src/types/annotation.types";
@@ -56,6 +56,46 @@ describe("resolveElement without scope", () => {
     const button = document.querySelector("button")!;
     const anchor = anchorFor("", "Send");
     expect(resolveElement(anchor)).toBe(button);
+  });
+
+  it("falls through to a label match when a stale nth-of-type selector now uniquely matches a different element", () => {
+    document.body.innerHTML = `
+      <div class="box">
+        <button>Cancel</button>
+        <button>Sign In</button>
+      </div>
+    `;
+    const signInButton = document.querySelectorAll("button")[1] as HTMLElement;
+    const { selector } = generateSelector(signInButton);
+    const anchor = anchorFor(selector, getElementLabel(signInButton));
+
+    // Sanity check: the generated selector resolves correctly before any layout change.
+    expect(resolveElement(anchor)).toBe(signInButton);
+
+    // Redesign: "Sign In" moves ahead of "Cancel". The stored selector
+    // (button:nth-of-type(2)) still uniquely matches one button in the new
+    // layout, but it's now the "Cancel" button, not "Sign In".
+    const box = document.querySelector(".box")!;
+    box.innerHTML = `<button>Sign In</button><button>Cancel</button>`;
+    const relocatedSignIn = document.querySelectorAll("button")[0] as HTMLElement;
+    const staleMatch = document.querySelector(selector);
+    expect(staleMatch).not.toBe(relocatedSignIn);
+
+    expect(resolveElement(anchor)).toBe(relocatedSignIn);
+  });
+
+  it("accepts a lone selector match as-is when there is no elementIdentifier to cross-check", () => {
+    document.body.innerHTML = `
+      <div class="box">
+        <button>Cancel</button>
+        <button>Sign In</button>
+      </div>
+    `;
+    const signInButton = document.querySelectorAll("button")[1] as HTMLElement;
+    const { selector } = generateSelector(signInButton);
+    const anchor = anchorFor(selector, "");
+
+    expect(resolveElement(anchor)).toBe(signInButton);
   });
 });
 

@@ -1,4 +1,4 @@
-import { useEffect, useRef, type PointerEvent as ReactPointerEvent } from "react";
+import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
 import {
   useAnnotationAuth,
   useAnnotationData,
@@ -38,7 +38,15 @@ function clampPosition(x: number, y: number, width: number, height: number) {
 }
 
 export function AnnotationToolbar() {
-  const { config, annotations, loading, error, retry, connectionState } = useAnnotationData();
+  const {
+    config,
+    loading,
+    error,
+    retry,
+    connectionState,
+    allAnnotations,
+    reloadAllAnnotations,
+  } = useAnnotationData();
   const {
     listOpen,
     setListOpen,
@@ -54,6 +62,25 @@ export function AnnotationToolbar() {
     requestCancelDraft,
   } = useAnnotationUi();
   const { activeAccount } = useAnnotationAuth();
+  // Guarantees the refresh icon visibly spins for at least one rotation on
+  // every click, even when the reload resolves before the CSS animation
+  // (tied to `loading`) would otherwise have a chance to show.
+  const [spinning, setSpinning] = useState(false);
+  const spinTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => () => {
+    if (spinTimeoutRef.current) {
+      clearTimeout(spinTimeoutRef.current);
+    }
+  }, []);
+  const refreshComments = () => {
+    retry();
+    reloadAllAnnotations();
+    setSpinning(true);
+    if (spinTimeoutRef.current) {
+      clearTimeout(spinTimeoutRef.current);
+    }
+    spinTimeoutRef.current = setTimeout(() => setSpinning(false), 800);
+  };
   const toolbarRef = useRef<HTMLElement | null>(null);
   const setToolbarRef = (node: HTMLElement | null) => {
     toolbarRef.current = node;
@@ -451,7 +478,7 @@ export function AnnotationToolbar() {
                 }}
               >
                 <Icon name="comment" className="wpn-toolbar__list-icon" />
-                <span className="wpn-toolbar__count">{annotations.length}</span>
+                <span className="wpn-toolbar__count">{allAnnotations.length}</span>
               </button>
             </Tooltip>
             <span className="wpn-toolbar__divider" aria-hidden="true" />
@@ -467,13 +494,13 @@ export function AnnotationToolbar() {
                     type="button"
                     className={[
                       "wpn-toolbar__refresh",
-                      loading ? "wpn-toolbar__refresh--spinning" : "",
+                      spinning || loading ? "wpn-toolbar__refresh--spinning" : "",
                     ]
                       .filter(Boolean)
                       .join(" ")}
                     aria-label="Refresh comments"
                     disabled={loading}
-                    onClick={() => retry()}
+                    onClick={refreshComments}
                   >
                     <Icon name="refresh" className="wpn-toolbar__refresh-icon" />
                   </button>

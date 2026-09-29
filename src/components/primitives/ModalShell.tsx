@@ -73,7 +73,7 @@ export function ModalShell({
             </h2>
             {subtitle ? <p className="wpn-modal-shell__subtitle">{subtitle}</p> : null}
           </div>
-          <Tooltip label={closeLabel}>
+          <Tooltip label={closeLabel} placement="left">
             <button
               type="button"
               className="wpn-modal-shell__close"

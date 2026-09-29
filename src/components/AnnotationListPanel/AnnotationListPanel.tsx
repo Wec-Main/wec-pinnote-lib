@@ -30,7 +30,13 @@ function clampPanelWidth(value: number): number {
 }
 
 export function AnnotationListPanel() {
-  const { annotations, config, loading, error, retry } = useAnnotationData();
+  const {
+    config,
+    allAnnotations,
+    allAnnotationsLoading: loading,
+    allAnnotationsError: error,
+    reloadAllAnnotations: retry,
+  } = useAnnotationData();
   const { selectedId, revealAnnotation, setListOpen } = useAnnotationUi();
   const currentUserId = config.currentUser.id;
 
@@ -96,8 +102,8 @@ export function AnnotationListPanel() {
     };
   }, [resizing]);
 
-  const presentIds = useAnnotationPresence(annotations);
-  const allThreads = useMemo(() => toThreads(annotations), [annotations]);
+  const presentIds = useAnnotationPresence(allAnnotations);
+  const allThreads = useMemo(() => toThreads(allAnnotations), [allAnnotations]);
   const threads = useMemo(
     () => filterThreads(allThreads, filters, currentUserId),
     [allThreads, filters, currentUserId],

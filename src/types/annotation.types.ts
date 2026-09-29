@@ -19,6 +19,10 @@ export interface AnnotationAnchor {
   fallbackY: number;
   viewportWidth: number;
   viewportHeight: number;
+  // When true, relativeX/relativeY were computed (and must be re-applied)
+  // against the target element's rendered text content rather than its own
+  // border box — set once at creation time, see measureContentRect().
+  contentRelative?: boolean;
 }
 
 export interface AnnotationComment {
@@ -80,7 +84,7 @@ export interface AnnotationListResponse {
 
 export interface AnnotationApiClient {
   listAnnotations(
-    params: { projectId: string; pageKey: string; projectVersionId?: string },
+    params: { projectId: string; pageKey?: string; projectVersionId?: string },
     signal?: AbortSignal,
   ): Promise<Annotation[]>;
   getAnnotation(annotationId: string, signal?: AbortSignal): Promise<Annotation>;

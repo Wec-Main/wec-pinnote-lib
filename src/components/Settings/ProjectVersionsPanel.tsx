@@ -1,7 +1,6 @@
 import { useMemo } from "react";
-import { useAnnotationContext } from "../../context/AnnotationContext";
 import type { ProjectVersion } from "../../types/projectVersion.types";
-import { Icon, RefreshButton, TableSkeleton, Tooltip } from "../primitives";
+import { Icon, RefreshButton, Switch, TableSkeleton, Tooltip } from "../primitives";
 import { useProjectVersioning } from "./useProjectVersioning";
 
 function versionLabel(version: ProjectVersion): string {
@@ -10,10 +9,29 @@ function versionLabel(version: ProjectVersion): string {
     : `Version ${version.versionNumber}`;
 }
 
-export function VersioningTab() {
-  const { config, activeAccount, reloadCurrentProjectVersion } = useAnnotationContext();
-  const authToken = activeAccount?.token;
+export interface ProjectVersionsPanelProps {
+  apiBaseUrl: string;
+  authToken: string | undefined;
+  projectId: string;
+  /** Shown as the "Project" label/name row above the table. Omit when the
+   * caller already shows the project name elsewhere (e.g. a modal title). */
+  projectName?: string;
+  onVersionChanged?: () => void;
+  /** Shows the Annotation/Tag/Flow version-restriction switches above the
+   * versions table. Only the Settings -> Projects gear-icon modal passes
+   * this — that's the only surface gated to the same role (super_admin)
+   * as the settings endpoint itself. */
+  showVersionSettings?: boolean;
+}
 
+export function ProjectVersionsPanel({
+  apiBaseUrl,
+  authToken,
+  projectId,
+  projectName,
+  onVersionChanged,
+  showVersionSettings = false,
+}: ProjectVersionsPanelProps) {
   const {
     project,
     versions,
@@ -27,12 +45,8 @@ export function VersioningTab() {
     addVersion,
     publishVersion,
     setActiveVersion,
-  } = useProjectVersioning(
-    config.apiBaseUrl,
-    authToken,
-    config.projectId,
-    reloadCurrentProjectVersion,
-  );
+    updateVersionSettings,
+  } = useProjectVersioning(apiBaseUrl, authToken, projectId, onVersionChanged);
 
   const activeVersion = useMemo(
     () => versions.find((version) => version.id === project?.currentProjectVersionId) ?? null,
@@ -44,10 +58,14 @@ export function VersioningTab() {
   return (
     <div className="wpn-settings-tab">
       <div className="wpn-versioning-header">
-        <div className="wpn-versioning-header__copy">
-          <span className="wpn-versioning-header__label">Project</span>
-          <span className="wpn-versioning-header__name">{project?.name ?? config.projectId}</span>
-        </div>
+        {projectName !== undefined ? (
+          <div className="wpn-versioning-header__copy">
+            <span className="wpn-versioning-header__label">Project</span>
+            <span className="wpn-versioning-header__name">{project?.name ?? projectName}</span>
+          </div>
+        ) : (
+          <span />
+        )}
         <div className="wpn-versioning-header__actions">
           <RefreshButton label="Refresh versions" loading={loading} onRefresh={reload} />
           <Tooltip
@@ -70,6 +88,54 @@ export function VersioningTab() {
           </Tooltip>
         </div>
       </div>
+
+      {showVersionSettings && project ? (
+        <div className="wpn-versioning-settings">
+          <span className="wpn-versioning-settings__title">Version Settings</span>
+          <div className="wpn-versioning-settings__row">
+            <div className="wpn-versioning-settings__copy">
+              <span className="wpn-versioning-settings__label">Annotation</span>
+              <span className="wpn-versioning-settings__caption">
+                Annotations follow the selected project version when on.
+              </span>
+            </div>
+            <Switch
+              label="Annotation version restriction"
+              checked={project.annotationVersioningEnabled ?? true}
+              disabled={busy}
+              onChange={(next) => void updateVersionSettings({ annotationVersioningEnabled: next })}
+            />
+          </div>
+          <div className="wpn-versioning-settings__row">
+            <div className="wpn-versioning-settings__copy">
+              <span className="wpn-versioning-settings__label">Tag</span>
+              <span className="wpn-versioning-settings__caption">
+                Tag pins follow the selected project version when on.
+              </span>
+            </div>
+            <Switch
+              label="Tag version restriction"
+              checked={project.tagVersioningEnabled ?? true}
+              disabled={busy}
+              onChange={(next) => void updateVersionSettings({ tagVersioningEnabled: next })}
+            />
+          </div>
+          <div className="wpn-versioning-settings__row">
+            <div className="wpn-versioning-settings__copy">
+              <span className="wpn-versioning-settings__label">Flow</span>
+              <span className="wpn-versioning-settings__caption">
+                Flows follow the selected project version when on.
+              </span>
+            </div>
+            <Switch
+              label="Flow version restriction"
+              checked={project.flowVersioningEnabled ?? true}
+              disabled={busy}
+              onChange={(next) => void updateVersionSettings({ flowVersioningEnabled: next })}
+            />
+          </div>
+        </div>
+      ) : null}
 
       {notice ? (
         <div className="wpn-users-notice" role="status">

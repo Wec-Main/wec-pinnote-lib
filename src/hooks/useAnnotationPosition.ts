@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type RefObject } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type RefObject } from "react";
 import type { AnnotationAnchor } from "../types/annotation.types";
 import { isLibraryElement, resolveElement } from "../utils/elementResolver";
 import { ANNOTATION_SCOPE_ATTRIBUTE } from "../utils/annotationScope";
@@ -6,6 +6,7 @@ import {
   computePinPosition,
   placePanel,
   positionsEqual,
+  type PanelPlacement,
   type PinScreenPosition,
 } from "../utils/positioning";
 
@@ -248,20 +249,21 @@ export function useFloatingPanel(
   anchorX: number,
   anchorY: number,
   panelRef: RefObject<HTMLElement | null>,
-): { left: number; top: number; side: string } {
-  const [placement, setPlacement] = useState({ left: 0, top: 0, side: "right" });
+): PanelPlacement | null {
+  const [placement, setPlacement] = useState<PanelPlacement | null>(null);
   const anchorXRef = useRef(anchorX);
   const anchorYRef = useRef(anchorY);
   const scheduleRef = useRef<(() => void) | null>(null);
   anchorXRef.current = anchorX;
   anchorYRef.current = anchorY;
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     scheduleRef.current?.();
   }, [anchorX, anchorY]);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (!open) {
+      setPlacement(null);
       return;
     }
 
@@ -279,7 +281,7 @@ export function useFloatingPanel(
         panel.offsetHeight,
       );
       setPlacement((current) =>
-        current.left === next.left && current.top === next.top && current.side === next.side
+        current && current.left === next.left && current.top === next.top && current.side === next.side
           ? current
           : next,
       );
@@ -291,7 +293,13 @@ export function useFloatingPanel(
     };
     scheduleRef.current = schedule;
 
-    schedule();
+    // Synchronous on the very first measurement (before paint, unlike the
+    // rAF-deferred schedule() below) so the panel's initial position is
+    // already correct on its first painted frame — never a visible flash at
+    // the (0,0)/hidden fallback. Later updates (resize/scroll/mutation) go
+    // through the throttled schedule() instead, which is fine since the
+    // panel is already visibly positioned by then.
+    update();
     window.addEventListener("resize", schedule);
     window.addEventListener("scroll", schedule, { capture: true, passive: true });
 

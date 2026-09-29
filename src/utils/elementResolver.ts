@@ -82,9 +82,17 @@ function resolveWithin(selector: string, root: ParentNode, elementIdentifier: st
     try {
       const matches = Array.from(root.querySelectorAll(selector));
       if (matches.length === 1) {
-        return matches[0] ?? null;
-      }
-      if (matches.length > 1) {
+        const match = matches[0] ?? null;
+        // A layout change can shift sibling structure enough that a stored
+        // nth-of-type path selector still uniquely matches, but now points at
+        // a different element than the one it was created for. Cross-check
+        // against the stored identifier/label before trusting it, the same
+        // way an ambiguous (>1 match) selector already is below — otherwise
+        // fall through to the identifier/label strategies instead.
+        if (!elementIdentifier || (match && getElementLabel(match) === elementIdentifier)) {
+          return match;
+        }
+      } else if (matches.length > 1) {
         const picked = pickAmong(matches, elementIdentifier);
         if (picked) {
           return picked;

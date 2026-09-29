@@ -22,6 +22,9 @@ export interface Project {
   description?: string;
   status: string;
   currentProjectVersionId?: string;
+  annotationVersioningEnabled?: boolean;
+  tagVersioningEnabled?: boolean;
+  flowVersioningEnabled?: boolean;
   createdAt: string;
   updatedAt: string;
 }

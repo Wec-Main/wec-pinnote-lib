@@ -110,6 +110,12 @@ export const ThreadCard = memo(function ThreadCard({
           {statusLabel(annotation.status)}
         </span>
       </button>
+      {!inView && annotation.path ? (
+        <div className="wpn-thread-card__path" title={annotation.path}>
+          <span className="wpn-thread-card__path-label">PATH: </span>
+          {annotation.path}
+        </div>
+      ) : null}
       <ThreadComment
         comment={root}
         quoted={undefined}
