@@ -22,16 +22,21 @@ import { ConfirmDialog } from "../UserManagement/ConfirmDialog";
 import { ProjectFormModal } from "./ProjectFormModal";
 import { ProjectVersionsPanel } from "./ProjectVersionsPanel";
 import { useResourceTable } from "./useResourceTable";
+import { canManageProjects } from "../../utils/permissions";
+import { projectVersionListKey } from "../../hooks/useProjectVersionList";
 
 export function ProjectsTab() {
-  const { config, activeAccount } = useAnnotationContext();
+  const { config, activeAccount, reloadCurrentProjectVersion } = useAnnotationContext();
   const authToken = activeAccount?.token;
+  const manageable = canManageProjects(activeAccount?.roleId ?? "developer");
+  const columnCount = manageable ? 5 : 3;
 
   const [organizationFilter, setOrganizationFilter] = useState("");
   const [versionsTarget, setVersionsTarget] = useState<Project | null>(null);
   const organizationsKey = `organizations:${config.apiBaseUrl}:${authToken ?? ""}`;
-  const { data: organizations } = useSharedFetch<Organization[]>(organizationsKey, (signal) =>
-    fetchOrganizations(config.apiBaseUrl, authToken, signal),
+  const { data: organizations } = useSharedFetch<Organization[]>(
+    manageable ? organizationsKey : null,
+    (signal) => fetchOrganizations(config.apiBaseUrl, authToken, signal),
   );
   const organizationList = useMemo(() => organizations ?? [], [organizations]);
 
@@ -127,27 +132,31 @@ export function ProjectsTab() {
         }}
         placeholder="Search projects"
         trailing={
-          <>
-            <SearchableSelect
-              options={organizationOptions}
-              value={organizationFilter}
-              onChange={setOrganizationFilter}
-              ariaLabel="Filter by organization"
-              placeholder="All organizations"
-              clearable
-              size="sm"
-            />
+          manageable ? (
+            <>
+              <SearchableSelect
+                options={organizationOptions}
+                value={organizationFilter}
+                onChange={setOrganizationFilter}
+                ariaLabel="Filter by organization"
+                placeholder="All organizations"
+                clearable
+                size="sm"
+              />
+              <RefreshButton label="Refresh projects" loading={loading} onRefresh={reload} />
+              <button
+                type="button"
+                className="wpn-users-create"
+                disabled={organizationList.length === 0}
+                onClick={() => open()}
+              >
+                <Icon name="plus" className="wpn-users-create__icon" />
+                New project
+              </button>
+            </>
+          ) : (
             <RefreshButton label="Refresh projects" loading={loading} onRefresh={reload} />
-            <button
-              type="button"
-              className="wpn-users-create"
-              disabled={organizationList.length === 0}
-              onClick={() => open()}
-            >
-              <Icon name="plus" className="wpn-users-create__icon" />
-              New project
-            </button>
-          </>
+          )
         }
       />
 
@@ -169,22 +178,26 @@ export function ProjectsTab() {
           <thead>
             <tr>
               <th>Project</th>
-              <th>Organization</th>
+              {manageable ? <th>Organization</th> : null}
               <th>Status</th>
               <th className="wpn-users-table__version-settings-head">Version Settings</th>
-              <th className="wpn-users-table__actions-head">Actions</th>
+              {manageable ? <th className="wpn-users-table__actions-head">Actions</th> : null}
             </tr>
           </thead>
           <tbody>
             {loading && !loaded ? (
               <TableSkeleton
                 rows={5}
-                columns={["identity", "text", "pill", "actions", "actions"]}
+                columns={
+                  manageable
+                    ? ["identity", "text", "pill", "actions", "actions"]
+                    : ["identity", "pill", "actions"]
+                }
                 label="Loading projects"
               />
             ) : loadError && projects.length === 0 ? (
               <tr>
-                <td colSpan={5} className="wpn-users-table__empty">
+                <td colSpan={columnCount} className="wpn-users-table__empty">
                   <Icon name="alert" className="wpn-users-table__empty-icon" />
                   <span>{loadError}</span>
                   <button type="button" className="wpn-btn wpn-btn--ghost" onClick={reload}>
@@ -194,12 +207,14 @@ export function ProjectsTab() {
               </tr>
             ) : visible.length === 0 ? (
               <tr>
-                <td colSpan={5} className="wpn-users-table__empty">
+                <td colSpan={columnCount} className="wpn-users-table__empty">
                   <Icon name="folder" className="wpn-users-table__empty-icon" />
                   <span>
-                    {organizationList.length === 0
-                      ? "Create an organization before adding projects."
-                      : "No projects yet."}
+                    {!manageable
+                      ? "No projects are assigned to you yet."
+                      : organizationList.length === 0
+                        ? "Create an organization before adding projects."
+                        : "No projects yet."}
                   </span>
                 </td>
               </tr>
@@ -214,7 +229,9 @@ export function ProjectsTab() {
                       </div>
                     </div>
                   </td>
-                  <td className="wpn-users-muted">{organizationName(project.organizationId)}</td>
+                  {manageable ? (
+                    <td className="wpn-users-muted">{organizationName(project.organizationId)}</td>
+                  ) : null}
                   <td>
                     <span className={`wpn-users-pill wpn-users-pill--status-${project.status}`}>
                       {project.status}
@@ -232,30 +249,32 @@ export function ProjectsTab() {
                       </button>
                     </Tooltip>
                   </td>
-                  <td>
-                    <div className="wpn-users-actions">
-                      <Tooltip label="Edit" placement="left">
-                        <button
-                          type="button"
-                          className="wpn-users-action"
-                          aria-label={`Edit ${project.name}`}
-                          onClick={() => open(project)}
-                        >
-                          <Icon name="edit" />
-                        </button>
-                      </Tooltip>
-                      <Tooltip label="Delete" placement="left">
-                        <button
-                          type="button"
-                          className="wpn-users-action wpn-users-action--danger"
-                          aria-label={`Delete ${project.name}`}
-                          onClick={() => askDelete(project)}
-                        >
-                          <Icon name="trash" />
-                        </button>
-                      </Tooltip>
-                    </div>
-                  </td>
+                  {manageable ? (
+                    <td>
+                      <div className="wpn-users-actions">
+                        <Tooltip label="Edit" placement="left">
+                          <button
+                            type="button"
+                            className="wpn-users-action"
+                            aria-label={`Edit ${project.name}`}
+                            onClick={() => open(project)}
+                          >
+                            <Icon name="edit" />
+                          </button>
+                        </Tooltip>
+                        <Tooltip label="Delete" placement="left">
+                          <button
+                            type="button"
+                            className="wpn-users-action wpn-users-action--danger"
+                            aria-label={`Delete ${project.name}`}
+                            onClick={() => askDelete(project)}
+                          >
+                            <Icon name="trash" />
+                          </button>
+                        </Tooltip>
+                      </div>
+                    </td>
+                  ) : null}
                 </tr>
               ))
             )}
@@ -297,7 +316,17 @@ export function ProjectsTab() {
             apiBaseUrl={config.apiBaseUrl}
             authToken={authToken}
             projectId={versionsTarget.id}
-            showVersionSettings
+            showVersionSettings={manageable}
+            onVersionChanged={() => {
+              if (activeAccount) {
+                invalidateSharedFetch(
+                  projectVersionListKey(config.apiBaseUrl, activeAccount.id, versionsTarget.id),
+                );
+              }
+              if (versionsTarget.id === config.projectId) {
+                reloadCurrentProjectVersion();
+              }
+            }}
           />
         </ModalShell>
       ) : null}

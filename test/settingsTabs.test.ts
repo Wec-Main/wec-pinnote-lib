@@ -16,4 +16,12 @@ describe("visibleSettingsTabs", () => {
   it("hides the dashboard from contributors", () => {
     expect(tabIds("contributor")).not.toContain("dashboard");
   });
+
+  it("shows admins the projects tab alongside users", () => {
+    expect(tabIds("admin")).toEqual(["users", "projects"]);
+  });
+
+  it("keeps projects hidden from contributors", () => {
+    expect(tabIds("contributor")).not.toContain("projects");
+  });
 });

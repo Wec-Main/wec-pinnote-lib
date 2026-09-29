@@ -1,4 +1,5 @@
 import { useId, type ReactNode } from "react";
+import { Icon } from "../primitives";
 
 interface FieldRenderProps {
   id: string;
@@ -32,7 +33,8 @@ export function Field({ label, required = false, error, hint, children }: FieldP
         "aria-required": required,
       })}
       {hasError ? (
-        <span className="wpn-users-modal__error" id={errorId}>
+        <span className="wpn-users-modal__error" id={errorId} role="alert">
+          <Icon name="alert" className="wpn-users-modal__error-icon" />
           {error}
         </span>
       ) : hint ? (

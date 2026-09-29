@@ -101,7 +101,11 @@ export function SearchableSelect({
             .join(" ")}
           style={
             floatingPosition
-              ? { top: floatingPosition.top, left: floatingPosition.left }
+              ? {
+                  top: floatingPosition.top,
+                  left: floatingPosition.left,
+                  minWidth: rootRef.current?.offsetWidth,
+                }
               : { visibility: "hidden" }
           }
         >

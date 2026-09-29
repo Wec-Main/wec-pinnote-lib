@@ -18,6 +18,7 @@ export interface ProjectVersioningState {
   loaded: boolean;
   error: string | null;
   busy: boolean;
+  progress: string | null;
   notice: string | null;
   dismissNotice: () => void;
   reload: () => void;
@@ -40,6 +41,7 @@ export function useProjectVersioning(
   const [error, setError] = useState<string | null>(null);
   const [reloadToken, setReloadToken] = useState(0);
   const [busy, setBusy] = useState(false);
+  const [progress, setProgress] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const noticeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -110,17 +112,16 @@ export function useProjectVersioning(
 
   const addVersion = useCallback(async () => {
     setBusy(true);
+    setProgress("Creating a new draft version…");
     try {
       await api.createProjectVersion(projectId, {});
-      showNotice("Version created.");
-      reload();
-      // createProjectVersion already flips the project's current version to
-      // the new draft server-side, so the rest of the already-mounted app
-      // needs to pick that up too, not just this tab's own list.
+      showNotice("New draft version created and set as active.");
       onVersionChanged?.();
+      reload();
     } catch (err) {
       showNotice(errorMessage(err));
     } finally {
+      setProgress(null);
       setBusy(false);
     }
   }, [api, projectId, showNotice, reload, onVersionChanged]);
@@ -128,17 +129,21 @@ export function useProjectVersioning(
   const publishVersion = useCallback(
     async (versionId: string) => {
       setBusy(true);
+      setProgress("Publishing version…");
       try {
         await api.updateProjectVersion(projectId, versionId, { status: "published" });
-        showNotice("Version published.");
+        showNotice("Version published. The next draft version is ready.");
+        onVersionChanged?.();
         reload();
       } catch (err) {
         showNotice(errorMessage(err));
+        reload();
       } finally {
+        setProgress(null);
         setBusy(false);
       }
     },
-    [api, projectId, showNotice, reload],
+    [api, projectId, showNotice, reload, onVersionChanged],
   );
 
   const setActiveVersion = useCallback(
@@ -182,6 +187,7 @@ export function useProjectVersioning(
       loaded,
       error,
       busy,
+      progress,
       notice,
       dismissNotice,
       reload,
@@ -197,6 +203,7 @@ export function useProjectVersioning(
       loaded,
       error,
       busy,
+      progress,
       notice,
       dismissNotice,
       reload,

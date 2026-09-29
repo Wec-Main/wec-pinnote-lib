@@ -6,6 +6,8 @@ import { createClientId } from "../utils/format";
 import { usePersistentState } from "./usePersistentState";
 import { isBoolean } from "../utils/valueGuards";
 import { useTokenGetter } from "./useTokenGetter";
+import type { StreamEvent } from "../types/stream.types";
+import { isFlowPin, isNewer } from "../utils/streamPayloadGuards";
 
 const LOAD_ERROR_MESSAGE = "Could not load flows for this page";
 const SUBMIT_ERROR_MESSAGE = "Could not create the flow pin";
@@ -34,6 +36,7 @@ export interface FlowPinsState {
   submitFlowPinDraft: (name: string) => Promise<void>;
   removeFlowPin: (flowPinId: string) => Promise<void>;
   syncFlowPinName: (flowPinId: string, name: string) => void;
+  applyFlowPinEvent: (event: StreamEvent) => void;
   selectedFlowPinId: string | null;
   selectFlowPin: (id: string | null) => void;
 }
@@ -171,6 +174,47 @@ export function useFlowPins(options: UseFlowPinsOptions): FlowPinsState {
     );
   }, []);
 
+  const projectVersionIdRef = useRef(projectVersionId);
+  projectVersionIdRef.current = projectVersionId;
+
+  const applyFlowPinEvent = useCallback((event: StreamEvent) => {
+    if (event.eventType === "flow_pin.deleted") {
+      const { flowPinId } = event.payload;
+      setFlowPins((current) =>
+        current.some((item) => item.id === flowPinId)
+          ? current.filter((item) => item.id !== flowPinId)
+          : current,
+      );
+      setSelectedFlowPinId((current) => (current === flowPinId ? null : current));
+      return;
+    }
+    if (event.eventType !== "flow_pin.created" && event.eventType !== "flow_pin.updated") {
+      return;
+    }
+    const incoming: unknown = event.payload.flowPin;
+    if (!isFlowPin(incoming)) {
+      return;
+    }
+    const viewedVersionId = projectVersionIdRef.current;
+    if (
+      viewedVersionId &&
+      incoming.projectVersionId &&
+      incoming.projectVersionId !== viewedVersionId
+    ) {
+      return;
+    }
+    setFlowPins((current) => {
+      const existing = current.find((item) => item.id === incoming.id);
+      if (!existing) {
+        return [incoming, ...current];
+      }
+      if (!isNewer(incoming.updatedAt, existing.updatedAt)) {
+        return current;
+      }
+      return current.map((item) => (item.id === incoming.id ? incoming : item));
+    });
+  }, []);
+
   const selectFlowPin = useCallback((id: string | null) => setSelectedFlowPinId(id), []);
 
   return useMemo(
@@ -188,6 +232,7 @@ export function useFlowPins(options: UseFlowPinsOptions): FlowPinsState {
       submitFlowPinDraft,
       removeFlowPin,
       syncFlowPinName,
+      applyFlowPinEvent,
       selectedFlowPinId,
       selectFlowPin,
     }),
@@ -205,6 +250,7 @@ export function useFlowPins(options: UseFlowPinsOptions): FlowPinsState {
       submitFlowPinDraft,
       removeFlowPin,
       syncFlowPinName,
+      applyFlowPinEvent,
       selectedFlowPinId,
       selectFlowPin,
     ],

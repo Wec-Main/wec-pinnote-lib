@@ -16,7 +16,10 @@ import type {
   UpdateAnnotationTagInput,
 } from "../types/annotationTag.types";
 import type { ProjectTag } from "../types/tag.types";
+import type { Project } from "../types/organization.types";
 import type { DraftFlowPin, FlowPin } from "../types/flowPin.types";
+
+export type VersionedLayer = "comments" | "flows";
 
 export interface DiscardPrompt {
   kind: "draft" | "edit";
@@ -34,6 +37,12 @@ export interface AnnotationDataContextValue {
   // component should read instead of config.projectVersionId directly.
   projectVersionId: string | undefined;
   reloadCurrentProjectVersion: () => void;
+  project: Project | null;
+  commentsVersionId: string | undefined;
+  reloadFlowPins: () => void;
+  reloadAnnotationTags: () => void;
+  flowsVersionId: string | undefined;
+  selectLayerVersion: (layer: VersionedLayer, versionId: string | undefined) => void;
   pageKey: string;
   annotations: Annotation[];
   loading: boolean;

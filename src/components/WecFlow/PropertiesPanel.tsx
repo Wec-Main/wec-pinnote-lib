@@ -341,7 +341,6 @@ function MultiSelection({
 function FlowOverview() {
   const engine = useFlowEngine();
   const name = useFlowState((s) => s.flowName);
-  const notes = useFlowState((s) => s.flowNotes);
   const readOnly = useFlowState((s) => s.readOnly);
   return (
     <>
@@ -357,17 +356,6 @@ function FlowOverview() {
             value={name}
             disabled={readOnly}
             onChange={(e) => engine.setFlowName(e.target.value)}
-          />
-        </label>
-        <label className="wpn-flowchart-ui__field wpn-flowchart-ui__field-grow">
-          <span className="wpn-flowchart-ui__field-label">Notes</span>
-          <textarea
-            className="wpn-flowchart-ui__input wpn-flowchart-ui__input-grow"
-            style={{ minHeight: 320 }}
-            value={notes}
-            placeholder="Notes about this flow as a whole..."
-            disabled={readOnly}
-            onChange={(e) => engine.setFlowNotes(e.target.value)}
           />
         </label>
       </section>

@@ -33,6 +33,7 @@ export interface FlowDocumentState {
   save: (flow: FlowJSON) => Promise<void>;
   publish: (flow: FlowJSON) => Promise<void>;
   reload: () => void;
+  applyRemoteRevision: (revision: number) => void;
 }
 
 interface SaveTarget {
@@ -236,6 +237,19 @@ export function useFlowDocument(options: UseFlowDocumentOptions): FlowDocumentSt
     setReloadToken((token) => token + 1);
   }, [clearTimer]);
 
+  const applyRemoteRevision = useCallback(
+    (revision: number) => {
+      if (!flowId || pendingRef.current) {
+        return;
+      }
+      if (revision <= (revisionsRef.current.get(flowId) ?? 0)) {
+        return;
+      }
+      reload();
+    },
+    [flowId, reload],
+  );
+
   return {
     status,
     document,
@@ -248,5 +262,6 @@ export function useFlowDocument(options: UseFlowDocumentOptions): FlowDocumentSt
     save,
     publish,
     reload,
+    applyRemoteRevision,
   };
 }

@@ -1,22 +1,19 @@
 import type { StreamConnectionState, StreamEvent, StreamEventType } from "../types/stream.types";
 import { useSseStream, type StreamTokenGetter } from "./useSseStream";
 
+const FLOW_PAGE_KEY = "__flow__";
+
 const EVENT_TYPES: readonly StreamEventType[] = [
-  "annotation.created",
-  "annotation.updated",
-  "annotation.deleted",
-  "comment.created",
-  "comment.updated",
-  "comment.deleted",
-  "flow_pin.created",
-  "flow_pin.updated",
-  "flow_pin.deleted",
+  "flow.created",
+  "flow.updated",
+  "flow.deleted",
+  "flow.published",
+  "flow_document.saved",
 ];
 
-export interface AnnotationStreamOptions {
+export interface FlowStreamOptions {
   apiBaseUrl: string;
   projectId: string;
-  pageKey: string;
   getAuthToken: StreamTokenGetter | undefined;
   sessionKey: string;
   enabled: boolean;
@@ -24,6 +21,6 @@ export interface AnnotationStreamOptions {
   onResync: () => void;
 }
 
-export function useAnnotationStream(options: AnnotationStreamOptions): StreamConnectionState {
-  return useSseStream({ ...options, eventTypes: EVENT_TYPES });
+export function useFlowStream(options: FlowStreamOptions): StreamConnectionState {
+  return useSseStream({ ...options, pageKey: FLOW_PAGE_KEY, eventTypes: EVENT_TYPES });
 }

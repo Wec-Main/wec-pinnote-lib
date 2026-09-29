@@ -4,6 +4,7 @@ import {
   authorOptions,
   filterThreads,
   filtersActive,
+  groupThreadsByPage,
   statusOptions,
   toThreads,
   type CommentFilters,
@@ -168,5 +169,37 @@ describe("option builders", () => {
       { value: "open", label: "Open" },
       { value: "completed", label: "Completed" },
     ]);
+  });
+});
+
+describe("groupThreadsByPage", () => {
+  const pricing: Annotation = {
+    ...annotation("a3", 3, "open", [
+      {
+        id: "c4",
+        message: "Price is wrong",
+        authorId: "u1",
+        authorName: "Ada Lovelace",
+        at: "2026-01-04T10:00:00.000Z",
+      },
+    ]),
+    pageKey: "/pricing::annual",
+    path: "Pricing > Plan card",
+  };
+  const threads = toThreads([pricing, openAnnotation, doneAnnotation]);
+
+  it("puts the current page first and keeps the thread order within each page", () => {
+    const groups = groupThreadsByPage(threads, "/home");
+    expect(groups.map((group) => group.pageKey)).toEqual(["/home", "/pricing::annual"]);
+    expect(groups[0]?.current).toBe(true);
+    expect(groups[0]?.threads.map((thread) => thread.annotation.id)).toEqual(["a1", "a2"]);
+  });
+
+  it("counts unresolved threads and names the page from its path title", () => {
+    const [home, pricingGroup] = groupThreadsByPage(threads, "/home");
+    expect(home?.openCount).toBe(1);
+    expect(home?.title).toBe("/home");
+    expect(pricingGroup?.title).toBe("Pricing");
+    expect(pricingGroup?.location).toBe("/pricing · annual");
   });
 });

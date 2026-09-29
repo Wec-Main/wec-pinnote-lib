@@ -2,16 +2,15 @@ import { useId, useState } from "react";
 import { Icon, Tooltip } from "../primitives";
 import { generatePassword } from "../../utils/password";
 
-export const MIN_PASSWORD_LENGTH = 8;
-
 interface PasswordFieldProps {
   label: string;
   value: string;
   placeholder: string;
   hint: string;
-  invalid?: boolean;
+  error?: string | null;
   readOnly?: boolean;
   onChange: (value: string) => void;
+  onBlur?: () => void;
 }
 
 export function PasswordField({
@@ -19,11 +18,13 @@ export function PasswordField({
   value,
   placeholder,
   hint,
-  invalid = false,
+  error,
   readOnly = false,
   onChange,
+  onBlur,
 }: PasswordFieldProps) {
   const labelId = useId();
+  const messageId = useId();
   const [revealed, setRevealed] = useState(readOnly);
   const [copied, setCopied] = useState(false);
 
@@ -50,7 +51,10 @@ export function PasswordField({
             autoComplete="new-password"
             placeholder={placeholder}
             aria-labelledby={labelId}
+            aria-describedby={messageId}
+            aria-invalid={error ? true : undefined}
             readOnly={readOnly}
+            onBlur={onBlur}
             onChange={(event) => {
               if (readOnly) {
                 return;
@@ -104,12 +108,15 @@ export function PasswordField({
           ) : null}
         </div>
       </div>
-      {invalid ? (
-        <span className="wpn-users-modal__error">
-          Use at least {MIN_PASSWORD_LENGTH} characters, or leave it blank.
+      {error ? (
+        <span className="wpn-users-modal__error" id={messageId} role="alert">
+          <Icon name="alert" className="wpn-users-modal__error-icon" />
+          {error}
         </span>
       ) : (
-        <span className="wpn-password-field__hint">{hint}</span>
+        <span className="wpn-password-field__hint" id={messageId}>
+          {hint}
+        </span>
       )}
     </div>
   );

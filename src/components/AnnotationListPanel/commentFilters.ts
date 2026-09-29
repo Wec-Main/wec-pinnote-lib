@@ -128,3 +128,53 @@ export function filtersActive(filters: CommentFilters): boolean {
     filters.sort !== DEFAULT_COMMENT_FILTERS.sort
   );
 }
+
+export interface PageGroup {
+  pageKey: string;
+  title: string;
+  location: string;
+  current: boolean;
+  openCount: number;
+  threads: CommentThread[];
+}
+
+function pageTitle(thread: CommentThread): string {
+  const segments = thread.annotation.path?.split(" > ") ?? [];
+  return segments.length > 1 && segments[0]?.trim() ? segments[0].trim() : "";
+}
+
+function pageLocation(pageKey: string): string {
+  const [base = "", view] = pageKey.split("::");
+  const location = base || "/";
+  return view ? `${location} · ${view}` : location;
+}
+
+export function groupThreadsByPage(threads: CommentThread[], currentPageKey: string): PageGroup[] {
+  const groups = new Map<string, PageGroup>();
+  for (const thread of threads) {
+    const { pageKey } = thread.annotation;
+    let group = groups.get(pageKey);
+    if (!group) {
+      const location = pageLocation(pageKey);
+      group = {
+        pageKey,
+        title: pageTitle(thread) || location,
+        location,
+        current: pageKey === currentPageKey,
+        openCount: 0,
+        threads: [],
+      };
+      groups.set(pageKey, group);
+    }
+    group.threads.push(thread);
+    if (!isDoneStatus(thread.annotation.status)) {
+      group.openCount += 1;
+    }
+  }
+  const ordered = [...groups.values()];
+  const currentIndex = ordered.findIndex((group) => group.current);
+  if (currentIndex > 0) {
+    ordered.unshift(...ordered.splice(currentIndex, 1));
+  }
+  return ordered;
+}

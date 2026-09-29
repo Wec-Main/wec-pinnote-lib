@@ -101,7 +101,11 @@ export function MultiSelect({
           className="wpn-select__menu wpn-select__menu--floating"
           style={
             floatingPosition
-              ? { top: floatingPosition.top, left: floatingPosition.left }
+              ? {
+                  top: floatingPosition.top,
+                  left: floatingPosition.left,
+                  minWidth: rootRef.current?.offsetWidth,
+                }
               : { visibility: "hidden" }
           }
         >

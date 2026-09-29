@@ -6,25 +6,16 @@ import { useScrimDismiss } from "../../hooks/useScrimDismiss";
 import type { Flow } from "../../types/flowPin.types";
 
 const NAME_MAX = 200;
-const NOTES_MAX = 10000;
 
 interface FlowFormModalProps {
-  mode: "create" | "edit";
-  initialFlow?: Flow;
+  flow: Flow;
   busy?: boolean;
   onClose: () => void;
-  onSubmit: (data: { name: string; description: string }) => void;
+  onSubmit: (data: { name: string }) => void;
 }
 
-export function FlowFormModal({
-  mode,
-  initialFlow,
-  busy = false,
-  onClose,
-  onSubmit,
-}: FlowFormModalProps) {
-  const [name, setName] = useState(initialFlow?.name ?? "");
-  const [notes, setNotes] = useState(initialFlow?.description ?? "");
+export function FlowFormModal({ flow, busy = false, onClose, onSubmit }: FlowFormModalProps) {
+  const [name, setName] = useState(flow.name);
   const [touched, setTouched] = useState(false);
   const dialogRef = useRef<HTMLFormElement>(null);
   const nameInputRef = useRef<HTMLInputElement>(null);
@@ -41,7 +32,6 @@ export function FlowFormModal({
 
   const trimmedName = name.trim();
   const nameValid = trimmedName.length > 0;
-  const isEdit = mode === "edit";
 
   const handleSubmit = (event: FormEvent) => {
     event.preventDefault();
@@ -49,7 +39,7 @@ export function FlowFormModal({
     if (!nameValid || busy) {
       return;
     }
-    onSubmit({ name: trimmedName, description: notes.trim() });
+    onSubmit({ name: trimmedName });
   };
 
   return (
@@ -65,19 +55,15 @@ export function FlowFormModal({
         <div className="wpn-epicflow-modal__header">
           <div>
             <h2 className="wpn-epicflow-modal__title" id="wpn-flow-form-title">
-              {isEdit ? "Edit flow" : "Create flow"}
+              Edit flow
             </h2>
-            <p className="wpn-epicflow-modal__subtitle">
-              {isEdit
-                ? "Update this flow's name and notes."
-                : "Start a new flow chart for this project."}
-            </p>
+            <p className="wpn-epicflow-modal__subtitle">Rename this flow.</p>
           </div>
           <Tooltip label="Close" placement="left">
             <button
               type="button"
               className="wpn-icon-btn wpn-icon-btn--danger"
-              aria-label={isEdit ? "Close edit flow" : "Close create flow"}
+              aria-label="Close edit flow"
               onClick={onClose}
               disabled={busy}
             >
@@ -107,18 +93,6 @@ export function FlowFormModal({
                 <span className="wpn-users-modal__error">A flow name is required.</span>
               ) : null}
             </label>
-
-            <label className="wpn-epicflow-modal__field">
-              <span className="wpn-epicflow-modal__label">Notes</span>
-              <textarea
-                className="wpn-epicflow-modal__input wpn-epicflow-modal__textarea"
-                value={notes}
-                maxLength={NOTES_MAX}
-                rows={4}
-                onChange={(event) => setNotes(event.target.value)}
-                placeholder="Notes about this flow as a whole..."
-              />
-            </label>
           </div>
         </div>
 
@@ -136,9 +110,9 @@ export function FlowFormModal({
             {busy ? (
               <Spinner className="wpn-btn__icon" />
             ) : (
-              <Icon name={isEdit ? "check" : "plus"} className="wpn-btn__icon" />
+              <Icon name="check" className="wpn-btn__icon" />
             )}
-            {isEdit ? "Save changes" : "Create flow"}
+            Save changes
           </button>
         </div>
       </form>

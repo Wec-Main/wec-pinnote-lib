@@ -63,6 +63,18 @@ export function canManageOrganizations(actorRole: UserManagementRole): boolean {
   return actorRole === "super_admin";
 }
 
+export function canManageProjects(actorRole: UserManagementRole): boolean {
+  return actorRole === "super_admin";
+}
+
+export function canViewProjects(actorRole: UserManagementRole): boolean {
+  return actorRole === "super_admin" || actorRole === "admin";
+}
+
 export function canManageTags(actorRole: UserManagementRole): boolean {
+  return actorRole === "super_admin" || actorRole === "admin";
+}
+
+export function canPublishVersions(actorRole: UserManagementRole): boolean {
   return actorRole === "super_admin" || actorRole === "admin";
 }

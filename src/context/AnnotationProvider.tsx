@@ -37,6 +37,8 @@ import { useSharedFetch } from "../hooks/useSharedFetch";
 import { useTokenGetter } from "../hooks/useTokenGetter";
 import { fetchProject } from "../services/organizationsApi";
 import type { Project } from "../types/organization.types";
+import type { StreamEvent } from "../types/stream.types";
+import type { VersionedLayer } from "./AnnotationContext";
 import { fetchTags } from "../services/tagsApi";
 import { resolveEffectiveProjectVersionId } from "../utils/resolveEffectiveProjectVersionId";
 import { createClientId } from "../utils/format";
@@ -44,6 +46,12 @@ import { isTrackingEnabled } from "../utils/pageVisitQueue";
 import type { ProjectTag } from "../types/tag.types";
 
 const DEFAULT_Z_INDEX = 2147483000;
+
+interface LayerVersionSelection {
+  scope: string;
+  comments?: string;
+  flows?: string;
+}
 
 function resolveConfig(config: AnnotationConfig): ResolvedAnnotationConfig {
   return {
@@ -155,10 +163,12 @@ export function AnnotationProvider({ config, children }: AnnotationProviderProps
     authenticated && sessionKey
       ? `project-current-version:${activeConfig.apiBaseUrl}:${sessionKey}:${projectId}`
       : null;
-  const { data: liveProject, reload: reloadCurrentProjectVersion } = useSharedFetch<Project>(
-    projectVersionKey,
-    async (signal) =>
-      fetchProject(activeConfig.apiBaseUrl, await getProjectVersionToken(), projectId, signal),
+  const {
+    data: liveProject,
+    error: liveProjectError,
+    reload: reloadCurrentProjectVersion,
+  } = useSharedFetch<Project>(projectVersionKey, async (signal) =>
+    fetchProject(activeConfig.apiBaseUrl, await getProjectVersionToken(), projectId, signal),
   );
   // config.projectVersionId is an explicit host override (pin to one
   // version); otherwise resolve to the project's live current version so
@@ -167,6 +177,33 @@ export function AnnotationProvider({ config, children }: AnnotationProviderProps
   const projectVersionId = resolveEffectiveProjectVersionId(
     activeConfig.projectVersionId,
     liveProject?.currentProjectVersionId,
+  );
+  const projectVersionResolved =
+    activeConfig.projectVersionId !== undefined ||
+    liveProject !== null ||
+    liveProjectError !== null;
+  const layerVersionScope = `${sessionKey ?? ""}:${projectId}`;
+  const [layerVersionSelection, setLayerVersionSelection] = useState<LayerVersionSelection>({
+    scope: layerVersionScope,
+  });
+  const selectedLayerVersions =
+    layerVersionSelection.scope === layerVersionScope ? layerVersionSelection : undefined;
+  const commentsVersionId = selectedLayerVersions?.comments ?? projectVersionId;
+  const flowsVersionId = selectedLayerVersions?.flows ?? projectVersionId;
+  const selectLayerVersion = useCallback(
+    (layer: VersionedLayer, versionId: string | undefined) => {
+      setLayerVersionSelection((current) => ({
+        ...(current.scope === layerVersionScope ? current : { scope: layerVersionScope }),
+        [layer]: versionId,
+      }));
+    },
+    [layerVersionScope],
+  );
+
+  const applyFlowPinEventRef = useRef<(event: StreamEvent) => void>(() => undefined);
+  const forwardFlowPinEvent = useCallback(
+    (event: StreamEvent) => applyFlowPinEventRef.current(event),
+    [],
   );
 
   const {
@@ -186,14 +223,15 @@ export function AnnotationProvider({ config, children }: AnnotationProviderProps
   } = useAnnotationCollection({
     api,
     projectId,
-    projectVersionId,
+    projectVersionId: commentsVersionId,
     pageKey,
     currentUser: activeUser,
-    authenticated: teardownActive,
+    authenticated: teardownActive && projectVersionResolved,
     apiBaseUrl: activeConfig.apiBaseUrl,
     getAuthToken: activeConfig.getAuthToken,
     sessionKey: sessionKey ?? "",
     events: resolved,
+    onFlowPinEvent: forwardFlowPinEvent,
   });
 
   const {
@@ -205,29 +243,23 @@ export function AnnotationProvider({ config, children }: AnnotationProviderProps
     api,
     apiBaseUrl: activeConfig.apiBaseUrl,
     projectId,
-    projectVersionId,
-    authenticated: teardownActive,
+    projectVersionId: commentsVersionId,
+    authenticated: teardownActive && projectVersionResolved,
     sessionKey,
   });
 
-  // The current page's own creates/edits/replies/deletes/status changes
-  // should show up in the project-wide count/list shortly after they
-  // succeed, without threading a reload call through every mutation
-  // callback. `annotations` (page-scoped) already changes reference on every
-  // successful mutation, so just piggyback on that; debounce since an
-  // optimistic update and its server confirmation both change the reference
-  // in quick succession.
   const reloadAllAnnotationsRef = useRef(reloadAllAnnotations);
   reloadAllAnnotationsRef.current = reloadAllAnnotations;
-  const isFirstAnnotationsRenderRef = useRef(true);
+  const annotationsLoadingRef = useRef(loading);
   useEffect(() => {
-    if (isFirstAnnotationsRenderRef.current) {
-      isFirstAnnotationsRenderRef.current = false;
+    const changedByPageLoad = annotationsLoadingRef.current || loading;
+    annotationsLoadingRef.current = loading;
+    if (changedByPageLoad) {
       return;
     }
     const timer = window.setTimeout(() => reloadAllAnnotationsRef.current(), 400);
     return () => window.clearTimeout(timer);
-  }, [annotations]);
+  }, [annotations, loading]);
 
   const [modeEnabled, setModeEnabledState] = useState(false);
   const setModeEnabled = useCallback(
@@ -291,6 +323,7 @@ export function AnnotationProvider({ config, children }: AnnotationProviderProps
     removeAnnotationTag,
     applyAnnotationTagLocal,
     commitAnnotationTagUpdate,
+    reloadAnnotationTags,
   } = useAnnotationTags({
     apiBaseUrl: activeConfig.apiBaseUrl,
     projectId,
@@ -298,7 +331,7 @@ export function AnnotationProvider({ config, children }: AnnotationProviderProps
     pageKey,
     getAuthToken: activeConfig.getAuthToken,
     sessionKey,
-    enabled: authenticated,
+    enabled: authenticated && projectVersionResolved,
   });
 
   const {
@@ -315,15 +348,19 @@ export function AnnotationProvider({ config, children }: AnnotationProviderProps
     syncFlowPinName,
     selectedFlowPinId,
     selectFlowPin: selectFlowPinRaw,
+    applyFlowPinEvent,
+    reloadFlowPins,
   } = useFlowPins({
     apiBaseUrl: activeConfig.apiBaseUrl,
     projectId,
-    projectVersionId,
+    projectVersionId: flowsVersionId,
     pageKey,
     getAuthToken: activeConfig.getAuthToken,
     sessionKey,
-    enabled: authenticated,
+    enabled: authenticated && projectVersionResolved,
   });
+
+  applyFlowPinEventRef.current = applyFlowPinEvent;
 
   usePageVisitTracker({
     apiBaseUrl: activeConfig.apiBaseUrl,
@@ -569,7 +606,8 @@ export function AnnotationProvider({ config, children }: AnnotationProviderProps
 
   const startDraft = useCallback(
     (anchor: AnnotationAnchor, label: string) => {
-      const number = annotationsRef.current.reduce((max, item) => Math.max(max, item.number), 0) + 1;
+      const number =
+        annotationsRef.current.reduce((max, item) => Math.max(max, item.number), 0) + 1;
       draftMessageRef.current = "";
       setSelectedId(null);
       setListOpen(false);
@@ -634,37 +672,32 @@ export function AnnotationProvider({ config, children }: AnnotationProviderProps
       if (!current) {
         return;
       }
-      const typedMessage = draftMessageRef.current;
-      clearDraft();
-      try {
-        const created = await createAnnotation({
-          projectId,
-          projectVersionId,
-          pageKey,
-          path: current.path,
-          anchor: current.anchor,
-          comment: {
-            message,
-            authorId: currentUserId,
-          },
-          status,
-        });
-        setModeEnabledState(false);
-        setSelectedId(created.id);
-        setPinsVisible(true);
-      } catch (err) {
-        draftMessageRef.current = typedMessage;
-        setDraft((existing) => existing ?? { ...current, message: typedMessage });
-        throw err;
+      const created = await createAnnotation({
+        projectId,
+        projectVersionId: commentsVersionId,
+        pageKey,
+        path: current.path,
+        anchor: current.anchor,
+        comment: {
+          message,
+          authorId: currentUserId,
+        },
+        status,
+      });
+      if (draftRef.current?.id === current.id) {
+        clearDraft();
       }
+      setModeEnabledState(false);
+      setSelectedId(created.id);
+      setPinsVisible(true);
     },
     [
       clearDraft,
+      commentsVersionId,
       createAnnotation,
       currentUserId,
       pageKey,
       projectId,
-      projectVersionId,
       setPinsVisible,
     ],
   );
@@ -728,6 +761,10 @@ export function AnnotationProvider({ config, children }: AnnotationProviderProps
       api,
       projectVersionId,
       reloadCurrentProjectVersion,
+      project: liveProject,
+      commentsVersionId,
+      flowsVersionId,
+      selectLayerVersion,
       pageKey,
       annotations,
       loading,
@@ -755,12 +792,18 @@ export function AnnotationProvider({ config, children }: AnnotationProviderProps
       commitAnnotationTagUpdate,
       flowPins,
       syncFlowPinName,
+      reloadFlowPins,
+      reloadAnnotationTags,
     }),
     [
       activeConfig,
       api,
       projectVersionId,
       reloadCurrentProjectVersion,
+      liveProject,
+      commentsVersionId,
+      flowsVersionId,
+      selectLayerVersion,
       pageKey,
       annotations,
       loading,
@@ -788,6 +831,8 @@ export function AnnotationProvider({ config, children }: AnnotationProviderProps
       commitAnnotationTagUpdate,
       flowPins,
       syncFlowPinName,
+      reloadFlowPins,
+      reloadAnnotationTags,
     ],
   );
 

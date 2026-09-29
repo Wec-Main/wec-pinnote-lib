@@ -1,5 +1,6 @@
 import type { Annotation, AnnotationComment } from "./annotation.types";
 import type { Epic, UserStory } from "./epicFlow.types";
+import type { Flow, FlowPin } from "./flowPin.types";
 
 export type StreamEventType =
   | "annotation.created"
@@ -13,7 +14,15 @@ export type StreamEventType =
   | "epic.deleted"
   | "user_story.created"
   | "user_story.updated"
-  | "user_story.deleted";
+  | "user_story.deleted"
+  | "flow.created"
+  | "flow.updated"
+  | "flow.deleted"
+  | "flow.published"
+  | "flow_document.saved"
+  | "flow_pin.created"
+  | "flow_pin.updated"
+  | "flow_pin.deleted";
 
 export type StreamConnectionState =
   "connecting" | "open" | "reconnecting" | "closed" | "unauthenticated";
@@ -31,6 +40,14 @@ export interface StreamEventPayloads {
   "user_story.created": { userStory: UserStory };
   "user_story.updated": { userStory: UserStory };
   "user_story.deleted": { userStoryId: string };
+  "flow.created": { flow: Flow };
+  "flow.updated": { flow: Flow };
+  "flow.deleted": { flowId: string };
+  "flow.published": { flowId: string; version: unknown };
+  "flow_document.saved": { flowId: string; revision: number };
+  "flow_pin.created": { flowPin: FlowPin };
+  "flow_pin.updated": { flowPin: FlowPin };
+  "flow_pin.deleted": { flowPinId: string };
 }
 
 interface StreamEventBase {

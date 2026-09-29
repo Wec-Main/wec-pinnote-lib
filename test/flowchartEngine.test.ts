@@ -157,18 +157,15 @@ describe("FlowEngine", () => {
     expect(other.getState().canUndo).toBe(false);
   });
 
-  it("carries flow-level notes through save and reload, independent of any node", () => {
+  it("drops legacy flow-level notes when a loaded flow is saved again", () => {
     const { engine } = simpleFlow();
-    expect(engine.getState().flowNotes).toBe("");
-    engine.setFlowNotes("Handles the checkout funnel.");
-    expect(engine.toJSON().meta?.notes).toBe("Handles the checkout funnel.");
+    const legacy = { ...engine.toJSON(), meta: { name: "Checkout", notes: "Old notes" } };
 
     const other = new FlowEngine();
-    other.loadFlow(parseFlow(JSON.stringify(engine.toJSON())));
-    expect(other.getState().flowNotes).toBe("Handles the checkout funnel.");
+    other.loadFlow(parseFlow(JSON.stringify(legacy)));
 
-    other.newFlow();
-    expect(other.getState().flowNotes).toBe("");
+    expect(other.getState().flowName).toBe("Checkout");
+    expect(other.toJSON().meta).not.toHaveProperty("notes");
   });
 
   it("emits change events", () => {

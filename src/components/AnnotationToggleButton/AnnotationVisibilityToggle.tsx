@@ -1,12 +1,31 @@
 import { useRef, useState } from "react";
-import { useAnnotationContext } from "../../context/AnnotationContext";
+import { useAnnotationContext, type VersionedLayer } from "../../context/AnnotationContext";
 import { useEscapeKey } from "../../hooks/useEscapeKey";
 import { useOutsidePointerDown } from "../../hooks/useOutsidePointerDown";
+import { useProjectVersionList } from "../../hooks/useProjectVersionList";
+import { projectVersionLabel } from "../../utils/projectVersionLabel";
 import { Icon, MenuPanel, Tooltip, type MenuItemDefinition } from "../primitives";
+import type { IconName } from "../primitives/Icon";
+
+interface LayerDefinition {
+  layer: VersionedLayer;
+  label: string;
+  icon: IconName;
+  count: number;
+  visible: boolean;
+  onToggle: (visible: boolean) => void;
+  versioningEnabled: boolean;
+  selectedVersionId: string | undefined;
+}
 
 export function AnnotationVisibilityToggle() {
   const {
     activeAccount,
+    project,
+    projectVersionId,
+    commentsVersionId,
+    flowsVersionId,
+    selectLayerVersion,
     annotations,
     flowPins,
     pinsVisible,
@@ -24,42 +43,97 @@ export function AnnotationVisibilityToggle() {
   useEscapeKey(close, open);
 
   const loggedOut = !activeAccount;
+  const anyLayerVersioned =
+    project?.annotationVersioningEnabled !== false || project?.flowVersioningEnabled !== false;
+  const { versions, error: versionsError } = useProjectVersionList(open && anyLayerVersioned);
+
   const someVisible = pinsVisible || tagsVisible || flowPinsVisible;
-  const label = loggedOut
-    ? "Log in first"
-    : someVisible
-      ? "Layer visibility"
-      : "All layers hidden";
+  const label = loggedOut ? "Log in first" : someVisible ? "Layer visibility" : "All layers hidden";
+
+  const versionItems = (definition: LayerDefinition): MenuItemDefinition[] => {
+    if (versionsError) {
+      return [
+        {
+          type: "action",
+          id: `${definition.layer}-versions-error`,
+          label: "Versions unavailable",
+          disabled: true,
+          onSelect: () => undefined,
+        },
+      ];
+    }
+    if (!versions) {
+      return [
+        {
+          type: "action",
+          id: `${definition.layer}-versions-loading`,
+          label: "Loading versions…",
+          disabled: true,
+          onSelect: () => undefined,
+        },
+      ];
+    }
+    return versions.map((version) => ({
+      type: "radio",
+      id: `${definition.layer}-version-${version.id}`,
+      label: projectVersionLabel(version),
+      shortcut: version.id === project?.currentProjectVersionId ? "Current" : version.status,
+      checked: version.id === definition.selectedVersionId,
+      onSelect: () =>
+        selectLayerVersion(
+          definition.layer,
+          version.id === projectVersionId ? undefined : version.id,
+        ),
+    }));
+  };
+
+  const layerItem = (definition: LayerDefinition): MenuItemDefinition => {
+    const visibility: MenuItemDefinition = {
+      type: "checkbox",
+      id: definition.layer,
+      label: definition.label,
+      icon: definition.icon,
+      checked: definition.visible,
+      shortcut: String(definition.count),
+      onToggle: definition.onToggle,
+    };
+    if (!definition.versioningEnabled) {
+      return visibility;
+    }
+    return {
+      type: "submenu",
+      id: `${definition.layer}-menu`,
+      label: definition.label,
+      icon: definition.icon,
+      items: [
+        { ...visibility, label: `Show ${definition.label.toLowerCase()}` },
+        { type: "separator", id: `${definition.layer}-versions-separator` },
+        ...versionItems(definition),
+      ],
+    };
+  };
 
   const items: MenuItemDefinition[] = [
-    {
-      type: "checkbox",
-      id: "pins",
+    layerItem({
+      layer: "comments",
       label: "Comments",
       icon: "comment",
-      checked: pinsVisible,
-      shortcut: String(annotations.length),
+      count: annotations.length,
+      visible: pinsVisible,
       onToggle: setPinsVisible,
-    },
-    // Tags temporarily hidden from the visibility menu — see AnnotationModeButton.
-    // {
-    //   type: "checkbox",
-    //   id: "tags",
-    //   label: "Tags",
-    //   icon: "tag",
-    //   checked: tagsVisible,
-    //   shortcut: String(annotationTags.length),
-    //   onToggle: setTagsVisible,
-    // },
-    {
-      type: "checkbox",
-      id: "flows",
+      versioningEnabled: project?.annotationVersioningEnabled !== false,
+      selectedVersionId: commentsVersionId,
+    }),
+    layerItem({
+      layer: "flows",
       label: "Flows",
       icon: "flow",
-      checked: flowPinsVisible,
-      shortcut: String(flowPins.length),
+      count: flowPins.length,
+      visible: flowPinsVisible,
       onToggle: setFlowPinsVisible,
-    },
+      versioningEnabled: project?.flowVersioningEnabled !== false,
+      selectedVersionId: flowsVersionId,
+    }),
   ];
 
   return (

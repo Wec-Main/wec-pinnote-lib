@@ -1,7 +1,9 @@
-import { useState } from "react";
+import { useCallback, useState } from "react";
 import { useAnnotationAuth, useAnnotationContext } from "../../context/AnnotationContext";
 import { Icon, Tooltip } from "../primitives";
 import { useFlowDocument } from "../../hooks/useFlowDocument";
+import { useFlowStream } from "../../hooks/useFlowStream";
+import type { StreamEvent } from "../../types/stream.types";
 import { FlowDocumentEditor } from "./FlowDocumentEditor";
 import { FlowListPanel } from "./FlowListPanel";
 
@@ -49,7 +51,18 @@ function errorMessage(error: unknown): string | null {
   return error instanceof Error && error.message ? error.message : "Could not load the flow";
 }
 
-function FlowEditorPane({ flowId }: { flowId: string }) {
+interface FlowEditorPaneProps {
+  flowId: string;
+}
+
+function remoteRevision(event: StreamEvent, flowId: string): number | null {
+  if (event.eventType !== "flow_document.saved" || event.payload.flowId !== flowId) {
+    return null;
+  }
+  return event.payload.revision;
+}
+
+function FlowEditorPane({ flowId }: FlowEditorPaneProps) {
   const { config } = useAnnotationContext();
   const { hostAuthenticated, activeAccount } = useAnnotationAuth();
   const signedIn = Boolean(config.getAuthToken);
@@ -59,6 +72,37 @@ function FlowEditorPane({ flowId }: { flowId: string }) {
     getAuthToken: config.getAuthToken,
     sessionKey,
     flowId,
+  });
+  const { applyRemoteRevision, reload } = flowDocument;
+  const currentUserId = activeAccount?.id;
+
+  const onStreamEvent = useCallback(
+    (event: StreamEvent) => {
+      if (event.eventType === "flow.deleted" && event.payload.flowId === flowId) {
+        reload();
+        return;
+      }
+      const revision = remoteRevision(event, flowId);
+      if (revision !== null && event.actorUserId !== currentUserId) {
+        applyRemoteRevision(revision);
+      }
+    },
+    [applyRemoteRevision, currentUserId, flowId, reload],
+  );
+
+  const reloadIfIdle = useCallback(
+    () => applyRemoteRevision(Number.POSITIVE_INFINITY),
+    [applyRemoteRevision],
+  );
+
+  useFlowStream({
+    apiBaseUrl: config.apiBaseUrl,
+    projectId: config.projectId,
+    getAuthToken: config.getAuthToken,
+    sessionKey,
+    enabled: Boolean(sessionKey),
+    onEvent: onStreamEvent,
+    onResync: reloadIfIdle,
   });
 
   return (
@@ -82,26 +126,24 @@ export function WecFlowPanel() {
             <Icon name="flow" />
           </span>
           <span className="wpn-panel__title">Flow</span>
+          {openFlowId ? (
+            <button
+              type="button"
+              className="wpn-flow-panel__back"
+              onClick={() => setOpenFlowId(null)}
+            >
+              <Icon name="chevronLeft" className="wpn-flow-panel__back-icon" />
+              Back to flows
+            </button>
+          ) : null}
         </span>
         <div className="wpn-flow-panel__header-actions">
           {openFlowId ? (
-            <>
-              <Tooltip label="Back to flow list" placement="bottom">
-                <button
-                  type="button"
-                  className="wpn-icon-btn"
-                  aria-label="Back to flow list"
-                  onClick={() => setOpenFlowId(null)}
-                >
-                  <Icon name="chevronLeft" />
-                </button>
-              </Tooltip>
-              <Tooltip label={shortcutList} placement="bottom">
-                <button type="button" className="wpn-icon-btn" aria-label="Keyboard shortcuts">
-                  <Icon name="info" />
-                </button>
-              </Tooltip>
-            </>
+            <Tooltip label={shortcutList} placement="bottom">
+              <button type="button" className="wpn-icon-btn" aria-label="Keyboard shortcuts">
+                <Icon name="info" />
+              </button>
+            </Tooltip>
           ) : null}
           <Tooltip label="Close" placement="bottom">
             <button

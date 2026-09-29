@@ -23,7 +23,8 @@ import { assignableRoles, canChangePrivileges } from "../../utils/permissions";
 import { fetchProjects } from "../../services/organizationsApi";
 import type { Project } from "../../types/organization.types";
 import { useSharedFetch } from "../../hooks/useSharedFetch";
-import { MIN_PASSWORD_LENGTH, PasswordField } from "./PasswordField";
+import { PasswordField } from "./PasswordField";
+import { emailError, passwordError } from "../../utils/credentialValidation";
 import type {
   ManagedUser,
   ManagedUserDraft,
@@ -31,7 +32,7 @@ import type {
   UserManagementRole,
 } from "../../types/userManagement.types";
 
-const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+type ValidatedField = "firstName" | "lastName" | "email" | "password";
 
 interface UserFormModalProps {
   user: ManagedUser | null;
@@ -40,6 +41,8 @@ interface UserFormModalProps {
   onClose: () => void;
   onSubmit: (draft: ManagedUserDraft) => void;
 }
+
+const HIDDEN_ROLE_IDS: readonly UserManagementRole[] = ["reviewer", "developer"];
 
 export function UserFormModal({
   user,
@@ -74,6 +77,12 @@ export function UserFormModal({
   const [category, setCategory] = useState<UserManagementCategory>(user?.category ?? "internal");
   const [password, setPassword] = useState("");
   const [touched, setTouched] = useState(false);
+  const [blurred, setBlurred] = useState<ReadonlySet<ValidatedField>>(() => new Set());
+  const markBlurred = (field: ValidatedField) =>
+    setBlurred((current) => (current.has(field) ? current : new Set(current).add(field)));
+  const shows = (field: ValidatedField) => touched || blurred.has(field);
+  const emailInputRef = useRef<HTMLInputElement>(null);
+  const [submitted, setSubmitted] = useState<Record<ValidatedField, string> | null>(null);
   const [projectIds, setProjectIds] = useState<string[]>(() => {
     if (user) {
       return user.projects.map((project) => project.id);
@@ -96,13 +105,18 @@ export function UserFormModal({
       : "Could not load projects."
     : null;
 
+  const currentRoleId = user?.roleId;
   const roleOptions = useMemo<SelectOption[]>(() => {
     const allowed = assignableRoles(actorRole);
-    return USER_ROLE_OPTIONS.filter((option) => allowed.includes(option.value)).map((option) => ({
+    return USER_ROLE_OPTIONS.filter(
+      (option) =>
+        allowed.includes(option.value) &&
+        (!HIDDEN_ROLE_IDS.includes(option.value) || option.value === currentRoleId),
+    ).map((option) => ({
       value: option.value,
       label: option.label,
     }));
-  }, [actorRole]);
+  }, [actorRole, currentRoleId]);
   const projectOptions = useMemo<SelectOption[]>(
     () =>
       projects.map((project) => ({
@@ -135,20 +149,37 @@ export function UserFormModal({
   const trimmedFirstName = firstName.trim();
   const trimmedLastName = lastName.trim();
   const trimmedEmail = email.trim();
-  const emailValid = EMAIL_PATTERN.test(trimmedEmail);
-  const passwordValid = password.length === 0 || password.length >= MIN_PASSWORD_LENGTH;
+  const emailProblem = emailError(email);
+  const passwordProblem = user ? null : passwordError(password);
   const canSubmit =
-    Boolean(trimmedFirstName) && Boolean(trimmedLastName) && emailValid && passwordValid;
-  const firstNameServerError = fieldErrors?.firstName?.[0];
-  const lastNameServerError = fieldErrors?.lastName?.[0];
-  const emailServerError = fieldErrors?.email?.[0];
+    Boolean(trimmedFirstName) &&
+    Boolean(trimmedLastName) &&
+    emailProblem === null &&
+    passwordProblem === null;
+  const serverError = (field: ValidatedField, current: string) =>
+    submitted && submitted[field] === current ? fieldErrors?.[field]?.[0] : undefined;
+  const firstNameServerError = serverError("firstName", trimmedFirstName);
+  const lastNameServerError = serverError("lastName", trimmedLastName);
+  const emailServerError = serverError("email", trimmedEmail);
+  const passwordServerError = serverError("password", password);
 
   const handleSubmit = (event: FormEvent) => {
     event.preventDefault();
     setTouched(true);
     if (!canSubmit || busy) {
+      if (!trimmedFirstName) {
+        firstNameInputRef.current?.focus();
+      } else if (emailProblem) {
+        emailInputRef.current?.focus();
+      }
       return;
     }
+    setSubmitted({
+      firstName: trimmedFirstName,
+      lastName: trimmedLastName,
+      email: trimmedEmail,
+      password,
+    });
     onSubmit({
       firstName: trimmedFirstName,
       lastName: trimmedLastName,
@@ -171,6 +202,7 @@ export function UserFormModal({
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}
+        noValidate
         onSubmit={handleSubmit}
       >
         <div className="wpn-epicflow-modal__header">
@@ -196,7 +228,7 @@ export function UserFormModal({
               required
               error={
                 firstNameServerError ??
-                (touched && !trimmedFirstName ? "A first name is required." : null)
+                (shows("firstName") && !trimmedFirstName ? "A first name is required." : null)
               }
             >
               {(fieldProps) => (
@@ -207,6 +239,7 @@ export function UserFormModal({
                   value={firstName}
                   placeholder="e.g. Priya"
                   onChange={(event) => setFirstName(event.target.value)}
+                  onBlur={() => markBlurred("firstName")}
                 />
               )}
             </Field>
@@ -215,7 +248,7 @@ export function UserFormModal({
               required
               error={
                 lastNameServerError ??
-                (touched && !trimmedLastName ? "A last name is required." : null)
+                (shows("lastName") && !trimmedLastName ? "A last name is required." : null)
               }
             >
               {(fieldProps) => (
@@ -225,6 +258,7 @@ export function UserFormModal({
                   value={lastName}
                   placeholder="e.g. Raghavan"
                   onChange={(event) => setLastName(event.target.value)}
+                  onBlur={() => markBlurred("lastName")}
                 />
               )}
             </Field>
@@ -234,18 +268,20 @@ export function UserFormModal({
             <Field
               label="Email"
               required
-              error={
-                emailServerError ?? (touched && !emailValid ? "Enter a valid email address." : null)
-              }
+              error={emailServerError ?? (shows("email") ? emailProblem : null)}
             >
               {(fieldProps) => (
                 <input
                   {...fieldProps}
                   className="wpn-epicflow-modal__input"
+                  ref={emailInputRef}
                   type="email"
+                  inputMode="email"
+                  autoComplete="off"
                   value={email}
                   placeholder="name@company.com"
                   onChange={(event) => setEmail(event.target.value)}
+                  onBlur={() => markBlurred("email")}
                 />
               )}
             </Field>
@@ -352,8 +388,9 @@ export function UserFormModal({
                 value={password}
                 placeholder="Leave blank to generate one"
                 hint="Share this with the user. Blank generates one shown after creating."
-                invalid={touched && !passwordValid}
+                error={passwordServerError ?? (shows("password") ? passwordProblem : null)}
                 onChange={setPassword}
+                onBlur={() => markBlurred("password")}
               />
             </div>
           )}
@@ -369,7 +406,11 @@ export function UserFormModal({
             <Icon name="close" className="wpn-btn__icon" />
             Cancel
           </button>
-          <button type="submit" className="wpn-btn wpn-btn--primary" disabled={!canSubmit || busy}>
+          <button
+            type="submit"
+            className="wpn-btn wpn-btn--primary"
+            disabled={busy || (touched && !canSubmit)}
+          >
             {busy ? (
               <Spinner className="wpn-btn__icon" />
             ) : (

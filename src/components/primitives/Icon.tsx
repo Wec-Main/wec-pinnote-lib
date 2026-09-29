@@ -47,6 +47,7 @@ export type IconName =
   | "layers"
   | "lock"
   | "lockOpen"
+  | "logout"
   | "info";
 
 const PATHS: Record<IconName, ReactElement> = {
@@ -290,6 +291,12 @@ const PATHS: Record<IconName, ReactElement> = {
     <>
       <rect x="5" y="11" width="14" height="9.5" rx="2" />
       <path d="M8 11V7.5a4 4 0 0 1 8 0V11" />
+    </>
+  ),
+  logout: (
+    <>
+      <path d="M14 4.5h3.5a2 2 0 0 1 2 2v11a2 2 0 0 1-2 2H14" />
+      <path d="M10 8 6 12l4 4M6 12h9.5" />
     </>
   ),
   lockOpen: (

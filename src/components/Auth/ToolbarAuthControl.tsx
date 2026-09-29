@@ -3,9 +3,14 @@ import { createPortal } from "react-dom";
 import { useAnnotationContext } from "../../context/AnnotationContext";
 import { useEscapeKey } from "../../hooks/useEscapeKey";
 import { getInitials } from "../../utils/format";
-import { Icon, SearchableSelect, Tooltip, type SelectOption } from "../primitives";
+import { Icon, SearchableSelect, Spinner, Tooltip, type SelectOption } from "../primitives";
 import { LoginDialog } from "./LoginDialog";
-import type { LoginOption } from "../../types/auth.types";
+import type { AuthSession, LoginOption } from "../../types/auth.types";
+
+interface ExitingAccount {
+  account: AuthSession;
+  index: number;
+}
 
 export function ToolbarAuthControl() {
   const {
@@ -30,6 +35,27 @@ export function ToolbarAuthControl() {
   const switcherRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const menuId = useId();
+  const [signingOutIds, setSigningOutIds] = useState<ReadonlySet<string>>(() => new Set());
+  const [exitingAccounts, setExitingAccounts] = useState<ExitingAccount[]>([]);
+
+  const signOut = async (account: AuthSession, index: number) => {
+    setSigningOutIds((current) => new Set(current).add(account.id));
+    try {
+      await logout(account.id);
+      setExitingAccounts((current) => [...current, { account, index }]);
+    } catch {
+      return;
+    } finally {
+      setSigningOutIds((current) => {
+        const next = new Set(current);
+        next.delete(account.id);
+        return next;
+      });
+    }
+  };
+
+  const finishExit = (accountId: string) =>
+    setExitingAccounts((current) => current.filter((item) => item.account.id !== accountId));
 
   const closeSwitcher = () => {
     setSwitcherOpen(false);
@@ -58,6 +84,16 @@ export function ToolbarAuthControl() {
   }, [switcherOpen, clearRevokeError]);
 
   const loggedInIds = useMemo(() => new Set(accounts.map((item) => item.id)), [accounts]);
+
+  const menuAccounts = useMemo(() => {
+    const rows = [...accounts];
+    for (const { account, index } of exitingAccounts) {
+      if (!loggedInIds.has(account.id)) {
+        rows.splice(Math.min(index, rows.length), 0, account);
+      }
+    }
+    return rows;
+  }, [accounts, exitingAccounts, loggedInIds]);
 
   const selectOptions = useMemo<SelectOption[]>(
     () =>
@@ -110,7 +146,7 @@ export function ToolbarAuthControl() {
 
   if (!activeAccount) {
     return (
-      <span className="wpn-toolbar__auth">
+      <span className="wpn-toolbar__auth wpn-toolbar__auth--enter">
         {loginOptionsError ? (
           <Tooltip label={loginOptionsError} placement="bottom">
             <button type="button" className="wpn-toolbar__auth-retry" onClick={reloadLoginOptions}>
@@ -138,10 +174,12 @@ export function ToolbarAuthControl() {
         aria-label={`Signed in as ${activeAccount.name}`}
         onClick={() => setSwitcherOpen((open) => !open)}
       >
-        <span className="wpn-avatar wpn-avatar--fallback wpn-toolbar__account-avatar">
-          {getInitials(activeAccount.name)}
+        <span key={activeAccount.id} className="wpn-toolbar__account-identity">
+          <span className="wpn-avatar wpn-avatar--fallback wpn-toolbar__account-avatar">
+            {getInitials(activeAccount.name)}
+          </span>
+          <span className="wpn-toolbar__account-name">{activeAccount.name}</span>
         </span>
-        <span className="wpn-toolbar__account-name">{activeAccount.name}</span>
         {accounts.length > 1 ? (
           <span className="wpn-toolbar__account-count">{accounts.length}</span>
         ) : null}
@@ -158,49 +196,72 @@ export function ToolbarAuthControl() {
               {revokeError}
             </span>
           ) : null}
-          {accounts.map((account) => (
-            <div
-              key={account.id}
-              className={[
-                "wpn-account-menu__row",
-                account.id === activeAccount.id ? "wpn-account-menu__row--active" : "",
-              ]
-                .filter(Boolean)
-                .join(" ")}
-            >
-              <button
-                type="button"
-                className="wpn-account-menu__pick"
-                onClick={() => {
-                  switchAccount(account.id);
-                  setSwitcherOpen(false);
+          {menuAccounts.map((account, index) => {
+            const exiting = !loggedInIds.has(account.id);
+            const signingOut = signingOutIds.has(account.id);
+            const active = account.id === activeAccount.id;
+            return (
+              <div
+                key={account.id}
+                className={[
+                  "wpn-account-menu__row",
+                  active ? "wpn-account-menu__row--active" : "",
+                  signingOut ? "wpn-account-menu__row--signing-out" : "",
+                  exiting ? "wpn-account-menu__row--exiting" : "",
+                ]
+                  .filter(Boolean)
+                  .join(" ")}
+                aria-busy={signingOut || undefined}
+                onAnimationEnd={(event) => {
+                  if (exiting && event.target === event.currentTarget) {
+                    finishExit(account.id);
+                  }
                 }}
               >
-                <span className="wpn-avatar wpn-avatar--fallback wpn-account-menu__avatar">
-                  {getInitials(account.name)}
-                </span>
-                <span className="wpn-account-menu__copy">
-                  <span className="wpn-account-menu__name">{account.name}</span>
-                  <span className="wpn-account-menu__email">{account.email}</span>
-                </span>
-                {account.id === activeAccount.id ? (
-                  <Icon name="check" className="wpn-account-menu__check" />
-                ) : null}
-              </button>
-              <Tooltip label="Log out" placement="left">
-                <button
-                  type="button"
-                  className="wpn-account-menu__logout"
-                  aria-label={`Log out ${account.name}`}
-                  onClick={() => {
-                    logout(account.id).catch(() => undefined);
-                  }}
-                >
-                  <Icon name="close" />
-                </button>
-              </Tooltip>
-            </div>
-          ))}
+                <div className="wpn-account-menu__row-inner">
+                  <button
+                    type="button"
+                    className="wpn-account-menu__pick"
+                    disabled={signingOut || exiting}
+                    onClick={() => {
+                      switchAccount(account.id);
+                      setSwitcherOpen(false);
+                    }}
+                  >
+                    <span className="wpn-avatar wpn-avatar--fallback wpn-account-menu__avatar">
+                      {getInitials(account.name)}
+                    </span>
+                    <span className="wpn-account-menu__copy">
+                      <span className="wpn-account-menu__name">{account.name}</span>
+                      <span className="wpn-account-menu__email">
+                        {signingOut ? "Signing out…" : exiting ? "Signed out" : account.email}
+                      </span>
+                    </span>
+                    {active && !signingOut && !exiting ? (
+                      <Icon name="check" className="wpn-account-menu__check" />
+                    ) : null}
+                  </button>
+                  <Tooltip label="Log out" placement="left">
+                    <button
+                      type="button"
+                      className="wpn-account-menu__logout"
+                      aria-label={`Log out ${account.name}`}
+                      disabled={signingOut || exiting}
+                      onClick={() => {
+                        void signOut(account, index);
+                      }}
+                    >
+                      {signingOut ? (
+                        <Spinner className="wpn-account-menu__logout-spinner" />
+                      ) : (
+                        <Icon name="logout" className="wpn-account-menu__logout-icon" />
+                      )}
+                    </button>
+                  </Tooltip>
+                </div>
+              </div>
+            );
+          })}
 
           <div className="wpn-account-menu__footer">
             {addingAccount ? (

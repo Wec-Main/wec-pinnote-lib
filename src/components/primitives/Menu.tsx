@@ -33,6 +33,16 @@ export interface MenuCheckboxItem {
   onToggle: (checked: boolean) => void;
 }
 
+export interface MenuRadioItem {
+  type: "radio";
+  id: string;
+  label: string;
+  checked: boolean;
+  shortcut?: string;
+  disabled?: boolean;
+  onSelect: () => void;
+}
+
 export interface MenuSeparatorItem {
   type: "separator";
   id: string;
@@ -48,7 +58,7 @@ export interface MenuSubmenuItem {
 }
 
 export type MenuItemDefinition =
-  MenuActionItem | MenuCheckboxItem | MenuSeparatorItem | MenuSubmenuItem;
+  MenuActionItem | MenuCheckboxItem | MenuRadioItem | MenuSeparatorItem | MenuSubmenuItem;
 
 export interface MenuDefinition {
   id: string;
@@ -66,6 +76,7 @@ export interface MenuPanelProps {
   className?: string;
 
   onInteract?: () => void;
+  onBack?: () => void;
 }
 
 function focusableIndexes(items: MenuItemDefinition[]): number[] {
@@ -79,18 +90,37 @@ interface SubmenuItemProps {
   item: MenuSubmenuItem;
   isActive: boolean;
   open: boolean;
+  registerRef: (element: HTMLButtonElement | null) => void;
   onHover: () => void;
   onOpen: () => void;
+  onClose: () => void;
   onRequestClose: () => void;
 }
 
-function SubmenuItem({ item, isActive, open, onHover, onOpen, onRequestClose }: SubmenuItemProps) {
-  const triggerRef = useRef<HTMLButtonElement>(null);
+function SubmenuItem({
+  item,
+  isActive,
+  open,
+  registerRef,
+  onHover,
+  onOpen,
+  onClose,
+  onRequestClose,
+}: SubmenuItemProps) {
+  const triggerRef = useRef<HTMLButtonElement | null>(null);
+  const setTriggerRef = (element: HTMLButtonElement | null) => {
+    triggerRef.current = element;
+    registerRef(element);
+  };
+  const closeAndRefocus = () => {
+    onClose();
+    triggerRef.current?.focus();
+  };
 
   return (
     <div className="wpn-menu__item-wrap" onPointerEnter={onHover}>
       <button
-        ref={triggerRef}
+        ref={setTriggerRef}
         type="button"
         role="menuitem"
         aria-haspopup="menu"
@@ -119,6 +149,7 @@ function SubmenuItem({ item, isActive, open, onHover, onOpen, onRequestClose }: 
           placement="right-start"
           anchorRef={triggerRef}
           onRequestClose={onRequestClose}
+          onBack={closeAndRefocus}
         />
       ) : null}
     </div>
@@ -132,6 +163,7 @@ export function MenuPanel({
   onRequestClose,
   className,
   onInteract,
+  onBack,
 }: MenuPanelProps) {
   const panelRef = useRef<HTMLDivElement>(null);
   const itemRefs = useRef(new Map<number, HTMLButtonElement>());
@@ -178,12 +210,17 @@ export function MenuPanel({
       item.onToggle(!item.checked);
       return;
     }
+    if (item.type === "radio") {
+      item.onSelect();
+      return;
+    }
     if (item.type === "submenu") {
       setOpenSubmenuId(item.id);
     }
   };
 
   const handleKeyDown = (event: ReactKeyboardEvent<HTMLDivElement>) => {
+    event.stopPropagation();
     onInteract?.();
     if (event.key === "ArrowDown") {
       event.preventDefault();
@@ -205,11 +242,13 @@ export function MenuPanel({
       if (openSubmenuId) {
         event.preventDefault();
         setOpenSubmenuId(null);
+      } else if (onBack) {
+        event.preventDefault();
+        onBack();
       }
       return;
     }
     if (event.key === "Tab") {
-
       event.preventDefault();
       moveActive(event.shiftKey ? -1 : 1);
       return;
@@ -241,19 +280,22 @@ export function MenuPanel({
               item={item}
               isActive={isActive}
               open={openSubmenuId === item.id}
+              registerRef={registerItemRef(index)}
               onHover={() => !item.disabled && setActiveIndex(index)}
               onOpen={() => !item.disabled && setOpenSubmenuId(item.id)}
+              onClose={() => setOpenSubmenuId(null)}
               onRequestClose={onRequestClose}
             />
           );
         }
-        if (item.type === "checkbox") {
+        if (item.type === "checkbox" || item.type === "radio") {
+          const icon = item.type === "checkbox" ? item.icon : undefined;
           return (
             <button
               key={item.id}
               ref={registerItemRef(index)}
               type="button"
-              role="menuitemcheckbox"
+              role={item.type === "radio" ? "menuitemradio" : "menuitemcheckbox"}
               aria-checked={item.checked}
               disabled={item.disabled}
               className={[
@@ -267,8 +309,8 @@ export function MenuPanel({
               onPointerEnter={() => !item.disabled && setActiveIndex(index)}
               onClick={() => activateItem(item)}
             >
-              {item.icon ? (
-                <Icon name={item.icon} className="wpn-menu__item-icon" />
+              {icon ? (
+                <Icon name={icon} className="wpn-menu__item-icon" />
               ) : (
                 <Icon
                   name="check"
@@ -281,7 +323,7 @@ export function MenuPanel({
                 />
               )}
               <span className="wpn-menu__item-label">{item.label}</span>
-              {item.icon && item.checked ? (
+              {icon && item.checked ? (
                 <Icon name="check" className="wpn-menu__item-check wpn-menu__item-check--visible" />
               ) : null}
               {item.shortcut ? (
@@ -324,7 +366,6 @@ export function MenuPanel({
   );
 
   return panelContent;
-
 }
 
 interface MenuProps {

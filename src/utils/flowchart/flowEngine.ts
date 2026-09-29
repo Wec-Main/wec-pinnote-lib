@@ -96,8 +96,6 @@ export interface FlowState {
   canRedo: boolean;
   flowName: string;
 
-  flowNotes: string;
-
   registryVersion: number;
 }
 
@@ -213,7 +211,6 @@ export class FlowEngine {
       canUndo: false,
       canRedo: false,
       flowName: initial.meta?.name ?? "Untitled flow",
-      flowNotes: initial.meta?.notes ?? "",
       registryVersion: 0,
     });
     this.pendingFitView = !initial.viewport && nodes.length > 0;
@@ -1111,7 +1108,6 @@ export class FlowEngine {
       issueNodeIds: EMPTY_MAP,
       issueEdgeIds: EMPTY_MAP,
       flowName: flow.meta?.name ?? this.getState().flowName,
-      flowNotes: flow.meta?.notes ?? this.getState().flowNotes,
       defaultEdgeType: savedEdgeType(flow.meta) ?? this.getState().defaultEdgeType,
     });
     if (flow.viewport) this.setViewport(flow.viewport);
@@ -1123,7 +1119,6 @@ export class FlowEngine {
     this.clearValidation();
     this.store.setState({
       flowName: name,
-      flowNotes: "",
       selectedNodeIds: EMPTY_SET,
       selectedEdgeIds: EMPTY_SET,
     });
@@ -1138,17 +1133,12 @@ export class FlowEngine {
       nodes: s.nodes,
       edges: s.edges,
       viewport: s.viewport,
-      meta: { name: s.flowName, edgeType: s.defaultEdgeType, notes: s.flowNotes },
+      meta: { name: s.flowName, edgeType: s.defaultEdgeType },
     };
   }
 
   setFlowName(name: string): void {
     this.store.setState({ flowName: name });
-    this.events.emit("change", this.getSnapshot());
-  }
-
-  setFlowNotes(notes: string): void {
-    this.store.setState({ flowNotes: notes });
     this.events.emit("change", this.getSnapshot());
   }
 

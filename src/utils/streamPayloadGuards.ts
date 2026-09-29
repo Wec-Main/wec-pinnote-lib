@@ -5,6 +5,7 @@ import type {
   AnnotationUser,
 } from "../types/annotation.types";
 import type { Epic, UserStory } from "../types/epicFlow.types";
+import type { FlowPin } from "../types/flowPin.types";
 import type { StreamEvent } from "../types/stream.types";
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -17,6 +18,18 @@ function isNonEmptyString(value: unknown): value is string {
 
 function isAnnotationUser(value: unknown): value is AnnotationUser {
   return isRecord(value) && isNonEmptyString(value.id) && typeof value.name === "string";
+}
+
+export function isFlowPin(value: unknown): value is FlowPin {
+  return (
+    isRecord(value) &&
+    isNonEmptyString(value.id) &&
+    isNonEmptyString(value.flowId) &&
+    isNonEmptyString(value.pageKey) &&
+    typeof value.name === "string" &&
+    isAnchor(value.anchor) &&
+    isNonEmptyString(value.updatedAt)
+  );
 }
 
 export function isComment(value: unknown): value is AnnotationComment {

@@ -34,27 +34,20 @@ export function listFlows(
   projectVersionId?: string,
   signal?: AbortSignal,
 ): Promise<Flow[]> {
-  return request<Flow[]>(buildUrl(apiBaseUrl, "/flows", { projectId, projectVersionId }), authToken, {
-    signal,
-  });
-}
-
-export function createFlow(
-  apiBaseUrl: string,
-  authToken: string | undefined,
-  input: { projectId: string; projectVersionId?: string; name: string; description?: string },
-): Promise<Flow> {
-  return request<Flow>(buildUrl(apiBaseUrl, "/flows"), authToken, {
-    method: "POST",
-    body: JSON.stringify(input),
-  });
+  return request<Flow[]>(
+    buildUrl(apiBaseUrl, "/flows", { projectId, projectVersionId }),
+    authToken,
+    {
+      signal,
+    },
+  );
 }
 
 export function updateFlow(
   apiBaseUrl: string,
   authToken: string | undefined,
   flowId: string,
-  input: { name?: string; description?: string },
+  input: { name: string },
 ): Promise<Flow> {
   return request<Flow>(buildUrl(apiBaseUrl, flowPath(flowId, "")), authToken, {
     method: "PATCH",

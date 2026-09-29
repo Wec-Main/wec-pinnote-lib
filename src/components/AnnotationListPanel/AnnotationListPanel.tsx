@@ -12,13 +12,14 @@ import {
   authorOptions,
   filterThreads,
   filtersActive,
+  groupThreadsByPage,
   statusOptions,
   toThreads,
   type CommentFilters,
   type CommentResolution,
   type CommentSort,
 } from "./commentFilters";
-import { ThreadCard } from "./ThreadCard";
+import { PageGroupSection } from "./PageGroupSection";
 
 const PANEL_DEFAULT_WIDTH = 320;
 const PANEL_MIN_WIDTH = 280;
@@ -32,6 +33,7 @@ function clampPanelWidth(value: number): number {
 export function AnnotationListPanel() {
   const {
     config,
+    pageKey,
     allAnnotations,
     allAnnotationsLoading: loading,
     allAnnotationsError: error,
@@ -108,6 +110,24 @@ export function AnnotationListPanel() {
     () => filterThreads(allThreads, filters, currentUserId),
     [allThreads, filters, currentUserId],
   );
+  const pageGroups = useMemo(() => groupThreadsByPage(threads, pageKey), [threads, pageKey]);
+  const [pageExpansion, setPageExpansion] = useState<ReadonlyMap<string, boolean>>(() => new Map());
+  const isPageExpanded = (groupPageKey: string) =>
+    pageExpansion.get(groupPageKey) ?? groupPageKey === pageKey;
+  const allCollapsed =
+    pageGroups.length > 0 && pageGroups.every((group) => !isPageExpanded(group.pageKey));
+  const togglePage = useCallback(
+    (groupPageKey: string) =>
+      setPageExpansion((current) =>
+        new Map(current).set(
+          groupPageKey,
+          !(current.get(groupPageKey) ?? groupPageKey === pageKey),
+        ),
+      ),
+    [pageKey],
+  );
+  const toggleAllPages = () =>
+    setPageExpansion(new Map(pageGroups.map((group) => [group.pageKey, allCollapsed])));
   const authors = useMemo(() => authorOptions(allThreads), [allThreads]);
   const statuses = useMemo(() => statusOptions(allThreads), [allThreads]);
   const active = filtersActive(filters);
@@ -281,26 +301,39 @@ export function AnnotationListPanel() {
       {threads.length === 0 && !loading && !error ? (
         <p className="wpn-muted">
           {allThreads.length === 0
-            ? "No comments on this page."
+            ? "No comments in this project yet."
             : "No comments match these filters."}
         </p>
       ) : null}
 
-      {error ? null : (
-        <ul className="wpn-list wpn-thread-list">
-          {threads.map((thread) => (
-            <ThreadCard
-              key={thread.annotation.id}
-              thread={thread}
-              active={selectedId === thread.annotation.id}
-              currentUserId={currentUserId}
-              repliesCollapsed={!openReplies.has(thread.annotation.id)}
-              inView={presentIds.has(thread.annotation.id)}
-              onToggleReplies={toggleReplies}
-              onSelect={openAnnotation}
-            />
-          ))}
-        </ul>
+      {error || pageGroups.length === 0 ? null : (
+        <>
+          <div className="wpn-page-groups__summary">
+            <span>
+              {pageGroups.length} {pageGroups.length === 1 ? "page" : "pages"}
+            </span>
+            <button type="button" className="wpn-page-groups__toggle-all" onClick={toggleAllPages}>
+              <Icon name={allCollapsed ? "chevronDown" : "chevronUp"} />
+              {allCollapsed ? "Expand all" : "Collapse all"}
+            </button>
+          </div>
+          <div className="wpn-list wpn-page-groups">
+            {pageGroups.map((group) => (
+              <PageGroupSection
+                key={group.pageKey}
+                group={group}
+                collapsed={!isPageExpanded(group.pageKey)}
+                selectedId={selectedId}
+                currentUserId={currentUserId}
+                openReplies={openReplies}
+                presentIds={presentIds}
+                onToggle={togglePage}
+                onToggleReplies={toggleReplies}
+                onSelect={openAnnotation}
+              />
+            ))}
+          </div>
+        </>
       )}
 
       <div className="wpn-list-panel__brand">

@@ -1,27 +1,48 @@
-import { useMemo } from "react";
-import type { ProjectVersion } from "../../types/projectVersion.types";
-import { Icon, RefreshButton, Switch, TableSkeleton, Tooltip } from "../primitives";
+import { Icon, RefreshButton, Switch, TableSkeleton, Tooltip, type IconName } from "../primitives";
 import { useProjectVersioning } from "./useProjectVersioning";
-
-function versionLabel(version: ProjectVersion): string {
-  return version.name && version.name.trim().length > 0
-    ? version.name
-    : `Version ${version.versionNumber}`;
-}
+import { projectVersionLabel } from "../../utils/projectVersionLabel";
+import { formatRelativeTime, formatTimestamp } from "../../utils/format";
+import type { ProjectVersionSettingsPatch } from "../../services/organizationsApi";
+import type { ProjectVersion } from "../../types/projectVersion.types";
 
 export interface ProjectVersionsPanelProps {
   apiBaseUrl: string;
   authToken: string | undefined;
   projectId: string;
-  /** Shown as the "Project" label/name row above the table. Omit when the
-   * caller already shows the project name elsewhere (e.g. a modal title). */
   projectName?: string;
   onVersionChanged?: () => void;
-  /** Shows the Annotation/Tag/Flow version-restriction switches above the
-   * versions table. Only the Settings -> Projects gear-icon modal passes
-   * this — that's the only surface gated to the same role (super_admin)
-   * as the settings endpoint itself. */
   showVersionSettings?: boolean;
+}
+
+interface VersionTrackingOption {
+  key: Extract<
+    keyof ProjectVersionSettingsPatch,
+    "annotationVersioningEnabled" | "flowVersioningEnabled"
+  >;
+  label: string;
+  caption: string;
+  icon: IconName;
+}
+
+const VERSION_TRACKING_OPTIONS: VersionTrackingOption[] = [
+  {
+    key: "annotationVersioningEnabled",
+    label: "Annotations",
+    caption: "Comments stay with the version they were made on.",
+    icon: "comment",
+  },
+  {
+    key: "flowVersioningEnabled",
+    label: "Flows",
+    caption: "Flows stay with the version they were built on.",
+    icon: "flow",
+  },
+];
+
+function versionTimeline(version: ProjectVersion): { label: string; at: string } {
+  return version.status === "published" && version.publishedAt
+    ? { label: "Published", at: version.publishedAt }
+    : { label: "Created", at: version.createdAt };
 }
 
 export function ProjectVersionsPanel({
@@ -39,6 +60,7 @@ export function ProjectVersionsPanel({
     loaded,
     error,
     busy,
+    progress,
     notice,
     dismissNotice,
     reload,
@@ -48,15 +70,17 @@ export function ProjectVersionsPanel({
     updateVersionSettings,
   } = useProjectVersioning(apiBaseUrl, authToken, projectId, onVersionChanged);
 
-  const activeVersion = useMemo(
-    () => versions.find((version) => version.id === project?.currentProjectVersionId) ?? null,
-    [versions, project?.currentProjectVersionId],
-  );
+  const activeVersion = versions.find((version) => version.id === project?.currentProjectVersionId);
+  const canAddVersion = activeVersion !== undefined && activeVersion.status !== "draft";
 
-  const canAddVersion = activeVersion?.status === "published";
+  const trackingOff =
+    project !== null && VERSION_TRACKING_OPTIONS.every((option) => project[option.key] === false);
+  const publishBlockedReason = trackingOff
+    ? "Turn on version tracking for annotations or flows to publish"
+    : null;
 
   return (
-    <div className="wpn-settings-tab">
+    <div className="wpn-settings-tab wpn-versioning">
       <div className="wpn-versioning-header">
         {projectName !== undefined ? (
           <div className="wpn-versioning-header__copy">
@@ -71,7 +95,7 @@ export function ProjectVersionsPanel({
           <Tooltip
             label={
               canAddVersion
-                ? "Branch a new version from the active version"
+                ? "Create a new draft version and make it active"
                 : "Publish the active version before adding a new one"
             }
             placement="bottom"
@@ -90,54 +114,75 @@ export function ProjectVersionsPanel({
       </div>
 
       {showVersionSettings && project ? (
-        <div className="wpn-versioning-settings">
-          <span className="wpn-versioning-settings__title">Version Settings</span>
-          <div className="wpn-versioning-settings__row">
-            <div className="wpn-versioning-settings__copy">
-              <span className="wpn-versioning-settings__label">Annotation</span>
-              <span className="wpn-versioning-settings__caption">
-                Annotations follow the selected project version when on.
-              </span>
-            </div>
-            <Switch
-              label="Annotation version restriction"
-              checked={project.annotationVersioningEnabled ?? true}
-              disabled={busy}
-              onChange={(next) => void updateVersionSettings({ annotationVersioningEnabled: next })}
-            />
+        <section
+          className="wpn-versioning-settings"
+          aria-labelledby="wpn-versioning-settings-title"
+        >
+          <div className="wpn-versioning-settings__head">
+            <span id="wpn-versioning-settings-title" className="wpn-versioning-settings__title">
+              Version tracking
+            </span>
+            <span className="wpn-versioning-settings__subtitle">
+              Choose what each published version keeps separate.
+            </span>
           </div>
-          <div className="wpn-versioning-settings__row">
-            <div className="wpn-versioning-settings__copy">
-              <span className="wpn-versioning-settings__label">Tag</span>
-              <span className="wpn-versioning-settings__caption">
-                Tag pins follow the selected project version when on.
-              </span>
-            </div>
-            <Switch
-              label="Tag version restriction"
-              checked={project.tagVersioningEnabled ?? true}
-              disabled={busy}
-              onChange={(next) => void updateVersionSettings({ tagVersioningEnabled: next })}
-            />
+          <div className="wpn-versioning-settings__grid">
+            {VERSION_TRACKING_OPTIONS.map((option) => {
+              const checked = project[option.key] ?? true;
+              return (
+                <div
+                  key={option.key}
+                  className={["wpn-versioning-option", checked ? "wpn-versioning-option--on" : ""]
+                    .filter(Boolean)
+                    .join(" ")}
+                >
+                  <span className="wpn-versioning-option__icon" aria-hidden="true">
+                    <Icon name={option.icon} />
+                  </span>
+                  <span className="wpn-versioning-option__copy">
+                    <span className="wpn-versioning-option__label">{option.label}</span>
+                    <span className="wpn-versioning-option__caption">{option.caption}</span>
+                  </span>
+                  <Switch
+                    label={`${option.label} version tracking`}
+                    checked={checked}
+                    disabled={busy}
+                    onChange={(next) => void updateVersionSettings({ [option.key]: next })}
+                  />
+                </div>
+              );
+            })}
           </div>
-          <div className="wpn-versioning-settings__row">
-            <div className="wpn-versioning-settings__copy">
-              <span className="wpn-versioning-settings__label">Flow</span>
-              <span className="wpn-versioning-settings__caption">
-                Flows follow the selected project version when on.
-              </span>
-            </div>
-            <Switch
-              label="Flow version restriction"
-              checked={project.flowVersioningEnabled ?? true}
-              disabled={busy}
-              onChange={(next) => void updateVersionSettings({ flowVersioningEnabled: next })}
-            />
-          </div>
+        </section>
+      ) : null}
+
+      {trackingOff ? (
+        <div className="wpn-versioning-warning" role="alert">
+          <Icon name="alert" className="wpn-versioning-warning__icon" />
+          <span className="wpn-versioning-warning__copy">
+            <strong>Publishing is paused</strong>
+            <span>
+              {showVersionSettings
+                ? "Version tracking is off for both annotations and flows, so a published version would hold nothing. Turn one on to publish."
+                : "Version tracking is off for both annotations and flows. Ask a super admin to turn one on before publishing."}
+            </span>
+          </span>
         </div>
       ) : null}
 
-      {notice ? (
+      {progress ? (
+        <div className="wpn-versioning-progress" role="status" aria-live="polite">
+          <span className="wpn-versioning-progress__label">{progress}</span>
+          <span
+            className="wpn-versioning-progress__track"
+            role="progressbar"
+            aria-label={progress}
+            aria-busy="true"
+          >
+            <span className="wpn-versioning-progress__bar" />
+          </span>
+        </div>
+      ) : notice ? (
         <div className="wpn-users-notice" role="status">
           <span>{notice}</span>
           <button type="button" className="wpn-icon-btn" onClick={dismissNotice}>
@@ -187,12 +232,23 @@ export function ProjectVersionsPanel({
             ) : (
               versions.map((version) => {
                 const isActive = version.id === project?.currentProjectVersionId;
+                const timeline = versionTimeline(version);
+                const label = projectVersionLabel(version);
                 return (
-                  <tr key={version.id}>
+                  <tr
+                    key={version.id}
+                    className={isActive ? "wpn-versioning-row--active" : undefined}
+                  >
                     <td>
                       <div className="wpn-users-identity">
                         <div className="wpn-users-identity__copy">
-                          <span className="wpn-users-identity__name">{versionLabel(version)}</span>
+                          <span className="wpn-users-identity__name">{label}</span>
+                          <span
+                            className="wpn-users-identity__email"
+                            title={formatTimestamp(timeline.at)}
+                          >
+                            {timeline.label} {formatRelativeTime(timeline.at)}
+                          </span>
                         </div>
                       </div>
                     </td>
@@ -205,31 +261,42 @@ export function ProjectVersionsPanel({
                       {isActive ? (
                         <span className="wpn-users-pill wpn-users-pill--status-active">Active</span>
                       ) : (
-                        <button
-                          type="button"
-                          className="wpn-users-pill wpn-users-pill--status-inactive wpn-versioning-active-btn"
-                          disabled={busy}
-                          onClick={() => void setActiveVersion(version.id)}
-                        >
-                          Inactive
-                        </button>
+                        <Tooltip label="Make this the active version" placement="top">
+                          <button
+                            type="button"
+                            className="wpn-users-pill wpn-users-pill--status-inactive wpn-versioning-active-btn"
+                            disabled={busy}
+                            onClick={() => void setActiveVersion(version.id)}
+                          >
+                            Set active
+                          </button>
+                        </Tooltip>
                       )}
                     </td>
                     <td>
                       <div className="wpn-users-actions">
                         {version.status === "draft" ? (
-                          <Tooltip label="Publish" placement="left">
+                          <Tooltip
+                            label={publishBlockedReason ?? `Publish ${label}`}
+                            placement="left"
+                          >
                             <button
                               type="button"
-                              className="wpn-users-action"
-                              aria-label={`Publish ${versionLabel(version)}`}
-                              disabled={busy}
+                              className="wpn-versioning-publish"
+                              aria-label={`Publish ${label}`}
+                              disabled={busy || trackingOff}
                               onClick={() => void publishVersion(version.id)}
                             >
-                              <Icon name="check" />
+                              <Icon name="upload" className="wpn-versioning-publish__icon" />
+                              Publish
                             </button>
                           </Tooltip>
-                        ) : null}
+                        ) : (
+                          <span className="wpn-versioning-published">
+                            <Icon name="check" className="wpn-versioning-published__icon" />
+                            Published
+                          </span>
+                        )}
                       </div>
                     </td>
                   </tr>

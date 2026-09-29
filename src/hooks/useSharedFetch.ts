@@ -21,7 +21,11 @@ function notifySubscribers(entry: CacheEntry<unknown>): void {
   }
 }
 
-function settle(key: string, entry: CacheEntry<unknown>, result: CacheEntry<unknown>["result"]): void {
+function settle(
+  key: string,
+  entry: CacheEntry<unknown>,
+  result: CacheEntry<unknown>["result"],
+): void {
   if (entry.controller.signal.aborted) {
     return;
   }
@@ -30,10 +34,16 @@ function settle(key: string, entry: CacheEntry<unknown>, result: CacheEntry<unkn
   evictIfSettled(key, entry);
 }
 
-function startFetch<T>(key: string, fetcher: (signal: AbortSignal) => Promise<T>): CacheEntry<unknown> {
+const fetchers = new Map<string, (signal: AbortSignal) => Promise<unknown>>();
+
+function startFetch<T>(
+  key: string,
+  fetcher: (signal: AbortSignal) => Promise<T>,
+  subscribers: CacheEntry<unknown>["subscribers"] = new Set(),
+): CacheEntry<unknown> {
   const controller = new AbortController();
   const promise = fetcher(controller.signal);
-  const entry: CacheEntry<unknown> = { controller, subscribers: new Set(), promise };
+  const entry: CacheEntry<unknown> = { controller, subscribers, promise };
   promise.then(
     (value) => settle(key, entry, { value }),
     (error: unknown) => settle(key, entry, { error }),
@@ -52,6 +62,7 @@ export function useSharedFetch<T>(
   const dataRef = useRef<T | null>(null);
   const errorRef = useRef<unknown>(null);
   const loadingRef = useRef(false);
+  const ownerRef = useRef<(() => CacheEntry<unknown>) | null>(null);
 
   const applyEntry = useCallback((entry: CacheEntry<unknown>) => {
     if (entry.result && "value" in entry.result) {
@@ -82,9 +93,11 @@ export function useSharedFetch<T>(
       applyEntry(next);
     };
     owner.subscribers.add(notify);
+    ownerRef.current = () => owner;
     applyEntry(owner);
 
     return () => {
+      ownerRef.current = null;
       owner.subscribers.delete(notify);
       if (owner.subscribers.size === 0 && !owner.result) {
         owner.controller.abort();
@@ -101,13 +114,23 @@ export function useSharedFetch<T>(
     if (!key) {
       return;
     }
-    const existing = cache.get(key);
+    const existing = cache.get(key) ?? ownerRef.current?.();
     existing?.controller.abort();
-    const entry = startFetch(key, fetcherRef.current);
-    if (existing) {
-      entry.subscribers = existing.subscribers;
-    }
+    const entry = startFetch(key, fetcherRef.current, existing?.subscribers);
     notifySubscribers(entry);
+  }, [key]);
+
+  useEffect(() => {
+    if (!key) {
+      return;
+    }
+    const fetcher = (signal: AbortSignal) => fetcherRef.current(signal);
+    fetchers.set(key, fetcher);
+    return () => {
+      if (fetchers.get(key) === fetcher) {
+        fetchers.delete(key);
+      }
+    };
   }, [key]);
 
   return {
@@ -123,8 +146,12 @@ export function invalidateSharedFetch(key: string): void {
   if (!entry) {
     return;
   }
-  if (entry.subscribers.size === 0) {
+  const fetcher = fetchers.get(key);
+  if (entry.subscribers.size === 0 || !fetcher) {
     entry.controller.abort();
+    cache.delete(key);
+    return;
   }
-  cache.delete(key);
+  entry.controller.abort();
+  notifySubscribers(startFetch(key, fetcher, entry.subscribers));
 }

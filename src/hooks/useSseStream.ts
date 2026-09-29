@@ -12,10 +12,7 @@ const TICKET_REFRESH_MARGIN_MS = 10000;
 const MIN_TICKET_REFRESH_DELAY_MS = 1000;
 
 export type StreamTokenGetter = () =>
-  | string
-  | undefined
-  | null
-  | Promise<string | undefined | null>;
+  string | undefined | null | Promise<string | undefined | null>;
 
 export interface SseStreamOptions {
   apiBaseUrl: string;
@@ -78,6 +75,7 @@ export function useSseStream({
     let stopped = false;
     let connecting = false;
     let source: EventSource | null = null;
+    let retiringSource: EventSource | null = null;
     let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
     let reconnectDelay = RECONNECT_DELAY_MS;
     let openedOnce = false;
@@ -138,8 +136,6 @@ export function useSseStream({
         if (stopped) {
           return;
         }
-        source?.close();
-        source = null;
         reconnectDelay = RECONNECT_DELAY_MS;
         void connect();
       }, delay);
@@ -164,18 +160,29 @@ export function useSseStream({
 
     const openSource = (ticket: string) => {
       const next = new EventSource(streamUrl(apiBaseUrl, ticket, lastEventId()));
+      const handingOver = source !== null;
+      retiringSource?.close();
+      retiringSource = source;
       source = next;
 
       next.addEventListener("open", () => {
         reconnectDelay = RECONNECT_DELAY_MS;
         setState("open");
-        if (openedOnce) {
+        if (handingOver) {
+          retiringSource?.close();
+          retiringSource = null;
+        } else if (openedOnce) {
           resync();
         }
         openedOnce = true;
       });
 
       next.addEventListener("error", () => {
+        if (next === retiringSource) {
+          next.close();
+          retiringSource = null;
+          return;
+        }
         if (stopped || source !== next) {
           return;
         }
@@ -189,6 +196,10 @@ export function useSseStream({
         resync();
       });
 
+      next.addEventListener("resync", () => {
+        resync();
+      });
+
       for (const type of types) {
         next.addEventListener(type, handleMessage as EventListener);
       }
@@ -199,7 +210,9 @@ export function useSseStream({
         return;
       }
       connecting = true;
-      setState(openedOnce ? "reconnecting" : "connecting");
+      if (!source) {
+        setState(openedOnce ? "reconnecting" : "connecting");
+      }
       try {
         let token: string | undefined | null;
         try {
@@ -282,6 +295,8 @@ export function useSseStream({
       document.removeEventListener("visibilitychange", handleVisibilityChange);
       source?.close();
       source = null;
+      retiringSource?.close();
+      retiringSource = null;
       setState("closed");
     };
   }, [apiBaseUrl, enabled, eventTypesKey, pageKey, projectId, sessionKey]);

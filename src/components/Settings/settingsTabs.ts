@@ -1,6 +1,6 @@
 import type { IconName } from "../primitives";
 import type { UserManagementRole } from "../../types/userManagement.types";
-import { canManageOrganizations, canManageTags } from "../../utils/permissions";
+import { canManageOrganizations, canManageTags, canViewProjects } from "../../utils/permissions";
 
 export type SettingsTab = "users" | "organizations" | "projects" | "tags" | "audit" | "dashboard";
 
@@ -26,7 +26,13 @@ const HIDDEN_TABS = new Set<SettingsTab>(["tags"]);
 export function visibleSettingsTabs(role: UserManagementRole): SettingsTabDefinition[] {
   let tabs = ALL_TABS;
   if (!canManageOrganizations(role)) {
-    const allowed = new Set<SettingsTab>(canManageTags(role) ? ["users", "tags"] : ["users"]);
+    const allowed = new Set<SettingsTab>(["users"]);
+    if (canViewProjects(role)) {
+      allowed.add("projects");
+    }
+    if (canManageTags(role)) {
+      allowed.add("tags");
+    }
     tabs = ALL_TABS.filter((tab) => allowed.has(tab.id));
   }
   return tabs.filter((tab) => !HIDDEN_TABS.has(tab.id));

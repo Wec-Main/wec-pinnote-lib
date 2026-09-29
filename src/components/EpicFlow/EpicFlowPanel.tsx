@@ -11,7 +11,7 @@ import {
   useAnnotationData,
   useAnnotationUi,
 } from "../../context/AnnotationContext";
-import { Icon, ListSearchBar, RefreshButton, Tooltip } from "../primitives";
+import { Icon, ListSearchBar, RefreshButton, Tooltip, LiveStatus } from "../primitives";
 import { Icons } from "../../assets/icons";
 import { useEpicFlowApi } from "../../hooks/useEpicFlowApi";
 import { useEpicFlowStream } from "../../hooks/useEpicFlowStream";
@@ -408,27 +408,7 @@ export function EpicFlowPanel() {
           <span className="wpn-panel__title">Draft Board</span>
         </span>
         <div className="wpn-epicflow-panel__header-actions">
-          {connectionState === "reconnecting" ? (
-            <Tooltip label="Reconnecting to live updates" placement="bottom">
-              <span
-                className="wpn-toolbar__live wpn-toolbar__live--reconnecting"
-                role="status"
-                aria-label="Reconnecting to live updates"
-              >
-                <span className="wpn-toolbar__live-dot" />
-              </span>
-            </Tooltip>
-          ) : connectionState === "unauthenticated" ? (
-            <Tooltip label="Live updates paused, sign in again" placement="bottom">
-              <span
-                className="wpn-toolbar__live wpn-toolbar__live--unauthenticated"
-                role="status"
-                aria-label="Live updates paused, sign in again"
-              >
-                <span className="wpn-toolbar__live-dot" />
-              </span>
-            </Tooltip>
-          ) : null}
+          <LiveStatus state={connectionState} />
           <Tooltip label={minimized ? "Maximize" : "Minimize"} placement="bottom">
             <button
               type="button"
@@ -461,7 +441,11 @@ export function EpicFlowPanel() {
         }}
         placeholder="Search epics or user stories"
         trailing={
-          <RefreshButton label="Refresh Draft Board" loading={refreshing} onRefresh={handleRefresh} />
+          <RefreshButton
+            label="Refresh Draft Board"
+            loading={refreshing}
+            onRefresh={handleRefresh}
+          />
         }
       />
       {loading ? (

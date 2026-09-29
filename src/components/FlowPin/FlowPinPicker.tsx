@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useAnnotationContext } from "../../context/AnnotationContext";
-import { Icon } from "../primitives";
+import { Icon, Spinner } from "../primitives";
 
 interface FlowPinPickerProps {
   x: number;
@@ -39,6 +39,7 @@ export function FlowPinPicker({ x, y }: FlowPinPickerProps) {
           type="button"
           className="wpn-icon-btn"
           aria-label="Cancel"
+          disabled={submitting}
           onClick={cancelFlowPinDraft}
         >
           <Icon name="close" />
@@ -52,6 +53,7 @@ export function FlowPinPicker({ x, y }: FlowPinPickerProps) {
         placeholder="Flow name"
         aria-label="Flow name"
         autoFocus
+        disabled={submitting}
         onChange={(event) => setName(event.target.value)}
         onKeyDown={(event) => {
           if (event.key === "Enter") {
@@ -70,16 +72,23 @@ export function FlowPinPicker({ x, y }: FlowPinPickerProps) {
       ) : null}
 
       <div className="wpn-flow-pin-picker__footer">
-        <button type="button" className="wpn-btn wpn-btn--ghost" onClick={cancelFlowPinDraft}>
+        <button
+          type="button"
+          className="wpn-btn wpn-btn--ghost"
+          disabled={submitting}
+          onClick={cancelFlowPinDraft}
+        >
           Cancel
         </button>
         <button
           type="button"
           className="wpn-btn wpn-btn--primary"
           disabled={!name.trim() || submitting}
+          aria-busy={submitting || undefined}
           onClick={create}
         >
-          Create
+          {submitting ? <Spinner className="wpn-btn__icon" /> : null}
+          {submitting ? "Creating…" : "Create"}
         </button>
       </div>
     </div>

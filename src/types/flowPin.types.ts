@@ -40,6 +40,8 @@ export interface Flow {
   createdById: string | null;
   updatedByUser: string | null;
   updatedById: string | null;
+  pinPageKey?: string | null;
+  nodeCount?: number;
   createdAt: string;
   updatedAt: string;
 }

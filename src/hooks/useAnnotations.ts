@@ -81,6 +81,20 @@ function reconcileSnapshot(
   return [...merged, ...pendingAnnotations].sort((a, b) => a.number - b.number);
 }
 
+function isFlowPinEvent(event: StreamEvent): boolean {
+  return event.eventType.startsWith("flow_pin.");
+}
+
+function belongsToOtherVersion(event: StreamEvent, projectVersionId: string | undefined): boolean {
+  if (!projectVersionId) {
+    return false;
+  }
+  const annotation = (event.payload as { annotation?: { projectVersionId?: unknown } } | null)
+    ?.annotation;
+  const eventVersionId = annotation?.projectVersionId;
+  return typeof eventVersionId === "string" && eventVersionId !== projectVersionId;
+}
+
 interface LoadScope {
   api: AnnotationApiClient;
   authenticated: boolean;
@@ -113,6 +127,7 @@ export interface AnnotationCollectionOptions {
   getAuthToken: StreamTokenGetter | undefined;
   sessionKey: string;
   events: AnnotationEventCallbacks;
+  onFlowPinEvent: (event: StreamEvent) => void;
 }
 
 export function useAnnotationCollection({
@@ -126,6 +141,7 @@ export function useAnnotationCollection({
   getAuthToken,
   sessionKey,
   events,
+  onFlowPinEvent,
 }: AnnotationCollectionOptions) {
   const [annotations, setAnnotations] = useState<Annotation[]>([]);
   const [loading, setLoading] = useState(authenticated);
@@ -163,7 +179,14 @@ export function useAnnotationCollection({
   useEffect(() => {
     const controller = new AbortController();
     let ignore = false;
-    const scope: LoadScope = { api, authenticated, pageKey, projectId, projectVersionId, sessionKey };
+    const scope: LoadScope = {
+      api,
+      authenticated,
+      pageKey,
+      projectId,
+      projectVersionId,
+      sessionKey,
+    };
     const scopeChanged = !sameScope(loadScopeRef.current, scope);
     loadScopeRef.current = scope;
 
@@ -258,7 +281,20 @@ export function useAnnotationCollection({
 
   useEffect(() => abortWrites, [abortWrites]);
 
+  const projectVersionIdRef = useRef(projectVersionId);
+  projectVersionIdRef.current = projectVersionId;
+
+  const onFlowPinEventRef = useRef(onFlowPinEvent);
+  onFlowPinEventRef.current = onFlowPinEvent;
+
   const onStreamEvent = useCallback((event: StreamEvent) => {
+    if (isFlowPinEvent(event)) {
+      onFlowPinEventRef.current(event);
+      return;
+    }
+    if (belongsToOtherVersion(event, projectVersionIdRef.current)) {
+      return;
+    }
     setAnnotations((current) => {
       const result = applyStreamEvent(current, event);
       if (result.needsResync) {

@@ -233,15 +233,9 @@ export function UserManagementPanel() {
         setNotice(`${user.firstName} ${user.lastName} deleted.`);
       } else {
         const { draft } = pending;
-        const created = await createUser(config.apiBaseUrl, getAuthToken, config.projectId, draft);
+        setFieldErrors(null);
+        await createUser(config.apiBaseUrl, getAuthToken, config.projectId, draft);
         setNotice(`${draft.firstName} ${draft.lastName} created.`);
-        setGeneratedPassword({
-          title: "User created",
-          description: created.generatedPassword
-            ? `A temporary password was generated for ${draft.firstName} ${draft.lastName} (${draft.email}).`
-            : `The password for ${draft.firstName} ${draft.lastName} (${draft.email}) is set below.`,
-          password: created.generatedPassword ?? draft.password ?? "",
-        });
         setPage(1);
         setFormOpen(false);
         setEditTarget(null);
@@ -250,6 +244,9 @@ export function UserManagementPanel() {
       reloadAll();
     } catch (err) {
       setNotice(errorMessage(err));
+      if (pending.kind === "create") {
+        setFieldErrors(validationDetailsFrom(err)?.fieldErrors ?? null);
+      }
       setPending(null);
     } finally {
       setBusy(false);
@@ -279,12 +276,6 @@ export function UserManagementPanel() {
 
   return (
     <div className="wpn-settings-tab">
-      {selfOnly ? (
-        <p className="wpn-settings-scope-note">
-          You can see and edit your own profile. Ask an admin for changes to anyone else.
-        </p>
-      ) : null}
-
       <ListSearchBar
         value={searchInput}
         onValueChange={setSearchInput}

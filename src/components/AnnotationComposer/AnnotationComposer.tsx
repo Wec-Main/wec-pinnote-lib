@@ -111,11 +111,7 @@ function DraftComposer({ draft, x, y }: DraftComposerProps) {
         visibility: placement ? "visible" : "hidden",
       }}
     >
-      <div
-        className="wpn-composer__resize-e"
-        role="presentation"
-        onPointerDown={startWidthDrag}
-      />
+      <div className="wpn-composer__resize-e" role="presentation" onPointerDown={startWidthDrag} />
       <div className="wpn-panel__header">
         <span className="wpn-panel__title-group">
           {editingLabel ? (
@@ -175,6 +171,7 @@ function DraftComposer({ draft, x, y }: DraftComposerProps) {
             type="button"
             className="wpn-icon-btn"
             aria-label="Cancel comment"
+            disabled={submitting}
             onClick={requestCancelDraft}
           >
             ×
@@ -223,15 +220,21 @@ function DraftComposer({ draft, x, y }: DraftComposerProps) {
             </div>
             <AnnotationStatusSelect value={status} onChange={setStatus} disabled={submitting} />
             <div className="wpn-panel__actions">
-              <button type="button" className="wpn-btn wpn-btn--ghost" onClick={requestCancelDraft}>
+              <button
+                type="button"
+                className="wpn-btn wpn-btn--ghost"
+                disabled={submitting}
+                onClick={requestCancelDraft}
+              >
                 Cancel
               </button>
               <button
                 type="submit"
                 className="wpn-btn wpn-btn--primary"
                 disabled={!message.trim() || !draft.path.trim() || submitting}
+                aria-busy={submitting || undefined}
               >
-                Add comment
+                {submitting ? "Saving…" : "Add comment"}
               </button>
             </div>
           </div>

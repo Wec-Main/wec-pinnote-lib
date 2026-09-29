@@ -3,7 +3,8 @@ import { Icon, Spinner, Tooltip } from "../primitives";
 import { useEscapeKey } from "../../hooks/useEscapeKey";
 import { useScrimDismiss } from "../../hooks/useScrimDismiss";
 import { useFocusTrap } from "../../hooks/useFocusTrap";
-import { MIN_PASSWORD_LENGTH, PasswordField } from "./PasswordField";
+import { PasswordField } from "./PasswordField";
+import { passwordError } from "../../utils/credentialValidation";
 import type { ManagedUser } from "../../types/userManagement.types";
 
 interface ResetPasswordModalProps {
@@ -28,7 +29,8 @@ export function ResetPasswordModal({
   const [password, setPassword] = useState("");
   const [touched, setTouched] = useState(false);
 
-  const passwordValid = password.length === 0 || password.length >= MIN_PASSWORD_LENGTH;
+  const passwordProblem = passwordError(password);
+  const passwordValid = passwordProblem === null;
 
   const handleSubmit = (event: FormEvent) => {
     event.preventDefault();
@@ -77,7 +79,8 @@ export function ResetPasswordModal({
               value={password}
               placeholder="Leave blank to generate one"
               hint="Copy this before saving. Blank generates one shown after saving."
-              invalid={touched && !passwordValid}
+              error={touched ? passwordProblem : null}
+              onBlur={() => setTouched(true)}
               onChange={setPassword}
             />
           </div>
