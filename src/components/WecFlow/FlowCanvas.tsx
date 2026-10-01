@@ -234,7 +234,6 @@ export function FlowCanvas({
       startDrag(e, {
         onStart: () => setPanning(true),
         onMove: (_ev, d) => {
-
           const current = engine.getState().viewport;
           engine.setViewport({
             ...current,
@@ -279,7 +278,6 @@ export function FlowCanvas({
   };
 
   const onCanvasKeyDown = (e: React.KeyboardEvent) => {
-
     if (e.key === "Escape") {
       startDrag.cancel();
       engine.cancelInteraction();

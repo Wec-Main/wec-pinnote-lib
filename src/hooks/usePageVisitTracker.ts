@@ -1,7 +1,11 @@
 import { useEffect, useRef } from "react";
 import { AnnotationApiError } from "../types/annotation.types";
 import type { OpenPageView, PageVisitRecord } from "../types/pageVisit.types";
-import { mintIngestToken, sendVisitBatch, type VisitSendMode } from "../services/analyticsIngestApi";
+import {
+  mintIngestToken,
+  sendVisitBatch,
+  type VisitSendMode,
+} from "../services/analyticsIngestApi";
 import { createClientId } from "../utils/format";
 import {
   FLUSH_INTERVAL_MS,

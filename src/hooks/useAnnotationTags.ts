@@ -125,9 +125,7 @@ export function useAnnotationTags(options: UseAnnotationTagsOptions): Annotation
       setTagsVisibleState(visible);
       getToken()
         .then((token) => saveTagsVisible(apiBaseUrl, token, projectId, visible))
-        .catch(() =>
-          setTagsVisibleState((current) => (current === visible ? previous : current)),
-        );
+        .catch(() => setTagsVisibleState((current) => (current === visible ? previous : current)));
     },
     [apiBaseUrl, getToken, projectId],
   );

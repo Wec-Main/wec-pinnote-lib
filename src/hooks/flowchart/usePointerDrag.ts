@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef } from "react";
 
 export interface DragCallbacks {
-
   onStart?: (e: PointerEvent) => void;
 
   onMove: (e: PointerEvent, delta: { x: number; y: number }) => void;
@@ -78,8 +77,5 @@ export function usePointerDrag() {
     [],
   );
 
-  return useMemo(
-    () => Object.assign(start, { cancel: () => cleanup.current?.() }),
-    [start],
-  );
+  return useMemo(() => Object.assign(start, { cancel: () => cleanup.current?.() }), [start]);
 }

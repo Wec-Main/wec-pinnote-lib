@@ -23,7 +23,6 @@ import { Toolbar, type FlowCommitHandler, type NoticeKind } from "./Toolbar";
 import { ValidationPanel } from "./ValidationPanel";
 
 export interface FlowEditorProps extends FlowEngineOptions {
-
   engine?: FlowEngine;
 
   onChange?: (flow: FlowJSON) => void;
@@ -113,10 +112,13 @@ function EditorLayout({
   const notify = useCallback((message: string, kind: NoticeKind) => {
     const id = ++noticeId.current;
     setNotices((n) => [...n.slice(-2), { id, message, kind }]);
-    const timer = setTimeout(() => {
-      noticeTimers.current.delete(timer);
-      setNotices((n) => n.filter((x) => x.id !== id));
-    }, kind === "error" ? 6000 : 3000);
+    const timer = setTimeout(
+      () => {
+        noticeTimers.current.delete(timer);
+        setNotices((n) => n.filter((x) => x.id !== id));
+      },
+      kind === "error" ? 6000 : 3000,
+    );
     noticeTimers.current.add(timer);
   }, []);
 

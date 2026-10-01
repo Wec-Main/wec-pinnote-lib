@@ -1,0 +1,132 @@
+@import "./datamodel-canvas.css";
+@import "./datamodel-editor.css";
+
+.wpn-datamodel-panel .wpn-flow-stage {
+  height: 100%;
+}
+
+.wpn-datamodel-list-tab__col-engine {
+  width: 120px;
+}
+
+.wpn-datamodel-list-tab__col-actions {
+  width: 280px;
+}
+
+.wpn-datamodel-engine-badge {
+  display: inline-flex;
+  align-items: center;
+  height: 22px;
+  padding: 0 10px;
+  border-radius: 999px;
+  background: var(--wpn-tone-bg, rgba(255, 255, 255, 0.08));
+  color: var(--wpn-tone, var(--wpn-text));
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.wpn-datamodel-engine-badge--na {
+  --wpn-tone: #a1a1aa;
+  --wpn-tone-bg: rgba(161, 161, 170, 0.16);
+}
+
+.wpn-datamodel-engine-badge--postgres {
+  --wpn-tone: #60a5fa;
+  --wpn-tone-bg: rgba(96, 165, 250, 0.16);
+}
+
+.wpn-datamodel-engine-badge--mysql {
+  --wpn-tone: #fbbf24;
+  --wpn-tone-bg: rgba(251, 191, 36, 0.16);
+}
+
+.wpn-datamodel-engine-badge--sqlite {
+  --wpn-tone: #6ee7b7;
+  --wpn-tone-bg: rgba(52, 211, 153, 0.16);
+}
+
+.wpn-datamodel-skeleton {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+  opacity: 0;
+  animation: wpn-flow-fade-in 240ms ease-out 120ms forwards;
+}
+
+.wpn-datamodel-skeleton__toolbar {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 16px;
+  height: 52px;
+  padding: 0 16px;
+  border-bottom: 1px solid var(--wpn-border);
+}
+
+.wpn-datamodel-skeleton__canvas {
+  position: relative;
+  flex: 1;
+  overflow: hidden;
+  background-image: radial-gradient(rgba(255, 255, 255, 0.09) 1px, transparent 1px);
+  background-size: 20px 20px;
+}
+
+.wpn-datamodel-skeleton__bar,
+.wpn-datamodel-skeleton__header,
+.wpn-datamodel-skeleton__row {
+  display: block;
+  background: linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0.06) 25%,
+    rgba(255, 255, 255, 0.14) 50%,
+    rgba(255, 255, 255, 0.06) 75%
+  );
+  background-size: 200% 100%;
+  animation: wpn-epicflow-shimmer 1.6s ease-in-out infinite;
+}
+
+.wpn-datamodel-skeleton__bar {
+  height: 12px;
+  border-radius: 999px;
+}
+
+.wpn-datamodel-skeleton__bar--title {
+  width: 160px;
+  height: 16px;
+}
+
+.wpn-datamodel-skeleton__bar--tools {
+  width: 220px;
+}
+
+.wpn-datamodel-skeleton__bar--action {
+  width: 88px;
+  height: 28px;
+  margin-left: auto;
+  border-radius: 8px;
+}
+
+.wpn-datamodel-skeleton__entity {
+  position: absolute;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  width: 200px;
+  padding: 0 0 10px;
+  border: 1px solid var(--wpn-border);
+  border-radius: 8px;
+  overflow: hidden;
+  animation: wpn-flow-fade-in 320ms ease-out both;
+}
+
+.wpn-datamodel-skeleton__header {
+  height: 30px;
+}
+
+.wpn-datamodel-skeleton__row {
+  height: 10px;
+  margin: 0 12px;
+  border-radius: 999px;
+}

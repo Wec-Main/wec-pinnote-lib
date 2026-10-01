@@ -1,0 +1,17 @@
+export const ENTITY_DEFAULT_WIDTH = 240;
+export const ENTITY_MIN_WIDTH = 160;
+export const ENTITY_HEADER_HEIGHT = 36;
+export const FIELD_ROW_HEIGHT = 26;
+export const ENTITY_BODY_PADDING = 8;
+export const NOTE_DEFAULT_SIZE = { width: 200, height: 120 } as const;
+export const NOTE_MIN_SIZE = { width: 120, height: 80 } as const;
+export const MARKER_LENGTH = 18;
+export const MARKER_HALF_SPREAD = 6;
+export const GRID_GAP = 80;
+export const LAYER_GAP_X = 140;
+export const LAYER_GAP_Y = 60;
+export const ERD_MIN_ZOOM = 0.1;
+export const ERD_MAX_ZOOM = 2.5;
+export const ERD_HISTORY_LIMIT = 100;
+export const ERD_PALETTE_DRAG_MIME = "application/x-erd-palette-item";
+export const ERD_DEFAULT_MODEL_NAME = "Untitled data model";

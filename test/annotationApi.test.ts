@@ -20,7 +20,10 @@ describe("createAnnotationApi retry on 401", () => {
       .mockResolvedValueOnce(jsonResponse(200, { id: "a1" }));
     vi.stubGlobal("fetch", fetchMock);
 
-    const getAuthToken = vi.fn().mockResolvedValueOnce(STALE_TOKEN).mockResolvedValueOnce(FRESH_TOKEN);
+    const getAuthToken = vi
+      .fn()
+      .mockResolvedValueOnce(STALE_TOKEN)
+      .mockResolvedValueOnce(FRESH_TOKEN);
     const api = createAnnotationApi({ apiBaseUrl: "https://api.example.com", getAuthToken });
 
     const result = await api.getAnnotation("a1");
@@ -28,8 +31,12 @@ describe("createAnnotationApi retry on 401", () => {
     expect(result).toMatchObject({ id: "a1" });
     expect(getAuthToken).toHaveBeenCalledTimes(2);
     expect(fetchMock).toHaveBeenCalledTimes(2);
-    expect(fetchMock.mock.calls[0][1]?.headers).toMatchObject({ Authorization: `Bearer ${STALE_TOKEN}` });
-    expect(fetchMock.mock.calls[1][1]?.headers).toMatchObject({ Authorization: `Bearer ${FRESH_TOKEN}` });
+    expect(fetchMock.mock.calls[0][1]?.headers).toMatchObject({
+      Authorization: `Bearer ${STALE_TOKEN}`,
+    });
+    expect(fetchMock.mock.calls[1][1]?.headers).toMatchObject({
+      Authorization: `Bearer ${FRESH_TOKEN}`,
+    });
   });
 
   it("propagates the 401 when the retry also fails", async () => {

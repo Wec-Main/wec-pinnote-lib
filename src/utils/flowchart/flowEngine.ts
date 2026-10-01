@@ -119,7 +119,6 @@ export interface FlowEngineEvents extends Record<string, unknown> {
 }
 
 export interface FlowEngineOptions {
-
   nodeTypes?: NodeTypeDefinition[];
 
   includeBuiltInNodeTypes?: boolean;
@@ -516,8 +515,7 @@ export class FlowEngine {
   private uniqueId(prefix: string, reserved?: Set<string>): string {
     const s = this.getState();
     let id = createId(prefix);
-    while (s.nodeLookup.has(id) || s.edgeLookup.has(id) || reserved?.has(id))
-      id = createId(prefix);
+    while (s.nodeLookup.has(id) || s.edgeLookup.has(id) || reserved?.has(id)) id = createId(prefix);
     reserved?.add(id);
     return id;
   }

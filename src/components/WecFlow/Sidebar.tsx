@@ -6,17 +6,12 @@ import { NODE_DRAG_MIME } from "../../utils/flowchart/constants";
 import { NodeIcon } from "./FlowIcons";
 
 export interface SidebarProps {
-
   nodeTypes?: string[];
   className?: string;
   style?: CSSProperties;
 }
 
-export const Sidebar = memo(function Sidebar({
-  nodeTypes,
-  className,
-  style,
-}: SidebarProps) {
+export const Sidebar = memo(function Sidebar({ nodeTypes, className, style }: SidebarProps) {
   const engine = useFlowEngine();
   const readOnly = useFlowState((s) => s.readOnly);
   const registryVersion = useFlowState((s) => s.registryVersion);
@@ -51,77 +46,71 @@ export const Sidebar = memo(function Sidebar({
   };
 
   return (
-    <aside
-      className={cx(
-        "wpn-flowchart-sidebar__sidebar",
-        className,
-      )}
-      style={style}
-    >
+    <aside className={cx("wpn-flowchart-sidebar__sidebar", className)} style={style}>
       <div className="wpn-flowchart-sidebar__list">
-          {groups.map(([category, defs]) => (
-            <div key={category} className="wpn-flowchart-sidebar__group">
-              <div className="wpn-flowchart-ui__section-title">{category}</div>
-              {defs.map((def) => (
-                <div
-                  key={def.type}
-                  className={cx(
-                    "wpn-flowchart-sidebar__item",
-                    readOnly && "wpn-flowchart-sidebar__item-disabled",
-                  )}
-                  style={{ "--node-color": def.color } as CSSProperties}
-                  draggable={!readOnly}
-                  role="button"
-                  tabIndex={readOnly ? -1 : 0}
-                  aria-disabled={readOnly}
-                  title={
-                    readOnly
-                      ? "Read-only mode"
-                      : `Drag onto the canvas or click to add a ${def.label} node`
+        {groups.map(([category, defs]) => (
+          <div key={category} className="wpn-flowchart-sidebar__group">
+            <div className="wpn-flowchart-ui__section-title">{category}</div>
+            {defs.map((def) => (
+              <div
+                key={def.type}
+                className={cx(
+                  "wpn-flowchart-sidebar__item",
+                  readOnly && "wpn-flowchart-sidebar__item-disabled",
+                )}
+                style={{ "--node-color": def.color } as CSSProperties}
+                draggable={!readOnly}
+                role="button"
+                tabIndex={readOnly ? -1 : 0}
+                aria-disabled={readOnly}
+                title={
+                  readOnly
+                    ? "Read-only mode"
+                    : `Drag onto the canvas or click to add a ${def.label} node`
+                }
+                onDragStart={(e) => {
+                  e.dataTransfer.setData(NODE_DRAG_MIME, def.type);
+                  e.dataTransfer.effectAllowed = "copy";
+                }}
+                onClick={() => !readOnly && addAtCenter(def)}
+                onKeyDown={(e) => {
+                  if (e.key === " ") {
+                    e.preventDefault();
+                    return;
                   }
-                  onDragStart={(e) => {
-                    e.dataTransfer.setData(NODE_DRAG_MIME, def.type);
-                    e.dataTransfer.effectAllowed = "copy";
-                  }}
-                  onClick={() => !readOnly && addAtCenter(def)}
-                  onKeyDown={(e) => {
-                    if (e.key === " ") {
-                      e.preventDefault();
-                      return;
-                    }
-                    if (!readOnly && e.key === "Enter") {
-                      e.preventDefault();
-                      addAtCenter(def);
-                    }
-                  }}
-                  onKeyUp={(e) => {
-                    if (!readOnly && e.key === " ") {
-                      e.preventDefault();
-                      addAtCenter(def);
-                    }
-                  }}
+                  if (!readOnly && e.key === "Enter") {
+                    e.preventDefault();
+                    addAtCenter(def);
+                  }
+                }}
+                onKeyUp={(e) => {
+                  if (!readOnly && e.key === " ") {
+                    e.preventDefault();
+                    addAtCenter(def);
+                  }
+                }}
+              >
+                <span
+                  className={cx(
+                    "wpn-flowchart-sidebar__icon",
+                    `wpn-flowchart-sidebar__icon-${def.shape}`,
+                  )}
                 >
-                  <span
-                    className={cx(
-                      "wpn-flowchart-sidebar__icon",
-                      `wpn-flowchart-sidebar__icon-${def.shape}`,
-                    )}
-                  >
-                    <NodeIcon icon={def.icon} size={15} />
-                  </span>
-                  <span className="wpn-flowchart-sidebar__item-text">
-                    <span className="wpn-flowchart-sidebar__item-label">{def.label}</span>
-                    {def.description && (
-                      <span className="wpn-flowchart-sidebar__item-desc">{def.description}</span>
-                    )}
-                  </span>
-                  <span className="wpn-flowchart-sidebar__grip" aria-hidden="true">
-                    ⋮⋮
-                  </span>
-                </div>
-              ))}
-            </div>
-          ))}
+                  <NodeIcon icon={def.icon} size={15} />
+                </span>
+                <span className="wpn-flowchart-sidebar__item-text">
+                  <span className="wpn-flowchart-sidebar__item-label">{def.label}</span>
+                  {def.description && (
+                    <span className="wpn-flowchart-sidebar__item-desc">{def.description}</span>
+                  )}
+                </span>
+                <span className="wpn-flowchart-sidebar__grip" aria-hidden="true">
+                  ⋮⋮
+                </span>
+              </div>
+            ))}
+          </div>
+        ))}
       </div>
     </aside>
   );

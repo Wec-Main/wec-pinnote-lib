@@ -58,9 +58,7 @@ function isPageVisitPage(payload: unknown): payload is PageVisitPage {
   }
   const page = payload as Record<string, unknown>;
   return (
-    Array.isArray(page.pages) &&
-    typeof page.limit === "number" &&
-    typeof page.offset === "number"
+    Array.isArray(page.pages) && typeof page.limit === "number" && typeof page.offset === "number"
   );
 }
 
@@ -77,9 +75,7 @@ function isTopUsersPage(payload: unknown): payload is TopUsersPage {
   }
   const page = payload as Record<string, unknown>;
   return (
-    Array.isArray(page.users) &&
-    typeof page.limit === "number" &&
-    typeof page.offset === "number"
+    Array.isArray(page.users) && typeof page.limit === "number" && typeof page.offset === "number"
   );
 }
 
@@ -89,9 +85,7 @@ function isVisitsPage(payload: unknown): payload is VisitsPage {
   }
   const page = payload as Record<string, unknown>;
   return (
-    Array.isArray(page.visits) &&
-    typeof page.limit === "number" &&
-    typeof page.offset === "number"
+    Array.isArray(page.visits) && typeof page.limit === "number" && typeof page.offset === "number"
   );
 }
 
@@ -108,7 +102,11 @@ export async function fetchAnalyticsSummary(
     { fallbackMessage: (status) => `Unable to load analytics summary (${status})` },
   );
   if (!isAnalyticsSummary(payload)) {
-    throw new AnnotationApiError("Unexpected analytics summary response", 500, JSON.stringify(payload));
+    throw new AnnotationApiError(
+      "Unexpected analytics summary response",
+      500,
+      JSON.stringify(payload),
+    );
   }
   return payload;
 }
@@ -147,7 +145,11 @@ export async function fetchAnalyticsTrends(
     { fallbackMessage: (status) => `Unable to load analytics trends (${status})` },
   );
   if (!isAnalyticsTrends(payload)) {
-    throw new AnnotationApiError("Unexpected analytics trends response", 500, JSON.stringify(payload));
+    throw new AnnotationApiError(
+      "Unexpected analytics trends response",
+      500,
+      JSON.stringify(payload),
+    );
   }
   return payload;
 }
@@ -218,7 +220,11 @@ export async function fetchAnalyticsStreamTicket(
     { fallbackMessage: (status) => `Unable to start live updates (${status})` },
   );
   if (!isAnalyticsStreamTicket(payload)) {
-    throw new AnnotationApiError("Unexpected live update ticket response", 500, JSON.stringify(payload));
+    throw new AnnotationApiError(
+      "Unexpected live update ticket response",
+      500,
+      JSON.stringify(payload),
+    );
   }
   return payload;
 }

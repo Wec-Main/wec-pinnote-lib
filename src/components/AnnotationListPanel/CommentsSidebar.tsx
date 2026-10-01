@@ -26,8 +26,9 @@ export function CommentsSidebar({
   authors,
   statuses,
 }: CommentsSidebarProps) {
-  const unresolvedCount = allThreads.filter((thread) => !isDoneStatus(thread.annotation.status))
-    .length;
+  const unresolvedCount = allThreads.filter(
+    (thread) => !isDoneStatus(thread.annotation.status),
+  ).length;
   const resolvedCount = allThreads.length - unresolvedCount;
 
   const resolutionOptions: SelectOption[] = [

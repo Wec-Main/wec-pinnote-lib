@@ -110,7 +110,6 @@ export function useResourceTable<T, Draft>({
         setLoaded(true);
       });
     return () => controller.abort();
-
   }, [query, reloadToken, ...deps]);
 
   const visible = items;

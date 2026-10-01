@@ -49,8 +49,7 @@ export function caretPosition(field: HTMLTextAreaElement, index: number): CaretP
   document.body.appendChild(mirror);
 
   const fontSize = Number.parseFloat(style.fontSize);
-  const lineHeight =
-    Number.parseFloat(style.lineHeight) || fontSize * LINE_HEIGHT_FALLBACK_RATIO;
+  const lineHeight = Number.parseFloat(style.lineHeight) || fontSize * LINE_HEIGHT_FALLBACK_RATIO;
   const position = {
     left: marker.offsetLeft + Number.parseFloat(style.borderLeftWidth) - field.scrollLeft,
     top: marker.offsetTop + Number.parseFloat(style.borderTopWidth) - field.scrollTop,

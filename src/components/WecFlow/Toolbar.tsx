@@ -3,6 +3,7 @@ import { useFlowEngine, useFlowState } from "../../context/FlowContext";
 import type { FlowJSON } from "../../types/flowchart.types";
 import { stringifyFlow } from "../../utils/flowchart/serialization";
 import { cx, shallowEqual } from "../../utils/flowchart/shallow";
+import { downloadTextFile } from "../../utils/downloadTextFile";
 import { ConfirmDialog } from "./ConfirmDialog";
 import { Icon } from "./FlowIcons";
 
@@ -11,7 +12,6 @@ export type NoticeKind = "info" | "success" | "error";
 export type FlowCommitHandler = (flow: FlowJSON) => void | Promise<void>;
 
 export interface ToolbarProps {
-
   brand?: ReactNode;
 
   onNotify?: (message: string, kind: NoticeKind) => void;
@@ -36,17 +36,6 @@ const slug = (s: string) =>
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-|-$/g, "") || "flow";
-
-function download(filename: string, text: string) {
-  const url = URL.createObjectURL(new Blob([text], { type: "application/json" }));
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = filename;
-  document.body.appendChild(a);
-  a.click();
-  a.remove();
-  setTimeout(() => URL.revokeObjectURL(url), 0);
-}
 
 const plural = (count: number, word: string) => `${count} ${word}${count === 1 ? "" : "s"}`;
 
@@ -76,7 +65,7 @@ export const Toolbar = memo(function Toolbar({
   const exportJson = () => {
     const json = stringifyFlow(engine.toJSON());
     if (onExport) onExport(json);
-    else download(`${slug(flowName)}.json`, json);
+    else downloadTextFile(`${slug(flowName)}.json`, json);
     notify("Flow exported as JSON", "success");
   };
 

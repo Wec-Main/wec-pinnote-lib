@@ -126,6 +126,11 @@ export function SearchableSelect({
             ) : (
               filtered.map((option, index) => (
                 <li key={option.value}>
+                  {option.group && option.group !== filtered[index - 1]?.group ? (
+                    <div className="wpn-select__group" role="presentation">
+                      {option.group}
+                    </div>
+                  ) : null}
                   <button
                     type="button"
                     id={optionId(index)}

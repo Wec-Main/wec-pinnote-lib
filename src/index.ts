@@ -22,6 +22,36 @@ export { UserManagementPanel } from "./components/UserManagement";
 export { SettingsPanel } from "./components/Settings";
 export { AuditHistoryPanel } from "./components/AuditHistory";
 export { LoginDialog, ToolbarAuthControl } from "./components/Auth";
+export {
+  listDataModels,
+  createDataModel,
+  fetchDataModel,
+  updateDataModel,
+  deleteDataModel,
+  fetchDataModelDocument,
+  saveDataModelDocument,
+  publishDataModel,
+  listDataModelVersions,
+  fetchDataModelVersion,
+} from "./services/dataModelApi";
+export type {
+  DataModel,
+  DataModelDocumentRecord,
+  DataModelDraft,
+  DataModelEngine,
+  DataModelSummary,
+  DataModelVersionDetail,
+  DataModelVersionRecord,
+  ErdCardinality,
+  ErdDocumentJSON,
+  ErdEntity,
+  ErdEnum,
+  ErdField,
+  ErdIndex,
+  ErdNote,
+  ErdReferentialAction,
+  ErdRelationship,
+} from "./types/dataModel.types";
 export { createAuthApi } from "./services/authApi";
 export { useAuthSessions } from "./hooks/useAuthSessions";
 export { useAnnotationStream } from "./hooks/useAnnotationStream";

@@ -21,9 +21,12 @@ describe("deriveDashboardStatus", () => {
     { summaryLoaded: true, error: { status: 503, message: "x" }, expected: "unavailable" },
     { summaryLoaded: true, error: null, expected: "ready" },
     { summaryLoaded: false, error: null, expected: "loading" },
-  ])("maps loaded=$summaryLoaded error=$error.status to $expected", ({ summaryLoaded, error, expected }) => {
-    expect(deriveDashboardStatus({ summaryLoaded, error })).toBe(expected);
-  });
+  ])(
+    "maps loaded=$summaryLoaded error=$error.status to $expected",
+    ({ summaryLoaded, error, expected }) => {
+      expect(deriveDashboardStatus({ summaryLoaded, error })).toBe(expected);
+    },
+  );
 });
 
 describe("widgetView", () => {

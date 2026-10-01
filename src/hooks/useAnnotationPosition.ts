@@ -281,7 +281,10 @@ export function useFloatingPanel(
         panel.offsetHeight,
       );
       setPlacement((current) =>
-        current && current.left === next.left && current.top === next.top && current.side === next.side
+        current &&
+        current.left === next.left &&
+        current.top === next.top &&
+        current.side === next.side
           ? current
           : next,
       );

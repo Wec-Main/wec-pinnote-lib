@@ -4,7 +4,6 @@ import { FlowContext, type FlowContextValue } from "../../context/FlowContext";
 import type { XYPosition } from "../../types/flowchart.types";
 
 export interface FlowProviderProps extends FlowEngineOptions {
-
   engine?: FlowEngine;
   children: ReactNode;
 }

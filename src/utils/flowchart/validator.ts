@@ -181,13 +181,15 @@ export function validateFlow(
   const ctx = buildContext(flow, registry);
 
   const used = new Map<string, number>();
-  const issues = rules.flatMap((rule) => rule(ctx)).map((issue) => {
-    const subject = [...(issue.nodeIds ?? []), ...(issue.edgeIds ?? [])].sort().join("_");
-    const base = subject ? `${issue.code}-${subject}` : issue.code;
-    const seen = used.get(base) ?? 0;
-    used.set(base, seen + 1);
-    return { ...issue, id: seen === 0 ? base : `${base}-${seen}` };
-  });
+  const issues = rules
+    .flatMap((rule) => rule(ctx))
+    .map((issue) => {
+      const subject = [...(issue.nodeIds ?? []), ...(issue.edgeIds ?? [])].sort().join("_");
+      const base = subject ? `${issue.code}-${subject}` : issue.code;
+      const seen = used.get(base) ?? 0;
+      used.set(base, seen + 1);
+      return { ...issue, id: seen === 0 ? base : `${base}-${seen}` };
+    });
   const errorCount = issues.filter((i) => i.severity === "error").length;
   return { valid: errorCount === 0, issues, errorCount, warningCount: issues.length - errorCount };
 }

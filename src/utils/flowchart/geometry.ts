@@ -75,25 +75,17 @@ export function getHandleOffset(
   const t = (() => {
     const sideSiblings = def.handles.filter((h) => h.side === handle.side);
     const hasUnlabeled = sideSiblings.some((h) => !h.label);
-    const slots = hasUnlabeled
-      ? [null, ...sideSiblings.filter((h) => h.label)]
-      : sideSiblings;
+    const slots = hasUnlabeled ? [null, ...sideSiblings.filter((h) => h.label)] : sideSiblings;
     const slotIndex = handle.label ? slots.indexOf(handle) : 0;
     return (slotIndex + 1) / (slots.length + 1);
   })();
   switch (handle.side) {
     case "top":
-      return def.shape === "diamond"
-        ? { x: width / 2, y: 0 }
-        : { x: width * t, y: 0 };
+      return def.shape === "diamond" ? { x: width / 2, y: 0 } : { x: width * t, y: 0 };
     case "bottom":
-      return def.shape === "diamond"
-        ? { x: width / 2, y: height }
-        : { x: width * t, y: height };
+      return def.shape === "diamond" ? { x: width / 2, y: height } : { x: width * t, y: height };
     case "left":
-      return def.shape === "diamond"
-        ? { x: 0, y: height / 2 }
-        : { x: skew, y: height * t };
+      return def.shape === "diamond" ? { x: 0, y: height / 2 } : { x: skew, y: height * t };
     case "right":
       return def.shape === "diamond"
         ? { x: width, y: height / 2 }

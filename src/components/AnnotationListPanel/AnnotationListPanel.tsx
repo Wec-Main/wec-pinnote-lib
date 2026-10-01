@@ -204,11 +204,7 @@ export function AnnotationListPanel() {
 
   return (
     <div
-      className={[
-        "wpn-panel",
-        "wpn-list-panel",
-        resizing ? "wpn-list-panel--resizing" : "",
-      ]
+      className={["wpn-panel", "wpn-list-panel", resizing ? "wpn-list-panel--resizing" : ""]
         .filter(Boolean)
         .join(" ")}
       style={{ width }}
@@ -365,7 +361,11 @@ export function AnnotationListPanel() {
               <span>
                 {pageGroups.length} {pageGroups.length === 1 ? "page" : "pages"}
               </span>
-              <button type="button" className="wpn-page-groups__toggle-all" onClick={toggleAllPages}>
+              <button
+                type="button"
+                className="wpn-page-groups__toggle-all"
+                onClick={toggleAllPages}
+              >
                 <Icon name={allCollapsed ? "chevronDown" : "chevronUp"} />
                 {allCollapsed ? "Expand all" : "Collapse all"}
               </button>

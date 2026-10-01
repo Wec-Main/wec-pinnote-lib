@@ -143,11 +143,7 @@ export function AnnotationThreadPanel({
     <>
       <div
         ref={panelRef}
-        className={[
-          "wpn-panel",
-          "wpn-thread-panel",
-          centered ? "wpn-thread-panel--centered" : "",
-        ]
+        className={["wpn-panel", "wpn-thread-panel", centered ? "wpn-thread-panel--centered" : ""]
           .filter(Boolean)
           .join(" ")}
         style={
@@ -164,82 +160,82 @@ export function AnnotationThreadPanel({
       >
         <div className="wpn-panel__header">
           <div className="wpn-panel__header-row">
-          <span className="wpn-panel__title-group">
-            {editingTitle ? (
-              <textarea
-                ref={focusTitleInputAtEnd}
-                className="wpn-panel__title-input"
-                rows={1}
-                value={titleValue}
-                onChange={(event) => {
-                  setTitleValue(event.target.value);
-                  fitTitleInputHeight(event.target);
-                }}
-                onBlur={commitTitle}
-                onKeyDown={(event) => {
-                  if (event.key === "Enter") {
-                    event.preventDefault();
-                    commitTitle();
-                  } else if (event.key === "Escape") {
-                    setEditingTitle(false);
-                  }
-                }}
-              />
-            ) : (
-              <span className="wpn-panel__title" title={title}>
-                {title}
+            <span className="wpn-panel__title-group">
+              {editingTitle ? (
+                <textarea
+                  ref={focusTitleInputAtEnd}
+                  className="wpn-panel__title-input"
+                  rows={1}
+                  value={titleValue}
+                  onChange={(event) => {
+                    setTitleValue(event.target.value);
+                    fitTitleInputHeight(event.target);
+                  }}
+                  onBlur={commitTitle}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter") {
+                      event.preventDefault();
+                      commitTitle();
+                    } else if (event.key === "Escape") {
+                      setEditingTitle(false);
+                    }
+                  }}
+                />
+              ) : (
+                <span className="wpn-panel__title" title={title}>
+                  {title}
+                </span>
+              )}
+              <Tooltip label={editingTitle ? "Save title" : "Edit title"} placement="bottom">
+                <button
+                  type="button"
+                  className="wpn-link wpn-link--icon"
+                  aria-label={editingTitle ? "Save title" : "Edit title"}
+                  onMouseDown={(event) => event.preventDefault()}
+                  onClick={editingTitle ? commitTitle : startEditingTitle}
+                >
+                  <Icon name={editingTitle ? "check" : "edit"} className="wpn-action-icon" />
+                </button>
+              </Tooltip>
+              <span
+                className="wpn-thread-panel__info"
+                onMouseEnter={() => setInfoOpen(true)}
+                onMouseLeave={() => setInfoOpen(false)}
+              >
+                <button
+                  type="button"
+                  className="wpn-link wpn-link--icon"
+                  aria-label="Thread info"
+                  onFocus={() => setInfoOpen(true)}
+                  onBlur={() => setInfoOpen(false)}
+                >
+                  <Icon name="info" className="wpn-action-icon" />
+                </button>
+                {infoOpen ? (
+                  <span className="wpn-thread-panel__info-popover" role="tooltip">
+                    <span>
+                      <kbd>Enter</kbd> to send
+                    </span>
+                    <span>
+                      <kbd>Shift</kbd>+<kbd>Enter</kbd> new line
+                    </span>
+                    <span>
+                      <kbd>@</kbd> to mention
+                    </span>
+                  </span>
+                ) : null}
               </span>
-            )}
-            <Tooltip label={editingTitle ? "Save title" : "Edit title"} placement="bottom">
+            </span>
+            <Tooltip label="Close" placement="left">
               <button
                 type="button"
-                className="wpn-link wpn-link--icon"
-                aria-label={editingTitle ? "Save title" : "Edit title"}
-                onMouseDown={(event) => event.preventDefault()}
-                onClick={editingTitle ? commitTitle : startEditingTitle}
+                className="wpn-icon-btn"
+                aria-label="Close thread"
+                onClick={requestClose}
               >
-                <Icon name={editingTitle ? "check" : "edit"} className="wpn-action-icon" />
+                ×
               </button>
             </Tooltip>
-            <span
-              className="wpn-thread-panel__info"
-              onMouseEnter={() => setInfoOpen(true)}
-              onMouseLeave={() => setInfoOpen(false)}
-            >
-              <button
-                type="button"
-                className="wpn-link wpn-link--icon"
-                aria-label="Thread info"
-                onFocus={() => setInfoOpen(true)}
-                onBlur={() => setInfoOpen(false)}
-              >
-                <Icon name="info" className="wpn-action-icon" />
-              </button>
-              {infoOpen ? (
-                <span className="wpn-thread-panel__info-popover" role="tooltip">
-                  <span>
-                    <kbd>Enter</kbd> to send
-                  </span>
-                  <span>
-                    <kbd>Shift</kbd>+<kbd>Enter</kbd> new line
-                  </span>
-                  <span>
-                    <kbd>@</kbd> to mention
-                  </span>
-                </span>
-              ) : null}
-            </span>
-          </span>
-          <Tooltip label="Close" placement="left">
-            <button
-              type="button"
-              className="wpn-icon-btn"
-              aria-label="Close thread"
-              onClick={requestClose}
-            >
-              ×
-            </button>
-          </Tooltip>
           </div>
           {annotation.path ? (
             <div className="wpn-thread-panel__path" title={annotation.path}>

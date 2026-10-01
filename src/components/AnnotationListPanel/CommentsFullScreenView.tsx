@@ -85,7 +85,10 @@ export function CommentsFullScreenView({
               disabled={loading}
               onClick={retry}
             >
-              <Icon name="refresh" className={loading ? "wpn-icon-btn__icon--spinning" : undefined} />
+              <Icon
+                name="refresh"
+                className={loading ? "wpn-icon-btn__icon--spinning" : undefined}
+              />
             </button>
           </Tooltip>
           <Tooltip label="Restore size" placement="bottom">

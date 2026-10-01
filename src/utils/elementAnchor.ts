@@ -67,8 +67,8 @@ export function createElementAnchor(
   const contentRect = measureContentRect(target);
   const contentRelative = Boolean(
     contentRect &&
-      (contentRect.width < rect.width * CONTENT_FIT_THRESHOLD ||
-        contentRect.height < rect.height * CONTENT_FIT_THRESHOLD),
+    (contentRect.width < rect.width * CONTENT_FIT_THRESHOLD ||
+      contentRect.height < rect.height * CONTENT_FIT_THRESHOLD),
   );
   const referenceRect = contentRelative && contentRect ? contentRect : rect;
   const width = referenceRect.width || 1;

@@ -35,7 +35,10 @@ export function applyEpicFlowStreamEvent(
       }
       const remainingEpics = epics.filter((item) => item.id !== epicId);
       const remainingStories = userStories.filter((item) => item.epicId !== epicId);
-      if (remainingEpics.length === epics.length && remainingStories.length === userStories.length) {
+      if (
+        remainingEpics.length === epics.length &&
+        remainingStories.length === userStories.length
+      ) {
         return unchanged;
       }
       return { epics: remainingEpics, userStories: remainingStories };

@@ -20,7 +20,6 @@ export interface StepBend {
 }
 
 export interface EdgePath {
-
   path: string;
 
   labelX: number;

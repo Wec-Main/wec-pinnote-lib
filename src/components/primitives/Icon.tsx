@@ -26,6 +26,7 @@ export type IconName =
   | "mapPin"
   | "epic"
   | "flow"
+  | "dataModel"
   | "comment"
   | "reply"
   | "history"
@@ -51,9 +52,17 @@ export type IconName =
   | "info"
   | "grid"
   | "list"
-  | "arrowUpRight";
+  | "arrowUpRight"
+  | "open";
 
 const PATHS: Record<IconName, ReactElement> = {
+  open: (
+    <>
+      <path d="M13.5 4.5h6v6" />
+      <path d="M19.5 4.5 11 13" />
+      <path d="M18 14v4.5a1.5 1.5 0 0 1-1.5 1.5h-11A1.5 1.5 0 0 1 4 18.5v-11A1.5 1.5 0 0 1 5.5 6H10" />
+    </>
+  ),
   info: (
     <>
       <circle cx="12" cy="12" r="8.5" />
@@ -163,6 +172,13 @@ const PATHS: Record<IconName, ReactElement> = {
       <circle cx="6" cy="18.5" r="2.2" />
       <circle cx="18" cy="12" r="2.2" />
       <path d="M6 7.7v8.6M8 6.2l7.3 4.6M8 17.8l7.3-4.6" />
+    </>
+  ),
+  dataModel: (
+    <>
+      <ellipse cx="12" cy="6" rx="7" ry="2.8" />
+      <path d="M5 6v12c0 1.5 3.1 2.8 7 2.8s7-1.3 7-2.8V6" />
+      <path d="M5 12c0 1.5 3.1 2.8 7 2.8s7-1.3 7-2.8" />
     </>
   ),
   comment: (

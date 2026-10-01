@@ -6,7 +6,11 @@ import {
   type AnnotationUser,
 } from "../../types/annotation.types";
 import { formatTimestamp, getInitials } from "../../utils/format";
-import { canDeleteAnnotation, canDeleteComment, canEditComment } from "../../utils/boardPermissions";
+import {
+  canDeleteAnnotation,
+  canDeleteComment,
+  canEditComment,
+} from "../../utils/boardPermissions";
 import {
   encodeMentions,
   mentionsToPlainText,

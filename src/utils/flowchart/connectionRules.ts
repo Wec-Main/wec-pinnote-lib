@@ -49,10 +49,8 @@ export function checkConnection(conn: Connection, ctx: ConnectionContext): Conne
   const outgoing = others.filter((e) => e.source === source.id);
   const incoming = others.filter((e) => e.target === target.id);
 
-  const storedSourceHandle = (e: FlowEdge) =>
-    e.sourceHandle ?? findHandle(sourceDef, "source")?.id;
-  const storedTargetHandle = (e: FlowEdge) =>
-    e.targetHandle ?? findHandle(targetDef, "target")?.id;
+  const storedSourceHandle = (e: FlowEdge) => e.sourceHandle ?? findHandle(sourceDef, "source")?.id;
+  const storedTargetHandle = (e: FlowEdge) => e.targetHandle ?? findHandle(targetDef, "target")?.id;
 
   if (
     outgoing.some(

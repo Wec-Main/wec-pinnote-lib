@@ -28,3 +28,5 @@ export { ColorPicker } from "./ColorPicker";
 export { Switch } from "./Switch";
 export { Tabs } from "./Tabs";
 export type { TabDefinition } from "./Tabs";
+export { SaveIndicator } from "./SaveIndicator";
+export { StageMessage } from "./StageMessage";

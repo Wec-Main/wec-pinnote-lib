@@ -65,9 +65,7 @@ describe("isTrackingEnabled", () => {
 
 describe("isContinuation", () => {
   it("is true at 4999 ms on the same page key", () => {
-    expect(isContinuation({ pageKey: "/board", leftAtMs: 1000 }, "/board", 5999, false)).toBe(
-      true,
-    );
+    expect(isContinuation({ pageKey: "/board", leftAtMs: 1000 }, "/board", 5999, false)).toBe(true);
   });
 
   it("is false at 5001 ms on the same page key", () => {

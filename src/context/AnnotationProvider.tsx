@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } fro
 import { createPortal } from "react-dom";
 import "../styles/annotation.css";
 import "../styles/flowchart.css";
+import "../styles/datamodel.css";
 import { AnnotationErrorBoundary } from "../components/AnnotationErrorBoundary";
 import { AnnotationLayer } from "../components/AnnotationLayer";
 import { useAnnotationApi } from "../hooks/useAnnotationApi";
@@ -303,6 +304,11 @@ export function AnnotationProvider({ config, children }: AnnotationProviderProps
     false,
     isBoolean,
   );
+  const [dataModelOpen, setDataModelOpen] = usePersistentState(
+    `wpn-ui:${projectId}:dataModelOpen`,
+    false,
+    isBoolean,
+  );
   const [userManagementOpen, setUserManagementOpen] = usePersistentState(
     `wpn-ui:${projectId}:userManagementOpen`,
     false,
@@ -510,7 +516,7 @@ export function AnnotationProvider({ config, children }: AnnotationProviderProps
   );
 
   const closeOtherSurfaces = useCallback(
-    (keep: "list" | "epicFlow" | "flow" | "userManagement") => {
+    (keep: "list" | "epicFlow" | "flow" | "dataModel" | "userManagement") => {
       if (keep !== "list") {
         setListOpen(false);
       }
@@ -519,6 +525,9 @@ export function AnnotationProvider({ config, children }: AnnotationProviderProps
       }
       if (keep !== "flow") {
         setFlowOpen(false);
+      }
+      if (keep !== "dataModel") {
+        setDataModelOpen(false);
       }
       if (keep !== "userManagement") {
         setUserManagementOpen(false);
@@ -530,6 +539,7 @@ export function AnnotationProvider({ config, children }: AnnotationProviderProps
     [
       selectFlowPin,
       setAuditHistoryOpen,
+      setDataModelOpen,
       setEpicFlowOpen,
       setFlowOpen,
       setListOpen,
@@ -562,6 +572,15 @@ export function AnnotationProvider({ config, children }: AnnotationProviderProps
       }
     },
     [closeOtherSurfaces, setFlowOpen],
+  );
+  const openDataModelExclusive = useCallback(
+    (open: boolean) => {
+      setDataModelOpen(open);
+      if (open) {
+        closeOtherSurfaces("dataModel");
+      }
+    },
+    [closeOtherSurfaces, setDataModelOpen],
   );
   const openUserManagementExclusive = useCallback(
     (open: boolean) => {
@@ -601,6 +620,7 @@ export function AnnotationProvider({ config, children }: AnnotationProviderProps
       setListOpen(false);
       setEpicFlowOpen(false);
       setFlowOpen(false);
+      setDataModelOpen(false);
       setUserManagementOpen(false);
       setAuditHistoryOpen(false);
       setFlowPinHookModeEnabled(false);
@@ -610,6 +630,7 @@ export function AnnotationProvider({ config, children }: AnnotationProviderProps
     authenticated,
     selectFlowPin,
     setAuditHistoryOpen,
+    setDataModelOpen,
     setEpicFlowOpen,
     setFlowOpen,
     setFlowPinHookModeEnabled,
@@ -923,6 +944,8 @@ export function AnnotationProvider({ config, children }: AnnotationProviderProps
       setEpicFlowOpen: openEpicFlowExclusive,
       flowOpen,
       setFlowOpen: openFlowExclusive,
+      dataModelOpen,
+      setDataModelOpen: openDataModelExclusive,
       userManagementOpen,
       setUserManagementOpen: openUserManagementExclusive,
       auditHistoryOpen,
@@ -975,6 +998,8 @@ export function AnnotationProvider({ config, children }: AnnotationProviderProps
       openEpicFlowExclusive,
       flowOpen,
       openFlowExclusive,
+      dataModelOpen,
+      openDataModelExclusive,
       userManagementOpen,
       openUserManagementExclusive,
       auditHistoryOpen,

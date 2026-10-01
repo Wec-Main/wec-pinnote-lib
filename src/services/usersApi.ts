@@ -49,9 +49,7 @@ export function fetchUsers(
   signal?: AbortSignal,
 ): Promise<UserPage> {
   const url = buildUrl(apiBaseUrl, "/users", usersQuery(query));
-  return withUnauthorizedRetry(getAuthToken, (token) =>
-    request<UserPage>(url, token, { signal }),
-  );
+  return withUnauthorizedRetry(getAuthToken, (token) => request<UserPage>(url, token, { signal }));
 }
 
 function toPayload(projectId: string, draft: ManagedUserDraft) {

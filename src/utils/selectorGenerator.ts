@@ -109,7 +109,8 @@ export function generateSelector(
 } {
   const root: ParentNode = scope ? scope.root : document;
   const stopAt = scope ? scope.root : null;
-  const wrap = (selector: string): string => (scope ? scopedSelector(scope.name, selector) : selector);
+  const wrap = (selector: string): string =>
+    scope ? scopedSelector(scope.name, selector) : selector;
 
   const annotationId = element.getAttribute("data-annotation-id");
   if (annotationId) {

@@ -94,11 +94,7 @@ export function NotesPanel({
     setEditing(false);
   };
 
-  const targetKindLabel = target
-    ? target.type === "epic"
-      ? "Epic"
-      : "User Stories"
-    : "";
+  const targetKindLabel = target ? (target.type === "epic" ? "Epic" : "User Stories") : "";
   const headerBreadcrumb = target ? `Notes: ${targetKindLabel} → ${title}` : "Notes";
 
   const actions = (
@@ -180,7 +176,10 @@ export function NotesPanel({
           aria-pressed={expanded}
           onClick={onToggleExpand}
         >
-          <Icon name={expanded ? "collapse" : "expand"} className="wpn-epicflow-column__expand-icon" />
+          <Icon
+            name={expanded ? "collapse" : "expand"}
+            className="wpn-epicflow-column__expand-icon"
+          />
         </button>
       </Tooltip>
     </div>

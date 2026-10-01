@@ -23,7 +23,9 @@ export function PageTabsRow({ pageGroups, activePageKey, onSelect }: PageTabsRow
             role="tab"
             aria-selected={group.pageKey === activePageKey}
             className={
-              group.pageKey === activePageKey ? "wpn-page-tile wpn-page-tile--active" : "wpn-page-tile"
+              group.pageKey === activePageKey
+                ? "wpn-page-tile wpn-page-tile--active"
+                : "wpn-page-tile"
             }
             onClick={() => onSelect(group.pageKey)}
           >

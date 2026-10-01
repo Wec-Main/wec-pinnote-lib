@@ -33,7 +33,8 @@ export function useAnnotationPresence(annotations: Annotation[]): Set<string> {
   annotationsRef.current = annotations;
 
   const anchorsKey = useMemo(
-    () => annotations.map((annotation) => `${annotation.id}:${annotation.anchor.selector}`).join("|"),
+    () =>
+      annotations.map((annotation) => `${annotation.id}:${annotation.anchor.selector}`).join("|"),
     [annotations],
   );
 

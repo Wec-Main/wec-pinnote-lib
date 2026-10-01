@@ -32,10 +32,7 @@ export const PropertiesPanel = memo(function PropertiesPanel({
     content = <MultiSelection nodeIds={nodeIds} edgeIds={edgeIds} />;
   else content = <FlowOverview />;
   return (
-    <aside
-      className={cx("wpn-flowchart-properties__panel", className)}
-      style={style}
-    >
+    <aside className={cx("wpn-flowchart-properties__panel", className)} style={style}>
       <div className="wpn-flowchart-properties__header-controls">
         {onClose && (
           <button
@@ -76,13 +73,7 @@ function PanelHeader({
   );
 }
 
-function CollapsibleSection({
-  title,
-  children,
-}: {
-  title: string;
-  children: React.ReactNode;
-}) {
+function CollapsibleSection({ title, children }: { title: string; children: React.ReactNode }) {
   const [open, setOpen] = useState(true);
   return (
     <section className="wpn-flowchart-ui__section">
@@ -187,10 +178,7 @@ function EdgeProperties({ edgeId }: { edgeId: string }) {
   const current = edge.type ?? "default";
   return (
     <>
-      <PanelHeader
-        title="Connection"
-        icon={<Icon name="curve" size={14} />}
-      />
+      <PanelHeader title="Connection" icon={<Icon name="curve" size={14} />} />
       {!!issues?.length && (
         <div className="wpn-flowchart-properties__issues">
           {issues.map((i) => (
@@ -344,10 +332,7 @@ function FlowOverview() {
   const readOnly = useFlowState((s) => s.readOnly);
   return (
     <>
-      <PanelHeader
-        title="Flow settings"
-        icon={<Icon name="flow" size={14} />}
-      />
+      <PanelHeader title="Flow settings" icon={<Icon name="flow" size={14} />} />
       <section className="wpn-flowchart-ui__section">
         <label className="wpn-flowchart-ui__field">
           <span className="wpn-flowchart-ui__field-label">Flow name</span>

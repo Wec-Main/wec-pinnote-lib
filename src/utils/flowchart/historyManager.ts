@@ -1,4 +1,3 @@
-
 export class HistoryManager<T> {
   private past: T[] = [];
   private future: T[] = [];

@@ -1,6 +1,7 @@
 import type { Annotation, AnnotationComment } from "./annotation.types";
 import type { Epic, UserStory } from "./epicFlow.types";
 import type { Flow, FlowPin } from "./flowPin.types";
+import type { DataModel } from "./dataModel.types";
 
 export type StreamEventType =
   | "annotation.created"
@@ -22,7 +23,12 @@ export type StreamEventType =
   | "flow_document.saved"
   | "flow_pin.created"
   | "flow_pin.updated"
-  | "flow_pin.deleted";
+  | "flow_pin.deleted"
+  | "data_model.created"
+  | "data_model.updated"
+  | "data_model.deleted"
+  | "data_model.published"
+  | "data_model_document.saved";
 
 export type StreamConnectionState =
   "connecting" | "open" | "reconnecting" | "closed" | "unauthenticated";
@@ -48,6 +54,11 @@ export interface StreamEventPayloads {
   "flow_pin.created": { flowPin: FlowPin };
   "flow_pin.updated": { flowPin: FlowPin };
   "flow_pin.deleted": { flowPinId: string };
+  "data_model.created": { dataModel: DataModel };
+  "data_model.updated": { dataModel: DataModel };
+  "data_model.deleted": { dataModelId: string };
+  "data_model.published": { dataModelId: string; version: unknown };
+  "data_model_document.saved": { dataModelId: string; revision: number };
 }
 
 interface StreamEventBase {

@@ -22,11 +22,11 @@ Figma-like website annotations and comments for any React application. The libra
 
 ## Setup
 
-This library is **not published to the npm registry**; install it from its GitHub repository.
+This library is **not published to the npm registry**. Install it either from its GitHub repository or from a local checkout on disk.
 
 Peer dependencies: `react` and `react-dom` >= 18.
 
-### Install from GitHub
+### Option A: from GitHub
 
 Add it straight to your host app's `package.json` (or run the equivalent `npm install` command) using a git URL instead of a version:
 
@@ -37,6 +37,45 @@ npm install git+https://github.com/Wec-Main/wec-pinnote-lib.git#main
 ```
 
 npm clones the repo, runs its `prepare` script (which runs `npm run build`), and installs it like any other dependency.
+
+### Option B: from a local checkout
+
+Useful when developing the library and a consuming app side by side (for example both cloned under the same parent folder, as `wec-pinnote-lib` and your app).
+
+**B1. As a built package dependency** — build the library once, then point npm at the folder:
+
+```bash
+cd wec-pinnote-lib
+npm install
+npm run build        # produces dist/, which package.json's main/module/types point to
+
+cd ../your-app
+npm install ../wec-pinnote-lib
+```
+
+npm creates a symlink in `your-app/node_modules/wec-pinnote-lib`. Re-run `npm run build` in `wec-pinnote-lib` after each change; `your-app` picks up the new `dist` output automatically since it's a symlink.
+
+**B2. Alias straight to source (fastest inner loop, no build step)** — resolve the package name directly to `src/index.ts` in your bundler config, so edits to the library are reflected immediately:
+
+```ts
+// your-app/vite.config.ts
+import { defineConfig } from "vite";
+import { resolve } from "node:path";
+
+export default defineConfig({
+  resolve: {
+    alias: {
+      "wec-pinnote-lib/style.css": resolve(
+        __dirname,
+        "../wec-pinnote-lib/src/styles/annotation.css",
+      ),
+      "wec-pinnote-lib": resolve(__dirname, "../wec-pinnote-lib/src/index.ts"),
+    },
+  },
+});
+```
+
+`examples/demo` in this repository is wired up this way; see it for a full working example.
 
 ---
 

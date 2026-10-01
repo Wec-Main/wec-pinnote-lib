@@ -318,7 +318,12 @@ describe("regressions", () => {
       parseFlow({
         version: 1,
         nodes: [
-          { id: "a", type: "start", position: { x: 0, y: 0 }, data: { label: "A", properties: {} } },
+          {
+            id: "a",
+            type: "start",
+            position: { x: 0, y: 0 },
+            data: { label: "A", properties: {} },
+          },
           { id: "b", type: "end", position: { x: 0, y: 99 }, data: { label: "B", properties: {} } },
         ],
         edges: [
@@ -344,7 +349,12 @@ describe("regressions", () => {
       {
         nodes: [
           orphan,
-          { id: "s", type: "start", position: { x: 0, y: 0 }, data: { label: "S", properties: {} } },
+          {
+            id: "s",
+            type: "start",
+            position: { x: 0, y: 0 },
+            data: { label: "S", properties: {} },
+          },
           { id: "e", type: "end", position: { x: 0, y: 9 }, data: { label: "E", properties: {} } },
         ],
         edges: [{ id: "e1", source: "s", target: "e" }],
@@ -361,7 +371,12 @@ describe("regressions", () => {
     const result = validateFlow(
       {
         nodes: [
-          { id: "s", type: "start", position: { x: 0, y: 0 }, data: { label: "S", properties: {} } },
+          {
+            id: "s",
+            type: "start",
+            position: { x: 0, y: 0 },
+            data: { label: "S", properties: {} },
+          },
           {
             id: "t",
             type: "terminator",

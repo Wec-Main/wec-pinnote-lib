@@ -9,7 +9,13 @@ import {
   type UpdateAnnotationRequest,
   type UpdateCommentRequest,
 } from "../types/annotation.types";
-import { buildUrl, request, requestNoContent, withUnauthorizedRetry, type QueryValue } from "./httpClient";
+import {
+  buildUrl,
+  request,
+  requestNoContent,
+  withUnauthorizedRetry,
+  type QueryValue,
+} from "./httpClient";
 import { toAnnotation } from "../utils/streamPayloadGuards";
 
 const PATHS = {
@@ -23,7 +29,9 @@ const PATHS = {
 function parseListPayload(payload: unknown): Annotation[] {
   const rawList = Array.isArray(payload)
     ? payload
-    : payload && typeof payload === "object" && Array.isArray((payload as { annotations?: unknown }).annotations)
+    : payload &&
+        typeof payload === "object" &&
+        Array.isArray((payload as { annotations?: unknown }).annotations)
       ? (payload as { annotations: unknown[] }).annotations
       : null;
 

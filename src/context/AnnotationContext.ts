@@ -126,6 +126,8 @@ export interface AnnotationUiContextValue {
   setEpicFlowOpen: (open: boolean) => void;
   flowOpen: boolean;
   setFlowOpen: (open: boolean) => void;
+  dataModelOpen: boolean;
+  setDataModelOpen: (open: boolean) => void;
   userManagementOpen: boolean;
   setUserManagementOpen: (open: boolean) => void;
   auditHistoryOpen: boolean;

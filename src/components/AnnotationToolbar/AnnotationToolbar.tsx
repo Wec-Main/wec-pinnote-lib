@@ -57,6 +57,8 @@ export function AnnotationToolbar() {
     setEpicFlowOpen,
     flowOpen,
     setFlowOpen,
+    dataModelOpen,
+    setDataModelOpen,
     userManagementOpen,
     setUserManagementOpen,
     setAuditHistoryOpen,
@@ -271,6 +273,19 @@ export function AnnotationToolbar() {
         })}
       >
         <Icon name="flow" className="wpn-launcher-item__glyph" />
+      </LauncherButton>
+      <LauncherButton
+        label={dataModelOpen ? "Close Data Models" : "Data Models"}
+        active={dataModelOpen}
+        blocked={loggedOut}
+        dragHandlers={launcherDragHandlers}
+        onActivate={guardedClick(() => {
+          if (!loggedOut) {
+            setDataModelOpen(!dataModelOpen);
+          }
+        })}
+      >
+        <Icon name="dataModel" className="wpn-launcher-item__glyph" />
       </LauncherButton>
       <LauncherButton
         label={userManagementOpen ? "Close settings" : "Settings"}

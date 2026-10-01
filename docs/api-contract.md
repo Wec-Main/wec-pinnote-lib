@@ -504,6 +504,117 @@ both the pin and its flow; saving the flow under a new name renames the pin too.
 deletes its flow, and is allowed for the pin's author or an admin. Pin flows are left out of
 `GET /flows`.
 
+# Data Model API contract
+
+Data models are project-scoped ERD documents: no project version applies. Every endpoint requires the
+bearer token described at the top of this document and project membership. Base path
+`/api/v1/pinnote`.
+
+```ts
+type DataModelEngine = "na" | "postgres" | "mysql" | "sqlite";
+
+interface DataModel {
+  id: string;
+  organizationId: string;
+  projectId: string;
+  name: string;
+  description: string;
+  engine: DataModelEngine;
+  createdByUser: string;
+  createdById: string | null;
+  updatedByUser: string | null;
+  updatedById: string | null;
+  entityCount: number;
+  createdAt: string;
+  updatedAt: string;
+}
+```
+
+## Document
+
+```ts
+interface ErdDocumentJSON {
+  version: 1;
+  engine: DataModelEngine;
+  entities: ErdEntity[];
+  relationships: ErdRelationship[];
+  enums: ErdEnum[];
+  notes: ErdNote[];
+  viewport?: { x: number; y: number; zoom: number };
+  meta: { name?: string; [key: string]: unknown };
+}
+
+interface ErdEntity {
+  id: string; name: string; schema?: string; comment?: string;
+  position: { x: number; y: number }; width?: number; collapsed?: boolean;
+  fields: ErdField[]; indexes: ErdIndex[];
+}
+
+interface ErdField {
+  id: string; name: string; type: string;
+  length?: number; precision?: number; scale?: number;
+  nullable: boolean; primaryKey: boolean; unique: boolean;
+  defaultValue?: string; enumId?: string;
+}
+
+interface ErdIndex { id: string; name: string; fieldIds: string[]; unique: boolean }
+
+interface ErdRelationship {
+  id: string; name?: string;
+  sourceEntityId: string; sourceFieldId?: string;
+  targetEntityId: string; targetFieldId?: string;
+  cardinality: "one-to-one" | "one-to-many" | "many-to-many";
+  sourceOptional: boolean; targetOptional: boolean;
+  onDelete: "cascade" | "restrict" | "set-null" | "no-action";
+  onUpdate: "cascade" | "restrict" | "set-null" | "no-action";
+}
+
+interface ErdEnum { id: string; name: string; values: string[] }
+interface ErdNote { id: string; text: string; position: { x: number; y: number }; width: number; height: number; color?: string }
+```
+
+The source side of a relationship is the parent (referenced) side and the target side is the child
+(foreign-key holding) side. A many-to-many relationship is exported as a junction table. Enums have
+no position and are not canvas nodes.
+
+Validation on save: at most 500 entities, 200 fields and 200 indexes per entity, 2000 relationships,
+200 enums and 200 notes; ids are unique within each collection (field ids within their entity);
+relationship entity and field ids, index field ids and field `enumId` values must exist; a
+relationship cannot reference the same field on both sides; unknown keys are rejected.
+
+## Endpoints
+
+| Method and path | Body | Response |
+|---|---|---|
+| `GET /data-models?projectId=` | | `DataModel[]`, most recently updated first |
+| `POST /data-models` | `{ projectId, name, description?, engine? }` | `201` `DataModel` (`engine` defaults to `"na"`); the new model starts with an empty document |
+| `GET /data-models/:dataModelId` | | `DataModel` |
+| `PATCH /data-models/:dataModelId` | `{ name?, description?, engine? }` | `DataModel` |
+| `DELETE /data-models/:dataModelId` | | `204`; allowed for the author or an admin, otherwise `403` |
+| `GET /data-models/:dataModelId/document` | | `{ dataModel, revision, document }` |
+| `PUT /data-models/:dataModelId/document` | `{ revision, document }` | `{ dataModel, revision, document }`; `409` when `revision` is stale |
+| `GET /data-models/:dataModelId/versions` | | `DataModelVersionSummary[]`, newest first, at most 100 |
+| `POST /data-models/:dataModelId/versions` | | `201` `DataModelVersion` (snapshot of the current document) |
+| `GET /data-models/:dataModelId/versions/:version` | | `DataModelVersion` |
+
+Saving a document also updates the model's `engine` from `document.engine` and its `name` from a
+non-empty `document.meta.name`. `GET …/document` always reports the model's current name in
+`document.meta.name`.
+
+```ts
+interface DataModelVersionSummary {
+  id: string; dataModelId: string; version: number;
+  publishedById: string | null; publishedByUser: string | null; publishedAt: string;
+}
+interface DataModelVersion extends DataModelVersionSummary { document: ErdDocumentJSON }
+```
+
+## Live updates
+
+Events use the page key `__data_model__`: `data_model.created` and `data_model.updated` carry
+`{ dataModel }`, `data_model.deleted` carries `{ dataModelId }`, `data_model.published` carries
+`{ dataModelId, version }` and `data_model_document.saved` carries `{ dataModelId, revision }`.
+
 # Settings API contract
 
 The Settings panel (Users, Organizations, Projects, Tags, Audit history) and the login picker each

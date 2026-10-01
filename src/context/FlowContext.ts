@@ -1,10 +1,5 @@
-import {
-  createContext,
-  useContext,
-  useRef,
-  useSyncExternalStore,
-  type MutableRefObject,
-} from "react";
+import { createContext, useContext, type MutableRefObject } from "react";
+import { useStoreSelector } from "../hooks/useStoreSelector";
 import type { FlowEngine, FlowState } from "../utils/flowchart/flowEngine";
 import type { XYPosition } from "../types/flowchart.types";
 
@@ -36,12 +31,5 @@ export function useFlowState<T>(
   equalityFn: (a: T, b: T) => boolean = Object.is,
 ): T {
   const { engine } = useFlowContext();
-  const cache = useRef<{ value: T } | null>(null);
-  const getSnapshot = () => {
-    const next = selector(engine.store.getState());
-    if (cache.current && equalityFn(cache.current.value, next)) return cache.current.value;
-    cache.current = { value: next };
-    return next;
-  };
-  return useSyncExternalStore(engine.store.subscribe, getSnapshot, getSnapshot);
+  return useStoreSelector(engine.store, selector, equalityFn);
 }

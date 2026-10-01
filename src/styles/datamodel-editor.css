@@ -1,0 +1,218 @@
+.wpn-erd {
+  --wpn-erd-flag-on: var(--wpn-accent);
+}
+
+.wpn-erd .wpn-erd__toolbar .wpn-flowchart-toolbar__name {
+  min-width: 180px;
+}
+
+.wpn-erd .wpn-flowchart-sidebar__item {
+  --node-color: var(--wpn-accent);
+  width: 100%;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  box-sizing: border-box;
+}
+
+.wpn-erd .wpn-flowchart-sidebar__item:disabled {
+  cursor: not-allowed;
+}
+
+.wpn-erd .wpn-flowchart-sidebar__item[draggable="false"] {
+  cursor: pointer;
+}
+
+.wpn-erd__section-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.wpn-erd__textarea {
+  height: auto;
+  min-height: 72px;
+  padding: 8px 10px;
+  resize: vertical;
+}
+
+.wpn-erd__field-table,
+.wpn-erd__indexes {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.wpn-erd__field {
+  border: 1px solid var(--wpn-flowchart-border);
+  border-radius: 8px;
+  background: var(--wpn-flowchart-panel);
+}
+
+.wpn-erd__field-expanded {
+  border-color: var(--wpn-flowchart-border-strong);
+}
+
+.wpn-erd__field-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px;
+}
+
+.wpn-erd__field-name {
+  flex: 1;
+  height: 28px;
+  min-width: 0;
+}
+
+.wpn-erd__flags {
+  display: flex;
+  gap: 2px;
+}
+
+.wpn-erd__flag {
+  min-width: 26px;
+  height: 24px;
+  padding: 0 4px;
+  border: 1px solid var(--wpn-flowchart-border);
+  border-radius: 6px;
+  font: inherit;
+  font-size: 10.5px;
+  font-weight: 600;
+  color: var(--wpn-flowchart-text-subtle);
+  background: transparent;
+  cursor: pointer;
+}
+
+.wpn-erd__flag:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.wpn-erd__flag-on {
+  border-color: var(--wpn-erd-flag-on);
+  color: var(--wpn-flowchart-text);
+  background: color-mix(in srgb, var(--wpn-erd-flag-on) 28%, transparent);
+}
+
+.wpn-erd__chevron {
+  display: inline-flex;
+  transition: transform 0.12s;
+}
+
+.wpn-erd__chevron-open {
+  transform: rotate(90deg);
+}
+
+.wpn-erd__field-detail {
+  padding: 8px 8px 0;
+  border-top: 1px solid var(--wpn-flowchart-border);
+}
+
+.wpn-erd__pair {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.wpn-erd__field-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding-bottom: 8px;
+}
+
+.wpn-erd__index {
+  padding: 8px;
+  border: 1px solid var(--wpn-flowchart-border);
+  border-radius: 8px;
+  background: var(--wpn-flowchart-panel);
+}
+
+.wpn-erd .wpn-flowchart-properties__endpoint {
+  grid-template-columns: 1fr auto 1fr;
+}
+
+.wpn-erd .wpn-erd__validation {
+  top: auto;
+  right: 16px;
+  bottom: 16px;
+  max-height: min(60%, 420px);
+}
+
+.wpn-erd__export-dialog {
+  width: min(760px, 100%);
+}
+
+.wpn-erd__export-dialog .wpn-modal-shell__body {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-height: 0;
+}
+
+.wpn-erd__export-preview {
+  width: 100%;
+  height: 420px;
+  max-height: 60vh;
+  padding: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 8px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 12px;
+  line-height: 1.5;
+  color: #fff;
+  background: rgba(0, 0, 0, 0.4);
+  resize: none;
+  box-sizing: border-box;
+  white-space: pre;
+  overflow: auto;
+}
+
+.wpn-erd__export-error {
+  margin: 0;
+  font-size: 13px;
+  color: var(--wpn-flowchart-warning, #f59e0b);
+}
+
+.wpn-erd .wpn-erd__toolbar-label {
+  flex: none;
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+  color: var(--wpn-flowchart-text-muted);
+}
+
+.wpn-erd .wpn-erd__palette-group {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.wpn-erd .wpn-erd__palette .wpn-flowchart-sidebar__item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 16px;
+}
+
+.wpn-erd .wpn-erd__palette-icon {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  color: var(--wpn-accent);
+  background: var(--wpn-flowchart-panel-muted);
+}
+
+.wpn-erd__value-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 6px;
+}

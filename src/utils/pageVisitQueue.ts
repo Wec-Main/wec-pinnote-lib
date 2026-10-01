@@ -64,10 +64,7 @@ export function finalizeVisit(
     referrer: openView.referrer,
     enteredAt: new Date(openView.enteredAtMs).toISOString(),
     durationMs,
-    maxScrollDepth: Math.min(
-      MAX_SCROLL_DEPTH,
-      Math.max(MIN_SCROLL_DEPTH, openView.maxScrollDepth),
-    ),
+    maxScrollDepth: Math.min(MAX_SCROLL_DEPTH, Math.max(MIN_SCROLL_DEPTH, openView.maxScrollDepth)),
     viewportWidth: openView.viewportWidth,
     viewportHeight: openView.viewportHeight,
     language: openView.language,

@@ -1,9 +1,6 @@
 import { useCallback } from "react";
 import { useFlowContext } from "../../context/FlowContext";
-import {
-  findEdgeDropTarget,
-  type EdgeSegment,
-} from "../../utils/flowchart/edgeDropTarget";
+import { findEdgeDropTarget, type EdgeSegment } from "../../utils/flowchart/edgeDropTarget";
 import { getStepPoints } from "../../utils/flowchart/edgePaths";
 import { findHandle, flowToScreen, getHandlePosition } from "../../utils/flowchart/geometry";
 import type { EdgeDropTarget } from "../../components/WecFlow/EdgeRenderer";

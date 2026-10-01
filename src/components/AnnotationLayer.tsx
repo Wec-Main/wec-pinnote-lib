@@ -21,6 +21,9 @@ import type { AnnotationTag, UpdateAnnotationTagInput } from "../types/annotatio
 const EpicFlowPanel = lazy(() =>
   import("./EpicFlow").then((module) => ({ default: module.EpicFlowPanel })),
 );
+const DataModelPanel = lazy(() =>
+  import("./DataModel").then((module) => ({ default: module.DataModelPanel })),
+);
 const WecFlowPanel = lazy(() =>
   import("./WecFlow").then((module) => ({ default: module.WecFlowPanel })),
 );
@@ -150,6 +153,7 @@ export function AnnotationLayer() {
     listOpen,
     epicFlowOpen,
     flowOpen,
+    dataModelOpen,
     userManagementOpen,
     discardPrompt,
     confirmDiscard,
@@ -496,6 +500,11 @@ export function AnnotationLayer() {
       {flowOpen && authenticated ? (
         <Suspense fallback={null}>
           <WecFlowPanel />
+        </Suspense>
+      ) : null}
+      {dataModelOpen && authenticated ? (
+        <Suspense fallback={null}>
+          <DataModelPanel />
         </Suspense>
       ) : null}
       {userManagementOpen ? (

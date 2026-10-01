@@ -24,16 +24,21 @@ afterEach(() => {
 
 describe("readErrorMessage", () => {
   it("uses the server's error text", async () => {
-    const response = new Response(JSON.stringify({ error: "You do not have access to this project" }), {
-      status: 403,
-    });
+    const response = new Response(
+      JSON.stringify({ error: "You do not have access to this project" }),
+      {
+        status: 403,
+      },
+    );
     await expect(readErrorMessage(response, "Request failed (403)")).resolves.toMatchObject({
       message: "You do not have access to this project",
     });
   });
 
   it("falls back when the body is empty", async () => {
-    await expect(readErrorMessage(new Response(null, { status: 502 }), "Request failed (502)")).resolves.toEqual({
+    await expect(
+      readErrorMessage(new Response(null, { status: 502 }), "Request failed (502)"),
+    ).resolves.toEqual({
       message: "Request failed (502)",
       text: "",
     });
@@ -41,7 +46,9 @@ describe("readErrorMessage", () => {
 
   it("uses a plain-text body as the message", async () => {
     const response = new Response("Bad gateway", { status: 502 });
-    await expect(readErrorMessage(response, "fallback")).resolves.toMatchObject({ message: "Bad gateway" });
+    await expect(readErrorMessage(response, "fallback")).resolves.toMatchObject({
+      message: "Bad gateway",
+    });
   });
 });
 
@@ -66,7 +73,11 @@ describe("requestBlob", () => {
     const body = new Blob(["visitId,sessionId\n1,s1\n"], { type: "text/csv" });
     vi.stubGlobal(
       "fetch",
-      vi.fn().mockResolvedValue(new Response(body, { status: 200, headers: { "Content-Type": "text/csv" } })),
+      vi
+        .fn()
+        .mockResolvedValue(
+          new Response(body, { status: 200, headers: { "Content-Type": "text/csv" } }),
+        ),
     );
 
     const result = await requestBlob("https://api.example.com/analytics/visits/export", TOKEN);
@@ -79,10 +90,16 @@ describe("requestBlob", () => {
     const received = stubWindow();
     vi.stubGlobal(
       "fetch",
-      vi.fn().mockResolvedValue(new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401 })),
+      vi
+        .fn()
+        .mockResolvedValue(
+          new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401 }),
+        ),
     );
 
-    await expect(requestBlob("https://api.example.com/analytics/visits/export", TOKEN)).rejects.toMatchObject({
+    await expect(
+      requestBlob("https://api.example.com/analytics/visits/export", TOKEN),
+    ).rejects.toMatchObject({
       status: 401,
     });
     expect(received).toEqual([TOKEN]);

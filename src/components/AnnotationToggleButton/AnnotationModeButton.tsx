@@ -104,8 +104,7 @@ export function AnnotationModeButton() {
 
   const cycleMode = (direction: 1 | -1) => {
     const currentIndex = MODE_CYCLE.indexOf(activeMode);
-    const nextIndex =
-      (currentIndex === -1 ? 0 : currentIndex) + direction + MODE_CYCLE.length;
+    const nextIndex = (currentIndex === -1 ? 0 : currentIndex) + direction + MODE_CYCLE.length;
     const nextMode = MODE_CYCLE[nextIndex % MODE_CYCLE.length];
     if (nextMode) {
       setMode(nextMode);

@@ -77,7 +77,11 @@ export function resolveElement(anchor: AnnotationAnchor): Element | null {
   return resolveWithin(inner, document, anchor.elementIdentifier);
 }
 
-function resolveWithin(selector: string, root: ParentNode, elementIdentifier: string): Element | null {
+function resolveWithin(
+  selector: string,
+  root: ParentNode,
+  elementIdentifier: string,
+): Element | null {
   if (selector) {
     try {
       const matches = Array.from(root.querySelectorAll(selector));
