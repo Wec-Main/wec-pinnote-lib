@@ -26,6 +26,12 @@ interface AnnotationThreadProps {
   onDelete: (comment: AnnotationComment) => void;
   onReply: (comment: AnnotationComment) => void;
   onEditingChange?: (editing: boolean) => void;
+  // When on, renders the first comment as a standalone "root" block, then a
+  // "N replies" label, then the rest of the comments in a connected list —
+  // used by the Full Screen detail pane. Off (the default) keeps every
+  // comment in one flat list, as the floating thread popup and Minimize mode
+  // have always rendered it.
+  separateReplies?: boolean;
 }
 
 function Avatar({ user }: { user: AnnotationUser }) {
@@ -233,6 +239,7 @@ export function AnnotationThread({
   onDelete,
   onReply,
   onEditingChange,
+  separateReplies = false,
 }: AnnotationThreadProps) {
   const [dirtyEditIds, setDirtyEditIds] = useState<Set<string>>(new Set());
   const candidates = useMentionCandidates();
@@ -257,23 +264,46 @@ export function AnnotationThread({
     });
   }, []);
 
+  const deletesAnnotation = annotation.comments.length === 1;
+  const canDelete = canDeleteAnnotation(annotation, currentUser);
+
+  const renderComment = (comment: AnnotationComment) => (
+    <CommentItem
+      key={comment.id}
+      comment={comment}
+      quoted={annotation.comments.find((item) => item.id === comment.replyToId)}
+      candidates={candidates}
+      currentUser={currentUser}
+      deletesAnnotation={deletesAnnotation}
+      canDeleteAnnotation={canDelete}
+      onEdit={onEdit}
+      onDelete={onDelete}
+      onReply={onReply}
+      onEditingChange={setCommentEditing}
+    />
+  );
+
+  if (!separateReplies) {
+    return (
+      <div className="wpn-thread" aria-live="polite" aria-relevant="additions">
+        {annotation.comments.map(renderComment)}
+      </div>
+    );
+  }
+
+  const [root, ...replies] = annotation.comments;
+
   return (
-    <div className="wpn-thread" aria-live="polite" aria-relevant="additions">
-      {annotation.comments.map((comment) => (
-        <CommentItem
-          key={comment.id}
-          comment={comment}
-          quoted={annotation.comments.find((item) => item.id === comment.replyToId)}
-          candidates={candidates}
-          currentUser={currentUser}
-          deletesAnnotation={annotation.comments.length === 1}
-          canDeleteAnnotation={canDeleteAnnotation(annotation, currentUser)}
-          onEdit={onEdit}
-          onDelete={onDelete}
-          onReply={onReply}
-          onEditingChange={setCommentEditing}
-        />
-      ))}
+    <div className="wpn-thread wpn-thread--separated" aria-live="polite" aria-relevant="additions">
+      {root ? <div className="wpn-thread__root">{renderComment(root)}</div> : null}
+      {replies.length > 0 ? (
+        <>
+          <div className="wpn-thread__replies-label">
+            {replies.length} {replies.length === 1 ? "reply" : "replies"}
+          </div>
+          <div className="wpn-thread__replies">{replies.map(renderComment)}</div>
+        </>
+      ) : null}
     </div>
   );
 }

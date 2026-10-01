@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useAnnotationData, useAnnotationUi } from "../../context/AnnotationContext";
 import { Icons } from "../../assets/icons";
-import { Icon, SearchableSelect, Tooltip } from "../primitives";
+import { Icon, SearchableSelect, Switch, Tooltip } from "../primitives";
 import { usePersistentState } from "../../hooks/usePersistentState";
 import { useAnnotationPresence } from "../../hooks/useAnnotationPresence";
 import { isBoolean, isNumber } from "../../utils/valueGuards";
@@ -11,7 +11,6 @@ import {
   SORT_OPTIONS,
   authorOptions,
   filterThreads,
-  filtersActive,
   groupThreadsByPage,
   statusOptions,
   toThreads,
@@ -20,6 +19,7 @@ import {
   type CommentSort,
 } from "./commentFilters";
 import { PageGroupSection } from "./PageGroupSection";
+import { CommentsFullScreenView } from "./CommentsFullScreenView";
 
 const PANEL_DEFAULT_WIDTH = 320;
 const PANEL_MIN_WIDTH = 280;
@@ -107,8 +107,8 @@ export function AnnotationListPanel() {
   const presentIds = useAnnotationPresence(allAnnotations);
   const allThreads = useMemo(() => toThreads(allAnnotations), [allAnnotations]);
   const threads = useMemo(
-    () => filterThreads(allThreads, filters, currentUserId),
-    [allThreads, filters, currentUserId],
+    () => filterThreads(allThreads, filters, currentUserId, pageKey),
+    [allThreads, filters, currentUserId, pageKey],
   );
   const pageGroups = useMemo(() => groupThreadsByPage(threads, pageKey), [threads, pageKey]);
   const [pageExpansion, setPageExpansion] = useState<ReadonlyMap<string, boolean>>(() => new Map());
@@ -130,7 +130,6 @@ export function AnnotationListPanel() {
     setPageExpansion(new Map(pageGroups.map((group) => [group.pageKey, allCollapsed])));
   const authors = useMemo(() => authorOptions(allThreads), [allThreads]);
   const statuses = useMemo(() => statusOptions(allThreads), [allThreads]);
-  const active = filtersActive(filters);
 
   const update = <K extends keyof CommentFilters>(key: K, value: CommentFilters[K]) =>
     setFilters((current) => ({ ...current, [key]: value }));
@@ -155,17 +154,38 @@ export function AnnotationListPanel() {
     [openReplies],
   );
 
+  if (expanded) {
+    return (
+      <div className="wpn-panel wpn-list-panel wpn-list-panel--expanded">
+        <CommentsFullScreenView
+          totalCount={threads.length}
+          loading={loading}
+          error={error}
+          retry={retry}
+          filters={filters}
+          update={update}
+          setFilters={setFilters}
+          authors={authors}
+          statuses={statuses}
+          allThreads={allThreads}
+          pageGroups={pageGroups}
+          onCollapse={() => setExpanded(false)}
+          onCloseList={() => setListOpen(false)}
+        />
+      </div>
+    );
+  }
+
   return (
     <div
       className={[
         "wpn-panel",
         "wpn-list-panel",
-        expanded ? "wpn-list-panel--expanded" : "",
         resizing ? "wpn-list-panel--resizing" : "",
       ]
         .filter(Boolean)
         .join(" ")}
-      style={expanded ? undefined : { width }}
+      style={{ width }}
     >
       {expanded ? null : (
         <div
@@ -267,19 +287,25 @@ export function AnnotationListPanel() {
           />
         </div>
         <div className="wpn-list-panel__filter-actions">
-          <button
-            type="button"
-            className={filters.mineOnly ? "wpn-chip-toggle wpn-chip-toggle--on" : "wpn-chip-toggle"}
-            aria-pressed={filters.mineOnly}
-            onClick={() => update("mineOnly", !filters.mineOnly)}
-          >
-            <Icon name="users" className="wpn-chip-toggle__icon" />
-            Only mine
-          </button>
+          <span className="wpn-filter-switch">
+            <Switch
+              label="Only mine"
+              checked={filters.mineOnly}
+              onChange={(next) => update("mineOnly", next)}
+            />
+            <span className="wpn-filter-switch__text">Only mine</span>
+          </span>
+          <span className="wpn-filter-switch">
+            <Switch
+              label="This page only"
+              checked={filters.thisPageOnly}
+              onChange={(next) => update("thisPageOnly", next)}
+            />
+            <span className="wpn-filter-switch__text">This page only</span>
+          </span>
           <button
             type="button"
             className="wpn-chip-toggle wpn-chip-toggle--clear"
-            disabled={!active}
             onClick={() => setFilters(DEFAULT_COMMENT_FILTERS)}
           >
             <Icon name="reset" className="wpn-chip-toggle__icon" />
@@ -288,53 +314,55 @@ export function AnnotationListPanel() {
         </div>
       </div>
 
-      {loading ? <p className="wpn-muted">Loading annotations...</p> : null}
-      {error ? (
-        <div className="wpn-inline-error">
-          <span>{error}</span>
-          <button type="button" className="wpn-btn wpn-btn--ghost" onClick={retry}>
-            <Icon name="refresh" className="wpn-btn__icon" />
-            Retry
-          </button>
-        </div>
-      ) : null}
-      {threads.length === 0 && !loading && !error ? (
-        <p className="wpn-muted">
-          {allThreads.length === 0
-            ? "No comments in this project yet."
-            : "No comments match these filters."}
-        </p>
-      ) : null}
-
-      {error || pageGroups.length === 0 ? null : (
-        <>
-          <div className="wpn-page-groups__summary">
-            <span>
-              {pageGroups.length} {pageGroups.length === 1 ? "page" : "pages"}
-            </span>
-            <button type="button" className="wpn-page-groups__toggle-all" onClick={toggleAllPages}>
-              <Icon name={allCollapsed ? "chevronDown" : "chevronUp"} />
-              {allCollapsed ? "Expand all" : "Collapse all"}
+      <div className="wpn-list-panel__content">
+        {loading ? <p className="wpn-muted">Loading annotations...</p> : null}
+        {error ? (
+          <div className="wpn-inline-error">
+            <span>{error}</span>
+            <button type="button" className="wpn-btn wpn-btn--ghost" onClick={retry}>
+              <Icon name="refresh" className="wpn-btn__icon" />
+              Retry
             </button>
           </div>
-          <div className="wpn-list wpn-page-groups">
-            {pageGroups.map((group) => (
-              <PageGroupSection
-                key={group.pageKey}
-                group={group}
-                collapsed={!isPageExpanded(group.pageKey)}
-                selectedId={selectedId}
-                currentUserId={currentUserId}
-                openReplies={openReplies}
-                presentIds={presentIds}
-                onToggle={togglePage}
-                onToggleReplies={toggleReplies}
-                onSelect={openAnnotation}
-              />
-            ))}
-          </div>
-        </>
-      )}
+        ) : null}
+        {threads.length === 0 && !loading && !error ? (
+          <p className="wpn-muted">
+            {allThreads.length === 0
+              ? "No comments in this project yet."
+              : "No comments match these filters."}
+          </p>
+        ) : null}
+
+        {error || pageGroups.length === 0 ? null : (
+          <>
+            <div className="wpn-page-groups__summary">
+              <span>
+                {pageGroups.length} {pageGroups.length === 1 ? "page" : "pages"}
+              </span>
+              <button type="button" className="wpn-page-groups__toggle-all" onClick={toggleAllPages}>
+                <Icon name={allCollapsed ? "chevronDown" : "chevronUp"} />
+                {allCollapsed ? "Expand all" : "Collapse all"}
+              </button>
+            </div>
+            <div className="wpn-list wpn-page-groups">
+              {pageGroups.map((group) => (
+                <PageGroupSection
+                  key={group.pageKey}
+                  group={group}
+                  collapsed={!isPageExpanded(group.pageKey)}
+                  selectedId={selectedId}
+                  currentUserId={currentUserId}
+                  openReplies={openReplies}
+                  presentIds={presentIds}
+                  onToggle={togglePage}
+                  onToggleReplies={toggleReplies}
+                  onSelect={openAnnotation}
+                />
+              ))}
+            </div>
+          </>
+        )}
+      </div>
 
       <div className="wpn-list-panel__brand">
         <span>Powered by</span>

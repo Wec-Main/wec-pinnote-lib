@@ -124,6 +124,7 @@ const FlowPinPinListItem = memo(function FlowPinPinListItem({
 export function AnnotationLayer() {
   const {
     annotations,
+    allAnnotations,
     config,
     annotationTags,
     removeAnnotationTag,
@@ -291,6 +292,15 @@ export function AnnotationLayer() {
   }, [authenticated, flowPins, flowPinsVisible, interactionActive, selectedFlowPinId]);
 
   const selected = authenticated ? annotations.find((item) => item.id === selectedId) : undefined;
+  // Selected via a "Not in this view" row for a thread on a different page —
+  // it won't be in the page-scoped `annotations`/`visible` set (and so never
+  // gets a computed pin position), but its data is still in the project-wide
+  // list. Rendered centered instead of anchored — see AnnotationThreadPanel's
+  // `centered` prop.
+  const selectedElsewhere =
+    authenticated && selectedId && !selected
+      ? allAnnotations.find((item) => item.id === selectedId)
+      : undefined;
 
   const rawPositionItems = useMemo(() => {
     const items = visible.map((item) => ({ id: item.id, anchor: item.anchor }));
@@ -466,6 +476,15 @@ export function AnnotationLayer() {
           x={selectedPosition.x}
           y={selectedPosition.y}
           orphaned={!selectedPosition.resolved}
+        />
+      ) : selectedElsewhere ? (
+        <AnnotationThreadPanel
+          key={selectedElsewhere.id}
+          annotationId={selectedElsewhere.id}
+          x={0}
+          y={0}
+          orphaned={false}
+          centered
         />
       ) : null}
       {listOpen && authenticated ? <AnnotationListPanel /> : null}

@@ -30,11 +30,28 @@ function focusTitleInputAtEnd(element: HTMLTextAreaElement | null) {
   element.setSelectionRange(element.value.length, element.value.length);
 }
 
+// The displayed title is the last " > " segment of the stored path
+// (see annotationLabel()); renaming it means replacing just that last
+// segment while keeping whatever page-name prefix it had.
+export function buildRenamedPath(currentPath: string | null | undefined, newTitle: string): string {
+  if (!currentPath) {
+    return newTitle;
+  }
+  const segments = currentPath.split(" > ");
+  segments[segments.length - 1] = newTitle;
+  return segments.join(" > ");
+}
+
 interface AnnotationThreadPanelProps {
   annotationId: string;
   x: number;
   y: number;
   orphaned: boolean;
+  // True when opened from a thread that isn't on the current page (e.g. from
+  // the "Not in this view" comments-list row for a different page) — there's
+  // no real on-page position to anchor to, so the panel is centered on the
+  // viewport instead of placed relative to x/y.
+  centered?: boolean;
 }
 
 export function AnnotationThreadPanel({
@@ -42,20 +59,30 @@ export function AnnotationThreadPanel({
   x,
   y,
   orphaned,
+  centered = false,
 }: AnnotationThreadPanelProps) {
-  const { annotations, config, addComment, editComment, removeComment, setStatus } =
-    useAnnotationData();
+  const {
+    annotations,
+    allAnnotations,
+    config,
+    addComment,
+    editComment,
+    removeComment,
+    setStatus,
+    renameAnnotation,
+  } = useAnnotationData();
   const { selectAnnotation } = useAnnotationUi();
-  const annotation = annotations.find((item) => item.id === annotationId);
+  const annotation =
+    annotations.find((item) => item.id === annotationId) ??
+    allAnnotations.find((item) => item.id === annotationId);
   const panelRef = useRef<HTMLDivElement>(null);
-  const placement = useFloatingPanel(Boolean(annotation), x, y, panelRef);
+  const placement = useFloatingPanel(!centered && Boolean(annotation), x, y, panelRef);
   const [hasUnsavedEdit, setHasUnsavedEdit] = useState(false);
   const [hasUnsentReply, setHasUnsentReply] = useState(false);
   const [confirmClose, setConfirmClose] = useState(false);
   const [replyTarget, setReplyTarget] = useState<AnnotationComment | null>(null);
   const [pendingDelete, setPendingDelete] = useState<AnnotationComment | null>(null);
   const [editingTitle, setEditingTitle] = useState(false);
-  const [titleOverride, setTitleOverride] = useState<string | null>(null);
   const [titleValue, setTitleValue] = useState("");
   const [infoOpen, setInfoOpen] = useState(false);
 
@@ -69,8 +96,7 @@ export function AnnotationThreadPanel({
     return null;
   }
 
-  const defaultTitle = annotationLabel(annotation);
-  const title = titleOverride ?? defaultTitle;
+  const title = annotationLabel(annotation);
 
   const startEditingTitle = () => {
     setTitleValue(title);
@@ -79,8 +105,13 @@ export function AnnotationThreadPanel({
 
   const commitTitle = () => {
     const trimmed = titleValue.trim();
-    setTitleOverride(trimmed || defaultTitle);
     setEditingTitle(false);
+    if (!trimmed || trimmed === title) {
+      return;
+    }
+    renameAnnotation(annotation.id, buildRenamedPath(annotation.path, trimmed)).catch(
+      () => undefined,
+    );
   };
 
   const requestClose = () => {
@@ -112,12 +143,22 @@ export function AnnotationThreadPanel({
     <>
       <div
         ref={panelRef}
-        className="wpn-panel wpn-thread-panel"
-        style={{
-          left: placement?.left ?? 0,
-          top: placement?.top ?? 0,
-          visibility: placement ? "visible" : "hidden",
-        }}
+        className={[
+          "wpn-panel",
+          "wpn-thread-panel",
+          centered ? "wpn-thread-panel--centered" : "",
+        ]
+          .filter(Boolean)
+          .join(" ")}
+        style={
+          centered
+            ? undefined
+            : {
+                left: placement?.left ?? 0,
+                top: placement?.top ?? 0,
+                visibility: placement ? "visible" : "hidden",
+              }
+        }
         role="dialog"
         aria-label={`Comment thread: ${title}`}
       >
@@ -206,6 +247,7 @@ export function AnnotationThreadPanel({
               {annotation.path}
             </div>
           ) : null}
+          {centered ? <span className="wpn-thread-panel__chip">Not in this view</span> : null}
         </div>
         {confirmClose ? (
           <div className="wpn-thread-panel__discard" role="alert">

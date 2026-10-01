@@ -21,6 +21,7 @@ export interface CommentFilters {
   resolution: CommentResolution;
   sort: CommentSort;
   mineOnly: boolean;
+  thisPageOnly: boolean;
 }
 
 export const DEFAULT_COMMENT_FILTERS: CommentFilters = {
@@ -29,6 +30,7 @@ export const DEFAULT_COMMENT_FILTERS: CommentFilters = {
   resolution: "all",
   sort: "newest",
   mineOnly: false,
+  thisPageOnly: false,
 };
 
 export const SORT_OPTIONS: SelectOption[] = [
@@ -107,6 +109,7 @@ export function filterThreads(
   threads: CommentThread[],
   filters: CommentFilters,
   currentUserId: string,
+  currentPageKey: string,
 ): CommentThread[] {
   return threads
     .filter(
@@ -114,7 +117,8 @@ export function filterThreads(
         matchesResolution(thread, filters.resolution) &&
         (!filters.status || thread.annotation.status === filters.status) &&
         (!filters.author || hasCommentBy(thread, filters.author)) &&
-        (!filters.mineOnly || hasCommentBy(thread, currentUserId)),
+        (!filters.mineOnly || hasCommentBy(thread, currentUserId)) &&
+        (!filters.thisPageOnly || thread.annotation.pageKey === currentPageKey),
     )
     .sort(COMPARATORS[filters.sort]);
 }
@@ -125,6 +129,7 @@ export function filtersActive(filters: CommentFilters): boolean {
     filters.author !== "" ||
     filters.resolution !== "all" ||
     filters.mineOnly ||
+    filters.thisPageOnly ||
     filters.sort !== DEFAULT_COMMENT_FILTERS.sort
   );
 }

@@ -662,6 +662,44 @@ export function useAnnotationCollection({
     [api, beginWrite, endWrite, reportActionError],
   );
 
+  const renameAnnotation = useCallback(
+    async (annotationId: string, path: string) => {
+      const previousPath = annotationsRef.current.find((item) => item.id === annotationId)?.path;
+      setAnnotations((current) =>
+        current.map((item) => (item.id === annotationId ? { ...item, path } : item)),
+      );
+      setActionError(null);
+      const requestingUser = currentUserRef.current;
+      const controller = beginWrite();
+
+      let updated: Annotation;
+      try {
+        updated = await api.updateAnnotation(annotationId, { path }, controller.signal);
+        if (currentUserRef.current.id !== requestingUser.id) {
+          return;
+        }
+      } catch (err) {
+        if (isAbortError(err)) {
+          return;
+        }
+        setAnnotations((current) =>
+          current.map((item) =>
+            item.id === annotationId ? { ...item, path: previousPath } : item,
+          ),
+        );
+        reportActionError(err);
+        throw err;
+      } finally {
+        endWrite(controller);
+      }
+      setAnnotations((current) =>
+        current.map((item) => (item.id === annotationId ? updated : item)),
+      );
+      eventsRef.current.onAnnotationUpdate?.(updated);
+    },
+    [api, beginWrite, endWrite, reportActionError],
+  );
+
   const clearActionError = useCallback(() => setActionError(null), []);
 
   return useMemo(
@@ -678,6 +716,7 @@ export function useAnnotationCollection({
       editComment,
       removeComment,
       setStatus,
+      renameAnnotation,
       removeAnnotation,
     }),
     [
@@ -693,6 +732,7 @@ export function useAnnotationCollection({
       editComment,
       removeComment,
       setStatus,
+      renameAnnotation,
       removeAnnotation,
     ],
   );
@@ -715,6 +755,7 @@ export function useAnnotations() {
     editComment: data.editComment,
     removeComment: data.removeComment,
     setStatus: data.setStatus,
+    renameAnnotation: data.renameAnnotation,
     removeAnnotation: data.removeAnnotation,
     pageKey: data.pageKey,
     connectionState: data.connectionState,

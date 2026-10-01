@@ -11,6 +11,7 @@ const ACTION_META: Record<string, ActionMeta> = {
   "auth.logout": { label: "Signed out", tone: "neutral" },
   "annotation.created": { label: "Annotation created", tone: "success" },
   "annotation.status-changed": { label: "Annotation status changed", tone: "warning" },
+  "annotation.renamed": { label: "Annotation renamed", tone: "warning" },
   "annotation.deleted": { label: "Annotation deleted", tone: "danger" },
   "comment.created": { label: "Comment added", tone: "success" },
   "comment.updated": { label: "Comment edited", tone: "warning" },

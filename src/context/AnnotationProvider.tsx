@@ -219,6 +219,7 @@ export function AnnotationProvider({ config, children }: AnnotationProviderProps
     editComment,
     removeComment,
     setStatus,
+    renameAnnotation,
     removeAnnotation,
   } = useAnnotationCollection({
     api,
@@ -273,10 +274,18 @@ export function AnnotationProvider({ config, children }: AnnotationProviderProps
   );
   const [selectedId, setSelectedId] = useState<string | null>(null);
   useEffect(() => {
-    if (selectedId && !annotations.some((item) => item.id === selectedId)) {
+    // A selected annotation not on this page (opened from a "Not in this
+    // view" row elsewhere in the project) is expected to be absent from the
+    // page-scoped `annotations` — only clear the selection once it's gone
+    // from the project-wide list too, i.e. genuinely deleted.
+    if (
+      selectedId &&
+      !annotations.some((item) => item.id === selectedId) &&
+      !allAnnotations.some((item) => item.id === selectedId)
+    ) {
       setSelectedId(null);
     }
-  }, [annotations, selectedId]);
+  }, [annotations, allAnnotations, selectedId]);
   const [draft, setDraft] = useState<DraftAnnotation | null>(null);
   const [discardPrompt, setDiscardPrompt] = useState<DiscardPrompt | null>(null);
   const [listOpen, setListOpen] = usePersistentState(
@@ -782,6 +791,7 @@ export function AnnotationProvider({ config, children }: AnnotationProviderProps
       editComment,
       removeComment,
       setStatus,
+      renameAnnotation,
       removeAnnotation,
       submitDraft,
       annotationTags,
@@ -821,6 +831,7 @@ export function AnnotationProvider({ config, children }: AnnotationProviderProps
       editComment,
       removeComment,
       setStatus,
+      renameAnnotation,
       removeAnnotation,
       submitDraft,
       annotationTags,

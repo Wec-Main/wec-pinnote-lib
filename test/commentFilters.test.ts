@@ -79,8 +79,10 @@ function withFilters(overrides: Partial<CommentFilters>): CommentFilters {
   return { ...DEFAULT_COMMENT_FILTERS, ...overrides };
 }
 
-function pinIds(filters: CommentFilters, currentUserId = "u1"): string[] {
-  return filterThreads(all, filters, currentUserId).map((thread) => thread.annotation.id);
+function pinIds(filters: CommentFilters, currentUserId = "u1", currentPageKey = "/home"): string[] {
+  return filterThreads(all, filters, currentUserId, currentPageKey).map(
+    (thread) => thread.annotation.id,
+  );
 }
 
 describe("toThreads", () => {
@@ -132,6 +134,22 @@ describe("filterThreads", () => {
     expect(pinIds(withFilters({ mineOnly: true }))).toEqual(["a1"]);
   });
 
+  it("limits to the current page's threads when thisPageOnly is set", () => {
+    const pricing = {
+      ...openAnnotation,
+      id: "a4",
+      pageKey: "/pricing",
+    };
+    const withOtherPage = toThreads([pricing, openAnnotation, doneAnnotation]);
+    const ids = filterThreads(
+      withOtherPage,
+      withFilters({ thisPageOnly: true }),
+      "u1",
+      "/home",
+    ).map((thread) => thread.annotation.id);
+    expect(ids).toEqual(["a2", "a1"]);
+  });
+
   it("filters by annotation status and combines filters conjunctively", () => {
     expect(pinIds(withFilters({ status: "completed" }))).toEqual(["a2"]);
     expect(pinIds(withFilters({ author: "u2", resolution: "open" }))).toEqual(["a1"]);
@@ -139,7 +157,7 @@ describe("filterThreads", () => {
 
   it("does not mutate the threads it is given", () => {
     const order = all.map((thread) => thread.annotation.id);
-    filterThreads(all, withFilters({ sort: "oldest" }), "u1");
+    filterThreads(all, withFilters({ sort: "oldest" }), "u1", "/home");
 
     expect(all.map((thread) => thread.annotation.id)).toEqual(order);
   });
@@ -152,6 +170,7 @@ describe("filtersActive", () => {
     expect(filtersActive(withFilters({ author: "u2" }))).toBe(true);
     expect(filtersActive(withFilters({ resolution: "resolved" }))).toBe(true);
     expect(filtersActive(withFilters({ mineOnly: true }))).toBe(true);
+    expect(filtersActive(withFilters({ thisPageOnly: true }))).toBe(true);
     expect(filtersActive(withFilters({ sort: "oldest" }))).toBe(true);
   });
 });

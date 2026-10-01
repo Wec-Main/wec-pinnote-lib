@@ -64,6 +64,7 @@ export interface AnnotationDataContextValue {
   editComment: (annotationId: string, commentId: string, message: string) => Promise<void>;
   removeComment: (annotationId: string, commentId: string) => Promise<void>;
   setStatus: (annotationId: string, status: AnnotationStatus) => Promise<void>;
+  renameAnnotation: (annotationId: string, path: string) => Promise<void>;
   removeAnnotation: (annotationId: string) => Promise<void>;
   submitDraft: (message: string, status?: AnnotationStatus) => Promise<void>;
   annotationTags: AnnotationTag[];

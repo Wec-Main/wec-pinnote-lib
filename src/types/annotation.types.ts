@@ -72,6 +72,7 @@ export interface CreateCommentRequest {
 
 export interface UpdateAnnotationRequest {
   status?: AnnotationStatus;
+  path?: string;
 }
 
 export interface UpdateCommentRequest {

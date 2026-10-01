@@ -36,6 +36,7 @@ describe("actionMeta", () => {
       "auth.logout",
       "annotation.created",
       "annotation.status-changed",
+      "annotation.renamed",
       "annotation.deleted",
       "comment.created",
       "comment.updated",

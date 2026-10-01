@@ -732,7 +732,13 @@ body.wpn-mode-active {
 .wpn-thread-panel .wpn-panel__header {
   flex-direction: column;
   align-items: stretch;
-  gap: 4px;
+  gap: 8px;
+}
+
+.wpn-thread-panel .wpn-panel__header-row,
+.wpn-thread-panel__path,
+.wpn-thread-panel__chip {
+  margin: 0;
 }
 
 .wpn-panel__header-row {
@@ -833,6 +839,30 @@ body.wpn-mode-active {
 .wpn-thread-panel,
 .wpn-composer {
   width: 460px;
+}
+
+/* Opened from a "Not in this view" comments-list row belonging to a
+   different page — there's no on-page pin position to anchor to, so center
+   it on the viewport instead. */
+.wpn-thread-panel--centered {
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  max-width: calc(100vw - 32px);
+  max-height: calc(100vh - 32px);
+}
+
+.wpn-thread-panel__chip {
+  display: inline-block;
+  align-self: flex-start;
+  flex: none;
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.1);
+  color: rgba(255, 255, 255, 0.72);
+  font-size: 9px;
+  font-weight: 650;
+  white-space: nowrap;
 }
 
 .wpn-composer__resize-e {
@@ -2046,7 +2076,12 @@ body.wpn-mode-active {
   max-height: none;
   overflow: hidden;
   color: #fff;
-  background: rgba(0, 0, 0, 0.82);
+  /* Solid, not translucent like the base .wpn-panel — this panel stays
+     anchored to a tall, fixed area (both `top` and `bottom` set) regardless
+     of how much content it has, so an empty/short result list would
+     otherwise leave the page behind visibly bleeding through the gap below
+     the footer. */
+  background: #15132a;
   border: 1px solid rgba(255, 255, 255, 0.16);
 }
 
@@ -2067,6 +2102,21 @@ body.wpn-mode-active {
 .wpn-list-panel .wpn-muted,
 .wpn-list-panel .wpn-inline-error {
   margin-bottom: 4px;
+}
+
+.wpn-list-panel__content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+/* Centers a lone status message (loading/empty) in the space above the
+   footer; has no effect once real list content is present, since that
+   content isn't a direct .wpn-muted child. */
+.wpn-list-panel__content > .wpn-muted {
+  margin: auto;
+  text-align: center;
 }
 
 .wpn-list-panel__brand {
@@ -6895,7 +6945,6 @@ body.wpn-epicflow-resizing {
 .wpn-thread-card--out-of-view .wpn-thread-card__path,
 .wpn-thread-card--out-of-view .wpn-thread-card__comment {
   opacity: 0.55;
-  cursor: not-allowed;
 }
 
 .wpn-thread-card__chip {
@@ -7123,6 +7172,579 @@ body.wpn-epicflow-resizing {
   grid-template-columns: repeat(4, minmax(0, 1fr));
 }
 
+/* ---------------------------------------------------------------------- */
+/* Comments panel — Full Screen master-detail view (CommentsFullScreenView) */
+/* Minimize mode never renders these classes — see AnnotationListPanel.tsx's */
+/* `if (expanded)` branch — so none of this affects the docked panel.       */
+/* ---------------------------------------------------------------------- */
+
+.wpn-comments-full {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  overflow: hidden;
+}
+
+.wpn-comments-sidebar {
+  flex: 0 0 240px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 14px 12px;
+  border-right: 1px solid rgba(255, 255, 255, 0.12);
+  overflow-y: auto;
+}
+
+.wpn-comments-sidebar__divider {
+  height: 1px;
+  margin: 6px 0;
+  border: 0;
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.wpn-comments-sidebar__heading {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 8px 12px;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.wpn-comments-sidebar__heading-icon {
+  width: 16px;
+  height: 16px;
+}
+
+.wpn-comments-sidebar__subheading {
+  padding: 0 8px 4px;
+  color: rgba(255, 255, 255, 0.6);
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.wpn-comments-sidebar__field {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  padding: 0 2px 4px;
+}
+
+.wpn-comments-sidebar__field-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.65);
+}
+
+.wpn-comments-sidebar__clear {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  width: 100%;
+  height: 34px;
+  margin-top: 8px;
+  border-radius: 8px;
+  border: 1px solid rgba(129, 140, 248, 0.6);
+  background: transparent;
+  color: #fff;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.wpn-comments-sidebar__clear:hover {
+  background: rgba(91, 77, 255, 0.16);
+}
+
+.wpn-comments-full__main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.wpn-thread-detail {
+  flex: 0 0 360px;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  border-left: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.015);
+}
+
+.wpn-thread-detail--empty {
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  text-align: center;
+}
+
+.wpn-thread-detail__header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 14px 16px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.wpn-thread-detail__number {
+  flex: 0 0 auto;
+  padding: 2px 9px;
+  border-radius: 999px;
+  background: var(--wpn-accent);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.wpn-thread-detail__path {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: rgba(255, 255, 255, 0.6);
+  font-size: 13px;
+}
+
+.wpn-thread-detail__title-input {
+  flex: 1;
+  min-width: 0;
+  resize: none;
+  border: 1px solid rgba(129, 140, 248, 0.6);
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.06);
+  color: inherit;
+  font: inherit;
+  font-size: 13px;
+  padding: 2px 6px;
+}
+
+.wpn-thread-detail__menu {
+  position: relative;
+  flex: 0 0 auto;
+}
+
+.wpn-thread-detail__menu-trigger {
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.6);
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.wpn-thread-detail__menu-trigger:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: #fff;
+}
+
+.wpn-thread-detail__menu-popover {
+  position: absolute;
+  top: calc(100% + 4px);
+  right: 0;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 150px;
+  padding: 4px;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: #1b1b24;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+}
+
+.wpn-thread-detail__menu-popover button {
+  padding: 7px 9px;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.85);
+  font-size: 12.5px;
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+}
+
+.wpn-thread-detail__menu-popover button:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.wpn-thread-detail__menu-danger {
+  color: #ff8a8a !important;
+}
+
+.wpn-thread-detail__scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 16px;
+}
+
+.wpn-thread-detail__scroll .wpn-thread {
+  max-height: none;
+  overflow: visible;
+  padding: 0;
+}
+
+.wpn-thread-detail__composer {
+  flex: 0 0 auto;
+  padding: 12px 16px;
+  border-top: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.wpn-thread__root {
+  padding: 12px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.wpn-thread__replies-label {
+  margin: 14px 0 10px;
+  color: rgba(255, 255, 255, 0.5);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.wpn-thread--separated .wpn-thread__replies {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.wpn-thread--separated .wpn-thread__replies .wpn-comment {
+  position: relative;
+  padding-left: 18px;
+}
+
+.wpn-thread--separated .wpn-thread__replies .wpn-comment::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 2px;
+  bottom: -14px;
+  width: 1px;
+  background: rgba(255, 255, 255, 0.14);
+}
+
+.wpn-thread--separated .wpn-thread__replies .wpn-comment:last-child::before {
+  bottom: 2px;
+}
+
+.wpn-thread--separated .wpn-thread__replies .wpn-comment + .wpn-comment {
+  border-top: 0;
+}
+
+.wpn-comments-full__scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 16px;
+}
+
+.wpn-comments-full__section-title {
+  margin: 0 0 12px;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.wpn-page-tiles-section {
+  margin-bottom: 20px;
+}
+
+.wpn-page-tiles {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 10px;
+}
+
+.wpn-page-tile {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(255, 255, 255, 0.03);
+  color: rgba(255, 255, 255, 0.85);
+  cursor: pointer;
+  text-align: left;
+}
+
+.wpn-page-tile:hover {
+  background: rgba(255, 255, 255, 0.07);
+}
+
+.wpn-page-tile--active {
+  border-color: var(--wpn-accent);
+  background: rgba(91, 77, 255, 0.16);
+}
+
+.wpn-page-tile__icon-badge {
+  display: grid;
+  place-items: center;
+  flex: 0 0 32px;
+  width: 32px;
+  height: 32px;
+  border-radius: 999px;
+  background: rgba(91, 77, 255, 0.24);
+}
+
+.wpn-page-tile__icon {
+  width: 16px;
+  height: 16px;
+  color: #fff;
+}
+
+.wpn-page-tile__label {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.wpn-page-tile__count {
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  min-width: 22px;
+  height: 22px;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.14);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.wpn-comments-full__grid {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 12px;
+}
+
+.wpn-comment-summary-wrap {
+  position: relative;
+  height: 100%;
+}
+
+.wpn-comment-summary {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  padding: 14px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.03);
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.wpn-comment-summary__content {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  width: 100%;
+  flex: 1;
+  min-height: 0;
+}
+
+.wpn-comment-summary:hover {
+  background: rgba(255, 255, 255, 0.07);
+}
+
+.wpn-comment-summary--active {
+  border-color: rgba(129, 140, 248, 0.7);
+  background: rgba(91, 77, 255, 0.16);
+}
+
+.wpn-comment-summary__head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+}
+
+.wpn-comment-summary__number {
+  flex: 0 0 auto;
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: var(--wpn-accent);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.wpn-comment-summary__page {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: rgba(255, 255, 255, 0.5);
+  font-size: 11px;
+}
+
+.wpn-comment-summary__title {
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.wpn-comment-summary__author-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  color: rgba(255, 255, 255, 0.55);
+  font-size: 11px;
+}
+
+.wpn-comment-summary__author-row .wpn-avatar {
+  width: 22px;
+  height: 22px;
+  font-size: 10px;
+  flex: 0 0 22px;
+}
+
+.wpn-comment-summary__author {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: rgba(255, 255, 255, 0.85);
+  font-weight: 600;
+}
+
+.wpn-comment-summary__snippet {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  max-width: 100%;
+  color: rgba(255, 255, 255, 0.7);
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.wpn-comment-summary__footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  width: 100%;
+  margin-top: 4px;
+  padding-top: 10px;
+  padding-right: 26px;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  color: rgba(255, 255, 255, 0.5);
+  font-size: 11px;
+}
+
+.wpn-comment-summary__footer span {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.wpn-comment-summary__footer-icon {
+  width: 11px;
+  height: 11px;
+  flex: 0 0 11px;
+}
+
+.wpn-comment-summary__menu {
+  position: absolute;
+  right: 12px;
+  bottom: 12px;
+}
+
+.wpn-comment-summary__menu-trigger {
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.55);
+  font-size: 14px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.wpn-comment-summary__menu-trigger:hover {
+  background: rgba(255, 255, 255, 0.12);
+  color: #fff;
+}
+
+.wpn-comment-summary__menu-popover {
+  position: absolute;
+  right: 0;
+  bottom: calc(100% + 4px);
+  z-index: 5;
+  min-width: 140px;
+  padding: 4px;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  background: #1c1a33;
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.35);
+}
+
+.wpn-comment-summary__menu-popover button {
+  display: block;
+  width: 100%;
+  padding: 7px 8px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.85);
+  font-size: 12px;
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+}
+
+.wpn-comment-summary__menu-popover button:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+@media (max-width: 760px) {
+  .wpn-comments-full {
+    flex-direction: column;
+    overflow-y: auto;
+  }
+
+  .wpn-comments-sidebar {
+    flex: 0 0 auto;
+    border-right: 0;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+  }
+
+  .wpn-thread-detail {
+    flex: 0 0 auto;
+    border-left: 0;
+    border-top: 1px solid rgba(255, 255, 255, 0.12);
+  }
+}
+
 .wpn-list-panel__filter-grid .wpn-select {
   min-width: 0;
 }
@@ -7145,9 +7767,54 @@ body.wpn-epicflow-resizing {
 
 .wpn-list-panel__filter-actions {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
-  gap: 4px;
+  gap: 6px;
+}
+
+/* The panel's width is user-resizable (280–760px, plus a full-grid expanded
+   mode), so at narrower widths the two switches alone can already fill the
+   row — wrap rather than force Clear to fit for that reason, and keep it a
+   compact pill (not the flex:1 full-width stretch .wpn-chip-toggle gets by
+   default) wherever it lands. */
+.wpn-list-panel__filter-actions .wpn-chip-toggle--clear {
+  flex: 0 0 auto;
+}
+
+.wpn-filter-switch {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  color: rgba(255, 255, 255, 0.85);
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+/* Used in the sidebar, stacked full-width like the nav items above it
+   instead of an inline pill. */
+.wpn-filter-switch--block {
+  display: flex;
+  width: 100%;
+  padding: 8px;
+  border: 0;
+  border-radius: 8px;
+  font-size: 13px;
+}
+
+.wpn-filter-switch--block:hover {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+/* This panel is purple-themed throughout — use the shared accent instead of
+   the Switch primitive's default green "on" state so it matches. */
+.wpn-filter-switch .wpn-switch--on .wpn-switch__track {
+  background: var(--wpn-accent);
+  border-color: rgba(129, 140, 248, 0.7);
 }
 
 .wpn-root .wpn-chip-toggle {

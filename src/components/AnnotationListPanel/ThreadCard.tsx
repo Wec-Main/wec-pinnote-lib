@@ -22,14 +22,12 @@ function ThreadComment({
   quoted,
   isReply,
   currentUserId,
-  disabled,
   onSelect,
 }: {
   comment: AnnotationComment;
   quoted: AnnotationComment | undefined;
   isReply: boolean;
   currentUserId: string;
-  disabled: boolean;
   onSelect: () => void;
 }) {
   const edited = comment.updatedAt !== comment.createdAt;
@@ -41,8 +39,6 @@ function ThreadComment({
           ? "wpn-thread-card__comment wpn-thread-card__comment--reply"
           : "wpn-thread-card__comment"
       }
-      disabled={disabled}
-      aria-disabled={disabled}
       onClick={onSelect}
     >
       {comment.createdBy.avatarUrl ? (
@@ -96,13 +92,7 @@ export const ThreadCard = memo(function ThreadCard({
         .filter(Boolean)
         .join(" ")}
     >
-      <button
-        type="button"
-        className="wpn-thread-card__head"
-        disabled={!inView}
-        aria-disabled={!inView}
-        onClick={select}
-      >
+      <button type="button" className="wpn-thread-card__head" onClick={select}>
         <span className="wpn-thread-card__pin">#{annotation.number}</span>
         <span className="wpn-thread-card__label">{label}</span>
         {inView ? null : <span className="wpn-thread-card__chip">Not in this view</span>}
@@ -121,7 +111,6 @@ export const ThreadCard = memo(function ThreadCard({
         quoted={undefined}
         isReply={false}
         currentUserId={currentUserId}
-        disabled={!inView}
         onSelect={select}
       />
       {replies.length > 0 ? (
@@ -151,7 +140,6 @@ export const ThreadCard = memo(function ThreadCard({
                   quoted={findQuoted(reply)}
                   isReply
                   currentUserId={currentUserId}
-                  disabled={!inView}
                   onSelect={select}
                 />
               ))}
