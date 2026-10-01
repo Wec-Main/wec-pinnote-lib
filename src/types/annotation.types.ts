@@ -121,7 +121,8 @@ export interface AnnotationEventCallbacks {
 }
 
 export interface AnnotationConfig extends AnnotationEventCallbacks {
-  apiBaseUrl: string;
+  // Defaults to the library's own WEC_PINNOTE_API_URL env value when omitted.
+  apiBaseUrl?: string;
   projectId: string;
   projectVersionId?: string;
   currentUser: AnnotationUser;
@@ -138,6 +139,7 @@ export interface AnnotationConfig extends AnnotationEventCallbacks {
 }
 
 export interface ResolvedAnnotationConfig extends AnnotationConfig {
+  apiBaseUrl: string;
   zIndex: number;
   enabled: boolean;
   showToggleButton: boolean;

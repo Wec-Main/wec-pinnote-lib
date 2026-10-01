@@ -1,3 +1,4 @@
+import { DEFAULT_PINNOTE_API_URL } from "../config/env";
 import { AnnotationApiError, type AnnotationConfig } from "../types/annotation.types";
 import type {
   CreateProjectVersionRequest,
@@ -57,12 +58,14 @@ function parseListPayload(payload: unknown): ProjectVersion[] {
 export function createProjectVersionsApi(
   config: Pick<AnnotationConfig, "apiBaseUrl" | "getAuthToken">,
 ): ProjectVersionApiClient {
+  const apiBaseUrl = config.apiBaseUrl ?? DEFAULT_PINNOTE_API_URL;
+
   async function call<T>(
     method: "GET" | "POST" | "PATCH",
     path: string,
     options: { body?: unknown; signal?: AbortSignal } = {},
   ): Promise<T> {
-    const url = buildUrl(config.apiBaseUrl, path);
+    const url = buildUrl(apiBaseUrl, path);
     return withUnauthorizedRetry(config.getAuthToken, (token) =>
       request<T>(url, token, {
         method,

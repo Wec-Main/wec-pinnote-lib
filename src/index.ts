@@ -1,5 +1,6 @@
 export { AnnotationProvider } from "./context/AnnotationProvider";
 export type { AnnotationProviderProps } from "./context/AnnotationProvider";
+export { DEFAULT_PINNOTE_API_URL, DEFAULT_USE_MOCK_API } from "./config/env";
 export {
   useAnnotationContext,
   useAnnotationData,

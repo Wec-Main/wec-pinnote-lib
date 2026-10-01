@@ -81,14 +81,15 @@ export default defineConfig({
 
 ## Configuration
 
-Read environment variables in the **host application**, then pass them into `AnnotationProvider`.
+The library owns its own API URL and mock-mode defaults (`WEC_PINNOTE_API_URL` /
+`WEC_USE_MOCK_API`, configured in the library's own `.env`). The **host
+application** only needs to provide project-specific configuration:
 
 ```tsx
 import { AnnotationProvider } from "wec-pinnote-lib";
 import "wec-pinnote-lib/style.css";
 
 const annotationConfig = {
-  apiBaseUrl: import.meta.env.VITE_ANNOTATION_API_URL,
   projectId: import.meta.env.VITE_ANNOTATION_PROJECT_ID,
   currentUser: {
     id: currentUser.id,
@@ -396,7 +397,7 @@ Authorization for edit/delete/resolve remains the backend's responsibility.
 
 ## Example project
 
-`examples/demo` is the canonical example for checking `wec-pinnote-lib` integration — a minimal login/home app whose Vite config aliases `wec-pinnote-lib` straight to this package's own `src/`. It defaults to the real `wec-pinnote-api` backend; set `VITE_USE_MOCK_API=true` in `examples/demo/.env` to use the bundled in-memory mock instead.
+`examples/demo` is the canonical example for checking `wec-pinnote-lib` integration — a minimal login/home app whose Vite config aliases `wec-pinnote-lib` straight to this package's own `src/`. It defaults to the real `wec-pinnote-api` backend; set `WEC_USE_MOCK_API=true` in this library's own `.env` to use the bundled in-memory mock instead.
 
 ```bash
 npm run demo

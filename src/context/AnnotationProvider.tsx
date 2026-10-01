@@ -4,6 +4,7 @@ import "../styles/annotation.css";
 import "../styles/flowchart.css";
 import "../styles/datamodel.css";
 import { AnnotationErrorBoundary } from "../components/AnnotationErrorBoundary";
+import { DEFAULT_PINNOTE_API_URL } from "../config/env";
 import { AnnotationLayer } from "../components/AnnotationLayer";
 import { useAnnotationApi } from "../hooks/useAnnotationApi";
 import { useAuthSessions } from "../hooks/useAuthSessions";
@@ -57,6 +58,7 @@ interface LayerVersionSelection {
 function resolveConfig(config: AnnotationConfig): ResolvedAnnotationConfig {
   return {
     ...config,
+    apiBaseUrl: config.apiBaseUrl ?? DEFAULT_PINNOTE_API_URL,
     zIndex: config.zIndex ?? DEFAULT_Z_INDEX,
     enabled: config.enabled ?? true,
     showToggleButton: config.showToggleButton ?? true,

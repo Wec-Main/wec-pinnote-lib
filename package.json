@@ -1,13 +1,9 @@
 {
   "name": "wec-pinnote-lib",
   "version": "1.0.0",
-  "description": "Figma-like website annotation and commenting library for React applications.",
+  "description": "A reusable React library for website annotations, comments, tags, epics, and visual collaboration.",
   "license": "UNLICENSED",
   "author": "Wec Technologies",
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/Wec-Main/wec-pinnote-lib.git"
-  },
   "type": "module",
   "sideEffects": [
     "**/*.css"

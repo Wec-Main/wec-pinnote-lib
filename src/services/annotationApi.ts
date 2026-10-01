@@ -9,6 +9,7 @@ import {
   type UpdateAnnotationRequest,
   type UpdateCommentRequest,
 } from "../types/annotation.types";
+import { DEFAULT_PINNOTE_API_URL } from "../config/env";
 import {
   buildUrl,
   request,
@@ -48,12 +49,14 @@ function parseListPayload(payload: unknown): Annotation[] {
 export function createAnnotationApi(
   config: Pick<AnnotationConfig, "apiBaseUrl" | "getAuthToken">,
 ): AnnotationApiClient {
+  const apiBaseUrl = config.apiBaseUrl ?? DEFAULT_PINNOTE_API_URL;
+
   async function call<T>(
     method: "GET" | "POST" | "PATCH" | "DELETE",
     path: string,
     options: { query?: Record<string, QueryValue>; body?: unknown; signal?: AbortSignal } = {},
   ): Promise<T> {
-    const url = buildUrl(config.apiBaseUrl, path, options.query);
+    const url = buildUrl(apiBaseUrl, path, options.query);
     return withUnauthorizedRetry(config.getAuthToken, (token) =>
       request<T>(url, token, {
         method,
@@ -68,7 +71,7 @@ export function createAnnotationApi(
     path: string,
     options: { query?: Record<string, QueryValue>; body?: unknown; signal?: AbortSignal } = {},
   ): Promise<void> {
-    const url = buildUrl(config.apiBaseUrl, path, options.query);
+    const url = buildUrl(apiBaseUrl, path, options.query);
     return withUnauthorizedRetry(config.getAuthToken, (token) =>
       requestNoContent(url, token, {
         method,

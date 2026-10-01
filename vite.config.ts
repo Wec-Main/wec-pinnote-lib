@@ -27,6 +27,7 @@ const isSharedModule = (id: string) =>
 
 export default defineConfig({
   plugins: [react()],
+  envPrefix: "WEC_",
   build: {
     lib: {
       entry: resolve(rootDir, "src/index.ts"),
