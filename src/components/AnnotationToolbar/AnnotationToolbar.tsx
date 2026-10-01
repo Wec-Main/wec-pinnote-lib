@@ -60,6 +60,7 @@ export function AnnotationToolbar() {
     userManagementOpen,
     setUserManagementOpen,
     setAuditHistoryOpen,
+    commentsFullScreenOpen,
     setModeEnabled,
     setFlowPinModeEnabled,
     setTagModeEnabled,
@@ -394,6 +395,7 @@ export function AnnotationToolbar() {
           "wpn-toolbar",
           barExpanded ? "" : "wpn-toolbar--collapsed",
           position ? "wpn-toolbar--placed" : "",
+          commentsFullScreenOpen ? "wpn-toolbar--hidden" : "",
         ]
           .filter(Boolean)
           .join(" ")}

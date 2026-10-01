@@ -48,7 +48,10 @@ export type IconName =
   | "lock"
   | "lockOpen"
   | "logout"
-  | "info";
+  | "info"
+  | "grid"
+  | "list"
+  | "arrowUpRight";
 
 const PATHS: Record<IconName, ReactElement> = {
   info: (
@@ -303,6 +306,28 @@ const PATHS: Record<IconName, ReactElement> = {
     <>
       <rect x="5" y="11" width="14" height="9.5" rx="2" />
       <path d="M8 11V7.5a4 4 0 0 1 7.6-1.8" />
+    </>
+  ),
+  grid: (
+    <>
+      <rect x="4" y="4" width="7" height="7" rx="1.5" />
+      <rect x="13" y="4" width="7" height="7" rx="1.5" />
+      <rect x="4" y="13" width="7" height="7" rx="1.5" />
+      <rect x="13" y="13" width="7" height="7" rx="1.5" />
+    </>
+  ),
+  list: (
+    <>
+      <circle cx="5" cy="6" r="1.3" fill="currentColor" stroke="none" />
+      <circle cx="5" cy="12" r="1.3" fill="currentColor" stroke="none" />
+      <circle cx="5" cy="18" r="1.3" fill="currentColor" stroke="none" />
+      <path d="M9.5 6h10M9.5 12h10M9.5 18h10" />
+    </>
+  ),
+  arrowUpRight: (
+    <>
+      <path d="M7 17 17 7" />
+      <path d="M8.5 7H17v8.5" />
     </>
   ),
 };

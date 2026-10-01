@@ -12,6 +12,7 @@ import {
   authorOptions,
   filterThreads,
   groupThreadsByPage,
+  isCommentsViewMode,
   statusOptions,
   toThreads,
   type CommentFilters,
@@ -39,7 +40,13 @@ export function AnnotationListPanel() {
     allAnnotationsError: error,
     reloadAllAnnotations: retry,
   } = useAnnotationData();
-  const { selectedId, revealAnnotation, setListOpen } = useAnnotationUi();
+  const {
+    selectedId,
+    revealAnnotation,
+    revealAnnotationAndHideList,
+    setListOpen,
+    setCommentsFullScreenOpen,
+  } = useAnnotationUi();
   const currentUserId = config.currentUser.id;
 
   const openAnnotation = useCallback(
@@ -57,6 +64,22 @@ export function AnnotationListPanel() {
     false,
     isBoolean,
   );
+  // Persisted (not local to CommentsFullScreenView) so it survives the
+  // panel briefly unmounting — e.g. while "open on page" temporarily hides
+  // the list to reveal a pin, the chosen grid/list layout isn't lost.
+  const [viewMode, setViewMode] = usePersistentState(
+    `wpn-ui:${config.projectId}:commentsViewMode`,
+    "grid",
+    isCommentsViewMode,
+  );
+  // The top toolbar hides itself, and the Full Screen panel claims the
+  // space that would've been reserved for it, for as long as Full Screen
+  // mode is open — not tied to any particular thread being selected.
+  useEffect(() => {
+    setCommentsFullScreenOpen(expanded);
+    return () => setCommentsFullScreenOpen(false);
+  }, [expanded, setCommentsFullScreenOpen]);
+
   const [persistedWidth, setPersistedWidth] = usePersistentState(
     `wpn-ui:${config.projectId}:commentsWidth`,
     PANEL_DEFAULT_WIDTH,
@@ -169,6 +192,9 @@ export function AnnotationListPanel() {
           statuses={statuses}
           allThreads={allThreads}
           pageGroups={pageGroups}
+          viewMode={viewMode}
+          onViewModeChange={setViewMode}
+          onRevealOnPage={revealAnnotationAndHideList}
           onCollapse={() => setExpanded(false)}
           onCloseList={() => setListOpen(false)}
         />

@@ -86,6 +86,10 @@ export interface AnnotationUiContextValue {
   selectedId: string | null;
   selectAnnotation: (id: string | null) => void;
   revealAnnotation: (id: string) => void;
+  // Reveals an annotation's on-page pin and temporarily hides the comments
+  // list panel (whatever mode it's in) so the pin isn't obscured; the panel
+  // reopens on its own once that pin's floating thread view is closed.
+  revealAnnotationAndHideList: (id: string) => void;
   draft: DraftAnnotation | null;
   startDraft: (anchor: AnnotationAnchor, label: string) => void;
   updateDraftLabel: (label: string) => void;
@@ -126,6 +130,14 @@ export interface AnnotationUiContextValue {
   setUserManagementOpen: (open: boolean) => void;
   auditHistoryOpen: boolean;
   setAuditHistoryOpen: (open: boolean) => void;
+  commentsFullScreenOpen: boolean;
+  setCommentsFullScreenOpen: (open: boolean) => void;
+  // Which thread the Full Screen comments view's right-side detail pane
+  // shows — lifted out of that view's own component state (rather than a
+  // local useState there) so it survives the view briefly unmounting, e.g.
+  // while "open on page" temporarily hides the list to reveal a pin.
+  commentsFullScreenSelectedThreadId: string | null;
+  setCommentsFullScreenSelectedThreadId: (id: string | null) => void;
 }
 
 export interface AnnotationAuthContextValue {

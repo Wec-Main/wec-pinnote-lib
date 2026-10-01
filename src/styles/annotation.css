@@ -234,6 +234,13 @@ body.wpn-mode-active {
   padding: 4px;
 }
 
+/* Hidden for as long as the Comments panel's Full Screen ("Expand panel")
+   mode is open — keeps the toolbar mounted (drag position, expanded state,
+   etc. untouched) rather than unmounting it. */
+.wpn-toolbar--hidden {
+  display: none;
+}
+
 .wpn-launcher-item__logo {
   width: 20px;
   height: 20px;
@@ -6642,7 +6649,10 @@ body.wpn-epicflow-resizing {
 }
 
 .wpn-list-panel--expanded {
-  top: 72px;
+  /* The top toolbar always hides itself while this mode is open (see
+     wpn-toolbar--hidden), so this claims the space that would've been
+     reserved below it instead of leaving it empty. */
+  top: 16px;
   right: 16px;
   bottom: 72px;
   left: 16px;
@@ -7290,24 +7300,14 @@ body.wpn-epicflow-resizing {
   border-bottom: 1px solid rgba(255, 255, 255, 0.12);
 }
 
-.wpn-thread-detail__number {
-  flex: 0 0 auto;
-  padding: 2px 9px;
-  border-radius: 999px;
-  background: var(--wpn-accent);
-  color: #fff;
-  font-size: 12px;
-  font-weight: 700;
-}
-
-.wpn-thread-detail__path {
+.wpn-thread-detail__title {
   flex: 1;
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  color: rgba(255, 255, 255, 0.6);
-  font-size: 13px;
+  font-size: 14px;
+  font-weight: 700;
 }
 
 .wpn-thread-detail__title-input {
@@ -7456,6 +7456,52 @@ body.wpn-epicflow-resizing {
   font-weight: 700;
 }
 
+.wpn-comments-full__section-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.wpn-comments-full__section-head .wpn-comments-full__section-title {
+  margin: 0;
+}
+
+.wpn-view-toggle {
+  display: flex;
+  gap: 2px;
+  padding: 2px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.wpn-view-toggle__btn {
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.6);
+  cursor: pointer;
+}
+
+.wpn-view-toggle__btn:hover {
+  color: #fff;
+}
+
+.wpn-view-toggle__btn--active {
+  background: var(--wpn-accent);
+  color: #fff;
+}
+
+.wpn-view-toggle__btn svg {
+  width: 14px;
+  height: 14px;
+}
+
 .wpn-page-tiles-section {
   margin-bottom: 20px;
 }
@@ -7527,6 +7573,67 @@ body.wpn-epicflow-resizing {
   font-weight: 700;
 }
 
+.wpn-comments-list-table__col-comment {
+  width: 38%;
+}
+
+.wpn-comments-list-table__col-status {
+  width: 110px;
+}
+
+.wpn-comments-list-table__col-replies {
+  width: 96px;
+}
+
+.wpn-comments-list-table__col-updated {
+  width: 110px;
+}
+
+.wpn-comments-list-table tbody tr {
+  cursor: pointer;
+}
+
+.wpn-comments-list-table tbody tr:focus-visible {
+  outline: 2px solid rgba(129, 140, 248, 0.8);
+  outline-offset: -2px;
+}
+
+.wpn-comments-list-table__row--active {
+  background: rgba(91, 77, 255, 0.16);
+}
+
+.wpn-comments-list-table__open {
+  width: 100%;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.wpn-comments-list-table__reveal {
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.6);
+  cursor: pointer;
+}
+
+.wpn-comments-list-table__reveal:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: #fff;
+}
+
+.wpn-comments-list-table__reveal svg {
+  width: 14px;
+  height: 14px;
+}
+
 .wpn-comments-full__grid {
   list-style: none;
   margin: 0;
@@ -7538,20 +7645,34 @@ body.wpn-epicflow-resizing {
 
 .wpn-comment-summary-wrap {
   position: relative;
-  height: 100%;
-}
-
-.wpn-comment-summary {
-  width: 100%;
-  height: 100%;
   display: flex;
   flex-direction: column;
-  align-items: flex-start;
-  gap: 6px;
+  height: 100%;
   padding: 14px;
   border-radius: 10px;
   border: 1px solid rgba(255, 255, 255, 0.12);
   background: rgba(255, 255, 255, 0.03);
+}
+
+.wpn-comment-summary-wrap:hover {
+  background: rgba(255, 255, 255, 0.07);
+}
+
+.wpn-comment-summary-wrap--active {
+  border-color: rgba(129, 140, 248, 0.7);
+  background: rgba(91, 77, 255, 0.16);
+}
+
+.wpn-comment-summary {
+  width: 100%;
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  border: 0;
+  padding: 0;
+  background: transparent;
   color: inherit;
   text-align: left;
   cursor: pointer;
@@ -7567,15 +7688,6 @@ body.wpn-epicflow-resizing {
   min-height: 0;
 }
 
-.wpn-comment-summary:hover {
-  background: rgba(255, 255, 255, 0.07);
-}
-
-.wpn-comment-summary--active {
-  border-color: rgba(129, 140, 248, 0.7);
-  background: rgba(91, 77, 255, 0.16);
-}
-
 .wpn-comment-summary__head {
   display: flex;
   align-items: center;
@@ -7583,29 +7695,18 @@ body.wpn-epicflow-resizing {
   width: 100%;
 }
 
-.wpn-comment-summary__number {
-  flex: 0 0 auto;
-  padding: 1px 7px;
-  border-radius: 999px;
-  background: var(--wpn-accent);
-  color: #fff;
-  font-size: 11px;
-  font-weight: 700;
-}
-
-.wpn-comment-summary__page {
+.wpn-comment-summary__title {
   flex: 1;
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  color: rgba(255, 255, 255, 0.5);
-  font-size: 11px;
-}
-
-.wpn-comment-summary__title {
   font-size: 14px;
   font-weight: 700;
+}
+
+.wpn-comment-summary__head .wpn-status-chip {
+  flex: 0 0 auto;
 }
 
 .wpn-comment-summary__author-row {
@@ -7650,9 +7751,9 @@ body.wpn-epicflow-resizing {
   justify-content: space-between;
   gap: 6px;
   width: 100%;
+  flex: 0 0 auto;
   margin-top: 4px;
   padding-top: 10px;
-  padding-right: 26px;
   border-top: 1px solid rgba(255, 255, 255, 0.1);
   color: rgba(255, 255, 255, 0.5);
   font-size: 11px;
@@ -7664,66 +7765,14 @@ body.wpn-epicflow-resizing {
   gap: 4px;
 }
 
+.wpn-comment-summary__footer .wpn-comment-summary__footer-actions {
+  gap: 8px;
+}
+
 .wpn-comment-summary__footer-icon {
   width: 11px;
   height: 11px;
   flex: 0 0 11px;
-}
-
-.wpn-comment-summary__menu {
-  position: absolute;
-  right: 12px;
-  bottom: 12px;
-}
-
-.wpn-comment-summary__menu-trigger {
-  display: grid;
-  place-items: center;
-  width: 22px;
-  height: 22px;
-  border: 0;
-  border-radius: 6px;
-  background: transparent;
-  color: rgba(255, 255, 255, 0.55);
-  font-size: 14px;
-  line-height: 1;
-  cursor: pointer;
-}
-
-.wpn-comment-summary__menu-trigger:hover {
-  background: rgba(255, 255, 255, 0.12);
-  color: #fff;
-}
-
-.wpn-comment-summary__menu-popover {
-  position: absolute;
-  right: 0;
-  bottom: calc(100% + 4px);
-  z-index: 5;
-  min-width: 140px;
-  padding: 4px;
-  border-radius: 8px;
-  border: 1px solid rgba(255, 255, 255, 0.16);
-  background: #1c1a33;
-  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.35);
-}
-
-.wpn-comment-summary__menu-popover button {
-  display: block;
-  width: 100%;
-  padding: 7px 8px;
-  border: 0;
-  border-radius: 6px;
-  background: transparent;
-  color: rgba(255, 255, 255, 0.85);
-  font-size: 12px;
-  font-weight: 600;
-  text-align: left;
-  cursor: pointer;
-}
-
-.wpn-comment-summary__menu-popover button:hover {
-  background: rgba(255, 255, 255, 0.1);
 }
 
 @media (max-width: 760px) {

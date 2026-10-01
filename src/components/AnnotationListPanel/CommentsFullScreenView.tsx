@@ -1,10 +1,12 @@
 import { useState } from "react";
+import { useAnnotationUi } from "../../context/AnnotationContext";
 import { Icon, Tooltip } from "../primitives";
+import { CommentsListTable } from "./CommentsListTable";
 import { CommentSummaryCard } from "./CommentSummaryCard";
 import { CommentsSidebar } from "./CommentsSidebar";
 import { PageTabsRow } from "./PageTabsRow";
 import { ThreadDetailPane } from "./ThreadDetailPane";
-import type { CommentFilters, CommentThread, PageGroup } from "./commentFilters";
+import type { CommentFilters, CommentThread, CommentsViewMode, PageGroup } from "./commentFilters";
 import type { SelectOption } from "../primitives";
 
 interface CommentsFullScreenViewProps {
@@ -19,6 +21,9 @@ interface CommentsFullScreenViewProps {
   statuses: SelectOption[];
   allThreads: CommentThread[];
   pageGroups: PageGroup[];
+  viewMode: CommentsViewMode;
+  onViewModeChange: (mode: CommentsViewMode) => void;
+  onRevealOnPage: (annotationId: string) => void;
   onCollapse: () => void;
   onCloseList: () => void;
 }
@@ -35,14 +40,22 @@ export function CommentsFullScreenView({
   statuses,
   allThreads,
   pageGroups,
+  viewMode,
+  onViewModeChange,
+  onRevealOnPage,
   onCollapse,
   onCloseList,
 }: CommentsFullScreenViewProps) {
   const [activePageKey, setActivePageKey] = useState<string | null>(null);
-  // Full Screen's selection is local, not the app's global selectedId: picking
-  // a card here renders the detail pane inline, instead of opening the
-  // floating AnnotationThreadPanel that Minimize mode and on-page pins use.
-  const [selectedThreadId, setSelectedThreadId] = useState<string | null>(null);
+  // Full Screen's selection lives in context (not the app's global
+  // selectedId — picking a card here renders the detail pane inline instead
+  // of opening the floating AnnotationThreadPanel that Minimize mode and
+  // on-page pins use) so it survives this view briefly unmounting, e.g.
+  // while "open on page" temporarily hides the list to reveal a pin.
+  const {
+    commentsFullScreenSelectedThreadId: selectedThreadId,
+    setCommentsFullScreenSelectedThreadId: setSelectedThreadId,
+  } = useAnnotationUi();
 
   const effectiveActivePageKey =
     (activePageKey && pageGroups.some((group) => group.pageKey === activePageKey)
@@ -118,9 +131,43 @@ export function CommentsFullScreenView({
             />
 
             <section className="wpn-comments-full__section">
-              <h3 className="wpn-comments-full__section-title">
-                Comments ({visibleThreads.length})
-              </h3>
+              <div className="wpn-comments-full__section-head">
+                <h3 className="wpn-comments-full__section-title">
+                  Comments ({visibleThreads.length})
+                </h3>
+                <div className="wpn-view-toggle" role="group" aria-label="Comments layout">
+                  <Tooltip label="Grid view" placement="bottom">
+                    <button
+                      type="button"
+                      className={
+                        viewMode === "grid"
+                          ? "wpn-view-toggle__btn wpn-view-toggle__btn--active"
+                          : "wpn-view-toggle__btn"
+                      }
+                      aria-pressed={viewMode === "grid"}
+                      aria-label="Grid view"
+                      onClick={() => onViewModeChange("grid")}
+                    >
+                      <Icon name="grid" />
+                    </button>
+                  </Tooltip>
+                  <Tooltip label="List view" placement="bottom">
+                    <button
+                      type="button"
+                      className={
+                        viewMode === "list"
+                          ? "wpn-view-toggle__btn wpn-view-toggle__btn--active"
+                          : "wpn-view-toggle__btn"
+                      }
+                      aria-pressed={viewMode === "list"}
+                      aria-label="List view"
+                      onClick={() => onViewModeChange("list")}
+                    >
+                      <Icon name="list" />
+                    </button>
+                  </Tooltip>
+                </div>
+              </div>
               {loading ? <p className="wpn-muted">Loading annotations...</p> : null}
               {error ? (
                 <div className="wpn-inline-error">
@@ -134,7 +181,7 @@ export function CommentsFullScreenView({
               {!loading && !error && visibleThreads.length === 0 ? (
                 <p className="wpn-muted">No comments match these filters.</p>
               ) : null}
-              {error ? null : (
+              {error || visibleThreads.length === 0 ? null : viewMode === "grid" ? (
                 <ul className="wpn-comments-full__grid">
                   {visibleThreads.map((thread) => (
                     <CommentSummaryCard
@@ -142,9 +189,17 @@ export function CommentsFullScreenView({
                       thread={thread}
                       active={thread.annotation.id === selectedThreadId}
                       onSelect={setSelectedThreadId}
+                      onRevealOnPage={onRevealOnPage}
                     />
                   ))}
                 </ul>
+              ) : (
+                <CommentsListTable
+                  threads={visibleThreads}
+                  selectedId={selectedThreadId}
+                  onSelect={setSelectedThreadId}
+                  onRevealOnPage={onRevealOnPage}
+                />
               )}
             </section>
           </div>

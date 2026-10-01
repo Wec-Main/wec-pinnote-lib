@@ -5,6 +5,12 @@ import type { SelectOption } from "../primitives";
 
 export type CommentSort = "newest" | "oldest" | "author";
 
+export type CommentsViewMode = "grid" | "list";
+
+export function isCommentsViewMode(value: unknown): value is CommentsViewMode {
+  return value === "grid" || value === "list";
+}
+
 export type CommentResolution = "all" | "open" | "resolved";
 
 export interface CommentThread {

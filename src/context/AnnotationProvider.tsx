@@ -318,6 +318,17 @@ export function AnnotationProvider({ config, children }: AnnotationProviderProps
     true,
     isBoolean,
   );
+  // Mirrors whether the Comments panel's Full Screen ("Expand panel") mode
+  // is open — not persisted, since it tracks `AnnotationListPanel`'s local
+  // `expanded` state, which itself never survives a reload with a stale
+  // value worth restoring.
+  const [commentsFullScreenOpen, setCommentsFullScreenOpen] = useState(false);
+  // Not persisted (resets on reload), but — unlike a useState local to the
+  // Full Screen view itself — survives that view briefly unmounting within
+  // a session.
+  const [commentsFullScreenSelectedThreadId, setCommentsFullScreenSelectedThreadId] = useState<
+    string | null
+  >(null);
 
   const {
     annotationTags,
@@ -754,6 +765,27 @@ export function AnnotationProvider({ config, children }: AnnotationProviderProps
     [clearDraft, hasUnsavedDraft, setPinsVisible],
   );
 
+  // Tracks whether the list is currently hidden specifically because of
+  // `revealAnnotationAndHideList` below, so the auto-reopen effect doesn't
+  // fire for unrelated ways the list or selection get closed.
+  const revealHidListRef = useRef(false);
+
+  const revealAnnotationAndHideList = useCallback(
+    (id: string) => {
+      revealHidListRef.current = true;
+      revealAnnotation(id);
+      setListOpen(false);
+    },
+    [revealAnnotation, setListOpen],
+  );
+
+  useEffect(() => {
+    if (revealHidListRef.current && !selectedId) {
+      revealHidListRef.current = false;
+      setListOpen(true);
+    }
+  }, [selectedId, setListOpen]);
+
   const confirmDiscard = useCallback(() => {
     const prompt = discardPrompt;
     setDiscardPrompt(null);
@@ -854,6 +886,7 @@ export function AnnotationProvider({ config, children }: AnnotationProviderProps
       selectedId,
       selectAnnotation,
       revealAnnotation,
+      revealAnnotationAndHideList,
       draft,
       startDraft,
       updateDraftLabel,
@@ -894,6 +927,10 @@ export function AnnotationProvider({ config, children }: AnnotationProviderProps
       setUserManagementOpen: openUserManagementExclusive,
       auditHistoryOpen,
       setAuditHistoryOpen,
+      commentsFullScreenOpen,
+      setCommentsFullScreenOpen,
+      commentsFullScreenSelectedThreadId,
+      setCommentsFullScreenSelectedThreadId,
     }),
     [
       modeEnabled,
@@ -901,6 +938,7 @@ export function AnnotationProvider({ config, children }: AnnotationProviderProps
       selectedId,
       selectAnnotation,
       revealAnnotation,
+      revealAnnotationAndHideList,
       draft,
       startDraft,
       updateDraftLabel,
@@ -941,6 +979,10 @@ export function AnnotationProvider({ config, children }: AnnotationProviderProps
       openUserManagementExclusive,
       auditHistoryOpen,
       setAuditHistoryOpen,
+      commentsFullScreenOpen,
+      setCommentsFullScreenOpen,
+      commentsFullScreenSelectedThreadId,
+      setCommentsFullScreenSelectedThreadId,
     ],
   );
 

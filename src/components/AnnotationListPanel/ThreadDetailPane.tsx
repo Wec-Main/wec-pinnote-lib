@@ -104,7 +104,6 @@ export function ThreadDetailPane({ annotationId }: ThreadDetailPaneProps) {
   return (
     <div className="wpn-thread-detail">
       <div className="wpn-thread-detail__header">
-        <span className="wpn-thread-detail__number">#{annotation.number}</span>
         {editingTitle ? (
           <textarea
             ref={focusTitleInputAtEnd}
@@ -126,8 +125,8 @@ export function ThreadDetailPane({ annotationId }: ThreadDetailPaneProps) {
             }}
           />
         ) : (
-          <span className="wpn-thread-detail__path" title={annotation.pageKey}>
-            {annotation.pageKey}
+          <span className="wpn-thread-detail__title" title={title}>
+            {title}
           </span>
         )}
         <AnnotationStatusSelect
