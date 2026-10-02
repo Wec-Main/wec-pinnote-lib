@@ -12,6 +12,7 @@ interface EpicColumnProps {
   currentUser: AnnotationUser;
   onSelect: (epicId: string) => void;
   onCreate: () => void;
+  onExport: (epic: Epic) => void;
   onEdit: (epic: Epic) => void;
   onDelete: (epic: Epic) => void;
 }
@@ -23,6 +24,7 @@ export function EpicColumn({
   currentUser,
   onSelect,
   onCreate,
+  onExport,
   onEdit,
   onDelete,
 }: EpicColumnProps) {
@@ -83,6 +85,20 @@ export function EpicColumn({
                 <div className="wpn-epicflow-card__row">
                   <span className="wpn-epicflow-card__title">{epic.title}</span>
                   <div className="wpn-epicflow-card__actions">
+                    <Tooltip label="Export epic" placement="bottom">
+                      <button
+                        type="button"
+                        className="wpn-epicflow-card__action-btn"
+                        aria-label="Export epic as JSON"
+                        title="Export epic as JSON"
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          onExport(epic);
+                        }}
+                      >
+                        <Icon name="download" />
+                      </button>
+                    </Tooltip>
                     <Tooltip label="Edit epic" placement="bottom">
                       <button
                         type="button"

@@ -67,6 +67,7 @@ export function AnnotationThreadPanel({
     config,
     addComment,
     editComment,
+    setCommentAddToContext,
     removeComment,
     setStatus,
     renameAnnotation,
@@ -128,11 +129,11 @@ export function AnnotationThreadPanel({
     removeComment(annotation.id, comment.id).catch(() => undefined);
   };
 
-  const sendReply = async (message: string) => {
+  const sendReply = async (message: string, addToContext: boolean) => {
     const target = replyTarget;
     setReplyTarget(null);
     try {
-      await addComment(annotation.id, message, target?.id);
+      await addComment(annotation.id, message, target?.id, addToContext);
     } catch (err) {
       setReplyTarget(target);
       throw err;
@@ -278,6 +279,9 @@ export function AnnotationThreadPanel({
           annotation={annotation}
           currentUser={config.currentUser}
           onEdit={(commentId, message) => editComment(annotation.id, commentId, message)}
+          onToggleContext={(commentId, value) =>
+            setCommentAddToContext(annotation.id, commentId, value)
+          }
           onDelete={setPendingDelete}
           onReply={setReplyTarget}
           onEditingChange={setHasUnsavedEdit}

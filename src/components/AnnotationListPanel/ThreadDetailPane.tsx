@@ -43,6 +43,7 @@ export function ThreadDetailPane({ annotationId }: ThreadDetailPaneProps) {
     config,
     addComment,
     editComment,
+    setCommentAddToContext,
     removeComment,
     setStatus,
     renameAnnotation,
@@ -90,11 +91,11 @@ export function ThreadDetailPane({ annotationId }: ThreadDetailPaneProps) {
     removeComment(annotation.id, comment.id).catch(() => undefined);
   };
 
-  const sendReply = async (message: string) => {
+  const sendReply = async (message: string, addToContext: boolean) => {
     const target = replyTarget;
     setReplyTarget(null);
     try {
-      await addComment(annotation.id, message, target?.id);
+      await addComment(annotation.id, message, target?.id, addToContext);
     } catch (err) {
       setReplyTarget(target);
       throw err;
@@ -181,6 +182,9 @@ export function ThreadDetailPane({ annotationId }: ThreadDetailPaneProps) {
           annotation={annotation}
           currentUser={config.currentUser}
           onEdit={(commentId, message) => editComment(annotation.id, commentId, message)}
+          onToggleContext={(commentId, value) =>
+            setCommentAddToContext(annotation.id, commentId, value)
+          }
           onDelete={setPendingDelete}
           onReply={setReplyTarget}
           separateReplies

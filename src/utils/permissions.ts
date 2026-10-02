@@ -78,3 +78,7 @@ export function canManageTags(actorRole: UserManagementRole): boolean {
 export function canPublishVersions(actorRole: UserManagementRole): boolean {
   return actorRole === "super_admin" || actorRole === "admin";
 }
+
+export function canExportData(actorRole: UserManagementRole): boolean {
+  return actorRole === "super_admin" || actorRole === "admin";
+}

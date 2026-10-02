@@ -2,7 +2,7 @@ import { Fragment, useCallback, useEffect, useMemo, useState } from "react";
 import { useAnnotationContext } from "../../../context/AnnotationContext";
 import { useSharedFetch } from "../../../hooks/useSharedFetch";
 import { fetchAnalyticsSummary } from "../../../services/analyticsApi";
-import { fetchOrganizations, fetchProjects } from "../../../services/organizationsApi";
+import { fetchProjects } from "../../../services/organizationsApi";
 import { AnnotationApiError } from "../../../types/annotation.types";
 import type {
   AnalyticsFilters,
@@ -10,7 +10,7 @@ import type {
   PageVisitRow,
   TopUserRecord,
 } from "../../../types/analytics.types";
-import type { Organization, Project } from "../../../types/organization.types";
+import type { Project } from "../../../types/organization.types";
 import {
   rangeForPreset,
   validateCustomRange,
@@ -51,8 +51,8 @@ const DEFAULT_PRESET: RangePreset = "7d";
 export function DashboardTab() {
   const { config, activeAccount } = useAnnotationContext();
   const authToken = activeAccount?.token;
-  const [organizationId, setOrganizationId] = useState("");
-  const [projectId, setProjectId] = useState("");
+  // Every query is scoped to a single project; it defaults to the current one.
+  const [projectId, setProjectId] = useState(config.projectId);
   const [rangeChoice, setRangeChoice] = useState<RangeChoice>(DEFAULT_PRESET);
   const [presetRange, setPresetRange] = useState<DateRange>(() =>
     rangeForPreset(DEFAULT_PRESET, new Date()),
@@ -66,30 +66,15 @@ export function DashboardTab() {
   const [topUsers, setTopUsers] = useState<TopUserRecord[]>([]);
   const [topPages, setTopPages] = useState<PageVisitRow[]>([]);
 
-  const { data: organizationsData } = useSharedFetch<Organization[]>(
-    `organizations:${config.apiBaseUrl}:${authToken ?? ""}`,
-    (signal) => fetchOrganizations(config.apiBaseUrl, authToken, signal),
-  );
   const { data: projectsData } = useSharedFetch<Project[]>(
     `projects:${config.apiBaseUrl}:${authToken ?? ""}:all`,
     (signal) => fetchProjects(config.apiBaseUrl, authToken, undefined, signal),
   );
 
-  const organizationOptions = useMemo<SelectOption[]>(
-    () =>
-      (organizationsData ?? []).map((organization) => ({
-        value: organization.id,
-        label: organization.companyName,
-      })),
-    [organizationsData],
-  );
-
   const projectOptions = useMemo<SelectOption[]>(
     () =>
-      (projectsData ?? [])
-        .filter((project) => !organizationId || project.organizationId === organizationId)
-        .map((project) => ({ value: project.id, label: project.name })),
-    [projectsData, organizationId],
+      (projectsData ?? []).map((project) => ({ value: project.id, label: project.name })),
+    [projectsData],
   );
 
   const projectName = useCallback(
@@ -121,13 +106,12 @@ export function DashboardTab() {
     () =>
       rangeValid
         ? {
-            organizationId: organizationId || undefined,
-            projectId: projectId || undefined,
+            projectId,
             from,
             to,
           }
         : null,
-    [rangeValid, organizationId, projectId, from, to],
+    [rangeValid, projectId, from, to],
   );
 
   useEffect(() => {
@@ -172,12 +156,7 @@ export function DashboardTab() {
     }
   };
 
-  const changeOrganization = (next: string) => {
-    setOrganizationId(next);
-    setProjectId("");
-  };
-
-  const filtersKey = [organizationId, projectId, from, to].join("|");
+  const filtersKey = [projectId, from, to].join("|");
   const status = deriveDashboardStatus({ summaryLoaded: summary !== null, error });
 
   const reloadChangedSections = useCallback((kinds: AnalyticsChangeKind[]) => {
@@ -191,10 +170,7 @@ export function DashboardTab() {
   const streamState = useAnalyticsStream({
     apiBaseUrl: config.apiBaseUrl,
     authToken,
-    scope: {
-      organizationId: organizationId || undefined,
-      projectId: projectId || undefined,
-    },
+    scope: { projectId },
     enabled: status === "ready",
     onChange: reloadChangedSections,
     onResync: reloadAllSections,
@@ -204,22 +180,12 @@ export function DashboardTab() {
     <div className="wpn-settings-tab wpn-dashboard">
       <div className="wpn-dashboard__filters">
         <SearchableSelect
-          options={organizationOptions}
-          value={organizationId}
-          onChange={changeOrganization}
-          placeholder="All organizations"
-          searchPlaceholder="Search organizations"
-          ariaLabel="Filter by organization"
-          clearable
-        />
-        <SearchableSelect
           options={projectOptions}
           value={projectId}
           onChange={setProjectId}
-          placeholder="All projects"
+          placeholder="Select project"
           searchPlaceholder="Search projects"
           ariaLabel="Filter by project"
-          clearable
         />
         <SearchableSelect
           options={RANGE_OPTIONS}

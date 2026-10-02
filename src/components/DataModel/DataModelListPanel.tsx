@@ -17,9 +17,13 @@ import type { StreamEvent } from "../../types/stream.types";
 import {
   createDataModel,
   deleteDataModel,
+  fetchDataModelDocument,
   listDataModels,
 } from "../../services/dataModelApi";
+import { canExportData } from "../../utils/permissions";
 import { canDeleteBoardItem } from "../../utils/boardPermissions";
+import { downloadJson } from "../../utils/downloadJson";
+import { stripExportNoise } from "../../utils/exportBundle";
 import { formatRelativeTime } from "../../utils/format";
 import type { DataModel, DataModelDraft } from "../../types/dataModel.types";
 import { DATA_MODEL_ENGINE_OPTIONS, DataModelFormModal } from "./DataModelFormModal";
@@ -54,6 +58,7 @@ export function DataModelListPanel({ onOpen }: DataModelListPanelProps) {
   const { config } = useAnnotationContext();
   const { hostAuthenticated, activeAccount } = useAnnotationAuth();
   const getToken = useTokenGetter(config.getAuthToken);
+  const mayExport = Boolean(activeAccount?.roleId && canExportData(activeAccount.roleId));
   const sessionKey = hostAuthenticated ? "host" : (activeAccount?.id ?? "");
   const listKey = sessionKey
     ? `data-models-list:${config.apiBaseUrl}:${sessionKey}:${config.projectId}`
@@ -151,6 +156,18 @@ export function DataModelListPanel({ onOpen }: DataModelListPanelProps) {
       setNotice(describeApiError(err));
     } finally {
       setBusy(false);
+    }
+  };
+
+  const handleExport = async (dataModel: DataModel) => {
+    setNotice(null);
+    try {
+      const authToken = await getToken();
+      const document = await fetchDataModelDocument(config.apiBaseUrl, authToken, dataModel.id);
+      const safeName = dataModel.name.replace(/[^A-Za-z0-9._-]+/g, "_").replace(/^_+|_+$/g, "");
+      downloadJson(`datamodel_${safeName || dataModel.id}.json`, stripExportNoise(document));
+    } catch (err) {
+      setNotice(describeApiError(err));
     }
   };
 
@@ -254,6 +271,17 @@ export function DataModelListPanel({ onOpen }: DataModelListPanelProps) {
               <Icon name="open" />
               <span>Open</span>
             </button>
+            {mayExport ? (
+              <button
+                type="button"
+                className="wpn-users-action wpn-users-action--labeled"
+                aria-label={`Export ${dataModel.name}`}
+                onClick={() => void handleExport(dataModel)}
+              >
+                <Icon name="download" />
+                <span>Export</span>
+              </button>
+            ) : null}
             {canDeleteBoardItem(dataModel.createdById, config.currentUser) ? (
               <button
                 type="button"

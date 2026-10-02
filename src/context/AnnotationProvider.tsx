@@ -220,6 +220,7 @@ export function AnnotationProvider({ config, children }: AnnotationProviderProps
     createAnnotation,
     addComment,
     editComment,
+    setCommentAddToContext,
     removeComment,
     setStatus,
     renameAnnotation,
@@ -710,7 +711,7 @@ export function AnnotationProvider({ config, children }: AnnotationProviderProps
 
   const currentUserId = activeConfig.currentUser.id;
   const submitDraft = useCallback(
-    async (message: string, status?: AnnotationStatus) => {
+    async (message: string, status?: AnnotationStatus, addToContext = false) => {
       const current = draftRef.current;
       if (!current) {
         return;
@@ -724,6 +725,7 @@ export function AnnotationProvider({ config, children }: AnnotationProviderProps
         comment: {
           message,
           authorId: currentUserId,
+          addToContext,
         },
         status,
       });
@@ -844,6 +846,7 @@ export function AnnotationProvider({ config, children }: AnnotationProviderProps
       createAnnotation,
       addComment,
       editComment,
+      setCommentAddToContext,
       removeComment,
       setStatus,
       renameAnnotation,
@@ -884,6 +887,7 @@ export function AnnotationProvider({ config, children }: AnnotationProviderProps
       createAnnotation,
       addComment,
       editComment,
+      setCommentAddToContext,
       removeComment,
       setStatus,
       renameAnnotation,

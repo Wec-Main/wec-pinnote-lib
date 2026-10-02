@@ -16,6 +16,8 @@ import { Icons } from "../../assets/icons";
 import { useEpicFlowApi } from "../../hooks/useEpicFlowApi";
 import { useEpicFlowStream } from "../../hooks/useEpicFlowStream";
 import { EpicFlowApiError } from "../../services/epicFlowApi";
+import { downloadJson } from "../../utils/downloadJson";
+import { buildEpicExport, epicExportFilename } from "../../utils/exportEpic";
 import { applyEpicFlowStreamEvent } from "../../utils/applyEpicFlowStreamEvent";
 import type { Epic, UserStory } from "../../types/epicFlow.types";
 import type { StreamEvent } from "../../types/stream.types";
@@ -474,6 +476,9 @@ export function EpicFlowPanel() {
               currentUser={config.currentUser}
               onSelect={selectEpic}
               onCreate={() => setEpicModal({ mode: "create" })}
+              onExport={(epic) =>
+                downloadJson(epicExportFilename(epic), buildEpicExport(epic, allUserStories))
+              }
               onEdit={(epic) => setEpicModal({ mode: "edit", epic })}
               onDelete={(epic) => setPendingDelete({ kind: "epic", epic })}
             />

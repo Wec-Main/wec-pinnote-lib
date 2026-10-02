@@ -18,6 +18,7 @@ import {
   type MentionCandidate,
 } from "../../utils/mentions";
 import { useMentionCandidates } from "../../hooks/useMentionCandidates";
+import { AddToContextCheckbox } from "../AddToContextCheckbox";
 import { CommentMessage } from "../CommentMessage";
 import { CommentQuote } from "../CommentQuote";
 import { MentionTextarea } from "../MentionTextarea";
@@ -27,6 +28,7 @@ interface AnnotationThreadProps {
   annotation: Annotation;
   currentUser: AnnotationUser;
   onEdit: (commentId: string, message: string) => Promise<void>;
+  onToggleContext?: (commentId: string, addToContext: boolean) => Promise<void>;
   onDelete: (comment: AnnotationComment) => void;
   onReply: (comment: AnnotationComment) => void;
   onEditingChange?: (editing: boolean) => void;
@@ -53,6 +55,7 @@ function CommentItem({
   deletesAnnotation,
   canDeleteAnnotation,
   onEdit,
+  onToggleContext,
   onDelete,
   onReply,
   onEditingChange,
@@ -64,6 +67,7 @@ function CommentItem({
   deletesAnnotation: boolean;
   canDeleteAnnotation: boolean;
   onEdit: (commentId: string, message: string) => Promise<void>;
+  onToggleContext?: (commentId: string, addToContext: boolean) => Promise<void>;
   onDelete: (comment: AnnotationComment) => void;
   onReply: (comment: AnnotationComment) => void;
   onEditingChange?: (commentId: string, editing: boolean) => void;
@@ -229,6 +233,14 @@ function CommentItem({
             <p className="wpn-comment__message">
               <CommentMessage message={comment.message} currentUserId={currentUser.id} />
             </p>
+            <AddToContextCheckbox
+              className="wpn-context-check--comment"
+              checked={comment.addToContext === true}
+              disabled={!canEdit || !onToggleContext}
+              onChange={(next) => {
+                onToggleContext?.(comment.id, next).catch(() => undefined);
+              }}
+            />
           </>
         )}
       </div>
@@ -240,6 +252,7 @@ export function AnnotationThread({
   annotation,
   currentUser,
   onEdit,
+  onToggleContext,
   onDelete,
   onReply,
   onEditingChange,
@@ -281,6 +294,7 @@ export function AnnotationThread({
       deletesAnnotation={deletesAnnotation}
       canDeleteAnnotation={canDelete}
       onEdit={onEdit}
+      onToggleContext={onToggleContext}
       onDelete={onDelete}
       onReply={onReply}
       onEditingChange={setCommentEditing}

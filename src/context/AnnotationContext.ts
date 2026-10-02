@@ -60,13 +60,27 @@ export interface AnnotationDataContextValue {
   actionError: string | null;
   clearActionError: () => void;
   createAnnotation: (request: CreateAnnotationRequest) => Promise<Annotation>;
-  addComment: (annotationId: string, message: string, replyToId?: string) => Promise<void>;
+  addComment: (
+    annotationId: string,
+    message: string,
+    replyToId?: string,
+    addToContext?: boolean,
+  ) => Promise<void>;
   editComment: (annotationId: string, commentId: string, message: string) => Promise<void>;
+  setCommentAddToContext: (
+    annotationId: string,
+    commentId: string,
+    addToContext: boolean,
+  ) => Promise<void>;
   removeComment: (annotationId: string, commentId: string) => Promise<void>;
   setStatus: (annotationId: string, status: AnnotationStatus) => Promise<void>;
   renameAnnotation: (annotationId: string, path: string) => Promise<void>;
   removeAnnotation: (annotationId: string) => Promise<void>;
-  submitDraft: (message: string, status?: AnnotationStatus) => Promise<void>;
+  submitDraft: (
+    message: string,
+    status?: AnnotationStatus,
+    addToContext?: boolean,
+  ) => Promise<void>;
   annotationTags: AnnotationTag[];
   projectTags: ProjectTag[];
   submitTagDraft: (tagId: string) => Promise<void>;

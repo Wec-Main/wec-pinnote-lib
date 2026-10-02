@@ -78,19 +78,22 @@ export function CommentsListTable({
                 </td>
                 <td className="wpn-users-table__muted">{formatRelativeTime(lastActivityAt)}</td>
                 <td>
-                  <Tooltip label="Open on page" placement="left">
-                    <button
-                      type="button"
-                      className="wpn-comments-list-table__reveal"
-                      aria-label={`Open "${label}" on the page`}
-                      onClick={(event) => {
-                        event.stopPropagation();
-                        onRevealOnPage(annotation.id);
-                      }}
-                    >
-                      <Icon name="arrowUpRight" />
-                    </button>
-                  </Tooltip>
+                  <div className="wpn-users-actions">
+                    <Tooltip label="Open on page" placement="left">
+                      <button
+                        type="button"
+                        className="wpn-users-action wpn-users-action--labeled"
+                        aria-label={`Open "${label}" on the page`}
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          onRevealOnPage(annotation.id);
+                        }}
+                      >
+                        <Icon name="arrowUpRight" />
+                        <span>Open</span>
+                      </button>
+                    </Tooltip>
+                  </div>
                 </td>
               </tr>
             );

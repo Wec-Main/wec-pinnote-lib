@@ -69,7 +69,7 @@ export function AnnotationListPanel() {
   // the list to reveal a pin, the chosen grid/list layout isn't lost.
   const [viewMode, setViewMode] = usePersistentState(
     `wpn-ui:${config.projectId}:commentsViewMode`,
-    "grid",
+    "list",
     isCommentsViewMode,
   );
   // The top toolbar hides itself, and the Full Screen panel claims the

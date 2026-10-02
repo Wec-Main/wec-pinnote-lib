@@ -12,6 +12,7 @@ import type {
   AnnotationStatus,
   AnnotationUser,
   CreateAnnotationRequest,
+  UpdateCommentRequest,
 } from "../types/annotation.types";
 import { AnnotationApiError } from "../types/annotation.types";
 import { createClientId } from "../utils/format";
@@ -337,6 +338,7 @@ export function useAnnotationCollection({
           {
             id: createClientId("comment"),
             message: request.comment.message,
+            addToContext: request.comment.addToContext ?? false,
             createdBy: requestingUser,
             createdAt: now,
             updatedAt: now,
@@ -386,7 +388,7 @@ export function useAnnotationCollection({
   );
 
   const addComment = useCallback(
-    async (annotationId: string, message: string, replyToId?: string) => {
+    async (annotationId: string, message: string, replyToId?: string, addToContext = false) => {
       const tempId = createClientId("comment");
       const now = new Date().toISOString();
       const requestingUser = currentUserRef.current;
@@ -394,6 +396,7 @@ export function useAnnotationCollection({
         id: tempId,
         message,
         replyToId,
+        addToContext,
         createdBy: requestingUser,
         createdAt: now,
         updatedAt: now,
@@ -427,6 +430,7 @@ export function useAnnotationCollection({
           {
             message,
             replyToId,
+            addToContext,
             authorId: requestingUser.id,
           },
           controller.signal,
@@ -465,8 +469,8 @@ export function useAnnotationCollection({
     [api, beginWrite, endWrite, reportActionError, retry],
   );
 
-  const editComment = useCallback(
-    async (annotationId: string, commentId: string, message: string) => {
+  const patchComment = useCallback(
+    async (annotationId: string, commentId: string, patch: UpdateCommentRequest) => {
       const previous = annotationsRef.current
         .find((item) => item.id === annotationId)
         ?.comments.find((comment) => comment.id === commentId);
@@ -477,7 +481,7 @@ export function useAnnotationCollection({
             ? {
                 ...item,
                 comments: item.comments.map((comment) =>
-                  comment.id === commentId ? { ...comment, message, updatedAt: now } : comment,
+                  comment.id === commentId ? { ...comment, ...patch, updatedAt: now } : comment,
                 ),
               }
             : item,
@@ -488,12 +492,7 @@ export function useAnnotationCollection({
       const controller = beginWrite();
 
       try {
-        const updated = await api.updateComment(
-          annotationId,
-          commentId,
-          { message },
-          controller.signal,
-        );
+        const updated = await api.updateComment(annotationId, commentId, patch, controller.signal);
         if (currentUserRef.current.id !== requestingUser.id) {
           return;
         }
@@ -535,6 +534,18 @@ export function useAnnotationCollection({
       }
     },
     [api, beginWrite, endWrite, reportActionError],
+  );
+
+  const editComment = useCallback(
+    (annotationId: string, commentId: string, message: string) =>
+      patchComment(annotationId, commentId, { message }),
+    [patchComment],
+  );
+
+  const setCommentAddToContext = useCallback(
+    (annotationId: string, commentId: string, addToContext: boolean) =>
+      patchComment(annotationId, commentId, { addToContext }),
+    [patchComment],
   );
 
   const removeAnnotation = useCallback(
@@ -714,6 +725,7 @@ export function useAnnotationCollection({
       createAnnotation,
       addComment,
       editComment,
+      setCommentAddToContext,
       removeComment,
       setStatus,
       renameAnnotation,
@@ -730,6 +742,7 @@ export function useAnnotationCollection({
       createAnnotation,
       addComment,
       editComment,
+      setCommentAddToContext,
       removeComment,
       setStatus,
       renameAnnotation,
@@ -753,6 +766,7 @@ export function useAnnotations() {
     createAnnotation: data.createAnnotation,
     addComment: data.addComment,
     editComment: data.editComment,
+    setCommentAddToContext: data.setCommentAddToContext,
     removeComment: data.removeComment,
     setStatus: data.setStatus,
     renameAnnotation: data.renameAnnotation,

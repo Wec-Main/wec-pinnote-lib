@@ -8,11 +8,13 @@ interface ConfirmDialogProps {
   title: string;
   description: string;
   detail?: ReactNode;
+  className?: string;
   confirmLabel: string;
   cancelLabel?: string;
   confirmIcon?: IconName;
   destructive?: boolean;
   busy?: boolean;
+  confirmDisabled?: boolean;
   onCancel: () => void;
   onConfirm: () => void;
 }
@@ -21,11 +23,13 @@ export function ConfirmDialog({
   title,
   description,
   detail,
+  className,
   confirmLabel,
   cancelLabel = "Cancel",
   confirmIcon,
   destructive = false,
   busy = false,
+  confirmDisabled = false,
   onCancel,
   onConfirm,
 }: ConfirmDialogProps) {
@@ -49,7 +53,10 @@ export function ConfirmDialog({
         className={[
           "wpn-confirm",
           destructive ? "wpn-confirm--destructive" : "wpn-confirm--neutral",
-        ].join(" ")}
+          className ?? "",
+        ]
+          .filter(Boolean)
+          .join(" ")}
         role="alertdialog"
         aria-modal="true"
         aria-label={title}
@@ -83,7 +90,7 @@ export function ConfirmDialog({
             type="button"
             className={["wpn-btn", destructive ? "wpn-btn--danger" : "wpn-btn--primary"].join(" ")}
             onClick={onConfirm}
-            disabled={busy}
+            disabled={busy || confirmDisabled}
             aria-busy={busy}
           >
             {busy ? (

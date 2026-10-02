@@ -88,28 +88,28 @@ export function AnnotationVisibilityToggle() {
   };
 
   const layerItem = (definition: LayerDefinition): MenuItemDefinition => {
-    const visibility: MenuItemDefinition = {
-      type: "checkbox",
-      id: definition.layer,
-      label: definition.label,
-      icon: definition.icon,
-      checked: definition.visible,
-      shortcut: String(definition.count),
-      onToggle: definition.onToggle,
-    };
+    const toggleLabel = `Show ${definition.label.toLowerCase()}`;
     if (!definition.versioningEnabled) {
-      return visibility;
+      return {
+        type: "checkbox",
+        id: definition.layer,
+        label: definition.label,
+        icon: definition.icon,
+        checked: definition.visible,
+        shortcut: String(definition.count),
+        variant: "switch",
+        onToggle: definition.onToggle,
+      };
     }
+    // The on/off switch lives on the layer row itself, so the right-hand flyout
+    // lists the versions chooser alone.
     return {
       type: "submenu",
       id: `${definition.layer}-menu`,
       label: definition.label,
       icon: definition.icon,
-      items: [
-        { ...visibility, label: `Show ${definition.label.toLowerCase()}` },
-        { type: "separator", id: `${definition.layer}-versions-separator` },
-        ...versionItems(definition),
-      ],
+      toggle: { label: toggleLabel, checked: definition.visible, onToggle: definition.onToggle },
+      items: versionItems(definition),
     };
   };
 

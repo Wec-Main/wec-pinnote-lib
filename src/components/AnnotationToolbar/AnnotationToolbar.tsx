@@ -10,6 +10,7 @@ import { Icons } from "../../assets/icons";
 import { Icon, LiveStatus, Tooltip } from "../primitives";
 import { LauncherButton, type LauncherDragHandlers } from "./LauncherButton";
 import { PublishVersionButton } from "./PublishVersionButton";
+import { ExportDialogButton } from "./ExportDialogButton";
 import { isBoolean, usePersistentState } from "../../hooks/usePersistentState";
 
 const EDGE = 8;
@@ -480,6 +481,7 @@ export function AnnotationToolbar() {
             <AnnotationModeButton />
             <AnnotationVisibilityToggle />
             <PublishVersionButton />
+            <ExportDialogButton />
             {/* Comments only load for a signed-in actor, so refreshing and the
                 failure it would report are meaningless while logged out. */}
             {loggedOut ? null : (

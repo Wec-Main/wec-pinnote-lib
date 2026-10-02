@@ -5,10 +5,11 @@ import { encodeMentions } from "../../utils/mentions";
 import { CommentQuote } from "../CommentQuote";
 import { ComposerHint } from "../ComposerHint";
 import { MentionTextarea, type MentionTextareaHandle } from "../MentionTextarea";
+import { AddToContextCheckbox } from "../AddToContextCheckbox";
 import { Tooltip } from "../primitives";
 
 interface AnnotationReplyComposerProps {
-  onSubmit: (message: string) => Promise<void>;
+  onSubmit: (message: string, addToContext: boolean) => Promise<void>;
   replyTarget: AnnotationComment | null;
   onCancelReply: () => void;
   onDraftChange?: (hasDraft: boolean) => void;
@@ -21,6 +22,7 @@ export function AnnotationReplyComposer({
   onDraftChange,
 }: AnnotationReplyComposerProps) {
   const [message, setMessage] = useState("");
+  const [addToContext, setAddToContext] = useState(false);
   const [sending, setSending] = useState(false);
   const [focused, setFocused] = useState(false);
   const fieldRef = useRef<MentionTextareaHandle>(null);
@@ -44,11 +46,14 @@ export function AnnotationReplyComposer({
     }
     setSending(true);
     setMessage("");
+    const flagged = addToContext;
+    setAddToContext(false);
     fieldRef.current?.focus();
     try {
-      await onSubmit(encodeMentions(trimmed, candidates));
+      await onSubmit(encodeMentions(trimmed, candidates), flagged);
     } catch {
       setMessage((current) => (current.trim() ? `${trimmed}\n${current}` : trimmed));
+      setAddToContext((current) => current || flagged);
     } finally {
       setSending(false);
     }
@@ -112,6 +117,7 @@ export function AnnotationReplyComposer({
           </Tooltip>
         </div>
       </form>
+      <AddToContextCheckbox checked={addToContext} onChange={setAddToContext} disabled={sending} />
       {focused || message ? <ComposerHint length={message.length} /> : null}
     </div>
   );

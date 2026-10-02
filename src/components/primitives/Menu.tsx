@@ -10,6 +10,7 @@ import { useEscapeKey } from "../../hooks/useEscapeKey";
 import { useFloatingPosition } from "../../hooks/useFloatingPosition";
 import { useOutsidePointerDown } from "../../hooks/useOutsidePointerDown";
 import { Icon, type IconName } from "./Icon";
+import { Switch } from "./Switch";
 
 export interface MenuActionItem {
   type: "action";
@@ -30,6 +31,8 @@ export interface MenuCheckboxItem {
   icon?: IconName;
   shortcut?: string;
   disabled?: boolean;
+  /** Render an on/off switch instead of a check mark. */
+  variant?: "switch";
   onToggle: (checked: boolean) => void;
 }
 
@@ -54,6 +57,8 @@ export interface MenuSubmenuItem {
   label: string;
   icon?: IconName;
   disabled?: boolean;
+  /** Inline on/off switch beside the row; the flyout then holds only `items`. */
+  toggle?: { label: string; checked: boolean; onToggle: (checked: boolean) => void };
   items: MenuItemDefinition[];
 }
 
@@ -118,7 +123,12 @@ function SubmenuItem({
   };
 
   return (
-    <div className="wpn-menu__item-wrap" onPointerEnter={onHover}>
+    <div
+      className={["wpn-menu__item-wrap", item.toggle ? "wpn-menu__item-wrap--toggle" : ""]
+        .filter(Boolean)
+        .join(" ")}
+      onPointerEnter={onHover}
+    >
       <button
         ref={setTriggerRef}
         type="button"
@@ -141,8 +151,30 @@ function SubmenuItem({
           <span className="wpn-menu__item-icon" aria-hidden="true" />
         )}
         <span className="wpn-menu__item-label">{item.label}</span>
-        <Icon name="chevronRight" className="wpn-menu__item-caret" />
+        {item.toggle ? null : <Icon name="chevronRight" className="wpn-menu__item-caret" />}
       </button>
+      {item.toggle ? (
+        <>
+          <span className="wpn-menu__item-switch">
+            <Switch
+              checked={item.toggle.checked}
+              onChange={item.toggle.onToggle}
+              label={item.toggle.label}
+              disabled={item.disabled}
+            />
+          </span>
+          <button
+            type="button"
+            tabIndex={-1}
+            aria-hidden="true"
+            disabled={item.disabled}
+            className="wpn-menu__item-expand"
+            onClick={onOpen}
+          >
+            <Icon name="chevronRight" className="wpn-menu__item-caret" />
+          </button>
+        </>
+      ) : null}
       {open ? (
         <MenuPanel
           items={item.items}
@@ -238,6 +270,11 @@ export function MenuPanel({
       setOpenSubmenuId(active.id);
       return;
     }
+    if (event.key === " " && active?.type === "submenu" && active.toggle && !active.disabled) {
+      event.preventDefault();
+      active.toggle.onToggle(!active.toggle.checked);
+      return;
+    }
     if (event.key === "ArrowLeft") {
       if (openSubmenuId) {
         event.preventDefault();
@@ -311,7 +348,7 @@ export function MenuPanel({
             >
               {icon ? (
                 <Icon name={icon} className="wpn-menu__item-icon" />
-              ) : (
+              ) : item.type === "checkbox" && item.variant === "switch" ? null : (
                 <Icon
                   name="check"
                   className={[
@@ -323,7 +360,18 @@ export function MenuPanel({
                 />
               )}
               <span className="wpn-menu__item-label">{item.label}</span>
-              {icon && item.checked ? (
+              {item.type === "checkbox" && item.variant === "switch" ? (
+                <span
+                  className={["wpn-switch", item.checked ? "wpn-switch--on" : ""]
+                    .filter(Boolean)
+                    .join(" ")}
+                  aria-hidden="true"
+                >
+                  <span className="wpn-switch__track">
+                    <span className="wpn-switch__knob" />
+                  </span>
+                </span>
+              ) : icon && item.checked ? (
                 <Icon name="check" className="wpn-menu__item-check wpn-menu__item-check--visible" />
               ) : null}
               {item.shortcut ? (

@@ -11,6 +11,7 @@ import { useMentionCandidates } from "../../hooks/useMentionCandidates";
 import { encodeMentions } from "../../utils/mentions";
 import { AnnotationStatusSelect } from "../AnnotationStatusSelect";
 import { ComposerHint, ComposerHintInfo } from "../ComposerHint";
+import { AddToContextCheckbox } from "../AddToContextCheckbox";
 import { MentionTextarea } from "../MentionTextarea";
 import { Icons } from "../../assets/icons";
 import { Tooltip } from "../primitives";
@@ -44,6 +45,7 @@ function DraftComposer({ draft, x, y }: DraftComposerProps) {
   const placement = useFloatingPanel(true, x, y, panelRef);
   const [message, setMessage] = useState(draft.message);
   const [status, setStatus] = useState<AnnotationStatus>("open");
+  const [addToContext, setAddToContext] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [editingLabel, setEditingLabel] = useState(false);
   const [labelValue, setLabelValue] = useState("");
@@ -79,7 +81,7 @@ function DraftComposer({ draft, x, y }: DraftComposerProps) {
     }
     setSubmitting(true);
     try {
-      await submitDraft(encodeMentions(trimmed, candidates), status);
+      await submitDraft(encodeMentions(trimmed, candidates), status, addToContext);
     } catch {
       setSubmitting(false);
     }
@@ -209,6 +211,12 @@ function DraftComposer({ draft, x, y }: DraftComposerProps) {
           autoFocus
           onEnter={() => void send()}
           onFocusChange={setFocused}
+        />
+        <AddToContextCheckbox
+          className="wpn-context-check--composer"
+          checked={addToContext}
+          onChange={setAddToContext}
+          disabled={submitting}
         />
         {focused || hovered ? <ComposerHint length={message.length} /> : null}
         <div className="wpn-panel__composer">

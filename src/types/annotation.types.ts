@@ -29,6 +29,7 @@ export interface AnnotationComment {
   id: string;
   message: string;
   replyToId?: string;
+  addToContext?: boolean;
   createdBy: AnnotationUser;
   createdAt: string;
   updatedAt: string;
@@ -58,6 +59,7 @@ export interface CreateAnnotationRequest {
   comment: {
     message: string;
     authorId?: string;
+    addToContext?: boolean;
   };
   status?: AnnotationStatus;
 }
@@ -68,6 +70,7 @@ export interface CreateCommentRequest {
   message: string;
   replyToId?: string;
   authorId?: string;
+  addToContext?: boolean;
 }
 
 export interface UpdateAnnotationRequest {
@@ -76,7 +79,8 @@ export interface UpdateAnnotationRequest {
 }
 
 export interface UpdateCommentRequest {
-  message: string;
+  message?: string;
+  addToContext?: boolean;
 }
 
 export interface AnnotationListResponse {
