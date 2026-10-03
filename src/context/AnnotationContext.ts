@@ -1,4 +1,6 @@
 import { createContext, useContext } from "react";
+import { useStoreSelector } from "../hooks/useStoreSelector";
+import type { Store } from "../utils/flowchart/store";
 import type { AuthSession, LoginOption } from "../types/auth.types";
 import type { StreamConnectionState } from "../types/stream.types";
 import type {
@@ -198,4 +200,26 @@ export function useAnnotationContext(): AnnotationContextValue {
   const ui = useAnnotationUi();
   const auth = useAnnotationAuth();
   return { ...data, ...ui, ...auth };
+}
+
+// A store mirroring the merged AnnotationContextValue (the same value
+// useAnnotationContext() above produces), kept in sync by AnnotationProvider
+// so narrow consumers can read a single slice of it — via
+// useAnnotationSelector below — without re-rendering whenever any of the
+// many unrelated fields on the merged context change. Built the same way
+// useStoreSelector.ts already does it for the Flow/ERD engines (see
+// FlowContext.ts / ErdContext.ts): a plain Store notified by the provider,
+// read through useSyncExternalStore with a cached, equality-checked
+// snapshot.
+export const AnnotationStoreContext = createContext<Store<AnnotationContextValue> | null>(null);
+
+export function useAnnotationStore(): Store<AnnotationContextValue> {
+  return requireContext(useContext(AnnotationStoreContext), "useAnnotationStore");
+}
+
+export function useAnnotationSelector<T>(
+  selector: (state: AnnotationContextValue) => T,
+  equalityFn?: (a: T, b: T) => boolean,
+): T {
+  return useStoreSelector(useAnnotationStore(), selector, equalityFn);
 }

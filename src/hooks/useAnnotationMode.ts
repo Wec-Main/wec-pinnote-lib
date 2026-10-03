@@ -1,11 +1,12 @@
-import { useAnnotationContext } from "../context/AnnotationContext";
+import { useAnnotationSelector } from "../context/AnnotationContext";
 
 export function useAnnotationMode() {
-  const context = useAnnotationContext();
+  const enabled = useAnnotationSelector((state) => state.modeEnabled);
+  const setEnabled = useAnnotationSelector((state) => state.setModeEnabled);
 
   return {
-    enabled: context.modeEnabled,
-    setEnabled: context.setModeEnabled,
-    toggle: () => context.setModeEnabled(!context.modeEnabled),
+    enabled,
+    setEnabled,
+    toggle: () => setEnabled(!enabled),
   };
 }
