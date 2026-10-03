@@ -1,6 +1,6 @@
 import type { Epic, UserStory } from "../types/epicFlow.types";
 import type { StreamEvent } from "../types/stream.types";
-import { isEpic, isUserStory, upsertById } from "./streamPayloadGuards";
+import { isEpic, isNewer, isUserStory, upsertById } from "./streamPayloadGuards";
 
 export interface EpicFlowStreamApplication {
   epics: Epic[];
@@ -30,7 +30,8 @@ export function applyEpicFlowStreamEvent(
 
     case "epic.deleted": {
       const { epicId } = payload as { epicId: string };
-      if (!epicId) {
+      const existing = epicId ? epics.find((item) => item.id === epicId) : undefined;
+      if (!epicId || !existing || isNewer(existing.updatedAt, event.createdAt)) {
         return unchanged;
       }
       const remainingEpics = epics.filter((item) => item.id !== epicId);
@@ -55,7 +56,10 @@ export function applyEpicFlowStreamEvent(
 
     case "user_story.deleted": {
       const { userStoryId } = payload as { userStoryId: string };
-      if (!userStoryId) {
+      const existing = userStoryId
+        ? userStories.find((item) => item.id === userStoryId)
+        : undefined;
+      if (!userStoryId || !existing || isNewer(existing.updatedAt, event.createdAt)) {
         return unchanged;
       }
       const remaining = userStories.filter((item) => item.id !== userStoryId);

@@ -33,7 +33,12 @@ function annotation(id: string, number: number, updatedAt: string): Annotation {
   };
 }
 
-function event(eventType: StreamEventType, payload: unknown, eventId = "1"): StreamEvent {
+function event(
+  eventType: StreamEventType,
+  payload: unknown,
+  eventId = "1",
+  createdAt = "2026-01-01T00:00:00.000Z",
+): StreamEvent {
   return {
     eventId,
     projectId: "project-1",
@@ -43,7 +48,7 @@ function event(eventType: StreamEventType, payload: unknown, eventId = "1"): Str
     commentId: null,
     actorUserId: "user-2",
     payload,
-    createdAt: "2026-01-01T00:00:00.000Z",
+    createdAt,
   };
 }
 
@@ -151,6 +156,34 @@ describe("applyStreamEvent", () => {
     );
 
     expect(result.annotations).toHaveLength(0);
+  });
+
+  it("ignores a delete that is stale relative to a recreated annotation", () => {
+    const recreated = annotation("a-1", 1, "2026-01-01T00:00:10.000Z");
+
+    const result = applyStreamEvent(
+      [recreated],
+      event("annotation.deleted", { annotationId: "a-1" }, "1", "2026-01-01T00:00:00.000Z"),
+    );
+
+    expect(result.annotations).toEqual([recreated]);
+  });
+
+  it("ignores a comment delete that is stale relative to a recreated comment", () => {
+    const local = annotation("a-1", 1, "2026-01-01T00:00:00.000Z");
+    local.comments = [comment("c-1", "recreated", "2026-01-01T00:00:10.000Z")];
+
+    const result = applyStreamEvent(
+      [local],
+      event(
+        "comment.deleted",
+        { annotationId: "a-1", commentId: "c-1" },
+        "1",
+        "2026-01-01T00:00:00.000Z",
+      ),
+    );
+
+    expect(result.annotations[0]?.comments).toHaveLength(1);
   });
 
   it("leaves state untouched for a malformed payload", () => {

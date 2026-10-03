@@ -57,7 +57,10 @@ export function applyStreamEvent(annotations: Annotation[], event: StreamEvent):
 
     case "annotation.deleted": {
       const { annotationId } = payload as { annotationId: string };
-      if (!annotationId || !annotations.some((item) => item.id === annotationId)) {
+      const existing = annotationId
+        ? annotations.find((item) => item.id === annotationId)
+        : undefined;
+      if (!annotationId || !existing || isNewer(existing.updatedAt, event.createdAt)) {
         return unchanged;
       }
       return {
@@ -95,7 +98,8 @@ export function applyStreamEvent(annotations: Annotation[], event: StreamEvent):
         commentId: string;
       };
       const target = annotations.find((item) => item.id === annotationId);
-      if (!target || !target.comments.some((comment) => comment.id === commentId)) {
+      const existingComment = target?.comments.find((comment) => comment.id === commentId);
+      if (!target || !existingComment || isNewer(existingComment.updatedAt, event.createdAt)) {
         return unchanged;
       }
       return {

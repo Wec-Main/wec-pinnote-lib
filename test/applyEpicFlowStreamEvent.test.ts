@@ -40,7 +40,12 @@ function story(id: string, epicId: string, updatedAt: string, title = "Story"): 
   };
 }
 
-function event(eventType: StreamEventType, payload: unknown, eventId = "1"): StreamEvent {
+function event(
+  eventType: StreamEventType,
+  payload: unknown,
+  eventId = "1",
+  createdAt = "2026-01-01T00:00:00.000Z",
+): StreamEvent {
   return {
     eventId,
     projectId: "project-1",
@@ -50,7 +55,7 @@ function event(eventType: StreamEventType, payload: unknown, eventId = "1"): Str
     commentId: null,
     actorUserId: "user-2",
     payload,
-    createdAt: "2026-01-01T00:00:00.000Z",
+    createdAt,
   };
 }
 
@@ -107,6 +112,30 @@ describe("applyEpicFlowStreamEvent", () => {
     );
 
     expect(result.epics).toHaveLength(0);
+  });
+
+  it("ignores an epic delete that is stale relative to a recreated epic", () => {
+    const recreated = epic("e-1", "2026-01-01T00:00:10.000Z", "Recreated");
+
+    const result = applyEpicFlowStreamEvent(
+      [recreated],
+      [],
+      event("epic.deleted", { epicId: "e-1" }, "1", "2026-01-01T00:00:00.000Z"),
+    );
+
+    expect(result.epics).toEqual([recreated]);
+  });
+
+  it("ignores a user story delete that is stale relative to a recreated user story", () => {
+    const recreated = story("s-1", "e-1", "2026-01-01T00:00:10.000Z", "Recreated");
+
+    const result = applyEpicFlowStreamEvent(
+      [],
+      [recreated],
+      event("user_story.deleted", { userStoryId: "s-1" }, "1", "2026-01-01T00:00:00.000Z"),
+    );
+
+    expect(result.userStories).toEqual([recreated]);
   });
 
   it("cascades an epic delete to its user stories", () => {
