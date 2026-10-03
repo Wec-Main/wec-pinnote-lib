@@ -1,4 +1,4 @@
-import { buildUrl, request, requestNoContent } from "./httpClient";
+import { createApiClient } from "./apiClientFactory";
 import type { ProjectTag, TagDraft } from "../types/tag.types";
 
 export async function fetchTags(
@@ -7,10 +7,9 @@ export async function fetchTags(
   filters?: { organizationId?: string; projectId?: string; status?: string },
   signal?: AbortSignal,
 ): Promise<ProjectTag[]> {
-  const payload = await request<{ tags: ProjectTag[] }>(
-    buildUrl(apiBaseUrl, "/tags", filters),
-    authToken,
-    { signal },
+  const payload = await createApiClient(apiBaseUrl, authToken).call<{ tags: ProjectTag[] }>(
+    "/tags",
+    { query: filters, signal },
   );
   return payload.tags;
 }
@@ -21,11 +20,10 @@ export async function createTag(
   draft: TagDraft,
   signal?: AbortSignal,
 ): Promise<ProjectTag[]> {
-  const payload = await request<{ tags: ProjectTag[] }>(buildUrl(apiBaseUrl, "/tags"), authToken, {
-    method: "POST",
-    body: JSON.stringify(draft),
-    signal,
-  });
+  const payload = await createApiClient(apiBaseUrl, authToken).call<{ tags: ProjectTag[] }>(
+    "/tags",
+    { method: "POST", body: draft, signal },
+  );
   return payload.tags;
 }
 
@@ -36,14 +34,9 @@ export function updateTag(
   draft: Omit<TagDraft, "projectIds">,
   signal?: AbortSignal,
 ): Promise<ProjectTag> {
-  return request<ProjectTag>(
-    buildUrl(apiBaseUrl, `/tags/${encodeURIComponent(tagId)}`),
-    authToken,
-    {
-      method: "PUT",
-      body: JSON.stringify(draft),
-      signal,
-    },
+  return createApiClient(apiBaseUrl, authToken).call<ProjectTag>(
+    `/tags/${encodeURIComponent(tagId)}`,
+    { method: "PUT", body: draft, signal },
   );
 }
 
@@ -53,8 +46,8 @@ export function deleteTag(
   tagId: string,
   signal?: AbortSignal,
 ): Promise<void> {
-  return requestNoContent(buildUrl(apiBaseUrl, `/tags/${encodeURIComponent(tagId)}`), authToken, {
-    method: "DELETE",
-    signal,
-  });
+  return createApiClient(apiBaseUrl, authToken).callNoContent(
+    `/tags/${encodeURIComponent(tagId)}`,
+    { method: "DELETE", signal },
+  );
 }

@@ -1,4 +1,4 @@
-import { buildUrl, request, requestNoContent } from "./httpClient";
+import { createApiClient } from "./apiClientFactory";
 import type {
   Organization,
   OrganizationDraft,
@@ -11,11 +11,9 @@ export async function fetchOrganizations(
   authToken: string | undefined,
   signal?: AbortSignal,
 ): Promise<Organization[]> {
-  const payload = await request<{ organizations: Organization[] }>(
-    buildUrl(apiBaseUrl, "/organizations"),
-    authToken,
-    { signal },
-  );
+  const payload = await createApiClient(apiBaseUrl, authToken).call<{
+    organizations: Organization[];
+  }>("/organizations", { signal });
   return payload.organizations;
 }
 
@@ -25,9 +23,9 @@ export function createOrganization(
   draft: OrganizationDraft,
   signal?: AbortSignal,
 ): Promise<Organization> {
-  return request<Organization>(buildUrl(apiBaseUrl, "/organizations"), authToken, {
+  return createApiClient(apiBaseUrl, authToken).call<Organization>("/organizations", {
     method: "POST",
-    body: JSON.stringify(draft),
+    body: draft,
     signal,
   });
 }
@@ -39,10 +37,9 @@ export function updateOrganization(
   draft: OrganizationDraft,
   signal?: AbortSignal,
 ): Promise<Organization> {
-  return request<Organization>(
-    buildUrl(apiBaseUrl, `/organizations/${encodeURIComponent(organizationId)}`),
-    authToken,
-    { method: "PUT", body: JSON.stringify(draft), signal },
+  return createApiClient(apiBaseUrl, authToken).call<Organization>(
+    `/organizations/${encodeURIComponent(organizationId)}`,
+    { method: "PUT", body: draft, signal },
   );
 }
 
@@ -52,9 +49,8 @@ export function deleteOrganization(
   organizationId: string,
   signal?: AbortSignal,
 ): Promise<void> {
-  return requestNoContent(
-    buildUrl(apiBaseUrl, `/organizations/${encodeURIComponent(organizationId)}`),
-    authToken,
+  return createApiClient(apiBaseUrl, authToken).callNoContent(
+    `/organizations/${encodeURIComponent(organizationId)}`,
     { method: "DELETE", signal },
   );
 }
@@ -65,10 +61,9 @@ export async function fetchProjects(
   organizationId?: string,
   signal?: AbortSignal,
 ): Promise<Project[]> {
-  const payload = await request<{ projects: Project[] }>(
-    buildUrl(apiBaseUrl, "/projects", { organizationId }),
-    authToken,
-    { signal },
+  const payload = await createApiClient(apiBaseUrl, authToken).call<{ projects: Project[] }>(
+    "/projects",
+    { query: { organizationId }, signal },
   );
   return payload.projects;
 }
@@ -79,12 +74,9 @@ export function fetchProject(
   projectId: string,
   signal?: AbortSignal,
 ): Promise<Project> {
-  return request<Project>(
-    buildUrl(apiBaseUrl, `/projects/${encodeURIComponent(projectId)}`),
-    authToken,
-    {
-      signal,
-    },
+  return createApiClient(apiBaseUrl, authToken).call<Project>(
+    `/projects/${encodeURIComponent(projectId)}`,
+    { signal },
   );
 }
 
@@ -94,9 +86,9 @@ export function createProject(
   draft: ProjectDraft,
   signal?: AbortSignal,
 ): Promise<Project> {
-  return request<Project>(buildUrl(apiBaseUrl, "/projects"), authToken, {
+  return createApiClient(apiBaseUrl, authToken).call<Project>("/projects", {
     method: "POST",
-    body: JSON.stringify(draft),
+    body: draft,
     signal,
   });
 }
@@ -108,14 +100,9 @@ export function updateProject(
   draft: ProjectDraft,
   signal?: AbortSignal,
 ): Promise<Project> {
-  return request<Project>(
-    buildUrl(apiBaseUrl, `/projects/${encodeURIComponent(projectId)}`),
-    authToken,
-    {
-      method: "PUT",
-      body: JSON.stringify(draft),
-      signal,
-    },
+  return createApiClient(apiBaseUrl, authToken).call<Project>(
+    `/projects/${encodeURIComponent(projectId)}`,
+    { method: "PUT", body: draft, signal },
   );
 }
 
@@ -132,14 +119,9 @@ export function updateProjectVersionSettings(
   patch: ProjectVersionSettingsPatch,
   signal?: AbortSignal,
 ): Promise<Project> {
-  return request<Project>(
-    buildUrl(apiBaseUrl, `/projects/${encodeURIComponent(projectId)}/version-settings`),
-    authToken,
-    {
-      method: "PATCH",
-      body: JSON.stringify(patch),
-      signal,
-    },
+  return createApiClient(apiBaseUrl, authToken).call<Project>(
+    `/projects/${encodeURIComponent(projectId)}/version-settings`,
+    { method: "PATCH", body: patch, signal },
   );
 }
 
@@ -149,12 +131,8 @@ export function deleteProject(
   projectId: string,
   signal?: AbortSignal,
 ): Promise<void> {
-  return requestNoContent(
-    buildUrl(apiBaseUrl, `/projects/${encodeURIComponent(projectId)}`),
-    authToken,
-    {
-      method: "DELETE",
-      signal,
-    },
+  return createApiClient(apiBaseUrl, authToken).callNoContent(
+    `/projects/${encodeURIComponent(projectId)}`,
+    { method: "DELETE", signal },
   );
 }

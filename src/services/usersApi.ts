@@ -1,7 +1,5 @@
-import { buildUrl, request, requestNoContent, withUnauthorizedRetry } from "./httpClient";
+import { createApiClient, type AuthTokenGetter } from "./apiClientFactory";
 import type { ManagedUser, ManagedUserDraft } from "../types/userManagement.types";
-
-type AuthTokenGetter = () => string | Promise<string>;
 
 export interface UserListQuery {
   projectId: string;
@@ -48,8 +46,10 @@ export function fetchUsers(
   query: UserListQuery,
   signal?: AbortSignal,
 ): Promise<UserPage> {
-  const url = buildUrl(apiBaseUrl, "/users", usersQuery(query));
-  return withUnauthorizedRetry(getAuthToken, (token) => request<UserPage>(url, token, { signal }));
+  return createApiClient(apiBaseUrl, getAuthToken).call<UserPage>("/users", {
+    query: usersQuery(query),
+    signal,
+  });
 }
 
 export interface MentionCandidateRecord {
@@ -64,10 +64,12 @@ export function fetchMentionCandidates(
   projectId: string,
   signal?: AbortSignal,
 ): Promise<MentionCandidateRecord[]> {
-  const url = buildUrl(apiBaseUrl, "/users/mention-candidates", { projectId });
-  return withUnauthorizedRetry(getAuthToken, (token) =>
-    request<{ users: MentionCandidateRecord[] }>(url, token, { signal }),
-  ).then((page) => page.users);
+  return createApiClient(apiBaseUrl, getAuthToken)
+    .call<{ users: MentionCandidateRecord[] }>("/users/mention-candidates", {
+      query: { projectId },
+      signal,
+    })
+    .then((page) => page.users);
 }
 
 function toPayload(projectId: string, draft: ManagedUserDraft) {
@@ -87,14 +89,11 @@ export function createUser(
   draft: ManagedUserDraft,
   signal?: AbortSignal,
 ): Promise<CreatedUser> {
-  const url = buildUrl(apiBaseUrl, "/users");
-  return withUnauthorizedRetry(getAuthToken, (token) =>
-    request<CreatedUser>(url, token, {
-      method: "POST",
-      body: JSON.stringify(toPayload(projectId, draft)),
-      signal,
-    }),
-  );
+  return createApiClient(apiBaseUrl, getAuthToken).call<CreatedUser>("/users", {
+    method: "POST",
+    body: toPayload(projectId, draft),
+    signal,
+  });
 }
 
 export function updateUser(
@@ -105,13 +104,13 @@ export function updateUser(
   draft: ManagedUserDraft,
   signal?: AbortSignal,
 ): Promise<ManagedUser> {
-  const url = buildUrl(apiBaseUrl, `/users/${encodeURIComponent(userId)}`);
-  return withUnauthorizedRetry(getAuthToken, (token) =>
-    request<ManagedUser>(url, token, {
+  return createApiClient(apiBaseUrl, getAuthToken).call<ManagedUser>(
+    `/users/${encodeURIComponent(userId)}`,
+    {
       method: "PUT",
-      body: JSON.stringify(toUpdatePayload(projectId, draft)),
+      body: toUpdatePayload(projectId, draft),
       signal,
-    }),
+    },
   );
 }
 
@@ -122,9 +121,13 @@ export function deleteUser(
   userId: string,
   signal?: AbortSignal,
 ): Promise<void> {
-  const url = buildUrl(apiBaseUrl, `/users/${encodeURIComponent(userId)}`, { projectId });
-  return withUnauthorizedRetry(getAuthToken, (token) =>
-    requestNoContent(url, token, { method: "DELETE", signal }),
+  return createApiClient(apiBaseUrl, getAuthToken).callNoContent(
+    `/users/${encodeURIComponent(userId)}`,
+    {
+      method: "DELETE",
+      query: { projectId },
+      signal,
+    },
   );
 }
 
@@ -136,12 +139,12 @@ export function resetUserPassword(
   password?: string,
   signal?: AbortSignal,
 ): Promise<PasswordReset> {
-  const url = buildUrl(apiBaseUrl, `/users/${encodeURIComponent(userId)}/password-reset`);
-  return withUnauthorizedRetry(getAuthToken, (token) =>
-    request<PasswordReset>(url, token, {
+  return createApiClient(apiBaseUrl, getAuthToken).call<PasswordReset>(
+    `/users/${encodeURIComponent(userId)}/password-reset`,
+    {
       method: "POST",
-      body: JSON.stringify({ projectId, password }),
+      body: { projectId, password },
       signal,
-    }),
+    },
   );
 }

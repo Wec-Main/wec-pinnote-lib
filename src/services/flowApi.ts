@@ -1,4 +1,4 @@
-import { buildUrl, request, requestNoContent } from "./httpClient";
+import { createApiClient } from "./apiClientFactory";
 import type { AnnotationAnchor } from "../types/annotation.types";
 import type {
   Flow,
@@ -21,9 +21,9 @@ export function resolveDefaultFlow(
   projectVersionId?: string,
   signal?: AbortSignal,
 ): Promise<FlowSummary> {
-  return request<FlowSummary>(buildUrl(apiBaseUrl, "/flows/default"), authToken, {
+  return createApiClient(apiBaseUrl, authToken).call<FlowSummary>("/flows/default", {
     method: "POST",
-    body: JSON.stringify({ projectId, projectVersionId }),
+    body: { projectId, projectVersionId },
     signal,
   });
 }
@@ -33,10 +33,12 @@ export function createFlow(
   authToken: string | undefined,
   projectId: string,
   input: { name: string; description?: string; projectVersionId?: string },
+  signal?: AbortSignal,
 ): Promise<Flow> {
-  return request<Flow>(buildUrl(apiBaseUrl, "/flows"), authToken, {
+  return createApiClient(apiBaseUrl, authToken).call<Flow>("/flows", {
     method: "POST",
-    body: JSON.stringify({ projectId, ...input }),
+    body: { projectId, ...input },
+    signal,
   });
 }
 
@@ -47,13 +49,10 @@ export function listFlows(
   projectVersionId?: string,
   signal?: AbortSignal,
 ): Promise<Flow[]> {
-  return request<Flow[]>(
-    buildUrl(apiBaseUrl, "/flows", { projectId, projectVersionId }),
-    authToken,
-    {
-      signal,
-    },
-  );
+  return createApiClient(apiBaseUrl, authToken).call<Flow[]>("/flows", {
+    query: { projectId, projectVersionId },
+    signal,
+  });
 }
 
 export function updateFlow(
@@ -61,10 +60,12 @@ export function updateFlow(
   authToken: string | undefined,
   flowId: string,
   input: { name: string },
+  signal?: AbortSignal,
 ): Promise<Flow> {
-  return request<Flow>(buildUrl(apiBaseUrl, flowPath(flowId, "")), authToken, {
+  return createApiClient(apiBaseUrl, authToken).call<Flow>(flowPath(flowId, ""), {
     method: "PATCH",
-    body: JSON.stringify(input),
+    body: input,
+    signal,
   });
 }
 
@@ -72,9 +73,11 @@ export function deleteFlow(
   apiBaseUrl: string,
   authToken: string | undefined,
   flowId: string,
+  signal?: AbortSignal,
 ): Promise<void> {
-  return requestNoContent(buildUrl(apiBaseUrl, flowPath(flowId, "")), authToken, {
+  return createApiClient(apiBaseUrl, authToken).callNoContent(flowPath(flowId, ""), {
     method: "DELETE",
+    signal,
   });
 }
 
@@ -84,12 +87,9 @@ export function fetchFlowDocument(
   flowId: string,
   signal?: AbortSignal,
 ): Promise<FlowDocumentRecord> {
-  return request<FlowDocumentRecord>(
-    buildUrl(apiBaseUrl, flowPath(flowId, "/document")),
-    authToken,
-    {
-      signal,
-    },
+  return createApiClient(apiBaseUrl, authToken).call<FlowDocumentRecord>(
+    flowPath(flowId, "/document"),
+    { signal },
   );
 }
 
@@ -99,14 +99,11 @@ export function saveFlowDocument(
   flowId: string,
   revision: number,
   document: FlowJSON,
+  signal?: AbortSignal,
 ): Promise<FlowDocumentRecord> {
-  return request<FlowDocumentRecord>(
-    buildUrl(apiBaseUrl, flowPath(flowId, "/document")),
-    authToken,
-    {
-      method: "PUT",
-      body: JSON.stringify({ revision, document }),
-    },
+  return createApiClient(apiBaseUrl, authToken).call<FlowDocumentRecord>(
+    flowPath(flowId, "/document"),
+    { method: "PUT", body: { revision, document }, signal },
   );
 }
 
@@ -114,13 +111,11 @@ export function publishFlow(
   apiBaseUrl: string,
   authToken: string | undefined,
   flowId: string,
+  signal?: AbortSignal,
 ): Promise<FlowVersionRecord> {
-  return request<FlowVersionRecord>(
-    buildUrl(apiBaseUrl, flowPath(flowId, "/versions")),
-    authToken,
-    {
-      method: "POST",
-    },
+  return createApiClient(apiBaseUrl, authToken).call<FlowVersionRecord>(
+    flowPath(flowId, "/versions"),
+    { method: "POST", signal },
   );
 }
 
@@ -130,9 +125,8 @@ export function listFlowVersions(
   flowId: string,
   signal?: AbortSignal,
 ): Promise<FlowVersionRecord[]> {
-  return request<FlowVersionRecord[]>(
-    buildUrl(apiBaseUrl, flowPath(flowId, "/versions")),
-    authToken,
+  return createApiClient(apiBaseUrl, authToken).call<FlowVersionRecord[]>(
+    flowPath(flowId, "/versions"),
     { signal },
   );
 }
@@ -144,9 +138,8 @@ export function fetchFlowVersionDocument(
   versionId: string,
   signal?: AbortSignal,
 ): Promise<FlowVersionWithDocument> {
-  return request<FlowVersionWithDocument>(
-    buildUrl(apiBaseUrl, flowPath(flowId, `/versions/${encodeURIComponent(versionId)}`)),
-    authToken,
+  return createApiClient(apiBaseUrl, authToken).call<FlowVersionWithDocument>(
+    flowPath(flowId, `/versions/${encodeURIComponent(versionId)}`),
     { signal },
   );
 }
@@ -159,11 +152,10 @@ export function fetchFlowPins(
   projectVersionId?: string,
   signal?: AbortSignal,
 ): Promise<FlowPin[]> {
-  return request<FlowPin[]>(
-    buildUrl(apiBaseUrl, "/flow-pins", { projectId, pageKey, projectVersionId }),
-    authToken,
-    { signal },
-  );
+  return createApiClient(apiBaseUrl, authToken).call<FlowPin[]>("/flow-pins", {
+    query: { projectId, pageKey, projectVersionId },
+    signal,
+  });
 }
 
 export function createFlowPin(
@@ -176,11 +168,13 @@ export function createFlowPin(
     name: string;
     anchor: AnnotationAnchor;
   },
+  signal?: AbortSignal,
 ): Promise<FlowPin> {
   const { anchor, ...rest } = input;
-  return request<FlowPin>(buildUrl(apiBaseUrl, "/flow-pins"), authToken, {
+  return createApiClient(apiBaseUrl, authToken).call<FlowPin>("/flow-pins", {
     method: "POST",
-    body: JSON.stringify({ ...rest, ...anchor }),
+    body: { ...rest, ...anchor },
+    signal,
   });
 }
 
@@ -188,10 +182,10 @@ export function deleteFlowPin(
   apiBaseUrl: string,
   authToken: string | undefined,
   flowPinId: string,
+  signal?: AbortSignal,
 ): Promise<void> {
-  return requestNoContent(
-    buildUrl(apiBaseUrl, `/flow-pins/${encodeURIComponent(flowPinId)}`),
-    authToken,
-    { method: "DELETE" },
+  return createApiClient(apiBaseUrl, authToken).callNoContent(
+    `/flow-pins/${encodeURIComponent(flowPinId)}`,
+    { method: "DELETE", signal },
   );
 }
