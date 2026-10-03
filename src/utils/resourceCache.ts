@@ -1,5 +1,5 @@
 import { AnnotationApiError } from "../types/annotation.types";
-import { withJitter } from "./backoff";
+import { computeBackoffDelay, withJitter } from "./backoff";
 
 export const DEFAULT_TTL_MS = 30_000;
 export const DEFAULT_RETRIES = 2;
@@ -70,6 +70,22 @@ interface Entry<T> {
 
 const entries = new Map<string, Entry<unknown>>();
 
+const MAX_ENTRIES = 500;
+
+function isEvictable(entry: Entry<unknown>): boolean {
+  return entry.listeners.size === 0 && entry.watchers <= 0 && !entry.inflight;
+}
+
+function evictIfOverCapacity(): void {
+  if (entries.size <= MAX_ENTRIES) return;
+  for (const [key, entry] of entries) {
+    if (entries.size <= MAX_ENTRIES) break;
+    if (isEvictable(entry)) {
+      entries.delete(key);
+    }
+  }
+}
+
 const EMPTY_SNAPSHOT: ResourceSnapshot<never> = {
   data: undefined,
   hasData: false,
@@ -88,6 +104,7 @@ function entryFor<T>(key: string): Entry<T> {
   if (!entry) {
     entry = { snapshot: emptySnapshot<T>(), listeners: new Set(), watchers: 0, inflight: null };
     entries.set(key, entry as Entry<unknown>);
+    evictIfOverCapacity();
   }
   return entry;
 }
@@ -189,6 +206,9 @@ export function removeResource(key: string): void {
   entry.inflight?.controller.abort();
   entry.inflight = null;
   publish(entry, { ...emptySnapshot<unknown>() });
+  if (isEvictable(entry)) {
+    entries.delete(key);
+  }
 }
 
 export function clearResources(): void {
@@ -244,7 +264,7 @@ async function runWithRetry<T>(
       if (isAbortError(error, signal) || attempt >= retries || !retryable(error)) {
         throw error;
       }
-      await sleep(withJitter(Math.min(base * 2 ** attempt, max)), signal);
+      await sleep(withJitter(computeBackoffDelay(attempt, { baseMs: base, maxMs: max })), signal);
       attempt += 1;
     }
   }

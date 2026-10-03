@@ -8,6 +8,8 @@ import {
   notModified,
   prefetchResource,
   readResource,
+  removeResource,
+  subscribeResource,
   withEtag,
   updateResource,
   watchResource,
@@ -190,5 +192,31 @@ describe("resourceCache", () => {
     writeResource("k", 1);
     mutateResource<number>("k", (current) => (current ?? 0) + 1);
     expect(readResource("k").data).toBe(2);
+  });
+
+  it("keeps a still-subscribed entry alive after removeResource clears its data", () => {
+    writeResource("k", "first");
+    const seen: unknown[] = [];
+    const unsubscribe = subscribeResource("k", () => {
+      seen.push(readResource("k").data);
+    });
+
+    removeResource("k");
+    expect(readResource("k").hasData).toBe(false);
+
+    writeResource("k", "second");
+    expect(readResource("k").data).toBe("second");
+    expect(seen).toContain("second");
+
+    unsubscribe();
+  });
+
+  it("caps the number of cached entries to avoid unbounded growth", async () => {
+    const total = 505;
+    for (let i = 0; i < total; i += 1) {
+      await fetchResource(`cap-${i}`, async () => i);
+    }
+    expect(readResource("cap-0").hasData).toBe(false);
+    expect(readResource(`cap-${total - 1}`).hasData).toBe(true);
   });
 });
