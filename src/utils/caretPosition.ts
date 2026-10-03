@@ -29,32 +29,40 @@ const MIRRORED_PROPERTIES = [
 
 const LINE_HEIGHT_FALLBACK_RATIO = 1.4;
 
+let mirrorElement: HTMLDivElement | null = null;
+
+function getMirrorElement(): HTMLDivElement {
+  if (!mirrorElement) {
+    const mirror = document.createElement("div");
+    mirror.style.position = "absolute";
+    mirror.style.visibility = "hidden";
+    mirror.style.top = "0";
+    mirror.style.left = "-9999px";
+    mirror.style.whiteSpace = "pre-wrap";
+    mirror.style.overflowWrap = "break-word";
+    mirror.style.overflow = "hidden";
+    document.body.appendChild(mirror);
+    mirrorElement = mirror;
+  }
+  return mirrorElement;
+}
+
 export function caretPosition(field: HTMLTextAreaElement, index: number): CaretPosition {
   const style = window.getComputedStyle(field);
-  const mirror = document.createElement("div");
+  const mirror = getMirrorElement();
   for (const property of MIRRORED_PROPERTIES) {
     mirror.style.setProperty(property, style.getPropertyValue(property));
   }
-  mirror.style.position = "absolute";
-  mirror.style.visibility = "hidden";
-  mirror.style.top = "0";
-  mirror.style.left = "-9999px";
-  mirror.style.whiteSpace = "pre-wrap";
-  mirror.style.overflowWrap = "break-word";
-  mirror.style.overflow = "hidden";
   mirror.textContent = field.value.slice(0, index);
   const marker = document.createElement("span");
   marker.textContent = field.value.slice(index) || ".";
   mirror.appendChild(marker);
-  document.body.appendChild(mirror);
 
   const fontSize = Number.parseFloat(style.fontSize);
   const lineHeight = Number.parseFloat(style.lineHeight) || fontSize * LINE_HEIGHT_FALLBACK_RATIO;
-  const position = {
+  return {
     left: marker.offsetLeft + Number.parseFloat(style.borderLeftWidth) - field.scrollLeft,
     top: marker.offsetTop + Number.parseFloat(style.borderTopWidth) - field.scrollTop,
     lineHeight,
   };
-  mirror.remove();
-  return position;
 }
