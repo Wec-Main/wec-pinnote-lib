@@ -157,15 +157,19 @@ describe("applying a proposal", () => {
 });
 
 describe("live AI drafts", () => {
-  it("draws partial ops, redraws without stacking, and restores on endDraft", () => {
+  it("draws partial ops, redraws without stacking, and restores on endDraft", async () => {
     const original = JSON.stringify(engine.toJSON());
-    act(() => {
-      expect(applier.draft([addEntity("labels")])).toBe(true);
+    await act(async () => {
+      expect(await applier.draft([addEntity("labels")])).toBe(true);
     });
     expect(names()).toContain("labels");
     expect(aiPreviewStore.get("data_model", "dm1")?.added.size).toBe(1);
-    act(() => {
-      applier.draft([addEntity("labels"), addEntity("badges"), { op: "addField", entity: "$x" }]);
+    await act(async () => {
+      await applier.draft([
+        addEntity("labels"),
+        addEntity("badges"),
+        { op: "addField", entity: "$x" },
+      ]);
     });
     expect(names().filter((name) => name === "labels")).toHaveLength(1);
     expect(names()).toContain("badges");
@@ -174,10 +178,30 @@ describe("live AI drafts", () => {
     expect(aiPreviewStore.get("data_model", "dm1")).toBeNull();
   });
 
+  it("applies only the new ops when the stream grows and still restores in one endDraft", async () => {
+    const original = JSON.stringify(engine.toJSON());
+    const first = addEntity("labels");
+    const second = addEntity("badges");
+    const third = addEntity("flags");
+    await act(async () => {
+      await applier.draft([first]);
+    });
+    await act(async () => {
+      await applier.draft([first, second]);
+    });
+    await act(async () => {
+      expect(await applier.draft([first, second, third])).toBe(true);
+    });
+    expect(names().filter((name) => ["labels", "badges", "flags"].includes(name))).toHaveLength(3);
+    expect(aiPreviewStore.get("data_model", "dm1")?.added.size).toBe(3);
+    act(() => applier.endDraft());
+    expect(JSON.stringify(engine.toJSON())).toBe(original);
+  });
+
   it("hands the canvas over to the final preview, and Discard returns to the original", async () => {
     const original = JSON.stringify(engine.toJSON());
-    act(() => {
-      applier.draft([addEntity("labels")]);
+    await act(async () => {
+      await applier.draft([addEntity("labels")]);
     });
     await act(async () => {
       const outcome = await applier.preview(batch([addEntity("labels"), addEntity("badges")]));
@@ -189,9 +213,9 @@ describe("live AI drafts", () => {
     expect(JSON.stringify(engine.toJSON())).toBe(original);
   });
 
-  it("stops drafting instead of undoing a change the user made", () => {
-    act(() => {
-      applier.draft([addEntity("labels")]);
+  it("stops drafting instead of undoing a change the user made", async () => {
+    await act(async () => {
+      await applier.draft([addEntity("labels")]);
     });
     act(() => {
       const current = engine.toJSON();
@@ -201,12 +225,89 @@ describe("live AI drafts", () => {
       );
     });
     let drawn = true;
-    act(() => {
-      drawn = applier.draft([addEntity("labels"), addEntity("badges")]);
+    await act(async () => {
+      drawn = await applier.draft([addEntity("labels"), addEntity("badges")]);
     });
     expect(drawn).toBe(false);
     expect(names()).not.toContain("badges");
     act(() => applier.endDraft());
     expect(names()).toContain("labels");
+  });
+});
+
+describe("undoing an accepted proposal", () => {
+  it("undoes it when nothing changed since", async () => {
+    await act(async () => {
+      await applier.preview(batch([addEntity("labels")]));
+    });
+    act(() => applier.accept());
+    let undone = false;
+    await act(async () => {
+      undone = await applier.undoAccepted("b1");
+    });
+    expect(undone).toBe(true);
+    expect(names()).not.toContain("labels");
+  });
+
+  it("refuses to undo once the document was edited after accepting", async () => {
+    await act(async () => {
+      await applier.preview(batch([addEntity("labels")]));
+    });
+    act(() => applier.accept());
+    act(() => {
+      const current = engine.toJSON();
+      engine.applyDocument(
+        { ...current, entities: current.entities.filter((entity) => entity.name !== "posts") },
+        { recordHistory: true },
+      );
+    });
+    let undone = true;
+    await act(async () => {
+      undone = await applier.undoAccepted("b1");
+    });
+    expect(undone).toBe(false);
+    expect(names()).toContain("labels");
+    expect(names()).not.toContain("posts");
+  });
+});
+
+describe("selecting changes", () => {
+  it("applies only the selected ops", async () => {
+    await act(async () => {
+      await applier.preview(batch([addEntity("labels"), addEntity("badges")]), {
+        exclude: new Set([1]),
+      });
+    });
+    expect(names()).toContain("labels");
+    expect(names()).not.toContain("badges");
+    await act(async () => {
+      await applier.repreview(batch([addEntity("labels"), addEntity("badges")]), {
+        exclude: new Set(),
+      });
+    });
+    expect(names()).toContain("badges");
+    expect(names().filter((name) => name === "labels")).toHaveLength(1);
+  });
+});
+
+describe("syncing status changes", () => {
+  it("reports a sync warning and keeps retrying when the status PATCH fails", async () => {
+    fetchMock.mockRejectedValue(new TypeError("offline"));
+    let outcome: Awaited<ReturnType<AiOpBatchApplier["preview"]>> | null = null;
+    await act(async () => {
+      outcome = await applier.preview(batch([addEntity("labels")]));
+    });
+    expect(outcome).toMatchObject({ ok: true, syncWarning: expect.stringContaining("retrying") });
+    expect(applier.syncPending).toBe(true);
+    expect(names()).toContain("labels");
+  });
+
+  it("treats a 409 as authoritative and does not keep retrying", async () => {
+    fetchMock.mockResolvedValue(new Response(JSON.stringify({ message: "no" }), { status: 409 }));
+    await act(async () => {
+      await applier.preview(batch([addEntity("labels")]));
+    });
+    expect(applier.syncPending).toBe(false);
+    expect(applier.error).toContain("already updated");
   });
 });

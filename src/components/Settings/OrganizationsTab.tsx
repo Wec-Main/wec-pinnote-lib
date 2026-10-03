@@ -101,7 +101,11 @@ export function OrganizationsTab() {
         placeholder="Search organizations"
         trailing={
           <>
-            <RefreshButton label="Refresh organizations" loading={loading || refreshing} onRefresh={reload} />
+            <RefreshButton
+              label="Refresh organizations"
+              loading={loading || refreshing}
+              onRefresh={reload}
+            />
             <button type="button" className="wpn-users-create" onClick={() => open()}>
               <Icon name="plus" className="wpn-users-create__icon" />
               New organization

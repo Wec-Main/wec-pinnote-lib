@@ -10,6 +10,7 @@ import {
   type KeyboardEvent as ReactKeyboardEvent,
 } from "react";
 import { createPortal } from "react-dom";
+import { isAiEffort } from "../../ai/modelValidation";
 import { useOptionalAiRuntime } from "../../context/AiRuntimeContext";
 import { useEscapeKey } from "../../hooks/useEscapeKey";
 import type { AiConnector, AiMe, AiModelInfo, AiProviderId } from "../../types/ai.types";
@@ -179,7 +180,7 @@ export function AiModelSwitcher({
     allOptions.find((option) => option.key === selectedKey) ??
     allOptions.find((option) => option.provider === route?.provider && option.model.isDefault) ??
     null;
-  const efforts = selected?.model.efforts ?? [];
+  const efforts = (selected?.model.efforts ?? []).filter(isAiEffort);
 
   const items = useMemo<NavItem[]>(() => {
     const list: NavItem[] = [];

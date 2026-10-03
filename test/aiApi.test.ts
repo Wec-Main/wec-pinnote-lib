@@ -28,6 +28,28 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
+describe("op batch and template requests", () => {
+  it("fetches a single op batch", async () => {
+    const fetchMock = stubFetch(200, { aiOpBatchId: "b/1", status: "applying" });
+    const batch = await ai.fetchAiOpBatch(BASE, "t", "b/1");
+    const call = lastCall(fetchMock);
+    expect(call.url).toBe(`${PREFIX}/ai/op-batches/b%2F1`);
+    expect(call.method).toBe("GET");
+    expect(batch.status).toBe("applying");
+  });
+
+  it("sends expectedVersion when saving a template", async () => {
+    const fetchMock = stubFetch(200, { actionKey: "comment.improve", version: 4 });
+    await ai.saveAiActionTemplate(BASE, "t", "p1", "comment.improve", {
+      name: "x",
+      expectedVersion: 3,
+    });
+    const call = lastCall(fetchMock);
+    expect(call.method).toBe("PUT");
+    expect(call.body).toEqual({ name: "x", expectedVersion: 3 });
+  });
+});
+
 describe("aiApi routes", () => {
   const cases: [string, () => Promise<unknown>, string, string, unknown?, number?][] = [
     ["me", () => ai.fetchAiMe(BASE, "t", "p1"), "GET", "/ai/me?projectId=p1"],

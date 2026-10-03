@@ -4,6 +4,7 @@ import type {
   ErdReferentialAction,
 } from "../../types/dataModel.types";
 import type { PropertyValue } from "../../types/flowchart.types";
+import type { NodeTypeDefinition } from "../../utils/flowchart/nodeTypes";
 
 export type OpRef = string;
 
@@ -223,6 +224,10 @@ export type ParseOpsResult<O> = { ok: true; ops: O[] } | { ok: false; errors: Op
 
 export interface ApplyOpsOptions {
   createId?: (prefix: string) => string;
+}
+
+export interface ApplyFlowOpsOptions extends ApplyOpsOptions {
+  nodeTypes?: readonly NodeTypeDefinition[];
 }
 
 export interface ErdSummaryField {

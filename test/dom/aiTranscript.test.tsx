@@ -140,6 +140,7 @@ function render(session: AiSessionState, props: Partial<AiTranscriptProps> = {})
         onRetryWithProvider,
         onOpenIntegrations,
         onEditLast,
+        onFeedback: vi.fn(),
         ...props,
       }),
     ),

@@ -257,7 +257,7 @@ export const ERD_OP_SPECS: ErdOpSpecs = {
   },
   setModelName: {
     description:
-      "Rename the data model (its title). Use a short, specific title that names the system, e.g. \"Online Shop Orders\".",
+      'Rename the data model (its title). Use a short, specific title that names the system, e.g. "Online Shop Orders".',
     properties: { name: name("Data model title, 2 to 6 words") },
     required: ["name"],
   },

@@ -1,16 +1,23 @@
-import { memo, useCallback, useEffect, useState, type CSSProperties } from "react";
+import { memo, Suspense, useEffect, useState, type CSSProperties } from "react";
 import type { AiDockControl } from "../../ai/aiDockState";
 import { useAiPreview } from "../../ai/aiPreviewStore";
-import { aiSelectionLabel, usePublishAiSelection } from "../../ai/aiSelectionStore";
 import type { AiOpBatchApplier } from "../../ai/useAiOpBatchApplier";
-import { useErdEngine, useErdState } from "../../context/ErdContext";
+import { useErdEngine } from "../../context/ErdContext";
 import { ENTITY_DEFAULT_WIDTH } from "../../utils/erd/erdConstants";
 import { entityHeight } from "../../utils/erd/erdGeometry";
 import type { ErdEngine } from "../../utils/erd/erdEngine";
+import type { AiEditorTargetKind } from "../../types/ai.types";
 import { Icon, Spinner } from "../primitives";
 import { ConfirmDialog } from "../UserManagement/ConfirmDialog";
-import { AiEditorDock } from "./AiEditorDock";
-import { useAiMentionCandidates } from "./useAiMentionCandidates";
+import {
+  getLazyErdAiDockHost,
+  prefetchAiDock,
+  resetLazyAiDockHosts,
+  useAiDockMounted,
+  usePrefetchAiDockWhenIdle,
+} from "./aiDockLoader";
+import { AiDockBoundary } from "./AiDockBoundary";
+import type { ErdAiBarProps } from "./ErdAiDockHost";
 import { useAiPreviewScope } from "./AiPreviewScope";
 import { useAiAvailable } from "./IntegrationsButton";
 
@@ -23,59 +30,20 @@ export function ErdEngineReporter({ onEngine }: { onEngine: (engine: ErdEngine |
   return null;
 }
 
-const ENTITY_NOUN = ["entity", "entities"] as const;
+export type { ErdAiBarProps } from "./ErdAiDockHost";
 
-export function ErdAiBar({
-  dataModelId,
-  applier,
-  control,
-  onSnapshot,
-}: {
-  dataModelId: string;
-  applier: AiOpBatchApplier;
-  control: AiDockControl;
-  onSnapshot?: () => Promise<void>;
-}) {
-  const engine = useErdEngine();
-  const selectedIds = useErdState((s) => s.selection.entityIds);
-  const selectedCount = selectedIds.size;
-  const readOnly = useErdState((s) => s.readOnly);
-  const isEmpty = useErdState((s) => s.entities.length === 0);
-  const getSelectedIds = useCallback(() => [...engine.getState().selection.entityIds], [engine]);
-  const getDocument = useCallback(() => engine.toJSON(), [engine]);
-  const selectionLabel = useCallback(
-    (ids: string[]) => {
-      const byId = new Map(engine.getState().entities.map((entity) => [entity.id, entity.name]));
-      return aiSelectionLabel(
-        ids.map((id) => byId.get(id) ?? ""),
-        ENTITY_NOUN,
-      );
-    },
-    [engine],
-  );
-  usePublishAiSelection("data_model", dataModelId, selectedIds, selectionLabel);
-  const subscribeChanges = useCallback(
-    (listener: () => void) => engine.on("change", listener),
-    [engine],
-  );
-  const mentionSource = useAiMentionCandidates();
+export function ErdAiBar(props: ErdAiBarProps) {
+  const available = useAiAvailable();
+  usePrefetchAiDockWhenIdle(available, "data_model");
+  const mounted = useAiDockMounted("data_model", props.dataModelId, props.control, available);
+  if (!mounted) return null;
+  const Host = getLazyErdAiDockHost();
   return (
-    <AiEditorDock
-      kind="data_model"
-      targetId={dataModelId}
-      applier={applier}
-      getSelectedIds={getSelectedIds}
-      selectedCount={selectedCount}
-      itemNoun={ENTITY_NOUN}
-      wholeLabel="Whole model"
-      isEmpty={isEmpty}
-      getDocument={getDocument}
-      subscribeChanges={subscribeChanges}
-      editable={!readOnly || applier.locked}
-      control={control}
-      onSnapshot={onSnapshot}
-      mentionSource={mentionSource}
-    />
+    <AiDockBoundary onRetry={resetLazyAiDockHosts}>
+      <Suspense fallback={null}>
+        <Host {...props} />
+      </Suspense>
+    </AiDockBoundary>
   );
 }
 
@@ -172,9 +140,11 @@ export function AiUnsavedChanges({
 export function AskAiButton({
   control,
   onClick,
+  kind,
 }: {
   control: AiDockControl;
   onClick?: () => void;
+  kind?: AiEditorTargetKind;
 }) {
   const available = useAiAvailable();
   if (!available) return null;
@@ -196,6 +166,8 @@ export function AskAiButton({
       title="Ask AI (⌘I)"
       aria-pressed={control.open}
       onClick={onClick ?? control.toggle}
+      onPointerEnter={() => prefetchAiDock(kind)}
+      onFocus={() => prefetchAiDock(kind)}
     >
       <Icon name="sparkles" className="wpn-ai-ask-btn__icon" /> Ask AI
       {control.badge ? (

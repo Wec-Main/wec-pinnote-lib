@@ -54,6 +54,8 @@ export function WorkspaceBatchCard({
           `${result.failed} ${result.failed === 1 ? "change was" : "changes were"} skipped.`,
         );
       }
+      if (result.syncWarning)
+        setError((current) => [current, result.syncWarning].filter(Boolean).join(" "));
     } catch (err) {
       setPhase("failed");
       setError(err instanceof Error && err.message ? err.message : "Something went wrong");

@@ -1,4 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent } from "react";
+import { prefetchAiSession } from "../../ai/prefetch";
+import { useOptionalAiRuntimeActions } from "../../context/AiRuntimeContext";
 import { useAiSessions, type AiSessionsState } from "../../hooks/useAiSessions";
 import { useSkeletonGate } from "../../hooks/useSkeletonGate";
 import { useEscapeKey } from "../../hooks/useEscapeKey";
@@ -208,6 +210,8 @@ export function InlineRename({
   );
 }
 
+const PREFETCH_HOVER_MS = 120;
+
 interface AiSessionListProps {
   selectedId: string | null;
   onSelect: (aiSessionId: string) => void;
@@ -244,6 +248,29 @@ export function AiSessionList({
     return () => clearTimeout(timer);
   }, [pendingFirstLoad]);
 
+  const runtime = useOptionalAiRuntimeActions();
+  const hoverTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const cancelPrefetch = useCallback(() => {
+    if (hoverTimer.current) clearTimeout(hoverTimer.current);
+    hoverTimer.current = null;
+  }, []);
+  const schedulePrefetch = (aiSessionId: string) => {
+    if (!runtime || !runtime.enabled || aiSessionId === selectedId) return;
+    cancelPrefetch();
+    hoverTimer.current = setTimeout(() => {
+      hoverTimer.current = null;
+      void prefetchAiSession(
+        {
+          apiBaseUrl: runtime.apiBaseUrl,
+          projectId: runtime.projectId,
+          getToken: runtime.getToken,
+        },
+        aiSessionId,
+      );
+    }, PREFETCH_HOVER_MS);
+  };
+  useEffect(() => cancelPrefetch, [cancelPrefetch]);
+
   const pins = useAiPinnedSessions();
   const visible = useMemo(
     () => pinnedFirst(filterSessions(sessions, search, scope), pins.pinned),
@@ -276,6 +303,10 @@ export function AiSessionList({
               className={["wpn-ai-session", selected ? "wpn-ai-session--selected" : ""].join(" ")}
               aria-current={selected ? "true" : undefined}
               onClick={() => onSelect(session.aiSessionId)}
+              onPointerEnter={() => schedulePrefetch(session.aiSessionId)}
+              onPointerLeave={cancelPrefetch}
+              onFocus={() => schedulePrefetch(session.aiSessionId)}
+              onBlur={cancelPrefetch}
               onDoubleClick={() => setRenaming(session.aiSessionId)}
             >
               <span className="wpn-ai-session__title">

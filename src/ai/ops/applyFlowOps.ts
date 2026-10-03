@@ -19,11 +19,11 @@ import {
 import { parseFlow } from "../../utils/flowchart/serialization";
 import { validateFlow } from "../../utils/flowchart/validator";
 import { diffFlow } from "./diff";
-import { AI_FLOW_LIMITS } from "./limits";
+import { AI_FLOW_LIMITS, FLOW_NODE_GAP } from "./limits";
 import { avoidOverlap, rightMost } from "./placement";
 import { IdFactory, TempIds, cloneJson, resolveRef, type RefCandidate, type RefKind } from "./refs";
 import type {
-  ApplyOpsOptions,
+  ApplyFlowOpsOptions,
   ApplyOpsResult,
   FlowOp,
   FlowOpName,
@@ -33,7 +33,6 @@ import type {
   OpRef,
 } from "./types";
 
-export const FLOW_NODE_GAP = 80;
 const LAYOUT_GAP_MAIN = 100;
 const LAYOUT_GAP_CROSS = 60;
 const LAYOUT_BAND_GAP = 110;
@@ -45,10 +44,6 @@ const AUTO_LAYOUT_MAX_EXISTING = 2;
 const HANDLE_ORDER: readonly string[] = ["yes", "no"];
 const DECISION_TYPE = "decision";
 const DECISION_HANDLES: readonly string[] = ["yes", "no"];
-
-export interface ApplyFlowOpsOptions extends ApplyOpsOptions {
-  nodeTypes?: readonly NodeTypeDefinition[];
-}
 
 interface Context {
   doc: FlowJSON;
@@ -896,9 +891,13 @@ function layoutFlow(ctx: Context, direction: "LR" | "TB"): Map<string, XYPositio
     let cursor = Number.NEGATIVE_INFINITY;
     const place = (group: FlowNode[], wanted: number | null) => {
       const sizes = group.map((node) => sizeOf.get(node.id) as number);
-      const span = sizes.reduce((sum, size) => sum + size, 0) + LAYOUT_GAP_CROSS * (group.length - 1);
+      const span =
+        sizes.reduce((sum, size) => sum + size, 0) + LAYOUT_GAP_CROSS * (group.length - 1);
       const floor = Number.isFinite(cursor) ? cursor : Number.NEGATIVE_INFINITY;
-      let top = Math.max(wanted === null ? (Number.isFinite(cursor) ? cursor : -span / 2) : wanted - span / 2, floor);
+      let top = Math.max(
+        wanted === null ? (Number.isFinite(cursor) ? cursor : -span / 2) : wanted - span / 2,
+        floor,
+      );
       group.forEach((node, i) => {
         centerOf.set(node.id, top + (sizes[i] as number) / 2);
         top += (sizes[i] as number) + LAYOUT_GAP_CROSS;
@@ -911,7 +910,11 @@ function layoutFlow(ctx: Context, direction: "LR" | "TB"): Map<string, XYPositio
       const parent = soleParent(node.id);
       if (parent !== null) {
         let end = index + 1;
-        while (end < layer.members.length && soleParent((layer.members[end] as FlowNode).id) === parent) end++;
+        while (
+          end < layer.members.length &&
+          soleParent((layer.members[end] as FlowNode).id) === parent
+        )
+          end++;
         place(layer.members.slice(index, end), centerOf.get(parent) as number);
         index = end;
         continue;
@@ -930,10 +933,14 @@ function layoutFlow(ctx: Context, direction: "LR" | "TB"): Map<string, XYPositio
   bands.forEach((band, bandIndex) => {
     const members = band.flatMap((layer) => layer.members);
     const top = Math.min(
-      ...members.map((node) => (centerOf.get(node.id) as number) - (sizeOf.get(node.id) as number) / 2),
+      ...members.map(
+        (node) => (centerOf.get(node.id) as number) - (sizeOf.get(node.id) as number) / 2,
+      ),
     );
     const bottom = Math.max(
-      ...members.map((node) => (centerOf.get(node.id) as number) + (sizeOf.get(node.id) as number) / 2),
+      ...members.map(
+        (node) => (centerOf.get(node.id) as number) + (sizeOf.get(node.id) as number) / 2,
+      ),
     );
     const shift = bandIndex === 0 ? 0 : previousBottom + LAYOUT_BAND_GAP - top;
     previousBottom = bottom + shift;
@@ -946,9 +953,7 @@ function layoutFlow(ctx: Context, direction: "LR" | "TB"): Map<string, XYPositio
         const rect = layer.rects[i] as Rect;
         const local = main + (layer.thickness - mainSize(rect)) / 2;
         const along = Math.round(reversed ? bandLength - local - mainSize(rect) : local);
-        const across = Math.round(
-          (centerOf.get(node.id) as number) - crossSize(rect) / 2 + shift,
-        );
+        const across = Math.round((centerOf.get(node.id) as number) - crossSize(rect) / 2 + shift);
         positions.set(node.id, horizontal ? { x: along, y: across } : { x: across, y: along });
       });
       main += layer.thickness + LAYOUT_GAP_MAIN;

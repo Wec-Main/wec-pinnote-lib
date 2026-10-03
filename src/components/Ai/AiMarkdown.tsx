@@ -290,7 +290,7 @@ function withBreaks(text: string, key: string): ReactNode[] {
     );
 }
 
-function CodeBlock({ lang, text }: { lang: string; text: string }) {
+const CodeBlock = memo(function CodeBlock({ lang, text }: { lang: string; text: string }) {
   const [copied, copy] = useCopy();
   return (
     <div className="wpn-ai-md__codeblock">
@@ -311,7 +311,7 @@ function CodeBlock({ lang, text }: { lang: string; text: string }) {
       </pre>
     </div>
   );
-}
+});
 
 const HEADING_TAGS = ["h1", "h2", "h3", "h4"] as const;
 
@@ -399,6 +399,13 @@ function renderBlocks(blocks: Block[], prefix: string): ReactNode[] {
   });
 }
 
+const BlockView = memo(
+  function BlockView({ block, index }: { block: Block; sig: string; index: number }) {
+    return <>{renderBlocks([block], `b${index}-`)}</>;
+  },
+  (previous, next) => previous.sig === next.sig && previous.index === next.index,
+);
+
 export const AiMarkdown = memo(function AiMarkdown({
   text,
   className,
@@ -408,14 +415,19 @@ export const AiMarkdown = memo(function AiMarkdown({
   className?: string;
   streaming?: boolean;
 }) {
-  const blocks = useMemo(() => parseMarkdownBlocks(text), [text]);
+  const blocks = useMemo(
+    () => parseMarkdownBlocks(text).map((block) => ({ block, sig: JSON.stringify(block) })),
+    [text],
+  );
   return (
     <div
       className={["wpn-ai-md", streaming ? "wpn-ai-md--streaming" : "", className]
         .filter(Boolean)
         .join(" ")}
     >
-      {renderBlocks(blocks, "b")}
+      {blocks.map(({ block, sig }, index) => (
+        <BlockView key={index} block={block} sig={sig} index={index} />
+      ))}
     </div>
   );
 });

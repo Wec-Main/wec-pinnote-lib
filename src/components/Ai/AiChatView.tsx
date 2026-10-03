@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useAiCurrentSelection } from "../../ai/aiSelectionStore";
-import { useAiRuntime } from "../../context/AiRuntimeContext";
+import { useAiRuntimeActions, useAiRuntimeState } from "../../context/AiRuntimeContext";
+import { createClientMessageId } from "../../utils/aiStreamGuards";
 import { useAiSession, type AiSessionState } from "../../hooks/useAiSession";
 import { createAiSession, sendAiMessage } from "../../services/aiApi";
 import type {
@@ -127,8 +128,8 @@ export function AiChatView({
   suggestions,
   autoFocus = true,
 }: AiChatViewProps) {
-  const runtime = useAiRuntime();
-  const { me, apiBaseUrl, getToken, projectId, currentUserId } = runtime;
+  const { apiBaseUrl, getToken, projectId, currentUserId } = useAiRuntimeActions();
+  const { me } = useAiRuntimeState();
   const ai = useAiUi();
   const ownSession = useAiSession(sessionFromParent ? null : aiSessionId);
   const session = sessionFromParent ?? ownSession;
@@ -157,6 +158,9 @@ export function AiChatView({
   const sessionRef = useRef(session);
   sessionRef.current = session;
   const lastAttemptRef = useRef<AiComposerSendInput | null>(null);
+  const lastClientIdRef = useRef<string | null>(null);
+  const editingRef = useRef<string | null>(null);
+  const [supersededId, setSupersededId] = useState<string | null>(null);
   const current = session.detail?.session ?? null;
 
   useEffect(() => {
@@ -171,12 +175,19 @@ export function AiChatView({
   const newKey = newChatDraftKey(scopeKind, scopeId);
 
   const submit = useCallback(
-    async (input: AiComposerSendInput, routeOverride?: AiRoute | null) => {
+    async (
+      input: AiComposerSendInput,
+      routeOverride?: AiRoute | null,
+      reuseClientMessageId?: string | null,
+    ) => {
       const target = routeOverride ?? route;
       if (!target) return;
       setFailure(null);
       lastAttemptRef.current = input;
+      const clientMessageId = reuseClientMessageId ?? createClientMessageId();
+      lastClientIdRef.current = clientMessageId;
       const request: SendAiMessageRequest = {
+        clientMessageId,
         text: input.text,
         mentions: input.mentions,
         mode: "model",
@@ -235,14 +246,21 @@ export function AiChatView({
   const sendNow = useCallback(
     (input: AiComposerSendInput) => {
       setOptimistic({ text: input.text, mentions: input.mentions, at: Date.now() });
-      submit(input).catch(() => {
-        setOptimistic(null);
-        setSeed((value) => ({
-          text: input.text,
-          mentions: input.mentions,
-          nonce: (value?.nonce ?? 0) + 1,
-        }));
-      });
+      const editing = editingRef.current;
+      editingRef.current = null;
+      submit(input)
+        .then(() => {
+          if (editing) setSupersededId(editing);
+        })
+        .catch(() => {
+          setOptimistic(null);
+          if (editing) editingRef.current = editing;
+          setSeed((value) => ({
+            text: input.text,
+            mentions: input.mentions,
+            nonce: (value?.nonce ?? 0) + 1,
+          }));
+        });
     },
     [submit],
   );
@@ -258,6 +276,7 @@ export function AiChatView({
   const editLast = useCallback((message: AiMessage) => {
     const input = inputOf(message);
     if (!input) return;
+    editingRef.current = message.aiMessageId;
     setSeed((value) => ({
       text: input.text,
       mentions: input.mentions,
@@ -265,15 +284,20 @@ export function AiChatView({
     }));
   }, []);
 
+  const editLastFromComposer = useCallback(() => {
+    const last = lastUserMessage(sessionRef.current);
+    if (last && last.authorId === currentUserId) editLast(last);
+  }, [currentUserId, editLast]);
+
   const retryAttempt = () => {
     const input = lastAttemptRef.current;
-    if (input) void submit(input).catch(() => undefined);
+    if (input) void submit(input, undefined, lastClientIdRef.current).catch(() => undefined);
   };
   const retryAttemptWithOther = () => {
     const input = lastAttemptRef.current;
     if (!input || !alternate) return;
     setRoute(alternate);
-    void submit(input, alternate).catch(() => undefined);
+    void submit(input, alternate, null).catch(() => undefined);
   };
 
   const stop = () => {
@@ -284,18 +308,25 @@ export function AiChatView({
       );
   };
 
-  const optimisticMatched = Boolean(
-    optimistic &&
-    session.messages.order.some((id) => {
-      const message = session.messages.byId[id];
-      return (
-        message?.role === "user" &&
+  const { messages: messageStore } = session;
+  const optimisticMatched = useMemo(() => {
+    if (!optimistic) return false;
+    const floor = optimistic.at - 60_000;
+    for (let index = messageStore.order.length - 1; index >= 0; index -= 1) {
+      const message = messageStore.byId[messageStore.order[index] as string];
+      if (!message) continue;
+      const created = Date.parse(message.createdAt);
+      if (created < floor) break;
+      if (
+        message.role === "user" &&
         message.content.type === "text" &&
-        message.content.text === optimistic.text &&
-        Date.parse(message.createdAt) >= optimistic.at - 60_000
-      );
-    }),
-  );
+        message.content.text === optimistic.text
+      ) {
+        return true;
+      }
+    }
+    return false;
+  }, [optimistic, messageStore]);
   useEffect(() => {
     if (optimisticMatched) setOptimistic(null);
   }, [optimisticMatched]);
@@ -316,33 +347,33 @@ export function AiChatView({
         <kbd>#</kbd>.
       </p>
       {suggestions && suggestions.length > 0 ? (
-        <div className="wpn-ai-suggestions" role="list">
+        <ul className="wpn-ai-suggestions">
           {suggestions.map((suggestion) => (
-            <button
-              key={suggestion.title}
-              type="button"
-              role="listitem"
-              className="wpn-ai-suggestion"
-              disabled={!ready}
-              onClick={() => pickSuggestion(suggestion.prompt)}
-            >
-              <span
-                className="wpn-ai-suggestion__tile"
-                data-tone={suggestion.tone ?? suggestion.icon ?? "sparkles"}
-                aria-hidden="true"
+            <li key={suggestion.title}>
+              <button
+                type="button"
+                className="wpn-ai-suggestion"
+                disabled={!ready}
+                onClick={() => pickSuggestion(suggestion.prompt)}
               >
-                <Icon name={suggestion.icon ?? "sparkles"} className="wpn-ai-suggestion__icon" />
-              </span>
-              <span className="wpn-ai-suggestion__text">
-                <span className="wpn-ai-suggestion__title">{suggestion.title}</span>
-                {suggestion.hint ? (
-                  <span className="wpn-ai-suggestion__hint">{suggestion.hint}</span>
-                ) : null}
-              </span>
-              <Icon name="chevronRight" className="wpn-ai-suggestion__go" />
-            </button>
+                <span
+                  className="wpn-ai-suggestion__tile"
+                  data-tone={suggestion.tone ?? suggestion.icon ?? "sparkles"}
+                  aria-hidden="true"
+                >
+                  <Icon name={suggestion.icon ?? "sparkles"} className="wpn-ai-suggestion__icon" />
+                </span>
+                <span className="wpn-ai-suggestion__text">
+                  <span className="wpn-ai-suggestion__title">{suggestion.title}</span>
+                  {suggestion.hint ? (
+                    <span className="wpn-ai-suggestion__hint">{suggestion.hint}</span>
+                  ) : null}
+                </span>
+                <Icon name="chevronRight" className="wpn-ai-suggestion__go" />
+              </button>
+            </li>
           ))}
-        </div>
+        </ul>
       ) : null}
     </div>
   );
@@ -364,6 +395,7 @@ export function AiChatView({
         onEditLast={editLast}
         onOpenIntegrations={ai ? openIntegrations : undefined}
         pendingUser={pendingUser}
+        supersededUserMessageId={supersededId}
         onAnswerQuestions={ready ? answerQuestions : undefined}
       />
       {failure ? (
@@ -397,6 +429,12 @@ export function AiChatView({
         disabledReason={disabledReason}
         active={active && current?.activeTurn?.userId === currentUserId}
         onStop={stop}
+        onEditLast={editLastFromComposer}
+        activeSince={
+          current?.activeTurn
+            ? Date.parse(current.activeTurn.startedAt ?? current.activeTurn.createdAt) || null
+            : null
+        }
         initialMentions={initialMentions}
         initialText={initialText}
         autoFocus={autoFocus}

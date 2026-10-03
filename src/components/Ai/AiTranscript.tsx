@@ -1,6 +1,9 @@
 import {
+  lazy,
   memo,
+  Suspense,
   useCallback,
+  useEffect,
   useId,
   useLayoutEffect,
   useMemo,
@@ -9,7 +12,7 @@ import {
   type ReactNode,
 } from "react";
 import type { AiSessionState } from "../../hooks/useAiSession";
-import type { AiStreamingDraft } from "../../ai/sessionReducer";
+import { staticDraftStore, useAiDraft, type AiDraftStore } from "../../ai/sessionViewStore";
 import type {
   AiMention,
   AiCommentDraft,
@@ -22,16 +25,24 @@ import { useSkeletonGate } from "../../hooks/useSkeletonGate";
 import { Icon, Spinner } from "../primitives";
 import { TranscriptSkeleton } from "../loading/ScreenSkeletons";
 import { formatElapsed, formatTokens } from "./AiActivity";
-import { AiMentionChip } from "./AiComposer";
+import { AiMentionChip } from "./AiMentionChip";
 import { AiMarkdown } from "./AiMarkdown";
+import { useAiOpBatch } from "../../hooks/useAiOpBatch";
 import { BatchCard } from "./BatchCard";
-import { WorkspaceBatchCard } from "./WorkspaceBatchCard";
 import { isWorkspaceBatch } from "./useAiWorkspaceApplier";
 import { DraftCommentCard } from "./DraftCommentCard";
 import { aiErrorActions, aiErrorText, isActiveTurn, type AiErrorAction } from "./aiHelpers";
 import { useAiCardActions } from "./useAiCardActions";
 import { AiQuestionsCard } from "./AiQuestionsCard";
 import { AiTurnWorking, workTitle } from "./AiTurnWorking";
+
+import { AiDockBoundary } from "./AiDockBoundary";
+
+const WorkspaceBatchCard = lazy(() =>
+  import("./WorkspaceBatchCard").then((module) => ({ default: module.WorkspaceBatchCard })),
+);
+
+type CardActions = ReturnType<typeof useAiCardActions>;
 
 export type AiFeedback = "up" | "down";
 
@@ -49,6 +60,7 @@ export interface AiTranscriptProps {
   onFeedback?: (aiMessageId: string, value: AiFeedback | null) => void;
   onAnswerQuestions?: (answers: string) => void;
   pendingUser?: { text: string; mentions: AiMention[]; at: number } | null;
+  supersededUserMessageId?: string | null;
 }
 
 export const NEAR_BOTTOM_PX = 80;
@@ -118,15 +130,29 @@ export function usageText(usage: AiUsage): string {
 
 type Row =
   | { kind: "user"; key: string; message: AiMessage }
-  | { kind: "turn"; key: string; aiTurnId: string | null; messages: AiMessage[] };
+  | {
+      kind: "turn";
+      key: string;
+      aiTurnId: string | null;
+      messages: AiMessage[];
+      precedingUserId: string | null;
+    };
+
+export interface TranscriptRows {
+  rows: Row[];
+  lastTurnRowIndex: number;
+  lastUserIndex: number;
+}
 
 function buildRows(order: readonly string[], byId: Readonly<Record<string, AiMessage>>): Row[] {
   const rows: Row[] = [];
+  let precedingUserId: string | null = null;
   for (const id of order) {
     const message = byId[id];
     if (!message) continue;
     if (message.role === "user") {
       rows.push({ kind: "user", key: message.aiMessageId, message });
+      precedingUserId = message.aiMessageId;
       continue;
     }
     const last = rows[rows.length - 1];
@@ -145,10 +171,71 @@ function buildRows(order: readonly string[], byId: Readonly<Record<string, AiMes
           : message.aiMessageId,
         aiTurnId: message.aiTurnId,
         messages: [message],
+        precedingUserId,
       });
     }
   }
   return rows;
+}
+
+export function buildTranscriptRows(
+  order: readonly string[],
+  byId: Readonly<Record<string, AiMessage>>,
+): TranscriptRows {
+  const rows = buildRows(order, byId);
+  let lastTurnRowIndex = -1;
+  let lastUserIndex = -1;
+  rows.forEach((row, index) => {
+    if (row.kind === "turn") lastTurnRowIndex = index;
+    else lastUserIndex = index;
+  });
+  return { rows, lastTurnRowIndex, lastUserIndex };
+}
+
+interface RowData {
+  batches: AiOpBatch[];
+  drafts: AiCommentDraft[];
+}
+
+const NO_ROW_DATA: RowData = { batches: [], drafts: [] };
+
+function sameItems<T>(a: readonly T[], b: readonly T[]): boolean {
+  return a.length === b.length && a.every((item, index) => item === b[index]);
+}
+
+export function collectRowData(
+  rows: readonly Row[],
+  opBatches: readonly AiOpBatch[],
+  commentDrafts: readonly AiCommentDraft[],
+  previous: ReadonlyMap<string, RowData>,
+): Map<string, RowData> {
+  const batchById = new Map(opBatches.map((batch) => [batch.aiOpBatchId, batch]));
+  const draftById = new Map(commentDrafts.map((draft) => [draft.aiCommentDraftId, draft]));
+  const next = new Map<string, RowData>();
+  for (const row of rows) {
+    if (row.kind !== "turn") continue;
+    const batches: AiOpBatch[] = [];
+    const drafts: AiCommentDraft[] = [];
+    for (const message of row.messages) {
+      const { content } = message;
+      if (content.type === "op_batch") {
+        const batch = batchById.get(content.aiOpBatchId);
+        if (batch) batches.push(batch);
+      } else if (content.type === "comment_draft") {
+        const draft = draftById.get(content.aiCommentDraftId);
+        if (draft) drafts.push(draft);
+      }
+    }
+    const before = previous.get(row.key);
+    if (batches.length === 0 && drafts.length === 0) {
+      next.set(row.key, NO_ROW_DATA);
+    } else if (before && sameItems(before.batches, batches) && sameItems(before.drafts, drafts)) {
+      next.set(row.key, before);
+    } else {
+      next.set(row.key, { batches, drafts });
+    }
+  }
+  return next;
 }
 
 function textOf(message: AiMessage): string {
@@ -366,7 +453,9 @@ interface TurnRowProps {
   canApplyModelOps: boolean;
   canSwitchProvider: boolean;
   feedback: AiFeedback | undefined;
-  onFeedback: (aiMessageId: string, value: AiFeedback | null) => void;
+  onFeedback: ((aiMessageId: string, value: AiFeedback | null) => void) | undefined;
+  actions: CardActions;
+  superseded: boolean;
   onRetry?: () => void;
   onRetryWithProvider?: () => void;
   onOpenIntegrations?: () => void;
@@ -391,6 +480,8 @@ function turnRowEqual(prev: TurnRowProps, next: TurnRowProps): boolean {
     prev.canSwitchProvider === next.canSwitchProvider &&
     prev.feedback === next.feedback &&
     prev.onFeedback === next.onFeedback &&
+    prev.actions === next.actions &&
+    prev.superseded === next.superseded &&
     prev.onRetry === next.onRetry &&
     prev.onRetryWithProvider === next.onRetryWithProvider &&
     prev.onOpenIntegrations === next.onOpenIntegrations &&
@@ -451,6 +542,40 @@ export function FailureActions({
   );
 }
 
+function OpBatchSlot({
+  aiOpBatchId,
+  batch,
+  canApply,
+  actions,
+}: {
+  aiOpBatchId: string;
+  batch: AiOpBatch | undefined;
+  canApply: boolean;
+  actions: CardActions;
+}) {
+  const fetched = useAiOpBatch(aiOpBatchId, batch !== undefined);
+  const resolved = batch ?? fetched;
+  if (!resolved) return null;
+  if (isWorkspaceBatch(resolved)) {
+    return (
+      <AiDockBoundary label="This card could not load.">
+        <Suspense fallback={<div className="wpn-ai-card-loading" aria-busy="true" />}>
+          <WorkspaceBatchCard batch={resolved} canApply={canApply} />
+        </Suspense>
+      </AiDockBoundary>
+    );
+  }
+  return (
+    <BatchCard
+      batch={resolved}
+      canApply={canApply}
+      onPreview={actions.previewBatch}
+      onReject={actions.rejectBatch}
+      onOpen={actions.openBatch}
+    />
+  );
+}
+
 const TurnRow = memo(function TurnRow({
   messages,
   turn,
@@ -462,13 +587,15 @@ const TurnRow = memo(function TurnRow({
   canSwitchProvider,
   feedback,
   onFeedback,
+  actions,
+  superseded,
   onRetry,
   onRetryWithProvider,
   onOpenIntegrations,
   onAnswerQuestions,
 }: TurnRowProps) {
-  const actions = useAiCardActions();
   const [expanded, setExpanded] = useState(false);
+  const [showSuperseded, setShowSuperseded] = useState(false);
   const stepsId = useId();
   const tools = messages.filter((message) => message.content.type === "tool");
   const rest = messages.filter((message) => message.content.type !== "tool");
@@ -478,8 +605,31 @@ const TurnRow = memo(function TurnRow({
   const failed = turn?.status === "failed";
   const showSteps = active || expanded;
 
+  if (superseded && !active && !showSuperseded) {
+    return (
+      <div className="wpn-ai-transcript__item wpn-ai-row wpn-ai-row--assistant wpn-ai-row--superseded">
+        <button
+          type="button"
+          className="wpn-ai-superseded__toggle"
+          aria-expanded={false}
+          onClick={() => setShowSuperseded(true)}
+        >
+          <Icon name="chevronRight" />
+          Earlier response, replaced by your edit
+        </button>
+      </div>
+    );
+  }
+
   return (
-    <div className="wpn-ai-transcript__item wpn-ai-row wpn-ai-row--assistant">
+    <div
+      className={[
+        "wpn-ai-transcript__item wpn-ai-row wpn-ai-row--assistant",
+        superseded ? "wpn-ai-row--superseded" : "",
+      ]
+        .filter(Boolean)
+        .join(" ")}
+    >
       {tools.length > 0 ? (
         <div className={["wpn-ai-turn__activity", active ? "wpn-ai-running-glow" : ""].join(" ")}>
           {active ? null : (
@@ -521,28 +671,16 @@ const TurnRow = memo(function TurnRow({
                 {content.code ? aiErrorText(content.code, content.text) : content.text}
               </p>
             );
-          case "op_batch": {
-            const batch = opBatches.find((item) => item.aiOpBatchId === content.aiOpBatchId);
-            if (batch && isWorkspaceBatch(batch)) {
-              return (
-                <WorkspaceBatchCard
-                  key={message.aiMessageId}
-                  batch={batch}
-                  canApply={canApplyModelOps}
-                />
-              );
-            }
-            return batch ? (
-              <BatchCard
+          case "op_batch":
+            return (
+              <OpBatchSlot
                 key={message.aiMessageId}
-                batch={batch}
+                aiOpBatchId={content.aiOpBatchId}
+                batch={opBatches.find((item) => item.aiOpBatchId === content.aiOpBatchId)}
                 canApply={canApplyModelOps}
-                onPreview={actions.previewBatch}
-                onReject={actions.rejectBatch}
-                onOpen={actions.openBatch}
+                actions={actions}
               />
-            ) : null;
-          }
+            );
           case "comment_draft": {
             const draft = commentDrafts.find(
               (item) => item.aiCommentDraftId === content.aiCommentDraftId,
@@ -601,7 +739,7 @@ const TurnRow = memo(function TurnRow({
           {isLast && onRetry && !failure ? (
             <ToolbarButton label="Retry" icon="refresh" onClick={onRetry} />
           ) : null}
-          {lastAssistant ? (
+          {lastAssistant && onFeedback ? (
             <>
               <ToolbarButton
                 label="Good response"
@@ -628,24 +766,43 @@ const TurnRow = memo(function TurnRow({
 }, turnRowEqual);
 
 interface LiveDraftProps {
-  draft: AiStreamingDraft | null;
+  draftStore: AiDraftStore;
   turn: AiTurn;
   detail: string | null;
   title: string;
   onStop?: () => void;
+  onGrow?: () => void;
 }
 
-const LiveDraft = memo(function LiveDraft({ draft, turn, detail, title, onStop }: LiveDraftProps) {
+const LiveDraft = memo(function LiveDraft({
+  draftStore,
+  turn,
+  detail,
+  title,
+  onStop,
+  onGrow,
+}: LiveDraftProps) {
+  const draft = useAiDraft(draftStore);
   const own = draft && draft.aiTurnId === turn.aiTurnId ? draft : null;
+  const rootRef = useRef<HTMLDivElement>(null);
+  const onGrowRef = useRef(onGrow);
+  onGrowRef.current = onGrow;
+  useEffect(() => {
+    const el = rootRef.current;
+    if (!el || typeof ResizeObserver === "undefined") return undefined;
+    const observer = new ResizeObserver(() => onGrowRef.current?.());
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [turn.status]);
   if (turn.status === "queued") {
     return (
-      <div className="wpn-ai-transcript__item wpn-ai-transcript__live">
+      <div ref={rootRef} className="wpn-ai-transcript__item wpn-ai-transcript__live">
         <p className="wpn-ai-livestatus">Queued. It starts when the current turn finishes.</p>
       </div>
     );
   }
   return (
-    <div className="wpn-ai-transcript__item wpn-ai-transcript__live">
+    <div ref={rootRef} className="wpn-ai-transcript__item wpn-ai-transcript__live">
       {own?.reasoning ? (
         <details className="wpn-ai-reasoning">
           <summary>Reasoning</summary>
@@ -653,7 +810,7 @@ const LiveDraft = memo(function LiveDraft({ draft, turn, detail, title, onStop }
         </details>
       ) : null}
       {own?.text ? (
-        <div className="wpn-ai-msg wpn-ai-msg--assistant wpn-ai-msg--streaming">
+        <div className="wpn-ai-msg wpn-ai-msg--assistant wpn-ai-msg--streaming" aria-busy="true">
           <AiMarkdown text={own.text} streaming />
         </div>
       ) : null}
@@ -667,6 +824,24 @@ const LiveDraft = memo(function LiveDraft({ draft, turn, detail, title, onStop }
     </div>
   );
 });
+
+function useStableCardActions(): CardActions {
+  const actions = useAiCardActions();
+  const ref = useRef(actions);
+  ref.current = actions;
+  return useMemo<CardActions>(
+    () => ({
+      openMention: (mention) => ref.current.openMention(mention),
+      previewBatch: (batch) => ref.current.previewBatch(batch),
+      openBatch: (batch) => ref.current.openBatch(batch),
+      rejectBatch: (batch) => ref.current.rejectBatch(batch),
+      postDraft: (draft, message) => ref.current.postDraft(draft, message),
+      discardDraft: (draft) => ref.current.discardDraft(draft),
+      openAnnotation: (annotationId) => ref.current.openAnnotation(annotationId),
+    }),
+    [],
+  );
+}
 
 export function AiTranscript({
   session,
@@ -682,9 +857,15 @@ export function AiTranscript({
   onFeedback,
   onAnswerQuestions,
   pendingUser = null,
+  supersededUserMessageId = null,
 }: AiTranscriptProps) {
-  const { detail, messages, draft, turns, loading, error, loadingOlder, loadOlder } = session;
-  const { openMention } = useAiCardActions();
+  const { detail, messages, turns, loading, error, loadingOlder, loadOlder, interrupt } = session;
+  const cardActions = useStableCardActions();
+  const { openMention } = cardActions;
+  const draftStore = useMemo(
+    () => session.draftStore ?? staticDraftStore(session.draft),
+    [session.draftStore, session.draft],
+  );
   const scrollRef = useRef<HTMLDivElement>(null);
   const nearBottomRef = useRef(true);
   const restoreRef = useRef<{ scrollTop: number; scrollHeight: number } | null>(null);
@@ -692,9 +873,24 @@ export function AiTranscript({
   const lastIdRef = useRef<string | undefined>(undefined);
   const [showJump, setShowJump] = useState(false);
   const [feedback, setFeedback] = useState<Record<string, AiFeedback>>({});
+  const [announcement, setAnnouncement] = useState("");
+  const rowDataRef = useRef<Map<string, RowData>>(new Map());
 
   const showSkeleton = useSkeletonGate(loading && !detail);
-  const rows = useMemo(() => buildRows(messages.order, messages.byId), [messages]);
+  const { rows, lastTurnRowIndex, lastUserIndex } = useMemo(
+    () => buildTranscriptRows(messages.order, messages.byId),
+    [messages],
+  );
+  const rowData = useMemo(() => {
+    const next = collectRowData(
+      rows,
+      detail?.opBatches ?? [],
+      detail?.commentDrafts ?? [],
+      rowDataRef.current,
+    );
+    rowDataRef.current = next;
+    return next;
+  }, [rows, detail?.opBatches, detail?.commentDrafts]);
   const activeTurn = detail?.session.activeTurn ?? null;
   const live = activeTurn && isActiveTurn(activeTurn) ? activeTurn : null;
   const liveWork = useMemo(() => {
@@ -730,8 +926,22 @@ export function AiTranscript({
   );
 
   const contentKey = `${pendingUser ? 1 : 0}:${messages.order.length}:${lastId ?? ""}:${lastMessage?.updatedAt ?? ""}:${
-    draft?.text.length ?? 0
-  }:${draft?.status ?? ""}:${live?.status ?? ""}`;
+    live?.aiTurnId ?? ""
+  }:${live?.status ?? ""}`;
+
+  const liveId = live?.aiTurnId ?? null;
+  const prevLiveRef = useRef<string | null>(null);
+  useEffect(() => {
+    const previous = prevLiveRef.current;
+    prevLiveRef.current = liveId;
+    if (liveId) {
+      setAnnouncement("");
+      return;
+    }
+    if (!previous) return;
+    const finished = turns[previous];
+    setAnnouncement((finished && turnFailureText(finished)) || "Response ready");
+  }, [liveId, turns]);
 
   useLayoutEffect(() => {
     const el = scrollRef.current;
@@ -758,6 +968,30 @@ export function AiTranscript({
       setShowJump(true);
     }
   }, [contentKey, currentUserId, firstId, lastId, lastMessage]);
+
+  const growFrameRef = useRef<number | null>(null);
+  const stickToBottom = useCallback(() => {
+    if (growFrameRef.current !== null) return;
+    const run = () => {
+      growFrameRef.current = null;
+      const el = scrollRef.current;
+      if (el && nearBottomRef.current) el.scrollTop = el.scrollHeight;
+    };
+    growFrameRef.current =
+      typeof requestAnimationFrame === "function"
+        ? requestAnimationFrame(run)
+        : (setTimeout(run, 16) as unknown as number);
+  }, []);
+  useEffect(
+    () => () => {
+      if (growFrameRef.current !== null && typeof cancelAnimationFrame === "function") {
+        cancelAnimationFrame(growFrameRef.current);
+      }
+    },
+    [],
+  );
+
+  const stop = useCallback(() => interrupt(), [interrupt]);
 
   const onScroll = () => {
     const el = scrollRef.current;
@@ -815,24 +1049,9 @@ export function AiTranscript({
     );
   }
 
-  const lastTurnRowIndex = rows.reduce(
-    (found, row, index) => (row.kind === "turn" ? index : found),
-    -1,
-  );
-  const lastUserIndex = rows.reduce(
-    (found, row, index) => (row.kind === "user" ? index : found),
-    -1,
-  );
-  const lastTurnRow = rows[lastTurnRowIndex];
-  const lastTurnId = lastTurnRow?.kind === "turn" ? lastTurnRow.aiTurnId : null;
-  const lastTurn = lastTurnId ? turns[lastTurnId] : undefined;
   const presence =
     live && live.userId !== currentUserId ? `${live.userName ?? "A teammate"} is asking AI…` : null;
-  const statusText = live
-    ? "AI is responding"
-    : lastTurn?.status === "failed"
-      ? "The AI turn failed"
-      : "";
+  const statusText = announcement || (live ? "AI is responding" : "");
   const idle = !live;
 
   return (
@@ -843,6 +1062,7 @@ export function AiTranscript({
         onScroll={onScroll}
         role="region"
         aria-label="AI conversation"
+        aria-busy={Boolean(live)}
         tabIndex={0}
         data-testid="ai-transcript"
       >
@@ -875,6 +1095,7 @@ export function AiTranscript({
           const lastAssistant = [...row.messages]
             .reverse()
             .find((message) => message.content.type === "text");
+          const data = rowData.get(row.key) ?? NO_ROW_DATA;
           return (
             <TurnRow
               key={row.key}
@@ -882,12 +1103,16 @@ export function AiTranscript({
               turn={turn}
               active={active}
               isLast={isLast}
-              opBatches={detail.opBatches}
-              commentDrafts={detail.commentDrafts}
+              opBatches={data.batches}
+              commentDrafts={data.drafts}
               canApplyModelOps={canApplyModelOps}
               canSwitchProvider={canSwitchProvider}
               feedback={lastAssistant ? feedback[lastAssistant.aiMessageId] : undefined}
-              onFeedback={handleFeedback}
+              onFeedback={onFeedback ? handleFeedback : undefined}
+              actions={cardActions}
+              superseded={
+                supersededUserMessageId !== null && row.precedingUserId === supersededUserMessageId
+              }
               onRetry={isLast ? onRetry : undefined}
               onRetryWithProvider={isLast ? onRetryWithProvider : undefined}
               onOpenIntegrations={isLast ? onOpenIntegrations : undefined}
@@ -928,17 +1153,23 @@ export function AiTranscript({
         ) : null}
         {live ? (
           <LiveDraft
-            draft={draft}
+            draftStore={draftStore}
             turn={live}
             detail={liveWork.detail}
             title={liveWork.title}
-            onStop={() => session.interrupt()}
+            onStop={stop}
+            onGrow={stickToBottom}
           />
         ) : null}
         {presence ? <p className="wpn-ai-presence">{presence}</p> : null}
       </div>
       {showJump ? (
-        <button type="button" className="wpn-ai-jump" onClick={jumpToLatest}>
+        <button
+          type="button"
+          className="wpn-ai-jump"
+          aria-label="Jump to latest message"
+          onClick={jumpToLatest}
+        >
           <Icon name="arrowDown" />
           Jump to latest
         </button>

@@ -156,9 +156,7 @@ describe("AiModelSwitcher", () => {
     const row = document.querySelector<HTMLElement>(".wpn-ai-switcher__row--effort")!;
     expect(row.textContent).toContain("Medium");
     click(row);
-    const items = Array.from(
-      document.querySelectorAll<HTMLElement>('[role="menuitemradio"]'),
-    );
+    const items = Array.from(document.querySelectorAll<HTMLElement>('[role="menuitemradio"]'));
     expect(items.map((item) => item.textContent)).toEqual(["Low", "Medium", "High"]);
     expect(items[1]!.getAttribute("aria-checked")).toBe("true");
     click(items[2]);

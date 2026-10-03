@@ -21,7 +21,7 @@ import {
   type AiDockMode,
 } from "../../ai/aiDockState";
 import { useAiPreview } from "../../ai/aiPreviewStore";
-import type { AiOpBatchApplier } from "../../ai/useAiOpBatchApplier";
+import type { AiBatchPreviewOutcome, AiOpBatchApplier } from "../../ai/useAiOpBatchApplier";
 import { useOptionalAiRuntime } from "../../context/AiRuntimeContext";
 import { updateAiOpBatch } from "../../services/aiApi";
 import type {
@@ -38,6 +38,7 @@ import { useEscapeKey } from "../../hooks/useEscapeKey";
 import { useOutsidePointerDown } from "../../hooks/useOutsidePointerDown";
 import { Icon, MenuPanel, type IconName, type MenuItemDefinition } from "../primitives";
 import { AiMentionChip } from "./AiComposer";
+import { AiChangeList } from "./AiChangeList";
 import {
   useMentionPicker,
   type AiMentionCandidate,
@@ -112,8 +113,17 @@ interface PendingReplace {
 }
 
 export const UNDO_TOAST_MS = 10_000;
+
+const undoHint = (() => {
+  try {
+    return /Mac|iPhone|iPad/.test(navigator.platform) ? "or press ⌘Z" : "or press Ctrl+Z";
+  } catch {
+    return "or press Ctrl+Z";
+  }
+})();
 const THREAD_LIMIT = 6;
 const FOLLOW_FIT_MS = 700;
+const DRAFT_THROTTLE_MS = 200;
 const WORK_DONE_MS = 9000;
 const MAX_TEXTAREA_PX = 160;
 const MIN_DOCK_HEIGHT = 200;
@@ -122,12 +132,8 @@ const HEIGHT_STEP = 24;
 const FALLBACK_MAX_HEIGHT = 2000;
 const NO_CANDIDATES: AiMentionCandidate[] = [];
 
-const nextFrame = (callback: () => void): (() => void) => {
-  if (typeof requestAnimationFrame === "function") {
-    const id = requestAnimationFrame(callback);
-    return () => cancelAnimationFrame(id);
-  }
-  const id = setTimeout(callback, 16);
+const scheduleTimeout = (callback: () => void, delayMs: number): (() => void) => {
+  const id = setTimeout(callback, delayMs);
   return () => clearTimeout(id);
 };
 
@@ -230,6 +236,10 @@ function AiEditorDockInner({
   const [pendingReplace, setPendingReplace] = useState<PendingReplace | null>(null);
   const [toast, setToast] = useState<{ batchId: string; key: number } | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  const [skippedOps, setSkippedOps] = useState<string[]>([]);
+  const [excluded, setExcluded] = useState<Record<string, readonly number[]>>({});
+  const excludedRef = useRef(excluded);
+  excludedRef.current = excluded;
   const [layout, setLayout] = useState<AiDockLayout>(() => loadAiDockLayout(kind));
   const [measured, setMeasured] = useState(0);
   const [dragging, setDragging] = useState(false);
@@ -265,6 +275,7 @@ function AiEditorDockInner({
   const isInteractingRef = useRef(isInteracting);
   isInteractingRef.current = isInteracting;
   const lastFitRef = useRef(0);
+  const lastDraftRef = useRef(0);
   const workTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const openRef = useRef(open);
   openRef.current = open;
@@ -345,9 +356,12 @@ function AiEditorDockInner({
     setDispositions((current) => ({ ...current, [batchId]: value }));
   }, []);
 
-  const showPreview = useCallback(async (batch: AiOpBatch): Promise<boolean> => {
-    setNotice(null);
-    const outcome = await applierRef.current.preview(batch);
+  const excludeFor = useCallback(
+    (batchId: string): ReadonlySet<number> => new Set(excludedRef.current[batchId] ?? []),
+    [],
+  );
+
+  const handleOutcome = useCallback((batch: AiOpBatch, outcome: AiBatchPreviewOutcome): boolean => {
     if (!outcome.ok) {
       setConflicts((current) => ({ ...current, [batch.aiOpBatchId]: outcome.detail }));
       return false;
@@ -358,16 +372,54 @@ function AiEditorDockInner({
       delete next[batch.aiOpBatchId];
       return next;
     });
-    if (outcome.skipped.length > 0) {
-      const count = outcome.skipped.length;
-      setNotice(
-        `${count} ${count === 1 ? "change" : "changes"} from the AI couldn't be applied and ${
-          count === 1 ? "was" : "were"
-        } skipped. ${outcome.skipped[0] ?? ""}`.trim(),
-      );
-    }
+    setSkippedOps(outcome.skipped);
+    const skippedCount = outcome.skipped.length;
+    setNotice(
+      [
+        skippedCount > 0
+          ? `${skippedCount} ${skippedCount === 1 ? "change" : "changes"} from the AI couldn't be applied and ${
+              skippedCount === 1 ? "was" : "were"
+            } skipped.`
+          : null,
+        outcome.syncWarning ?? null,
+      ]
+        .filter(Boolean)
+        .join(" ") || null,
+    );
     return true;
   }, []);
+
+  const showPreview = useCallback(
+    async (batch: AiOpBatch): Promise<boolean> => {
+      setNotice(null);
+      setSkippedOps([]);
+      const outcome = await applierRef.current.preview(batch, {
+        exclude: excludeFor(batch.aiOpBatchId),
+      });
+      return handleOutcome(batch, outcome);
+    },
+    [excludeFor, handleOutcome],
+  );
+
+  const toggleChange = useCallback(
+    (batch: AiOpBatch, opIndex: number) => {
+      const id = batch.aiOpBatchId;
+      const current = new Set(excludedRef.current[id] ?? []);
+      if (current.has(opIndex)) current.delete(opIndex);
+      else current.add(opIndex);
+      const next = { ...excludedRef.current, [id]: [...current] };
+      excludedRef.current = next;
+      setExcluded(next);
+      if (applierRef.current.previewingBatchId === id) {
+        setNotice(null);
+        setSkippedOps([]);
+        void applierRef.current
+          .repreview(batch, { exclude: current })
+          .then((outcome) => handleOutcome(batch, outcome));
+      }
+    },
+    [handleOutcome],
+  );
 
   const acceptCurrent = useCallback(() => {
     const id = applierRef.current.previewingBatchId;
@@ -399,14 +451,15 @@ function AiEditorDockInner({
     const pending = pendingReplace;
     if (!pending) return;
     setPendingReplace(null);
-    const previous = applierRef.current.previewingBatchId;
-    if (previous) {
-      await applierRef.current.reject();
-      mark(previous, "discarded");
-    }
-    const ok = await showPreview(pending.batch);
+    setNotice(null);
+    setSkippedOps([]);
+    const { previous, outcome } = await applierRef.current.replacePreview(pending.batch, {
+      exclude: excludeFor(pending.batch.aiOpBatchId),
+    });
+    if (previous) mark(previous, "discarded");
+    const ok = handleOutcome(pending.batch, outcome);
     if (ok && pending.then === "apply") acceptCurrent();
-  }, [acceptCurrent, mark, pendingReplace, showPreview]);
+  }, [acceptCurrent, excludeFor, handleOutcome, mark, pendingReplace]);
 
   const discard = useCallback(
     async (batch: AiOpBatch) => {
@@ -452,12 +505,11 @@ function AiEditorDockInner({
 
   useEffect(() => {
     if (!toast) return undefined;
-    const timer = setTimeout(() => setToast(null), UNDO_TOAST_MS);
-    const unsubscribe = subscribeChanges?.(() => setToast(null));
-    return () => {
-      clearTimeout(timer);
-      unsubscribe?.();
-    };
+    if (!subscribeChanges) {
+      const timer = setTimeout(() => setToast(null), UNDO_TOAST_MS);
+      return () => clearTimeout(timer);
+    }
+    return subscribeChanges(() => setToast(null));
   }, [subscribeChanges, toast]);
 
   const stopDrafting = useCallback(() => {
@@ -472,18 +524,24 @@ function AiEditorDockInner({
     if (state.partialOps.length === 0) return;
     draftOpsRef.current = state.partialOps;
     if (draftTimerRef.current !== null) return;
-    draftTimerRef.current = nextFrame(() => {
+    const delay = Math.max(0, DRAFT_THROTTLE_MS - (Date.now() - lastDraftRef.current));
+    draftTimerRef.current = scheduleTimeout(() => {
       draftTimerRef.current = null;
       if (activeRunRef.current === null) return;
-      if (applierRef.current.draft(draftOpsRef.current)) {
-        setDrafting(true);
-        const now = Date.now();
-        if (now - lastFitRef.current > FOLLOW_FIT_MS && !isInteractingRef.current()) {
-          lastFitRef.current = now;
-          applierRef.current.fit();
-        }
-      }
-    });
+      lastDraftRef.current = Date.now();
+      void applierRef.current
+        .draft(draftOpsRef.current)
+        .catch(() => false)
+        .then((drawn) => {
+          if (!drawn || activeRunRef.current === null) return;
+          setDrafting(true);
+          const now = Date.now();
+          if (now - lastFitRef.current > FOLLOW_FIT_MS && !isInteractingRef.current()) {
+            lastFitRef.current = now;
+            applierRef.current.fit();
+          }
+        });
+    }, delay);
   }, [canApply, running, state.actionKey, state.partialOps]);
 
   useEffect(
@@ -1201,6 +1259,8 @@ function AiEditorDockInner({
                   conflict={(id) => conflicts[id] ?? null}
                   running={running}
                   canChat={Boolean(ui)}
+                  excludedFor={excludeFor}
+                  onToggleChange={toggleChange}
                   onPreview={(batch) => void requestPreview(batch)}
                   onApply={(batch) => void requestPreview(batch, "apply")}
                   onDiscard={(batch) => void discard(batch)}
@@ -1303,6 +1363,7 @@ function AiEditorDockInner({
           <div key={toast.key} className="wpn-ai-dock__toast" role="status">
             <Icon name="check" className="wpn-ai-dock__toast-icon" />
             <span>AI change applied. Save to keep it.</span>
+            <span className="wpn-ai-dock__toast-hint">{undoHint}</span>
             <button
               type="button"
               className="wpn-ai-dock__toast-btn"
@@ -1311,13 +1372,31 @@ function AiEditorDockInner({
               <Icon name="undo" className="wpn-btn__icon" />
               Undo AI change
             </button>
-            <span className="wpn-ai-dock__toast-timer" aria-hidden="true" />
+            {subscribeChanges ? null : (
+              <span className="wpn-ai-dock__toast-timer" aria-hidden="true" />
+            )}
           </div>
         ) : null}
 
-        {notice || applier.error ? (
+        {applier.syncPending ? (
+          <div className="wpn-ai-dock__sync" role="status">
+            {applier.syncError ?? "Not synced — retrying"}
+          </div>
+        ) : null}
+
+        {notice || applier.error || skippedOps.length > 0 ? (
           <div className="wpn-ai-dock__notice" role="alert">
             {notice ?? applier.error}
+            {skippedOps.length > 0 ? (
+              <details className="wpn-ai-dock__skipped">
+                <summary>Show skipped changes</summary>
+                <ul>
+                  {skippedOps.map((entry, index) => (
+                    <li key={index}>{entry}</li>
+                  ))}
+                </ul>
+              </details>
+            ) : null}
           </div>
         ) : null}
 
@@ -1472,6 +1551,8 @@ interface DockRunItemProps {
   conflict: (batchId: string) => string | null;
   running: boolean;
   canChat: boolean;
+  excludedFor: (batchId: string) => ReadonlySet<number>;
+  onToggleChange: (batch: AiOpBatch, opIndex: number) => void;
   onPreview: (batch: AiOpBatch) => void;
   onApply: (batch: AiOpBatch) => void;
   onDiscard: (batch: AiOpBatch) => void;
@@ -1503,6 +1584,8 @@ function DockRunItem({
   conflict,
   running,
   canChat,
+  excludedFor,
+  onToggleChange,
   onPreview,
   onApply,
   onDiscard,
@@ -1547,6 +1630,8 @@ function DockRunItem({
           canApply={canApply}
           disposition={disposition(batch.aiOpBatchId)}
           conflict={conflict(batch.aiOpBatchId)}
+          excluded={excludedFor(batch.aiOpBatchId)}
+          onToggle={(opIndex) => onToggleChange(batch, opIndex)}
           onPreview={onPreview}
           onApply={onApply}
           onDiscard={onDiscard}
@@ -1615,6 +1700,8 @@ function BatchResult({
   canApply,
   disposition,
   conflict,
+  excluded,
+  onToggle,
   onPreview,
   onApply,
   onDiscard,
@@ -1624,6 +1711,8 @@ function BatchResult({
   canApply: boolean;
   disposition: Disposition;
   conflict: string | null;
+  excluded: ReadonlySet<number>;
+  onToggle: (opIndex: number) => void;
   onPreview: (batch: AiOpBatch) => void;
   onApply: (batch: AiOpBatch) => void;
   onDiscard: (batch: AiOpBatch) => void;
@@ -1685,6 +1774,14 @@ function BatchResult({
           </span>
         )}
       </div>
+      {!empty ? (
+        <AiChangeList
+          lines={changes}
+          excluded={excluded}
+          onToggle={open ? onToggle : undefined}
+          disabled={!canApply}
+        />
+      ) : null}
       {problems.length > 0 ? (
         <details className="wpn-ai-dock__problems">
           <summary role="alert">

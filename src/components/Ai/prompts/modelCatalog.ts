@@ -1,3 +1,4 @@
+import { isValidModelId } from "../../../ai/modelValidation";
 import type { AiMe, AiModelInfo, AiProviderId } from "../../../types/ai.types";
 import { connectedProviders, effectiveConnector } from "../aiHelpers";
 
@@ -318,7 +319,7 @@ export function buildProviderCatalogs(me: AiMe | null | undefined): ProviderCata
     }
     const liveModels = effectiveConnector(me, provider)?.models ?? [];
     for (const info of liveModels) {
-      if (info.id === "default") continue;
+      if (info.id === "default" || !isValidModelId(info.id)) continue;
       const live = fromLive(info);
       const known = models.get(info.id);
       models.set(info.id, known ? { ...known, live: true, description: known.description } : live);

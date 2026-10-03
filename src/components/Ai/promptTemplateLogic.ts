@@ -1,3 +1,4 @@
+import { AI_EFFORTS, isValidModelId } from "../../ai/modelValidation";
 import type {
   AiActionOutputFormat,
   AiActionTarget,
@@ -17,7 +18,7 @@ export const TEMPLATE_PLACEHOLDERS = [
 export const SYSTEM_PROMPT_LIMIT = 20_000;
 export const MAX_TOKENS_MIN = 64;
 export const MAX_TOKENS_MAX = 64_000;
-export const TEMPLATE_EFFORTS = ["low", "medium", "high"] as const;
+export const TEMPLATE_EFFORTS = AI_EFFORTS;
 
 export const OUTPUT_FORMATS: { id: AiActionOutputFormat; label: string }[] = [
   { id: "json", label: "JSON" },
@@ -131,6 +132,9 @@ export function validateDraft(draft: TemplateDraft, template?: AiActionTemplate)
     errors.push(
       `Max tokens must be a whole number from ${MAX_TOKENS_MIN} to ${MAX_TOKENS_MAX.toLocaleString()}.`,
     );
+  }
+  if (draft.model !== null && draft.model !== "" && !isValidModelId(draft.model)) {
+    errors.push("Model id contains characters the server does not accept.");
   }
   if (draft.effort !== null && !(TEMPLATE_EFFORTS as readonly string[]).includes(draft.effort)) {
     errors.push(`Effort must be one of: ${TEMPLATE_EFFORTS.join(", ")}.`);

@@ -220,11 +220,16 @@ export function AiWorkspaceDialog({ request, onClose }: AiWorkspaceDialogProps) 
           phase: result.done === 0 ? "failed" : result.failed > 0 ? "partial" : "applied",
           summary: summarizeWorkspaceResult(result),
           error:
-            result.done === 0
-              ? (result.items[0]?.error ?? "Nothing could be created")
-              : result.failed > 0
-                ? `${result.failed} ${result.failed === 1 ? "change was" : "changes were"} skipped.`
-                : null,
+            [
+              result.done === 0
+                ? (result.items[0]?.error ?? "Nothing could be created")
+                : result.failed > 0
+                  ? `${result.failed} ${result.failed === 1 ? "change was" : "changes were"} skipped.`
+                  : null,
+              result.syncWarning ?? null,
+            ]
+              .filter(Boolean)
+              .join(" ") || null,
         });
         chatsApi.reload();
       } catch (err) {

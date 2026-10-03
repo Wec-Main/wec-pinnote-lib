@@ -9,6 +9,8 @@ import { withJitter } from "../utils/backoff";
 const RESYNC_COOLDOWN_MS = 5000;
 const RECONNECT_DELAY_MS = 2000;
 const MAX_RECONNECT_DELAY_MS = 30000;
+const STABLE_OPEN_MS = 5000;
+const HIDDEN_PAUSE_MS = 30000;
 
 export type StreamTokenGetter = () =>
   string | undefined | null | Promise<string | undefined | null>;
@@ -77,6 +79,23 @@ export function useSseStream({
     let reconnectDelay = RECONNECT_DELAY_MS;
     let openedOnce = false;
     let ticketController: AbortController | null = null;
+    let paused = false;
+    let stableTimer: ReturnType<typeof setTimeout> | null = null;
+    let hiddenTimer: ReturnType<typeof setTimeout> | null = null;
+
+    const clearStableTimer = () => {
+      if (stableTimer) {
+        clearTimeout(stableTimer);
+        stableTimer = null;
+      }
+    };
+
+    const clearHiddenTimer = () => {
+      if (hiddenTimer) {
+        clearTimeout(hiddenTimer);
+        hiddenTimer = null;
+      }
+    };
 
     const resync = () => {
       const now = Date.now();
@@ -100,6 +119,7 @@ export function useSseStream({
         resync();
         return;
       }
+      reconnectDelay = RECONNECT_DELAY_MS;
       lastEventRef.current = { scope, eventId: parsed.eventId };
       if (parsed.projectId !== projectId || parsed.pageKey !== pageKey) {
         return;
@@ -115,7 +135,7 @@ export function useSseStream({
     };
 
     const scheduleReconnect = () => {
-      if (stopped || reconnectTimer) {
+      if (stopped || paused || reconnectTimer) {
         return;
       }
       setState("reconnecting");
@@ -139,7 +159,11 @@ export function useSseStream({
       source = next;
 
       next.addEventListener("open", () => {
-        reconnectDelay = RECONNECT_DELAY_MS;
+        clearStableTimer();
+        stableTimer = setTimeout(() => {
+          stableTimer = null;
+          reconnectDelay = RECONNECT_DELAY_MS;
+        }, STABLE_OPEN_MS);
         setState("open");
         if (handingOver) {
           retiringSource?.close();
@@ -159,6 +183,7 @@ export function useSseStream({
         if (stopped || source !== next) {
           return;
         }
+        clearStableTimer();
         next.close();
         source = null;
         scheduleReconnect();
@@ -238,7 +263,7 @@ export function useSseStream({
     }
 
     const reconnectNow = () => {
-      if (stopped || connecting || source) {
+      if (stopped || paused || connecting || source) {
         return;
       }
       clearReconnectTimer();
@@ -246,9 +271,32 @@ export function useSseStream({
     };
 
     const handleVisibilityChange = () => {
+      clearHiddenTimer();
       if (document.visibilityState === "visible") {
+        if (paused) {
+          paused = false;
+          reconnectDelay = RECONNECT_DELAY_MS;
+          void connect();
+          return;
+        }
         reconnectNow();
+        return;
       }
+      hiddenTimer = setTimeout(() => {
+        hiddenTimer = null;
+        if (stopped || document.visibilityState !== "hidden") {
+          return;
+        }
+        paused = true;
+        clearReconnectTimer();
+        ticketController?.abort();
+        clearStableTimer();
+        source?.close();
+        source = null;
+        retiringSource?.close();
+        retiringSource = null;
+        setState("closed");
+      }, HIDDEN_PAUSE_MS);
     };
 
     window.addEventListener("online", reconnectNow);
@@ -258,6 +306,8 @@ export function useSseStream({
     return () => {
       stopped = true;
       clearReconnectTimer();
+      clearStableTimer();
+      clearHiddenTimer();
       ticketController?.abort();
       window.removeEventListener("online", reconnectNow);
       document.removeEventListener("visibilitychange", handleVisibilityChange);

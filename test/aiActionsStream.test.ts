@@ -98,6 +98,41 @@ describe("runAiAction", () => {
     vi.unstubAllGlobals();
   });
 
+  it("fails with stream_interrupted when the stream ends without done or result", async () => {
+    fetchMock.mockResolvedValue(streamResponse(['event: delta\ndata: {"text":"a"}\n\n']));
+    const error = await runAiAction({
+      apiBaseUrl: "https://api.example.com",
+      authToken: "tok",
+      projectId: "p1",
+      actionKey: "erd.explain",
+      body: {},
+      onEvent: () => undefined,
+    }).catch((err: unknown) => err);
+    expect(error).toBeInstanceOf(AiActionRequestError);
+    expect((error as AiActionRequestError).code).toBe("stream_interrupted");
+  });
+
+  it("aborts and fails when the stream goes idle", async () => {
+    fetchMock.mockImplementation(async (_url: string, init: RequestInit) => {
+      const body = new ReadableStream<Uint8Array>({
+        start(controller) {
+          init.signal?.addEventListener("abort", () => controller.error(new Error("aborted")));
+        },
+      });
+      return new Response(body, { status: 200 });
+    });
+    const error = await runAiAction({
+      apiBaseUrl: "https://api.example.com",
+      authToken: "tok",
+      projectId: "p1",
+      actionKey: "erd.explain",
+      body: {},
+      idleTimeoutMs: 20,
+      onEvent: () => undefined,
+    }).catch((err: unknown) => err);
+    expect((error as AiActionRequestError).code).toBe("stream_interrupted");
+  });
+
   it("posts to the action route with auth headers and streams typed events", async () => {
     const encoder = new TextEncoder();
     const euro = encoder.encode('event: delta\ndata: {"text":"€"}\n\n');

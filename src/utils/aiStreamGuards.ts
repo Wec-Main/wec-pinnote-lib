@@ -10,6 +10,7 @@ export const AI_STREAM_EVENT_TYPES: readonly AiStreamEventType[] = [
   "ai_delta",
   "ai_snapshot",
   "ai_open_in_editor",
+  "ai_resync",
   "ai_connectors.updated",
   "ai_connector_login.updated",
 ];
@@ -64,6 +65,7 @@ const CHECKS: Record<AiStreamEventType, (event: Record<string, unknown>) => bool
     isRecord(e.target) &&
     (e.target.kind === "data_model" || e.target.kind === "flow") &&
     isNonEmptyString(e.target.id),
+  ai_resync: () => true,
   "ai_connectors.updated": (e) =>
     Array.isArray(e.connectors) && e.connectors.every((c) => hasId(c, "provider")),
   "ai_connector_login.updated": (e) =>
@@ -81,6 +83,9 @@ export function parseAiStreamEvent(eventName: string, data: string): AiStreamEve
   if (!isAiStreamEventType(eventName)) {
     return null;
   }
+  if (eventName === "ai_resync") {
+    return { type: "ai_resync" };
+  }
   let parsed: unknown;
   try {
     parsed = JSON.parse(data);
@@ -91,4 +96,16 @@ export function parseAiStreamEvent(eventName: string, data: string): AiStreamEve
     return null;
   }
   return parsed as unknown as AiStreamEvent;
+}
+
+export function createClientMessageId(): string {
+  const cryptoApi = typeof globalThis !== "undefined" ? globalThis.crypto : undefined;
+  if (cryptoApi && typeof cryptoApi.randomUUID === "function") {
+    return cryptoApi.randomUUID();
+  }
+  const hex = (n: number) =>
+    Math.floor(Math.random() * 16 ** n)
+      .toString(16)
+      .padStart(n, "0");
+  return `${hex(8)}-${hex(4)}-4${hex(3)}-${(8 + Math.floor(Math.random() * 4)).toString(16)}${hex(3)}-${hex(12)}`;
 }

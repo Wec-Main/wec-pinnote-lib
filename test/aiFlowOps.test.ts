@@ -1,12 +1,6 @@
 import { describe, expect, it } from "vitest";
-import {
-  AI_FLOW_LIMITS,
-  applyFlowOps,
-  diffFlow,
-  parseFlowOps,
-  summarizeFlow,
-  type FlowOp,
-} from "../src/ai/ops";
+import { AI_FLOW_LIMITS, diffFlow, parseFlowOps, summarizeFlow, type FlowOp } from "../src/ai/ops";
+import { applyFlowOps } from "../src/ai/ops/applyFlowOps";
 import type { FlowJSON, FlowNode } from "../src/types/flowchart.types";
 import { getNodeRect, rectsIntersect } from "../src/utils/flowchart/geometry";
 import { NodeTypeRegistry } from "../src/utils/flowchart/nodeTypes";

@@ -203,10 +203,7 @@ describe("ConnectDialog — Claude subscription", () => {
 
     click(button("Open Claude sign-in"));
     expect(openSpy).toHaveBeenCalledTimes(1);
-    expect(openSpy).toHaveBeenCalledWith(
-      "https://claude.ai/oauth/authorize?x=1",
-      "_blank"
-    );
+    expect(openSpy).toHaveBeenCalledWith("https://claude.ai/oauth/authorize?x=1", "_blank");
     expect(dialog().textContent).toContain("Opened in a new tab");
     expect(button("Open again")).not.toBeNull();
     expect(
@@ -471,10 +468,7 @@ describe("ConnectDialog — Codex subscription", () => {
 
     click(button("Open ChatGPT"));
     expect(openSpy).toHaveBeenCalledTimes(1);
-    expect(openSpy).toHaveBeenCalledWith(
-      "https://auth.openai.com/codex/device",
-      "_blank"
-    );
+    expect(openSpy).toHaveBeenCalledWith("https://auth.openai.com/codex/device", "_blank");
     expect(dialog().textContent).toContain("Waiting for you to approve in ChatGPT…");
     expect(dialog().textContent).toContain("This finishes by itself");
 

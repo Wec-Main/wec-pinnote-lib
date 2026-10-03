@@ -1,22 +1,64 @@
-import { applyErdOps } from "./ops/applyErdOps";
-import { applyFlowOps } from "./ops/applyFlowOps";
-import type { DocDiff, ErdOp, FlowOp, OpError } from "./ops/types";
+import type { ApplyOpsResult, DocDiff, ErdOp, FlowOp, OpError } from "./ops/types";
 import type { AiPreviewOverlay } from "./aiPreviewStore";
 import type { AiOpBatch, AiOpBatchStatus, AiOpBatchTargetKind } from "../types/ai.types";
 import type { ErdDocumentJSON } from "../types/dataModel.types";
 import type { FlowJSON } from "../types/flowchart.types";
 
 const TRANSITIONS: Readonly<Record<AiOpBatchStatus, readonly AiOpBatchStatus[]>> = {
-  proposed: ["applied", "rejected", "conflict", "discarded"],
+  proposed: ["applying", "applied", "rejected", "conflict", "discarded"],
+  applying: ["proposed", "applied", "rejected", "conflict", "discarded"],
   applied: ["saved", "discarded", "rejected", "conflict"],
-  conflict: ["applied", "discarded"],
+  conflict: ["applying", "applied", "discarded"],
   saved: [],
   rejected: [],
   discarded: [],
 };
 
 export function canTransitionOpBatch(from: AiOpBatchStatus, to: AiOpBatchStatus): boolean {
-  return TRANSITIONS[from].includes(to);
+  return (TRANSITIONS[from] as readonly AiOpBatchStatus[] | undefined)?.includes(to) ?? false;
+}
+
+export function isBusyOpBatchStatus(status: AiOpBatchStatus | string): boolean {
+  return status === "applying";
+}
+
+type OpsRunner<D, O> = (
+  doc: D,
+  ops: readonly O[],
+  options?: { createId?: (prefix: string) => string },
+) => ApplyOpsResult<D>;
+
+let erdRunner: Promise<OpsRunner<ErdDocumentJSON, ErdOp>> | null = null;
+let flowRunner: Promise<OpsRunner<FlowJSON, FlowOp>> | null = null;
+
+export function loadErdOpsRunner(): Promise<OpsRunner<ErdDocumentJSON, ErdOp>> {
+  erdRunner ??= import("./ops/applyErdOps")
+    .then((module) => module.applyErdOps)
+    .catch((err: unknown) => {
+      erdRunner = null;
+      throw err;
+    });
+  return erdRunner;
+}
+
+export function loadFlowOpsRunner(): Promise<OpsRunner<FlowJSON, FlowOp>> {
+  flowRunner ??= import("./ops/applyFlowOps")
+    .then((module) => module.applyFlowOps)
+    .catch((err: unknown) => {
+      flowRunner = null;
+      throw err;
+    });
+  return flowRunner;
+}
+
+export function prefetchOpsRunners(): void {
+  void loadErdOpsRunner().catch(() => undefined);
+  void loadFlowOpsRunner().catch(() => undefined);
+}
+
+export function filterBatchOps(batch: AiOpBatch, excluded: ReadonlySet<number>): AiOpBatch {
+  if (excluded.size === 0) return batch;
+  return { ...batch, ops: batch.ops.filter((_, index) => !excluded.has(index)) } as AiOpBatch;
 }
 
 export type BatchApplication<D> =
@@ -40,14 +82,16 @@ export function describeOpErrors(errors: readonly OpError[]): string {
     .join("\n");
 }
 
-export function applyBatchToDocument(
+export async function applyBatchToDocument(
   batch: AiOpBatch,
   current: ErdDocumentJSON | FlowJSON,
-): BatchApplication<ErdDocumentJSON | FlowJSON> {
+): Promise<BatchApplication<ErdDocumentJSON | FlowJSON>> {
+  const erd = batch.targetKind === "data_model" ? await loadErdOpsRunner() : null;
+  const flow = batch.targetKind === "data_model" ? null : await loadFlowOpsRunner();
   const run = (list: unknown[]) =>
-    batch.targetKind === "data_model"
-      ? applyErdOps(current as ErdDocumentJSON, list as ErdOp[])
-      : applyFlowOps(current as FlowJSON, list as FlowOp[]);
+    erd
+      ? erd(current as ErdDocumentJSON, list as ErdOp[])
+      : flow!(current as FlowJSON, list as FlowOp[]);
   let ops: unknown[] = [...batch.ops];
   let origin = ops.map((_, index) => index);
   const skipped: string[] = [];
@@ -85,28 +129,81 @@ export function applyBatchToDocument(
 
 const DRAFT_ATTEMPTS = 4;
 
-function draftIds(): (prefix: string) => string {
-  let n = 0;
-  return (prefix) => `${prefix}_draft_${++n}`;
+export interface DraftIds {
+  next: number;
 }
 
-export function applyPartialOps(
+export function draftIds(state: DraftIds = { next: 0 }): (prefix: string) => string {
+  return (prefix) => `${prefix}_draft_${++state.next}`;
+}
+
+export async function applyPartialOps(
   kind: AiOpBatchTargetKind,
   current: ErdDocumentJSON | FlowJSON,
   ops: readonly unknown[],
-): { document: ErdDocumentJSON | FlowJSON; diff: DocDiff } | null {
+  ids: DraftIds = { next: 0 },
+): Promise<{ document: ErdDocumentJSON | FlowJSON; diff: DocDiff } | null> {
+  const erd = kind === "data_model" ? await loadErdOpsRunner() : null;
+  const flow = kind === "data_model" ? null : await loadFlowOpsRunner();
   let pending = ops.filter((op) => typeof op === "object" && op !== null);
   for (let attempt = 0; attempt < DRAFT_ATTEMPTS && pending.length > 0; attempt++) {
-    const result =
-      kind === "data_model"
-        ? applyErdOps(current as ErdDocumentJSON, pending as ErdOp[], { createId: draftIds() })
-        : applyFlowOps(current as FlowJSON, pending as FlowOp[], { createId: draftIds() });
+    const start = ids.next;
+    const createId = draftIds(ids);
+    const result = erd
+      ? erd(current as ErdDocumentJSON, pending as ErdOp[], { createId })
+      : flow!(current as FlowJSON, pending as FlowOp[], { createId });
     if (result.ok) return { document: result.document, diff: result.diff };
+    ids.next = start;
     const bad = new Set(result.errors.map((error) => error.index).filter((index) => index >= 0));
     if (bad.size === 0) return null;
     pending = pending.filter((_, index) => !bad.has(index));
   }
   return null;
+}
+
+export type DraftPlan = { mode: "full" } | { mode: "suffix"; from: number };
+
+export const DRAFT_COMPACT_STEPS = 8;
+
+const referencesTemp = (op: unknown): boolean => JSON.stringify(op).includes('"$');
+
+export function planDraftStep(
+  applied: readonly unknown[],
+  next: readonly unknown[],
+  steps: number,
+): DraftPlan {
+  if (applied.length === 0 || next.length <= applied.length || steps >= DRAFT_COMPACT_STEPS) {
+    return { mode: "full" };
+  }
+  for (let index = 0; index < applied.length; index++) {
+    if (applied[index] !== next[index]) return { mode: "full" };
+  }
+  for (let index = applied.length; index < next.length; index++) {
+    const op = next[index];
+    if (typeof op !== "object" || op === null || referencesTemp(op)) return { mode: "full" };
+  }
+  return { mode: "suffix", from: applied.length };
+}
+
+export function mergeDocDiffs(base: DocDiff, next: DocDiff): DocDiff {
+  const added = new Set(base.added);
+  const changed = new Set(base.changed);
+  const removed = new Set(base.removed);
+  for (const id of next.added) {
+    if (removed.has(id)) {
+      removed.delete(id);
+      changed.add(id);
+    } else added.add(id);
+  }
+  for (const id of next.changed) if (!added.has(id)) changed.add(id);
+  for (const id of next.removed) {
+    if (added.has(id)) added.delete(id);
+    else {
+      changed.delete(id);
+      removed.add(id);
+    }
+  }
+  return { added: [...added], changed: [...changed], removed: [...removed] };
 }
 
 export function buildPreviewOverlay(

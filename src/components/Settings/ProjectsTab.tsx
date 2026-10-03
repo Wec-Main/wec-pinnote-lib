@@ -149,7 +149,11 @@ export function ProjectsTab() {
                 clearable
                 size="sm"
               />
-              <RefreshButton label="Refresh projects" loading={loading || refreshing} onRefresh={reload} />
+              <RefreshButton
+                label="Refresh projects"
+                loading={loading || refreshing}
+                onRefresh={reload}
+              />
               <button
                 type="button"
                 className="wpn-users-create"
@@ -161,7 +165,11 @@ export function ProjectsTab() {
               </button>
             </>
           ) : (
-            <RefreshButton label="Refresh projects" loading={loading || refreshing} onRefresh={reload} />
+            <RefreshButton
+              label="Refresh projects"
+              loading={loading || refreshing}
+              onRefresh={reload}
+            />
           )
         }
       />

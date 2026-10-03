@@ -18,6 +18,7 @@ const lazyPanelDirectories = [
   "/src/components/EpicFlow/",
   "/src/components/WecFlow/",
   "/src/components/Ai/",
+  "/src/ai/ops/apply",
 ];
 
 const isSharedModule = (id: string) =>

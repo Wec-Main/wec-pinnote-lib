@@ -1,8 +1,24 @@
-import { fetchAiMe, listAiActionTemplates, listAiSessions } from "../services/aiApi";
-import type { AiActionTemplate, AiMe, AiScopeKind, AiSession } from "../types/ai.types";
+import {
+  fetchAiMe,
+  fetchAiSession,
+  listAiActionTemplates,
+  listAiSessions,
+} from "../services/aiApi";
+import type {
+  AiActionTemplate,
+  AiMe,
+  AiScopeKind,
+  AiSession,
+  AiSessionDetail,
+} from "../types/ai.types";
 import { sortSessions } from "./sessionReducer";
 import { prefetchResource } from "../utils/resourceCache";
-import { aiMeCacheKey, aiSessionsCacheKey, aiTemplatesCacheKey } from "./cacheKeys";
+import {
+  aiMeCacheKey,
+  aiSessionCacheKey,
+  aiSessionsCacheKey,
+  aiTemplatesCacheKey,
+} from "./cacheKeys";
 
 export { AI_TEMPLATES_CACHE_KEY, aiTemplatesCacheKey } from "./cacheKeys";
 
@@ -34,6 +50,21 @@ export function prefetchAiMe(
     aiMeCacheKey(apiBaseUrl, projectId, sessionKey),
     async (signal) => fetchAiMe(apiBaseUrl, await getToken(), projectId, signal),
     { ttlMs: 20_000, retries: 0 },
+  );
+}
+
+export const AI_SESSION_DETAIL_TTL_MS = 5_000;
+
+export function prefetchAiSession(
+  target: AiPrefetchTarget,
+  aiSessionId: string | null | undefined,
+): Promise<AiSessionDetail | undefined> {
+  if (!aiSessionId) return Promise.resolve(undefined);
+  const { apiBaseUrl, getToken } = target;
+  return prefetchResource<AiSessionDetail>(
+    aiSessionCacheKey(apiBaseUrl, aiSessionId),
+    async (signal) => fetchAiSession(apiBaseUrl, await getToken(), aiSessionId, signal),
+    { ttlMs: AI_SESSION_DETAIL_TTL_MS, retries: 0 },
   );
 }
 

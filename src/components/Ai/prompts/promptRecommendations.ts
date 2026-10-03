@@ -1,6 +1,7 @@
+import type { AiEffort } from "../../../ai/modelValidation";
 import type { ModelTier } from "./modelCatalog";
 
-export type PromptEffort = "low" | "medium" | "high";
+export type PromptEffort = AiEffort;
 
 export interface PromptRecommendation {
   tier: ModelTier;
@@ -77,7 +78,12 @@ export function recommendationFor(actionKey: string): PromptRecommendation {
 }
 
 export const EFFORT_DETAILS: Record<PromptEffort, { label: string; hint: string }> = {
+  default: { label: "Default", hint: "Use the provider default." },
+  none: { label: "None", hint: "No extra reasoning." },
+  minimal: { label: "Minimal", hint: "Barely any reasoning. Fastest." },
   low: { label: "Low", hint: "Fastest. For short, simple tasks." },
   medium: { label: "Medium", hint: "Balanced speed and care." },
-  high: { label: "High", hint: "Slowest and most thorough." },
+  high: { label: "High", hint: "Slow and thorough." },
+  xhigh: { label: "Extra high", hint: "Deeper reasoning for hard tasks." },
+  max: { label: "Max", hint: "Slowest and most thorough." },
 };

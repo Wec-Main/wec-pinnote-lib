@@ -143,6 +143,10 @@ describe("AiComposer drafts", () => {
   it("keeps the draft per session in sessionStorage and clears it after sending", async () => {
     remount({ draftKey: "s1" });
     typeInto(field(), "half written");
+    expect(window.sessionStorage.getItem("wpn-ai:draft:s1")).toBeNull();
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 450));
+    });
     expect(JSON.parse(window.sessionStorage.getItem("wpn-ai:draft:s1") ?? "{}").text).toBe(
       "half written",
     );

@@ -1,10 +1,13 @@
-import { useId, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import type { AiOpBatch, AiOpBatchStatus } from "../../types/ai.types";
 import { Icon, Spinner } from "../primitives";
-import { CHANGE_MARKS, describeOpBatch } from "./aiOpChanges";
+import { filterBatchOps, isBusyOpBatchStatus } from "../../ai/opBatchApplier";
+import { AiChangeList } from "./AiChangeList";
+import { describeOpBatch } from "./aiOpChanges";
 
 export function batchStatusLabel(batch: Pick<AiOpBatch, "status" | "savedRevision">): string {
   const labels: Record<AiOpBatchStatus, string> = {
+    applying: "Applying…",
     proposed: "Proposed",
     applied: "Applied (unsaved)",
     saved: batch.savedRevision !== null ? `Saved rev ${batch.savedRevision}` : "Saved",
@@ -12,7 +15,7 @@ export function batchStatusLabel(batch: Pick<AiOpBatch, "status" | "savedRevisio
     conflict: "Conflict",
     discarded: "Discarded",
   };
-  return labels[batch.status];
+  return labels[batch.status] ?? String(batch.status);
 }
 
 interface BatchCardProps {
@@ -34,15 +37,21 @@ export function BatchCard({
 }: BatchCardProps) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const changesId = useId();
   const kindLabel = batch.targetKind === "data_model" ? "Data model" : "Flow";
   const { added, changed, removed } = batch.summary;
-  const [showChanges, setShowChanges] = useState(false);
-  const lines = useMemo(
-    () => (showChanges ? describeOpBatch(batch, null) : []),
-    [batch, showChanges],
-  );
-  const actionable = batch.status === "proposed" || batch.status === "conflict";
+  const [excluded, setExcluded] = useState<ReadonlySet<number>>(new Set());
+  const lines = useMemo(() => describeOpBatch(batch, null), [batch]);
+  const applyingElsewhere = isBusyOpBatchStatus(batch.status);
+  const actionable =
+    batch.status === "proposed" || batch.status === "conflict" || applyingElsewhere;
+
+  const toggle = (opIndex: number) =>
+    setExcluded((current) => {
+      const next = new Set(current);
+      if (next.has(opIndex)) next.delete(opIndex);
+      else next.add(opIndex);
+      return next;
+    });
 
   const reject = async () => {
     setBusy(true);
@@ -73,39 +82,11 @@ export function BatchCard({
         <span className="wpn-ai-batch__removed">−{removed}</span>
       </p>
       {batch.ops.length > 0 ? (
-        <>
-          <button
-            type="button"
-            className="wpn-ai-link wpn-ai-batch__toggle"
-            aria-expanded={showChanges}
-            aria-controls={changesId}
-            onClick={() => setShowChanges((open) => !open)}
-          >
-            {showChanges ? "Hide changes" : "Show changes"}
-          </button>
-          <ul id={changesId} className="wpn-ai-batch__changes" hidden={!showChanges}>
-            {lines.map((line, index) => (
-              <li key={`${line.kind}-${line.subject}-${index}`} className="wpn-ai-batch__change">
-                <span
-                  className={`wpn-ai-batch__mark wpn-ai-batch__mark--${line.kind}`}
-                  aria-hidden="true"
-                >
-                  {CHANGE_MARKS[line.kind]}
-                </span>
-                <span className="wpn-sr-only">
-                  {line.kind === "add" ? "Add" : line.kind === "remove" ? "Remove" : "Change"}
-                </span>
-                <span>{line.subject}</span>
-                {line.detail ? <span className="wpn-ai-muted">{line.detail}</span> : null}
-                {line.before !== undefined && line.after !== undefined ? (
-                  <span className="wpn-ai-muted">
-                    {line.before} → {line.after}
-                  </span>
-                ) : null}
-              </li>
-            ))}
-          </ul>
-        </>
+        <AiChangeList
+          lines={lines}
+          excluded={excluded}
+          onToggle={actionable && canApply ? toggle : undefined}
+        />
       ) : null}
       {batch.rationale ? <p className="wpn-ai-card__body">{batch.rationale}</p> : null}
       {batch.status === "conflict" && batch.statusDetail ? (
@@ -121,12 +102,16 @@ export function BatchCard({
           <button
             type="button"
             className="wpn-btn wpn-btn--primary"
-            disabled={!canApply}
+            disabled={!canApply || applyingElsewhere}
             title={canApply ? undefined : "Your role cannot edit this document"}
-            onClick={() => onPreview(batch)}
+            onClick={() => onPreview(excluded.size > 0 ? filterBatchOps(batch, excluded) : batch)}
           >
             <Icon name="eye" className="wpn-btn__icon" />
-            {batch.status === "conflict" ? "Try again" : "Preview"}
+            {applyingElsewhere
+              ? "Applying…"
+              : batch.status === "conflict"
+                ? "Try again"
+                : "Preview"}
           </button>
         ) : null}
         {batch.status === "proposed" ? (

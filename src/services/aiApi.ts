@@ -24,7 +24,7 @@ import type {
   CreateAiSessionRequest,
   SendAiMessageRequest,
   SendAiMessageResponse,
-  UpdateAiActionTemplateRequest,
+  SaveAiActionTemplateRequest,
   UpdateAiCommentDraftRequest,
   UpdateAiOpBatchRequest,
   UpdateAiSessionRequest,
@@ -330,6 +330,17 @@ export function interruptAiSession(
   );
 }
 
+export function fetchAiOpBatch(
+  apiBaseUrl: string,
+  authToken: string | undefined,
+  aiOpBatchId: string,
+  signal?: AbortSignal,
+): Promise<AiOpBatch> {
+  return request<AiOpBatch>(buildUrl(apiBaseUrl, `/ai/op-batches/${seg(aiOpBatchId)}`), authToken, {
+    signal,
+  });
+}
+
 export function updateAiOpBatch(
   apiBaseUrl: string,
   authToken: string | undefined,
@@ -482,7 +493,7 @@ export async function saveAiActionTemplate(
   authToken: string | undefined,
   projectId: string,
   actionKey: AiActionKey,
-  input: UpdateAiActionTemplateRequest,
+  input: SaveAiActionTemplateRequest,
 ): Promise<AiActionTemplate> {
   const body = await request<unknown>(
     buildUrl(apiBaseUrl, templatePath(actionKey), { projectId }),

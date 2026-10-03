@@ -11,6 +11,7 @@ export interface AiChangeLine {
   detail?: string;
   before?: string;
   after?: string;
+  opIndex?: number;
 }
 
 export const CHANGE_MARKS: Record<AiChangeKind, string> = { add: "+", change: "~", remove: "−" };
@@ -89,7 +90,7 @@ function describeErdOps(ops: readonly ErdOp[], doc: ErdDocumentJSON | null): AiC
     return `${source} → ${target}`;
   };
 
-  return ops.flatMap((op): AiChangeLine[] => {
+  const lineFor = (op: ErdOp): AiChangeLine[] => {
     switch (op.op) {
       case "addEntity": {
         if (op.tempId) temps.set(stripTemp(op.tempId), op.name);
@@ -218,7 +219,8 @@ function describeErdOps(ops: readonly ErdOp[], doc: ErdDocumentJSON | null): AiC
       default:
         return [];
     }
-  });
+  };
+  return ops.flatMap((op, opIndex) => lineFor(op).map((line) => ({ ...line, opIndex })));
 }
 
 function describeFlowOps(ops: readonly FlowOp[], doc: FlowJSON | null): AiChangeLine[] {
@@ -236,7 +238,7 @@ function describeFlowOps(ops: readonly FlowOp[], doc: FlowJSON | null): AiChange
     return `${nodeName(edge.source)} → ${nodeName(edge.target)}`;
   };
 
-  return ops.flatMap((op): AiChangeLine[] => {
+  const lineFor = (op: FlowOp): AiChangeLine[] => {
     switch (op.op) {
       case "addNode":
         if (op.tempId) temps.set(stripTemp(op.tempId), op.label);
@@ -289,7 +291,8 @@ function describeFlowOps(ops: readonly FlowOp[], doc: FlowJSON | null): AiChange
       default:
         return [];
     }
-  });
+  };
+  return ops.flatMap((op, opIndex) => lineFor(op).map((line) => ({ ...line, opIndex })));
 }
 
 const plural = (count: number, one: string, many: string) => `${count} ${count === 1 ? one : many}`;

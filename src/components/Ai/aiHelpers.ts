@@ -1,3 +1,4 @@
+import { isValidModelId } from "../../ai/modelValidation";
 import {
   AI_ACTIVE_TURN_STATUSES,
   AI_KNOWN_PROVIDERS,
@@ -140,7 +141,8 @@ export function resolveRoute(me: AiMe | null, preference: AiRoutePreference): Ai
   const chosen =
     (preference.model && models.find((model) => model.id === preference.model)) ||
     defaultModel(models);
-  const model = chosen?.id ?? preference.model ?? "default";
+  const preferred = preference.model && isValidModelId(preference.model) ? preference.model : null;
+  const model = chosen?.id ?? preferred ?? "default";
   const efforts = chosen?.efforts ?? [];
   const effort =
     preference.effort && efforts.includes(preference.effort)
@@ -181,6 +183,12 @@ export const AI_ERROR_TEXT: Record<string, string> = {
   session_reset: "The conversation context was reset. Retry to continue from here.",
   session_not_found: "This conversation no longer exists on the agent. Retry to start fresh.",
   interrupted: "The turn was interrupted before it finished.",
+  stale_base_revision: "The document changed while the AI was working. Ask the AI again.",
+  persist_failed: "The AI result could not be saved. Retry to run it again.",
+  invalid_ops: "The AI proposed changes that are not valid. Ask the AI again.",
+  template_conflict:
+    "This prompt was changed by someone else. It has been reloaded; review it and save again.",
+  op_batch_status_conflict: "This AI change was already updated elsewhere.",
 };
 
 const ERROR_ACTIONS: Record<string, AiErrorAction[]> = {
@@ -189,6 +197,11 @@ const ERROR_ACTIONS: Record<string, AiErrorAction[]> = {
   cli_missing: ["switch_provider", "integrations"],
   forbidden: [],
   runner_lost: ["retry"],
+  stale_base_revision: ["retry"],
+  persist_failed: ["retry"],
+  invalid_ops: ["retry"],
+  template_conflict: [],
+  op_batch_status_conflict: [],
   rate_limited: ["retry", "switch_provider"],
   provider_error: ["retry", "switch_provider"],
   runtime_unavailable: ["retry", "switch_provider"],

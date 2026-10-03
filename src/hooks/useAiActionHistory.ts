@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { useOptionalAiRuntime } from "../context/AiRuntimeContext";
+import { useOptionalAiRuntimeActions } from "../context/AiRuntimeContext";
 import { getAiActionHistory } from "../services/aiApi";
 import type { AiActionTarget, AiMessage } from "../types/ai.types";
 
@@ -10,7 +10,7 @@ export function useAiActionHistory(
   targetId: string | null | undefined,
   options: { enabled?: boolean; refreshKey?: number; aiSessionId?: string | null } = {},
 ): { messages: AiMessage[]; loading: boolean; error: boolean; retry: () => void } {
-  const runtime = useOptionalAiRuntime();
+  const runtime = useOptionalAiRuntimeActions();
   const { enabled = true, refreshKey = 0, aiSessionId = null } = options;
   const [messages, setMessages] = useState<AiMessage[]>(NO_MESSAGES);
   const [loading, setLoading] = useState(false);

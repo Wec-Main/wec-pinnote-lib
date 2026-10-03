@@ -1,13 +1,13 @@
 import { describe, expect, it } from "vitest";
 import {
   AI_ERD_LIMITS,
-  applyErdOps,
   diffErd,
   parseErdOps,
   summarizeChanges,
   summarizeErd,
   type ErdOp,
 } from "../src/ai/ops";
+import { applyErdOps } from "../src/ai/ops/applyErdOps";
 import type { ErdDocumentJSON } from "../src/types/dataModel.types";
 import { getEntityRect, getNoteRect } from "../src/utils/erd/erdGeometry";
 import { parseErdDocument } from "../src/utils/erd/erdSerialization";

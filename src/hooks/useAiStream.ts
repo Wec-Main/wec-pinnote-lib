@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { AiStreamEvent } from "../types/ai.types";
 import type { StreamConnectionState } from "../types/stream.types";
 import { AnnotationApiError } from "../types/annotation.types";
@@ -10,6 +10,13 @@ import type { StreamTokenGetter } from "./useSseStream";
 
 const RECONNECT_DELAY_MS = 2000;
 const MAX_RECONNECT_DELAY_MS = 30000;
+const STABLE_OPEN_MS = 5000;
+const HIDDEN_PAUSE_MS = 30000;
+
+export interface AiStreamConnection {
+  state: StreamConnectionState;
+  reconnect: () => void;
+}
 
 export interface AiStreamOptions {
   apiBaseUrl: string;
@@ -18,6 +25,7 @@ export interface AiStreamOptions {
   enabled: boolean;
   onEvent: (event: AiStreamEvent) => void;
   onReconnect?: () => void;
+  keepAlive?: () => boolean;
 }
 
 function streamUrl(apiBaseUrl: string, ticket: string): string {
@@ -31,18 +39,27 @@ function isForbidden(err: unknown): boolean {
   return err instanceof AnnotationApiError && err.status === 403;
 }
 
-export function useAiStream({
+export function useAiStream(options: AiStreamOptions): StreamConnectionState {
+  return useAiStreamConnection(options).state;
+}
+
+export function useAiStreamConnection({
   apiBaseUrl,
   projectId,
   getAuthToken,
   enabled,
   onEvent,
   onReconnect,
-}: AiStreamOptions): StreamConnectionState {
+  keepAlive,
+}: AiStreamOptions): AiStreamConnection {
   const [state, setState] = useState<StreamConnectionState>("closed");
+  const reconnectFnRef = useRef<() => void>(() => undefined);
+  const reconnect = useCallback(() => reconnectFnRef.current(), []);
   const onEventRef = useRef(onEvent);
   const onReconnectRef = useRef(onReconnect);
   const getAuthTokenRef = useRef(getAuthToken);
+  const keepAliveRef = useRef(keepAlive);
+  keepAliveRef.current = keepAlive;
   onEventRef.current = onEvent;
   onReconnectRef.current = onReconnect;
   getAuthTokenRef.current = getAuthToken;
@@ -65,10 +82,28 @@ export function useAiStream({
     let reconnectDelay = RECONNECT_DELAY_MS;
     let openedOnce = false;
     let ticketController: AbortController | null = null;
+    let paused = false;
+    let stableTimer: ReturnType<typeof setTimeout> | null = null;
+    let hiddenTimer: ReturnType<typeof setTimeout> | null = null;
+
+    const clearStableTimer = () => {
+      if (stableTimer) {
+        clearTimeout(stableTimer);
+        stableTimer = null;
+      }
+    };
+
+    const clearHiddenTimer = () => {
+      if (hiddenTimer) {
+        clearTimeout(hiddenTimer);
+        hiddenTimer = null;
+      }
+    };
 
     const handleMessage = (event: MessageEvent<string>) => {
       const parsed = parseAiStreamEvent(event.type, event.data);
       if (parsed) {
+        reconnectDelay = RECONNECT_DELAY_MS;
         onEventRef.current(parsed);
       }
     };
@@ -81,7 +116,7 @@ export function useAiStream({
     };
 
     const scheduleReconnect = () => {
-      if (stopped || reconnectTimer) {
+      if (stopped || paused || reconnectTimer) {
         return;
       }
       setState("reconnecting");
@@ -99,7 +134,11 @@ export function useAiStream({
         if (source !== next) {
           return;
         }
-        reconnectDelay = RECONNECT_DELAY_MS;
+        clearStableTimer();
+        stableTimer = setTimeout(() => {
+          stableTimer = null;
+          reconnectDelay = RECONNECT_DELAY_MS;
+        }, STABLE_OPEN_MS);
         setState("open");
         if (openedOnce) {
           onReconnectRef.current?.();
@@ -110,6 +149,7 @@ export function useAiStream({
         if (stopped || source !== next) {
           return;
         }
+        clearStableTimer();
         next.close();
         source = null;
         scheduleReconnect();
@@ -174,17 +214,66 @@ export function useAiStream({
     }
 
     const reconnectNow = () => {
-      if (stopped || connecting || source) {
+      if (stopped || paused || connecting || source) {
         return;
       }
       clearReconnectTimer();
       void connect();
     };
 
+    const closeSource = () => {
+      clearStableTimer();
+      source?.close();
+      source = null;
+    };
+
+    const forceReconnect = () => {
+      if (stopped) {
+        return;
+      }
+      paused = false;
+      clearReconnectTimer();
+      closeSource();
+      reconnectDelay = RECONNECT_DELAY_MS;
+      void connect();
+    };
+    reconnectFnRef.current = forceReconnect;
+
     const handleVisibilityChange = () => {
       if (document.visibilityState === "visible") {
+        clearHiddenTimer();
+        if (paused) {
+          paused = false;
+          reconnectDelay = RECONNECT_DELAY_MS;
+          void connect();
+          return;
+        }
         reconnectNow();
+        return;
       }
+      clearHiddenTimer();
+      const armHidden = () => {
+        hiddenTimer = setTimeout(() => {
+          hiddenTimer = null;
+          if (stopped || document.visibilityState !== "hidden") {
+            return;
+          }
+          if (keepAliveRef.current?.()) {
+            armHidden();
+            return;
+          }
+          pause();
+        }, HIDDEN_PAUSE_MS);
+      };
+      armHidden();
+    };
+
+    const pause = () => {
+      paused = true;
+      clearReconnectTimer();
+      ticketController?.abort();
+      closeSource();
+      setState("closed");
     };
 
     window.addEventListener("online", reconnectNow);
@@ -193,7 +282,10 @@ export function useAiStream({
 
     return () => {
       stopped = true;
+      reconnectFnRef.current = () => undefined;
       clearReconnectTimer();
+      clearStableTimer();
+      clearHiddenTimer();
       ticketController?.abort();
       window.removeEventListener("online", reconnectNow);
       document.removeEventListener("visibilitychange", handleVisibilityChange);
@@ -203,5 +295,5 @@ export function useAiStream({
     };
   }, [apiBaseUrl, enabled, projectId]);
 
-  return state;
+  return { state, reconnect };
 }

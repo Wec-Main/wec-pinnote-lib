@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useState } from "react";
-import { useAiRuntime } from "../../context/AiRuntimeContext";
+import { useCallback, useEffect, useId, useRef, useState } from "react";
+import { useAiRuntimeActions, useAiRuntimeState } from "../../context/AiRuntimeContext";
 import { isMissingSessionStatus, useAiSession } from "../../hooks/useAiSession";
 import { useAiSessions } from "../../hooks/useAiSessions";
 import { useEscapeKey } from "../../hooks/useEscapeKey";
@@ -8,6 +8,7 @@ import type { AiMention, AiScopeKind } from "../../types/ai.types";
 import { Icon, Tooltip } from "../primitives";
 import { AiChatView, useChatRoute, type AiSuggestion } from "./AiChatView";
 import { AiSessionList, InlineRename, sessionTitle } from "./AiSessionList";
+import { isActiveTurn } from "./aiHelpers";
 import { useAiUi } from "./AiUiContext";
 
 interface NewSessionSeed {
@@ -64,9 +65,26 @@ function useNarrow(breakpoint: number): boolean {
   return narrow;
 }
 
+const canStream = typeof EventSource !== "undefined";
+
 export function AiPanel() {
   const ai = useAiUi();
-  const { projectId, me, connection } = useAiRuntime();
+  const { projectId, reconnect, currentUserId } = useAiRuntimeActions();
+  const { me, connection } = useAiRuntimeState();
+  const titleId = useId();
+  const openerRef = useRef<HTMLElement | null>(null);
+  if (openerRef.current === null && typeof document !== "undefined") {
+    const focused = document.activeElement;
+    openerRef.current =
+      focused instanceof HTMLElement && focused !== document.body ? focused : null;
+  }
+  useEffect(
+    () => () => {
+      const opener = openerRef.current;
+      if (opener && opener.isConnected) opener.focus();
+    },
+    [],
+  );
   const [selectedId, setSelectedId] = usePersistentState<string | null>(
     `wpn-ui:${projectId}:aiSession`,
     null,
@@ -115,10 +133,21 @@ export function AiPanel() {
     setRenaming(false);
   }, [selectedId]);
 
+  const activeTurn = session.detail?.session.activeTurn;
+  const stoppable = isActiveTurn(activeTurn) && activeTurn?.userId === currentUserId;
+  const { interrupt } = session;
   const close = useCallback(() => {
-    if (drawer) setDrawer(null);
-    else ai?.closePanel();
-  }, [ai, drawer]);
+    if (drawer) {
+      setDrawer(null);
+      return;
+    }
+    const focused = typeof document !== "undefined" ? document.activeElement : null;
+    if (stoppable && focused instanceof HTMLElement && focused.closest(".wpn-ai-composer")) {
+      void interrupt().catch(() => undefined);
+      return;
+    }
+    ai?.closePanel();
+  }, [ai, drawer, interrupt, stoppable]);
   useEscapeKey(close, !renaming);
 
   const detail = session.detail;
@@ -138,7 +167,8 @@ export function AiPanel() {
         drawer ? `wpn-ai-panel--drawer-${drawer}` : "",
       ].join(" ")}
       role="dialog"
-      aria-label="AI assistant"
+      aria-modal="false"
+      aria-labelledby={titleId}
     >
       <div className="wpn-flow-panel__header">
         <span className="wpn-flow-panel__brand">
@@ -156,7 +186,9 @@ export function AiPanel() {
           <span className="wpn-flow-panel__brand-icon wpn-flow-panel__brand-icon--ai">
             <Icon name="sparkles" />
           </span>
-          <span className="wpn-panel__title">WeCollab AI</span>
+          <span id={titleId} className="wpn-panel__title">
+            WeCollab AI
+          </span>
           {current ? (
             renaming ? (
               <InlineRename
@@ -206,6 +238,17 @@ export function AiPanel() {
         <div className="wpn-ai-reconnecting" role="status">
           <span className="wpn-ai-reconnecting__dot" aria-hidden="true" />
           Reconnecting…
+        </div>
+      ) : null}
+      {me && (connection === "unauthenticated" || connection === "closed") && canStream ? (
+        <div className="wpn-ai-reconnecting wpn-ai-reconnecting--offline" role="status">
+          <span className="wpn-ai-reconnecting__dot" aria-hidden="true" />
+          {connection === "unauthenticated"
+            ? "Live updates need you to sign in again."
+            : "Live updates are paused."}
+          <button type="button" className="wpn-ai-link" onClick={reconnect}>
+            Reconnect
+          </button>
         </div>
       ) : null}
       <div className="wpn-flow-panel__body wpn-ai-panel__body">

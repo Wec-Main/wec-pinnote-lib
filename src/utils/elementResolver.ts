@@ -96,8 +96,7 @@ function resolveWithin(
           return picked;
         }
       }
-    } catch {
-    }
+    } catch {}
   }
 
   if (elementIdentifier) {

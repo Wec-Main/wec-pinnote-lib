@@ -329,9 +329,12 @@ Agents are connected in **Settings → Integrations**, which has two tabs:
   - API key: paste an Anthropic / OpenAI key (show / hide) and **Save and connect**.
 
   Closing the dialog (Esc, ×, Cancel) cancels a sign-in that is still running. Below the cards is the default model for new chats.
+
 - **Connections** — **Your connections** (Check now, Reconnect, Disconnect) and **Shared with your organization** (connected by; manageable by admins, read-only for everyone else).
 
 Until an agent is connected, AI entry points say "Connect Claude or Codex in Settings → Integrations, or ask an admin to connect it for everyone" and link there (`useAiUi().openIntegrations("connectors")`). Connector state comes from `GET /ai/me` (`me.connectors`, `me.systemConnectors`) and is kept live by the `ai_connectors.updated` and `ai_connector_login.updated` stream events — nothing is polled. The routes are listed in [docs/api-contract.md](docs/api-contract.md#ai-connectors-api-contract).
+
+The op appliers are loaded on demand so they stay out of the main bundle: `applyErdOps`, `applyFlowOps` and `applyBatchToDocument` are **async** and return a `Promise`. Op batches can be in the `applying` status (another client is applying them); status updates are compare-and-set, so a `409` with code `op_batch_status_conflict` makes the client refetch the batch with `fetchAiOpBatch` (`GET /ai/op-batches/{aiOpBatchId}`) and adopt the server's status.
 
 ---
 

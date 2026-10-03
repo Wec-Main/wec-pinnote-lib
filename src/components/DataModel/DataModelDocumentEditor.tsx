@@ -259,7 +259,7 @@ export function DataModelDocumentEditor({
                         onSave={saveAiChanges}
                         saving={aiSaving}
                       />
-                    <AskAiButton control={aiDock} />
+                      <AskAiButton control={aiDock} />
                     </>
                   ) : null
                 }

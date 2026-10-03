@@ -3892,8 +3892,14 @@ body.wpn-epicflow-resizing {
 }
 
 @keyframes wpn-flow-versions-slide-in {
-  from { opacity: 0; transform: translateX(20px); }
-  to   { opacity: 1; transform: translateX(0); }
+  from {
+    opacity: 0;
+    transform: translateX(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
 }
 
 .wpn-flow-versions-panel__header {
@@ -4014,12 +4020,23 @@ body.wpn-epicflow-resizing {
   animation: wpn-flow-skeleton-pulse 1.4s ease-in-out infinite;
 }
 
-.wpn-flow-version-skeleton:nth-child(2) { animation-delay: 0.15s; opacity: 0.7; }
-.wpn-flow-version-skeleton:nth-child(3) { animation-delay: 0.3s; opacity: 0.45; }
+.wpn-flow-version-skeleton:nth-child(2) {
+  animation-delay: 0.15s;
+  opacity: 0.7;
+}
+.wpn-flow-version-skeleton:nth-child(3) {
+  animation-delay: 0.3s;
+  opacity: 0.45;
+}
 
 @keyframes wpn-flow-skeleton-pulse {
-  0%, 100% { opacity: 0.4; }
-  50%       { opacity: 0.65; }
+  0%,
+  100% {
+    opacity: 0.4;
+  }
+  50% {
+    opacity: 0.65;
+  }
 }
 
 .wpn-flow-version-item {
@@ -4032,7 +4049,9 @@ body.wpn-epicflow-resizing {
   border: 1px solid transparent;
   background: transparent;
   text-align: left;
-  transition: background 120ms, border-color 120ms;
+  transition:
+    background 120ms,
+    border-color 120ms;
   width: 100%;
   position: relative;
 }
@@ -4079,7 +4098,10 @@ body.wpn-epicflow-resizing {
   font-variant-numeric: tabular-nums;
   letter-spacing: -0.02em;
   flex-shrink: 0;
-  transition: background 120ms, border-color 120ms, color 120ms;
+  transition:
+    background 120ms,
+    border-color 120ms,
+    color 120ms;
 }
 
 .wpn-flow-version-item__avatar--draft {
@@ -11048,7 +11070,11 @@ body.wpn-epicflow-resizing {
 }
 
 .wpn-launcher__fab {
-  background: radial-gradient(circle at 30% 25%, rgba(60, 50, 120, 0.95), rgba(10, 10, 16, 0.96) 70%);
+  background: radial-gradient(
+    circle at 30% 25%,
+    rgba(60, 50, 120, 0.95),
+    rgba(10, 10, 16, 0.96) 70%
+  );
 }
 
 .wpn-launcher__menu {

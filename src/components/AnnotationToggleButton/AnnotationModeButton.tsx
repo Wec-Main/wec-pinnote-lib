@@ -129,7 +129,7 @@ export function AnnotationModeButton() {
     return () => document.removeEventListener("keydown", handleKeyDown, true);
   }, []);
 
-  const items: MenuItemDefinition[] = (["annotate",  "flow"] as const).map((mode) => ({
+  const items: MenuItemDefinition[] = (["annotate", "flow"] as const).map((mode) => ({
     type: "action",
     id: mode,
     label: MODE_LABEL[mode],

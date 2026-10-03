@@ -60,16 +60,17 @@ describe("describeOpBatch", () => {
       doc,
     );
     expect(lines).toEqual([
-      { kind: "add", subject: "tags", detail: "1 field" },
-      { kind: "add", subject: "tags.label", detail: "varchar(40)" },
+      { kind: "add", subject: "tags", detail: "1 field", opIndex: 0 },
+      { kind: "add", subject: "tags.label", detail: "varchar(40)", opIndex: 1 },
       {
         kind: "change",
         subject: `${entity.name}.${field.name}`,
         detail: "type",
         before: field.type,
         after: "bigint",
+        opIndex: 2,
       },
-      { kind: "remove", subject: entity.name, detail: "entity" },
+      { kind: "remove", subject: entity.name, detail: "entity", opIndex: 3 },
     ]);
   });
 });

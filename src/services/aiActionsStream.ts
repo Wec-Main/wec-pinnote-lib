@@ -64,31 +64,33 @@ export function createSseParser(onFrame: (frame: SseFrame) => void): SseParser {
     } else if (field === "id") id = value;
   };
 
+  let pendingCr = false;
+
   return {
     push(chunk) {
-      buffer += chunk;
+      let text = chunk;
+      if (pendingCr) {
+        text = `\r${text}`;
+        pendingCr = false;
+      }
+      if (text.endsWith("\r")) {
+        pendingCr = true;
+        text = text.slice(0, -1);
+      }
+      buffer += text.indexOf("\r") === -1 ? text : text.replace(/\r\n?/g, "\n");
       let start = 0;
       for (;;) {
         const lf = buffer.indexOf("\n", start);
-        const cr = buffer.indexOf("\r", start);
-        let end: number;
-        if (lf === -1 && cr === -1) break;
-        if (cr !== -1 && (lf === -1 || cr < lf)) {
-          if (cr === buffer.length - 1) break;
-          end = cr;
-          processLine(buffer.slice(start, end));
-          start = buffer[cr + 1] === "\n" ? cr + 2 : cr + 1;
-        } else {
-          end = lf as number;
-          processLine(buffer.slice(start, end));
-          start = end + 1;
-        }
+        if (lf === -1) break;
+        processLine(buffer.slice(start, lf));
+        start = lf + 1;
       }
-      buffer = buffer.slice(start);
+      if (start > 0) buffer = buffer.slice(start);
     },
     flush() {
+      pendingCr = false;
       if (buffer) {
-        processLine(buffer.replace(/\r$/, ""));
+        processLine(buffer);
         buffer = "";
       }
       dispatch();
@@ -153,12 +155,16 @@ export function toRunActionBody(body: AiActionRunRequest): AiActionRunRequest {
   if (body.effort !== undefined && body.effort !== "") out.effort = body.effort;
   if (body.template) out.template = body.template;
   if (body.fresh === true) out.fresh = true;
-  const mentions = (body.mentions ?? []).filter((item) => item && item.id && item.kind).slice(0, 20);
+  const mentions = (body.mentions ?? [])
+    .filter((item) => item && item.id && item.kind)
+    .slice(0, 20);
   if (mentions.length > 0) {
     out.mentions = mentions.map(({ kind, id, label }) => ({ kind, id, label: label ?? "" }));
   }
   return out;
 }
+
+export const AI_ACTION_IDLE_TIMEOUT_MS = 60_000;
 
 export interface RunAiActionOptions {
   apiBaseUrl: string;
@@ -167,7 +173,12 @@ export interface RunAiActionOptions {
   actionKey: AiActionKey;
   body: AiActionRunRequest;
   signal?: AbortSignal;
+  idleTimeoutMs?: number;
   onEvent: (event: AiActionEvent) => void;
+}
+
+function streamInterrupted(message: string): AiActionRequestError {
+  return new AiActionRequestError(message, 503, null, "stream_interrupted");
 }
 
 export async function runAiAction({
@@ -177,54 +188,95 @@ export async function runAiAction({
   actionKey,
   body,
   signal,
+  idleTimeoutMs = AI_ACTION_IDLE_TIMEOUT_MS,
   onEvent,
 }: RunAiActionOptions): Promise<void> {
   const url = buildUrl(apiBaseUrl, `/ai/actions/${encodeURIComponent(actionKey)}/run`, {
     projectId,
   });
-  const response = await fetch(url, {
-    method: "POST",
-    headers: {
-      Accept: "text/event-stream",
-      "Content-Type": "application/json",
-      ...actorHeaders(authToken),
-    },
-    body: JSON.stringify(toRunActionBody(body)),
-    signal,
-  });
+  const inner = new AbortController();
+  const relayAbort = () => inner.abort();
+  if (signal?.aborted) inner.abort();
+  else signal?.addEventListener("abort", relayAbort, { once: true });
+  let idleTimer: ReturnType<typeof setTimeout> | null = null;
+  let idledOut = false;
+  const touch = () => {
+    if (idleTimer) clearTimeout(idleTimer);
+    if (idleTimeoutMs <= 0) return;
+    idleTimer = setTimeout(() => {
+      idledOut = true;
+      inner.abort();
+    }, idleTimeoutMs);
+  };
+  const clearIdle = () => {
+    if (idleTimer) clearTimeout(idleTimer);
+    idleTimer = null;
+  };
 
-  if (!response.ok) {
-    reportUnauthorized(response.status, authToken);
-    const { message, text } = await readErrorMessage(
-      response,
-      `AI action failed (${response.status})`,
-    );
-    throw new AiActionRequestError(message, response.status, text || null, errorCode(text));
-  }
-
-  const parser = createSseParser((frame) => {
-    const event = toAiActionEvent(frame);
-    if (event) onEvent(event);
-  });
-
-  if (!response.body) {
-    parser.push(await response.text());
-    parser.flush();
-    return;
-  }
-
-  const reader = response.body.getReader();
-  const decoder = new TextDecoder();
+  let sawTerminal = false;
   try {
-    for (;;) {
-      const { value, done } = await reader.read();
-      if (done) break;
-      parser.push(decoder.decode(value, { stream: true }));
+    touch();
+    let response: Response;
+    try {
+      response = await fetch(url, {
+        method: "POST",
+        headers: {
+          Accept: "text/event-stream",
+          "Content-Type": "application/json",
+          ...actorHeaders(authToken),
+        },
+        body: JSON.stringify(toRunActionBody(body)),
+        signal: inner.signal,
+      });
+    } catch (err) {
+      if (idledOut) throw streamInterrupted("The AI action timed out waiting for a response");
+      throw err;
     }
-    parser.push(decoder.decode());
-    parser.flush();
+
+    if (!response.ok) {
+      reportUnauthorized(response.status, authToken);
+      const { message, text } = await readErrorMessage(
+        response,
+        `AI action failed (${response.status})`,
+      );
+      throw new AiActionRequestError(message, response.status, text || null, errorCode(text));
+    }
+
+    const parser = createSseParser((frame) => {
+      const event = toAiActionEvent(frame);
+      if (!event) return;
+      if (event.type === "done" || event.type === "result") sawTerminal = true;
+      onEvent(event);
+    });
+
+    if (!response.body) {
+      parser.push(await response.text());
+      parser.flush();
+    } else {
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      try {
+        for (;;) {
+          const { value, done } = await reader.read();
+          if (done) break;
+          touch();
+          parser.push(decoder.decode(value, { stream: true }));
+        }
+        parser.push(decoder.decode());
+        parser.flush();
+      } catch (err) {
+        if (idledOut) throw streamInterrupted("The AI action stopped responding");
+        throw err;
+      } finally {
+        reader.releaseLock?.();
+      }
+    }
+    if (!sawTerminal && !inner.signal.aborted) {
+      throw streamInterrupted("The AI response ended before it finished");
+    }
   } finally {
-    reader.releaseLock?.();
+    clearIdle();
+    signal?.removeEventListener("abort", relayAbort);
   }
 }
 

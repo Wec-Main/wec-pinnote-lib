@@ -162,6 +162,11 @@
 .wpn-ai-transcript__live {
 }
 
+.wpn-ai-transcript__item:not(.wpn-ai-transcript__live):not(:nth-last-child(-n + 4)) {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 96px;
+}
+
 .wpn-ai-transcript__older {
   align-self: center;
   font-size: 11.5px;
@@ -895,7 +900,15 @@
   --wpn-accent-soft: var(--wpn-ai-accent-soft);
 }
 
-:is(.wpn-ai-popover, .wpn-ai-settings, .wpn-ai-compact, .wpn-ai-dialog, .wpn-ai-bar, .wpn-ai-modal, .wpn-ai-panel)
+:is(
+    .wpn-ai-popover,
+    .wpn-ai-settings,
+    .wpn-ai-compact,
+    .wpn-ai-dialog,
+    .wpn-ai-bar,
+    .wpn-ai-modal,
+    .wpn-ai-panel
+  )
   .wpn-btn--primary {
   color: var(--wpn-ai-on-accent);
 }
@@ -4908,6 +4921,7 @@
 }
 
 .wpn-ai-row:hover .wpn-ai-msgbar,
+.wpn-ai-row:focus-within .wpn-ai-msgbar,
 .wpn-ai-msgbar:focus-within {
   opacity: 1;
 }
@@ -5023,6 +5037,8 @@
 }
 
 .wpn-ai-suggestions {
+  list-style: none;
+  padding: 0;
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 10px;
@@ -5036,7 +5052,13 @@
   gap: 8px;
 }
 
+.wpn-ai-suggestions > li {
+  display: flex;
+  min-width: 0;
+}
+
 .wpn-ai-suggestion {
+  width: 100%;
   display: flex;
   align-items: center;
   gap: 12px;
@@ -6885,4 +6907,76 @@
 .wpn-ai-dialog__spark svg {
   width: 14px;
   height: 14px;
+}
+
+.wpn-ai-composer__status {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  padding: 2px 4px 0;
+  font-size: 11.5px;
+  color: var(--wpn-ai-muted);
+}
+
+.wpn-ai-composer__status-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+  animation: wpn-ai-status-pulse 1.2s ease-in-out infinite;
+}
+
+.wpn-ai-composer__status-hint {
+  margin-left: auto;
+  opacity: 0.7;
+}
+
+@keyframes wpn-ai-status-pulse {
+  0%,
+  100% {
+    opacity: 0.35;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .wpn-ai-composer__status-dot {
+    animation: none;
+  }
+}
+
+.wpn-ai-row--superseded {
+  opacity: 0.7;
+}
+
+.wpn-ai-superseded__toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  align-self: flex-start;
+  padding: 2px 4px;
+  border: 0;
+  background: transparent;
+  color: var(--wpn-ai-muted);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.wpn-ai-superseded__toggle:hover {
+  color: var(--wpn-ai-text);
+}
+
+.wpn-ai-card-loading {
+  min-height: 72px;
+  border: 1px solid var(--wpn-ai-border);
+  border-radius: 12px;
+  background: var(--wpn-ai-surface);
+}
+
+.wpn-ai-reconnecting--offline .wpn-ai-link {
+  margin-left: 8px;
 }

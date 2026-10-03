@@ -1,6 +1,7 @@
 export const AI_ME_CACHE_KEY = "ai:me";
 export const AI_SESSIONS_CACHE_KEY = "ai:sessions";
 export const AI_TEMPLATES_CACHE_KEY = "ai:templates";
+export const AI_SESSION_CACHE_KEY = "ai:session";
 
 function scoped(
   prefix: string,
@@ -46,4 +47,8 @@ export function aiSessionsCacheKey(parts: AiSessionsKeyParts): string {
     Boolean(parts.includeActions),
     parts.limit,
   ]);
+}
+
+export function aiSessionCacheKey(apiBaseUrl: string, aiSessionId: string): string {
+  return scoped(AI_SESSION_CACHE_KEY, [apiBaseUrl, aiSessionId]);
 }

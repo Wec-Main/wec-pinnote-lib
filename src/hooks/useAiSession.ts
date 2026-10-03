@@ -1,16 +1,20 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import {
   EMPTY_AI_SESSION_VIEW,
   loadSessionDetail,
   markDraftStale,
   messageList,
   prependMessages,
-  reduceSessionView,
   type AiMessageStore,
   type AiSessionViewState,
   type AiStreamingDraft,
 } from "../ai/sessionReducer";
-import { useAiRuntime } from "../context/AiRuntimeContext";
+import { aiSessionCacheKey } from "../ai/cacheKeys";
+import { AI_SESSION_DETAIL_TTL_MS } from "../ai/prefetch";
+import { AiSessionViewStore, type AiDraftStore } from "../ai/sessionViewStore";
+import { useAiRuntimeActions } from "../context/AiRuntimeContext";
+import { fetchResource, readResource, writeResource } from "../utils/resourceCache";
+import { createClientMessageId } from "../utils/aiStreamGuards";
 import {
   fetchAiSession,
   fetchAiSessionMessages,
@@ -36,6 +40,7 @@ export interface AiSessionState {
   messages: AiMessageStore;
   turns: Readonly<Record<string, AiTurn>>;
   draft: AiStreamingDraft | null;
+  draftStore: AiDraftStore;
   deleted: boolean;
   loading: boolean;
   error: string | null;
@@ -56,58 +61,103 @@ export function isMissingSessionStatus(status: number | null): boolean {
   return status === 404 || status === 403;
 }
 
+interface FetchState {
+  id: string | null;
+  loading: boolean;
+  error: string | null;
+  errorStatus: number | null;
+}
+
+function seedView(apiBaseUrl: string, aiSessionId: string | null): AiSessionViewState {
+  if (!aiSessionId) return EMPTY_AI_SESSION_VIEW;
+  const cached = readResource<AiSessionDetail>(aiSessionCacheKey(apiBaseUrl, aiSessionId)).data;
+  return cached ? loadSessionDetail(EMPTY_AI_SESSION_VIEW, cached) : EMPTY_AI_SESSION_VIEW;
+}
+
 export function useAiSession(aiSessionId: string | null): AiSessionState {
-  const { apiBaseUrl, enabled, getToken, subscribe } = useAiRuntime();
-  const [view, setView] = useState<AiSessionViewState>(EMPTY_AI_SESSION_VIEW);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [errorStatus, setErrorStatus] = useState<number | null>(null);
+  const { apiBaseUrl, enabled, getToken, subscribe } = useAiRuntimeActions();
+  const [fetchState, setFetchState] = useState<FetchState>({
+    id: null,
+    loading: false,
+    error: null,
+    errorStatus: null,
+  });
   const [loadingOlder, setLoadingOlder] = useState(false);
   const [reloadToken, setReloadToken] = useState(0);
-  const viewRef = useRef(view);
-  viewRef.current = view;
   const active = enabled && Boolean(aiSessionId);
+
+  const store = useMemo(
+    () => new AiSessionViewStore(seedView(apiBaseUrl, aiSessionId), aiSessionId),
+    [apiBaseUrl, aiSessionId],
+  );
+  useEffect(() => () => store.dispose(), [store]);
+  const view = useSyncExternalStore(store.subscribeView, store.getView, store.getView);
 
   const reload = useCallback(() => setReloadToken((token) => token + 1), []);
 
   useEffect(() => {
-    setView(EMPTY_AI_SESSION_VIEW);
-    setError(null);
-    setErrorStatus(null);
-  }, [aiSessionId]);
-
-  useEffect(() => {
     if (!active || !aiSessionId) return undefined;
+    let cancelled = false;
     const controller = new AbortController();
-    setLoading(true);
-    getToken()
-      .then((authToken) => fetchAiSession(apiBaseUrl, authToken, aiSessionId, controller.signal))
+    const cacheKey = aiSessionCacheKey(apiBaseUrl, aiSessionId);
+    setFetchState({ id: aiSessionId, loading: true, error: null, errorStatus: null });
+    const load: Promise<AiSessionDetail | undefined> =
+      reloadToken > 0
+        ? getToken()
+            .then((authToken) =>
+              fetchAiSession(apiBaseUrl, authToken, aiSessionId, controller.signal),
+            )
+            .then((detail) => {
+              writeResource(cacheKey, detail);
+              return detail;
+            })
+        : fetchResource<AiSessionDetail>(
+            cacheKey,
+            async (signal) => fetchAiSession(apiBaseUrl, await getToken(), aiSessionId, signal),
+            { ttlMs: AI_SESSION_DETAIL_TTL_MS, retries: 0, detached: true },
+          ).then((detail) => {
+            const snapshot = readResource<AiSessionDetail>(cacheKey);
+            if (!detail && snapshot.error) throw snapshot.error;
+            return detail;
+          });
+    load
       .then((detail) => {
-        if (controller.signal.aborted) return;
-        setView((current) => loadSessionDetail(current, detail));
-        setError(null);
-        setErrorStatus(null);
-        setLoading(false);
+        if (cancelled || !detail) return;
+        store.update((current) => loadSessionDetail(current, detail));
+        setFetchState({ id: aiSessionId, loading: false, error: null, errorStatus: null });
       })
       .catch((err: unknown) => {
-        if (controller.signal.aborted) return;
-        setError(describe(err));
-        setErrorStatus(err instanceof AnnotationApiError ? err.status : null);
-        setLoading(false);
+        if (cancelled) return;
+        setFetchState({
+          id: aiSessionId,
+          loading: false,
+          error: describe(err),
+          errorStatus: err instanceof AnnotationApiError ? err.status : null,
+        });
       });
-    return () => controller.abort();
-  }, [active, aiSessionId, apiBaseUrl, getToken, reloadToken]);
+    return () => {
+      cancelled = true;
+      controller.abort();
+    };
+  }, [active, aiSessionId, apiBaseUrl, getToken, reloadToken, store]);
 
   useEffect(() => {
     if (!active || !aiSessionId) return undefined;
     return subscribe(
-      (event) => setView((current) => reduceSessionView(current, aiSessionId, event)),
+      (event) => {
+        if (event.type === "ai_resync") {
+          store.flush();
+          reload();
+          return;
+        }
+        store.dispatch(event);
+      },
       () => {
-        setView((current) => markDraftStale(current));
+        store.update(markDraftStale);
         reload();
       },
     );
-  }, [active, aiSessionId, reload, subscribe]);
+  }, [active, aiSessionId, reload, store, subscribe]);
 
   const stale = Boolean(view.draft?.stale);
   useEffect(() => {
@@ -116,16 +166,19 @@ export function useAiSession(aiSessionId: string | null): AiSessionState {
 
   const applyLocal = useCallback(
     (event: AiStreamEvent) => {
-      if (aiSessionId) setView((current) => reduceSessionView(current, aiSessionId, event));
+      store.dispatch(event);
     },
-    [aiSessionId],
+    [store],
   );
 
   const send = useCallback(
     async (input: SendAiMessageRequest) => {
       if (!aiSessionId) throw new Error("No AI session is open");
       const authToken = await getToken();
-      const response = await sendAiMessage(apiBaseUrl, authToken, aiSessionId, input);
+      const response = await sendAiMessage(apiBaseUrl, authToken, aiSessionId, {
+        ...input,
+        clientMessageId: input.clientMessageId ?? createClientMessageId(),
+      });
       applyLocal({ type: "ai_message.upserted", message: response.message });
       applyLocal({ type: "ai_turn.upserted", turn: response.turn });
       return response;
@@ -153,7 +206,7 @@ export function useAiSession(aiSessionId: string | null): AiSessionState {
   );
 
   const loadOlder = useCallback(async () => {
-    const current = viewRef.current;
+    const current = store.getView();
     if (!aiSessionId || !current.meta || !current.meta.hasMoreMessages) return;
     const oldestId = current.messages.order[0];
     setLoadingOlder(true);
@@ -163,12 +216,14 @@ export function useAiSession(aiSessionId: string | null): AiSessionState {
         before: oldestId,
         limit: OLDER_PAGE_SIZE,
       });
-      setView((state) => prependMessages(state, page.messages, page.hasMore));
+      store.update((state) => prependMessages(state, page.messages, page.hasMore));
     } finally {
       setLoadingOlder(false);
     }
-  }, [aiSessionId, apiBaseUrl, getToken]);
+  }, [aiSessionId, apiBaseUrl, getToken, store]);
 
+  const current = fetchState.id === aiSessionId ? fetchState : null;
+  const fetching = active && (current === null || current.loading);
   const { meta, messages } = view;
   const detail = useMemo<AiSessionDetail | null>(
     () => (meta ? { ...meta, messages: messageList(messages) } : null),
@@ -180,10 +235,11 @@ export function useAiSession(aiSessionId: string | null): AiSessionState {
     messages,
     turns: view.turns,
     draft: view.draft,
+    draftStore: store,
     deleted: view.deleted,
-    loading,
-    error,
-    errorStatus,
+    loading: fetching && !view.meta,
+    error: current?.error ?? null,
+    errorStatus: current?.errorStatus ?? null,
     loadingOlder,
     send,
     interrupt,

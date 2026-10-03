@@ -1,4 +1,5 @@
 import { useMemo } from "react";
+import { AI_EFFORTS } from "../../../ai/modelValidation";
 import { useOptionalAiRuntime } from "../../../context/AiRuntimeContext";
 import type { AiProviderId } from "../../../types/ai.types";
 import { Icon, SearchableSelect, Tooltip, type SelectOption } from "../../primitives";
@@ -18,7 +19,7 @@ interface PromptModelPickerProps {
   }) => void;
 }
 
-const EFFORTS: PromptEffort[] = ["low", "medium", "high"];
+const EFFORTS: PromptEffort[] = AI_EFFORTS.filter((value) => value !== "default");
 const SENDERS_CHOICE = "";
 
 export function PromptModelPicker({

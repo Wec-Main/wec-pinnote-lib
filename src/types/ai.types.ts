@@ -126,13 +126,7 @@ export interface AiSession {
   activeTurn: AiTurn | null;
 }
 
-export type AiMentionKind =
-  | "data_model"
-  | "flow"
-  | "annotation"
-  | "epic"
-  | "user_story"
-  | "user";
+export type AiMentionKind = "data_model" | "flow" | "annotation" | "epic" | "user_story" | "user";
 
 export interface AiMention {
   kind: AiMentionKind;
@@ -189,7 +183,7 @@ export interface AiMessage {
 export type AiOpBatchTargetKind = "data_model" | "flow" | "workspace";
 export type AiEditorTargetKind = Exclude<AiOpBatchTargetKind, "workspace">;
 export type AiOpBatchStatus =
-  "proposed" | "applied" | "saved" | "rejected" | "conflict" | "discarded";
+  "proposed" | "applying" | "applied" | "saved" | "rejected" | "conflict" | "discarded";
 
 export interface AiChangeSummary {
   added: number;
@@ -272,6 +266,7 @@ export interface SendAiMessageRequest {
   provider?: AiProviderId;
   model?: string;
   effort?: string | null;
+  clientMessageId?: string;
 }
 
 export interface SendAiMessageResponse {
@@ -324,6 +319,7 @@ export type AiStreamEvent =
       aiTurnId: string;
       target: { kind: "data_model" | "flow"; id: string };
     }
+  | { type: "ai_resync" }
   | { type: "ai_connectors.updated"; connectors: AiConnector[] }
   | ({ type: "ai_connector_login.updated" } & AiLoginStatus);
 
@@ -514,6 +510,10 @@ export interface AiActionTemplate extends AiActionTemplateFields {
 }
 
 export type UpdateAiActionTemplateRequest = Partial<AiActionTemplateFields>;
+
+export type SaveAiActionTemplateRequest = UpdateAiActionTemplateRequest & {
+  expectedVersion?: number;
+};
 
 export interface AiActionTemplatePreviewRequest {
   template?: UpdateAiActionTemplateRequest;

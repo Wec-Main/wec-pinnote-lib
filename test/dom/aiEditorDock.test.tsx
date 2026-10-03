@@ -167,6 +167,13 @@ async function mount(doc: ErdDocumentJSON = blogDocument()) {
   await flush();
 }
 
+async function settleDraft() {
+  await act(async () => {
+    await new Promise((resolve) => setTimeout(resolve, 260));
+  });
+  await flush(40);
+}
+
 async function ask(text: string) {
   typeInto(input(), text);
   press(input(), "Enter");
@@ -366,7 +373,7 @@ describe("AiEditorDock", () => {
           }),
       ),
     );
-    await flush(40);
+    await settleDraft();
     expect(names()).toContain("shop_items");
     expect(engine.getState().readOnly).toBe(true);
     act(() => engine.setViewport({ x: 40, y: 25, zoom: 0.8 }));
@@ -379,7 +386,7 @@ describe("AiEditorDock", () => {
         }),
       ),
     );
-    await flush(40);
+    await settleDraft();
     expect(names()).toEqual(expect.arrayContaining(["shop_items", "shop_orders"]));
     const done = batch("ob9", "shop_items");
     stream.enqueue(
@@ -587,7 +594,7 @@ describe("AiEditorDock", () => {
     expect(buttonByText(container, "Undo AI change")).toBeNull();
   });
 
-  it("hides the undo toast after ten seconds", async () => {
+  it("keeps the undo toast until the next edit", async () => {
     await mount();
     results.push(batch("ob1", "labels"));
     await ask("Add labels");
@@ -596,7 +603,11 @@ describe("AiEditorDock", () => {
       press(input(), "Enter");
       expect(buttonByText(container, "Undo AI change")).not.toBeNull();
       act(() => {
-        vi.advanceTimersByTime(10_001);
+        vi.advanceTimersByTime(60_000);
+      });
+      expect(buttonByText(container, "Undo AI change")).not.toBeNull();
+      act(() => {
+        engine.applyDocument({ ...engine.toJSON(), notes: [] }, { recordHistory: true });
       });
       expect(buttonByText(container, "Undo AI change")).toBeNull();
     } finally {

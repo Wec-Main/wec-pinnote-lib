@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { reduceSessionList, type AiSessionFilter } from "../ai/sessionReducer";
-import { useAiRuntime } from "../context/AiRuntimeContext";
+import { useAiRuntimeActions } from "../context/AiRuntimeContext";
 import { updateAiSession } from "../services/aiApi";
 import { aiSessionsCacheKey } from "../ai/cacheKeys";
 import { loadAiSessionPage, type AiSessionPage } from "../ai/prefetch";
@@ -37,7 +37,8 @@ function describe(err: unknown): string {
 }
 
 export function useAiSessions(filter: UseAiSessionsOptions = {}): AiSessionsState {
-  const { apiBaseUrl, projectId, enabled, currentUserId, getToken, subscribe } = useAiRuntime();
+  const { apiBaseUrl, projectId, enabled, currentUserId, getToken, subscribe } =
+    useAiRuntimeActions();
   const active = enabled && filter.enabled !== false && Boolean(projectId);
   const filterRef = useRef(filter);
   filterRef.current = filter;
@@ -85,14 +86,21 @@ export function useAiSessions(filter: UseAiSessionsOptions = {}): AiSessionsStat
 
   useEffect(() => {
     if (!active) return undefined;
-    return subscribe(
-      (event) =>
-        update((current) => ({
-          ...current,
-          sessions: reduceSessionList(current.sessions, event, filterRef.current, currentUserId),
-        })),
-      reload,
-    );
+    return subscribe((event) => {
+      if (event.type === "ai_resync") {
+        reload();
+        return;
+      }
+      update((current) => {
+        const sessions = reduceSessionList(
+          current.sessions,
+          event,
+          filterRef.current,
+          currentUserId,
+        );
+        return sessions === current.sessions ? current : { ...current, sessions };
+      });
+    }, reload);
   }, [active, currentUserId, update, reload, subscribe]);
 
   const hasMore = rawCount >= limit && limit < MAX_LIMIT;

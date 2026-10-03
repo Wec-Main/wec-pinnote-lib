@@ -1,4 +1,5 @@
 import {
+  useCallback,
   useEffect,
   useId,
   useRef,
@@ -8,8 +9,10 @@ import {
   type ReactNode,
 } from "react";
 import type { AiMention, AiSelection } from "../../types/ai.types";
-import { getInitials } from "../../utils/format";
 import { Icon, Spinner } from "../primitives";
+import { AiMentionChip } from "./AiMentionChip";
+import { formatElapsed } from "./AiActivity";
+import { useNow } from "./useAiPreferences";
 import {
   MENTION_ICONS,
   filterMentionCandidates,
@@ -20,6 +23,7 @@ import {
 } from "./useMentionPicker";
 
 export {
+  AiMentionChip,
   MENTION_ICONS,
   filterMentionCandidates,
   findMentionQuery,
@@ -45,6 +49,7 @@ export interface AiComposerSelection {
 }
 
 export const AI_COMPOSER_MAX_CHARS = 100000;
+export const COMPOSER_DRAFT_DEBOUNCE_MS = 400;
 const COUNTER_FROM = 0.8;
 const DRAFT_PREFIX = "wpn-ai:draft:";
 
@@ -100,6 +105,8 @@ export interface AiComposerProps {
   disabledReason?: string | null;
   active?: boolean;
   onStop?: () => void;
+  onEditLast?: () => void;
+  activeSince?: number | null;
   toolbar?: ReactNode;
   initialMentions?: readonly AiMention[];
   initialText?: string;
@@ -112,63 +119,16 @@ export interface AiComposerProps {
   maxLength?: number;
 }
 
-const OPEN_LABELS: Record<AiMention["kind"], string> = {
-  flow: "Open flow",
-  data_model: "Open data model",
-  epic: "Open epic",
-  user_story: "Open user story",
-  annotation: "Open comment",
-  user: "",
-};
-
-export function AiMentionChip({
-  mention,
-  onRemove,
-  onOpen,
-}: {
-  mention: AiMention;
-  onRemove?: () => void;
-  onOpen?: (mention: AiMention) => void;
-}) {
-  const body = (
-    <>
-      {mention.kind === "user" ? (
-        <span className="wpn-ai-mention__badge">{getInitials(mention.label)}</span>
-      ) : (
-        <Icon name={MENTION_ICONS[mention.kind]} className="wpn-ai-mention__icon" />
-      )}
-      <span className="wpn-ai-mention__label">
-        {mention.kind === "user" ? `@${mention.label}` : mention.label}
-      </span>
-    </>
-  );
-  const openable = onOpen !== undefined && mention.kind !== "user";
+function ComposerStatus({ since }: { since: number | null }) {
+  const mountedAt = useRef(Date.now());
+  const now = useNow(true, 1000);
+  const elapsed = Math.max(0, now - (since ?? mountedAt.current));
   return (
-    <span className={`wpn-ai-mention wpn-ai-mention--${mention.kind}`}>
-      {openable ? (
-        <button
-          type="button"
-          className="wpn-ai-mention__open"
-          title={`${OPEN_LABELS[mention.kind]}: ${mention.label}`}
-          aria-label={`${OPEN_LABELS[mention.kind]}: ${mention.label}`}
-          onClick={() => onOpen(mention)}
-        >
-          {body}
-        </button>
-      ) : (
-        body
-      )}
-      {onRemove ? (
-        <button
-          type="button"
-          className="wpn-ai-mention__remove"
-          aria-label={`Remove ${mention.label}`}
-          onClick={onRemove}
-        >
-          <Icon name="x" />
-        </button>
-      ) : null}
-    </span>
+    <p className="wpn-ai-composer__status" aria-hidden="true">
+      <span className="wpn-ai-composer__status-dot" />
+      AI is writing… {formatElapsed(elapsed - (elapsed % 1000))}
+      <span className="wpn-ai-composer__status-hint">Esc to stop</span>
+    </p>
   );
 }
 
@@ -180,6 +140,8 @@ export function AiComposer({
   disabledReason,
   active = false,
   onStop,
+  onEditLast,
+  activeSince = null,
   toolbar,
   initialMentions,
   initialText = "",
@@ -200,6 +162,9 @@ export function AiComposer({
   const [includeSelection, setIncludeSelection] = useState(true);
   const fieldRef = useRef<HTMLTextAreaElement>(null);
   const draftKeyRef = useRef(draftKey);
+  const latestDraftRef = useRef<StoredDraft>({ text, mentions });
+  latestDraftRef.current = { text, mentions };
+  const draftTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const counterId = useId();
   const picker = useMentionPicker({
     candidates,
@@ -211,8 +176,17 @@ export function AiComposer({
     onMentionTrigger,
   });
 
+  const flushDraft = useCallback(() => {
+    if (draftTimerRef.current) {
+      clearTimeout(draftTimerRef.current);
+      draftTimerRef.current = null;
+    }
+    writeComposerDraft(draftKeyRef.current, latestDraftRef.current);
+  }, []);
+
   useEffect(() => {
     if (draftKeyRef.current === draftKey) return;
+    flushDraft();
     draftKeyRef.current = draftKey;
     const stored = readComposerDraft(draftKey);
     setText(stored?.text ?? "");
@@ -221,8 +195,20 @@ export function AiComposer({
   }, [draftKey]);
 
   useEffect(() => {
-    writeComposerDraft(draftKeyRef.current, { text, mentions });
+    const timer = setTimeout(() => {
+      draftTimerRef.current = null;
+      writeComposerDraft(draftKeyRef.current, latestDraftRef.current);
+    }, COMPOSER_DRAFT_DEBOUNCE_MS);
+    draftTimerRef.current = timer;
+    return () => clearTimeout(timer);
   }, [text, mentions]);
+
+  useEffect(
+    () => () => {
+      writeComposerDraft(draftKeyRef.current, latestDraftRef.current);
+    },
+    [],
+  );
 
   const seedNonce = seed?.nonce ?? null;
   const seedRef = useRef(seed);
@@ -289,7 +275,8 @@ export function AiComposer({
       setText("");
       setMentions([]);
       picker.close();
-      writeComposerDraft(draftKeyRef.current, null);
+      latestDraftRef.current = { text: "", mentions: [] };
+      flushDraft();
     } catch {
       return;
     } finally {
@@ -300,6 +287,26 @@ export function AiComposer({
   const handleKeyDown = (event: KeyboardEvent<HTMLTextAreaElement>) => {
     if (event.nativeEvent.isComposing) return;
     if (picker.handleKey(event)) return;
+    if (event.key === "Escape" && active && onStop) {
+      event.preventDefault();
+      onStop();
+      return;
+    }
+    if (
+      event.key === "ArrowUp" &&
+      onEditLast &&
+      !active &&
+      text === "" &&
+      mentions.length === 0 &&
+      !event.shiftKey &&
+      !event.altKey &&
+      !event.metaKey &&
+      !event.ctrlKey
+    ) {
+      event.preventDefault();
+      onEditLast();
+      return;
+    }
     if (event.key === "Enter" && !event.shiftKey) {
       event.preventDefault();
       void send();
@@ -373,12 +380,16 @@ export function AiComposer({
             onClick={(event) =>
               picker.update(event.currentTarget.value, event.currentTarget.selectionStart ?? 0)
             }
-            onBlur={picker.onFieldBlur}
+            onBlur={() => {
+              flushDraft();
+              picker.onFieldBlur();
+            }}
             aria-describedby={showCounter ? counterId : undefined}
             aria-invalid={tooLong || undefined}
           />
           {picker.menu}
         </div>
+        {active ? <ComposerStatus since={activeSince} /> : null}
         <div className="wpn-ai-composer__bar">
           <div className="wpn-ai-composer__tools">{toolbar}</div>
           {showCounter ? (

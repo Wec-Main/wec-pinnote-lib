@@ -13,7 +13,7 @@ import { useOptionalAiRuntime } from "../../context/AiRuntimeContext";
 import { useAnnotationAuth, useAnnotationUi } from "../../context/AnnotationContext";
 import { useAiSession } from "../../hooks/useAiSession";
 import { useAiSessions } from "../../hooks/useAiSessions";
-import { prefetchAiMe, prefetchAiSessions } from "../../ai/prefetch";
+import { prefetchAiMe, prefetchAiSession, prefetchAiSessions } from "../../ai/prefetch";
 import { useEscapeKey } from "../../hooks/useEscapeKey";
 import { usePersistentState } from "../../hooks/usePersistentState";
 import { Icon, Tooltip } from "../primitives";
@@ -319,6 +319,7 @@ export function AiFloatingButton() {
     };
     void prefetchAiMe(target);
     void prefetchAiSessions(target, { mine: true, limit: 20 });
+    void prefetchAiSession(target, sessionsState.sessions[0]?.aiSessionId);
   };
 
   const onClick = () => {

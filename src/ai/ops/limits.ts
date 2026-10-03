@@ -10,3 +10,5 @@ export const AI_FLOW_LIMITS = {
   maxNodes: 2000,
   maxEdges: 4000,
 } as const;
+
+export const FLOW_NODE_GAP = 80;

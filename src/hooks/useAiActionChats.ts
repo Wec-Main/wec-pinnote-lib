@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { useOptionalAiRuntime } from "../context/AiRuntimeContext";
+import { useOptionalAiRuntimeActions } from "../context/AiRuntimeContext";
 import { listAiActionChats, updateAiSession } from "../services/aiApi";
 import type { AiActionTarget, AiSession } from "../types/ai.types";
 
@@ -18,7 +18,7 @@ export function useAiActionChats(
   targetId: string | null | undefined,
   enabled = true,
 ): AiActionChats {
-  const runtime = useOptionalAiRuntime();
+  const runtime = useOptionalAiRuntimeActions();
   const [chats, setChats] = useState<AiSession[]>(NO_CHATS);
   const [loading, setLoading] = useState(false);
   const [tick, setTick] = useState(0);

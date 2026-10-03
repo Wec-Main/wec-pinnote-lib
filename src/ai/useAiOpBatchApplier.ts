@@ -2,24 +2,31 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useOptionalAiRuntime } from "../context/AiRuntimeContext";
 import type { RevisionedDocumentState } from "../hooks/useRevisionedDocument";
 import { useTokenGetter } from "../hooks/useTokenGetter";
-import { updateAiOpBatch } from "../services/aiApi";
+import { fetchAiOpBatch, updateAiOpBatch } from "../services/aiApi";
 import type { AiOpBatch, UpdateAiOpBatchRequest } from "../types/ai.types";
 import type { ErdDocumentJSON } from "../types/dataModel.types";
 import type { FlowJSON } from "../types/flowchart.types";
 import type { ErdEngine } from "../utils/erd/erdEngine";
 import type { FlowEngine } from "../utils/flowchart/flowEngine";
 import { aiPreviewStore, type AiPreviewStore } from "./aiPreviewStore";
+import { AsyncMutex } from "./asyncMutex";
 import {
   NO_APPLIED_BATCHES,
   applyBatchToDocument,
   applyPartialOps,
   buildPreviewOverlay,
+  filterBatchOps,
+  mergeDocDiffs,
+  planDraftStep,
   withAccepted,
   withPreview,
   withRejected,
   type AppliedBatches,
+  type DraftIds,
 } from "./opBatchApplier";
 import type { DocDiff } from "./ops/types";
+import { isOpBatchStatusConflict, reconcileStatusConflict } from "./opBatchConflict";
+import { PatchQueue, type PatchQueueState, type PatchSendResult } from "./patchQueue";
 
 interface ApplierBase {
   targetId: string | null;
@@ -29,6 +36,7 @@ interface ApplierBase {
   onModelDescription?: (description: string) => void;
   onModelName?: (name: string) => void;
   previewStore?: AiPreviewStore;
+  onBatchSynced?: (batch: AiOpBatch) => void;
 }
 
 export type UseAiOpBatchApplierOptions = ApplierBase &
@@ -48,8 +56,12 @@ export type UseAiOpBatchApplierOptions = ApplierBase &
   );
 
 export type AiBatchPreviewOutcome =
-  | { ok: true; diff: DocDiff; warnings: string[]; skipped: string[] }
+  | { ok: true; diff: DocDiff; warnings: string[]; skipped: string[]; syncWarning?: string }
   | { ok: false; status: "conflict" | "invalid"; detail: string };
+
+export interface AiPreviewOptions {
+  exclude?: ReadonlySet<number>;
+}
 
 export interface AiOpBatchApplier {
   previewingBatchId: string | null;
@@ -58,8 +70,15 @@ export interface AiOpBatchApplier {
   discardedBatchIds: readonly string[];
   hasUnsavedAiChanges: boolean;
   error: string | null;
-  preview: (batch: AiOpBatch) => Promise<AiBatchPreviewOutcome>;
-  draft: (ops: readonly unknown[]) => boolean;
+  syncPending: boolean;
+  syncError: string | null;
+  preview: (batch: AiOpBatch, options?: AiPreviewOptions) => Promise<AiBatchPreviewOutcome>;
+  repreview: (batch: AiOpBatch, options?: AiPreviewOptions) => Promise<AiBatchPreviewOutcome>;
+  replacePreview: (
+    batch: AiOpBatch,
+    options?: AiPreviewOptions,
+  ) => Promise<{ previous: string | null; outcome: AiBatchPreviewOutcome }>;
+  draft: (ops: readonly unknown[]) => Promise<boolean>;
   endDraft: () => void;
   locked: boolean;
   setLocked: (locked: boolean) => void;
@@ -78,6 +97,26 @@ function describe(err: unknown): string {
   return err instanceof Error && err.message ? err.message : "Could not update the AI batch";
 }
 
+function httpStatus(err: unknown): number | null {
+  const status = (err as { status?: unknown } | null)?.status;
+  return typeof status === "number" ? status : null;
+}
+
+const FRESH_KEY = "\u0000fresh";
+const NOT_SYNCED = "Not synced — retrying";
+
+interface DraftState {
+  abandoned: boolean;
+  applied: readonly unknown[];
+  steps: number;
+  pushes: number;
+  ids: DraftIds;
+  before: ErdDocumentJSON | FlowJSON | null;
+  diff: DocDiff | null;
+}
+
+type ChangeSource = { on: (event: "change", handler: () => void) => () => void };
+
 export function useAiOpBatchApplier(options: UseAiOpBatchApplierOptions): AiOpBatchApplier {
   const runtime = useOptionalAiRuntime();
   const fallbackToken = useTokenGetter(options.getAuthToken);
@@ -86,14 +125,22 @@ export function useAiOpBatchApplier(options: UseAiOpBatchApplierOptions): AiOpBa
   const store = options.previewStore ?? aiPreviewStore;
   const [batches, setBatches] = useState<AppliedBatches>(NO_APPLIED_BATCHES);
   const [error, setError] = useState<string | null>(null);
+  const [sync, setSync] = useState<PatchQueueState>({ pending: 0, retrying: false });
+  const [syncError, setSyncError] = useState<string | null>(null);
   const batchesRef = useRef(batches);
   batchesRef.current = batches;
   const optionsRef = useRef(options);
   optionsRef.current = options;
-  const statusRef = useRef(new Map<string, AiOpBatch["status"]>());
+  const transportRef = useRef({ apiBaseUrl, getToken });
+  transportRef.current = { apiBaseUrl, getToken };
+  const statusRef = useRef(new Map<string, string>());
   const stopWatchRef = useRef<(() => void) | null>(null);
-  const draftRef = useRef<{ drawn: string | null; abandoned: boolean } | null>(null);
-  const freshRef = useRef<string | null>(null);
+  const draftRef = useRef<DraftState | null>(null);
+  const draftEpochRef = useRef(0);
+  const mutexRef = useRef(new AsyncMutex());
+  const revRef = useRef(0);
+  const knownRevRef = useRef(0);
+  const markersRef = useRef(new Map<string, number>());
   const snapshotsRef = useRef(0);
   const [savedIds, setSavedIds] = useState<readonly string[]>([]);
   const [discardedIds, setDiscardedIds] = useState<readonly string[]>([]);
@@ -104,18 +151,112 @@ export function useAiOpBatchApplier(options: UseAiOpBatchApplierOptions): AiOpBa
     setBatches(next);
   }, []);
 
-  const patch = useCallback(
-    async (aiOpBatchId: string, input: UpdateAiOpBatchRequest) => {
-      try {
-        const authToken = await getToken();
-        const updated = await updateAiOpBatch(apiBaseUrl, authToken, aiOpBatchId, input);
-        statusRef.current.set(aiOpBatchId, updated.status);
-        setError(null);
-      } catch (err) {
-        setError(describe(err));
+  useEffect(() => {
+    if (!engine) return undefined;
+    return (engine as unknown as ChangeSource).on("change", () => {
+      revRef.current += 1;
+    });
+  }, [engine]);
+
+  const mutate = useCallback((run: () => void) => {
+    const previous = knownRevRef.current;
+    const clean = revRef.current === previous;
+    run();
+    const now = revRef.current;
+    knownRevRef.current = now;
+    if (clean) {
+      for (const [id, marker] of markersRef.current) {
+        if (marker === previous) markersRef.current.set(id, now);
       }
+    }
+  }, []);
+
+  const userEdited = useCallback(() => revRef.current !== knownRevRef.current, []);
+
+  const queueRef = useRef<PatchQueue<UpdateAiOpBatchRequest> | null>(null);
+  if (queueRef.current === null) {
+    queueRef.current = new PatchQueue<UpdateAiOpBatchRequest>({
+      send: async (aiOpBatchId, input): Promise<PatchSendResult> => {
+        try {
+          const transport = transportRef.current;
+          const authToken = await transport.getToken();
+          const updated = await updateAiOpBatch(
+            transport.apiBaseUrl,
+            authToken,
+            aiOpBatchId,
+            input,
+          );
+          statusRef.current.set(aiOpBatchId, updated.status);
+          setError(null);
+          return "ok";
+        } catch (err) {
+          const status = httpStatus(err);
+          if (status === 409) {
+            statusRef.current.delete(aiOpBatchId);
+            if (isOpBatchStatusConflict(err)) {
+              const transport = transportRef.current;
+              const outcome = await reconcileStatusConflict(input, async () =>
+                fetchAiOpBatch(transport.apiBaseUrl, await transport.getToken(), aiOpBatchId),
+              );
+              if (outcome.kind !== "unknown") {
+                statusRef.current.set(aiOpBatchId, outcome.batch.status);
+                optionsRef.current.onBatchSynced?.(outcome.batch);
+              }
+              if (outcome.kind === "settled") {
+                setError(null);
+                return "ok";
+              }
+            }
+            setError("This AI change was already updated elsewhere.");
+            return "conflict";
+          }
+          if (
+            status !== null &&
+            status >= 400 &&
+            status < 500 &&
+            status !== 408 &&
+            status !== 429
+          ) {
+            setError(describe(err));
+            return "drop";
+          }
+          setSyncError(describe(err));
+          return "retry";
+        }
+      },
+      onSettled: (_id, result) => {
+        if (result === "drop") {
+          setError((current) => current ?? "Could not sync this AI change. Check your connection.");
+        }
+      },
+      onChange: (state) => {
+        setSync(state);
+        if (state.pending === 0) setSyncError(null);
+      },
+    });
+  }
+  const queue = queueRef.current;
+
+  useEffect(() => {
+    queue.resume();
+    const flush = () => {
+      if (typeof document !== "undefined" && document.visibilityState === "hidden") return;
+      void queue.flush();
+    };
+    window.addEventListener("online", flush);
+    document.addEventListener("visibilitychange", flush);
+    return () => {
+      window.removeEventListener("online", flush);
+      document.removeEventListener("visibilitychange", flush);
+      queue.dispose();
+    };
+  }, [queue]);
+
+  const patch = useCallback(
+    async (aiOpBatchId: string, input: UpdateAiOpBatchRequest): Promise<PatchSendResult> => {
+      return queue.sendNow(aiOpBatchId, input);
     },
-    [apiBaseUrl, getToken],
+    [queue],
   );
 
   const stopWatching = useCallback(() => {
@@ -132,7 +273,7 @@ export function useAiOpBatchApplier(options: UseAiOpBatchApplierOptions): AiOpBa
   const nameBaselineRef = useRef<string | null>(null);
 
   const accept = useCallback(() => {
-    freshRef.current = null;
+    markersRef.current.delete(FRESH_KEY);
     clearOverlay();
     setBatchState(withAccepted(batchesRef.current));
     const description = descriptionRef.current;
@@ -177,53 +318,63 @@ export function useAiOpBatchApplier(options: UseAiOpBatchApplierOptions): AiOpBa
 
   useEffect(() => () => setLocked(false), [setLocked]);
 
-  const loadDocument = useCallback((incoming: ErdDocumentJSON | FlowJSON) => {
-    const current = optionsRef.current;
-    const engine = current.engine;
-    let document = incoming;
-    if (current.kind === "data_model") {
-      if (nameBaselineRef.current === null) {
-        nameBaselineRef.current = current.engine?.getState().name.trim() ?? "";
-      }
-      const { description, ...meta } = (incoming as ErdDocumentJSON).meta ?? {};
-      descriptionRef.current =
-        typeof description === "string" && description.trim() ? description.trim() : null;
-      document = { ...(incoming as ErdDocumentJSON), meta };
-    }
-    const relock = lockRef.current.locked;
-    if (relock) engine?.setReadOnly(false);
-    try {
+  const loadDocument = useCallback(
+    (incoming: ErdDocumentJSON | FlowJSON): boolean => {
+      const current = optionsRef.current;
+      const engine = current.engine;
+      let document = incoming;
       if (current.kind === "data_model") {
-        current.engine?.applyDocument(document as ErdDocumentJSON, { recordHistory: true });
-      } else {
-        current.engine?.loadFlow(document as FlowJSON, { recordHistory: true });
+        if (nameBaselineRef.current === null) {
+          nameBaselineRef.current = current.engine?.getState().name.trim() ?? "";
+        }
+        const { description, ...meta } = (incoming as ErdDocumentJSON).meta ?? {};
+        descriptionRef.current =
+          typeof description === "string" && description.trim() ? description.trim() : null;
+        document = { ...(incoming as ErdDocumentJSON), meta };
       }
-    } finally {
-      if (relock) engine?.setReadOnly(true);
-    }
-  }, []);
+      const relock = lockRef.current.locked;
+      const startRev = revRef.current;
+      mutate(() => {
+        if (relock) engine?.setReadOnly(false);
+        try {
+          if (current.kind === "data_model") {
+            current.engine?.applyDocument(document as ErdDocumentJSON, { recordHistory: true });
+          } else {
+            current.engine?.loadFlow(document as FlowJSON, { recordHistory: true });
+          }
+        } finally {
+          if (relock) engine?.setReadOnly(true);
+        }
+      });
+      return revRef.current !== startRev;
+    },
+    [mutate],
+  );
 
-  const serialize = useCallback(() => {
-    const document = currentDocument();
-    if (!document) return null;
-    const { viewport: _viewport, ...content } = document;
-    return JSON.stringify(content);
-  }, [currentDocument]);
+  const undoEngine = useCallback(
+    (times: number) => {
+      mutate(() => {
+        for (let index = 0; index < times; index++) optionsRef.current.engine?.undo();
+      });
+    },
+    [mutate],
+  );
 
   const restoreDraft = useCallback((): boolean => {
     const draft = draftRef.current;
-    if (!draft || draft.drawn === null) return true;
-    if (serialize() !== draft.drawn) {
-      draft.drawn = null;
+    if (!draft || draft.pushes === 0) return true;
+    if (userEdited()) {
+      draft.pushes = 0;
       draft.abandoned = true;
       return false;
     }
-    optionsRef.current.engine?.undo();
-    draft.drawn = null;
+    undoEngine(draft.pushes);
+    draft.pushes = 0;
     return true;
-  }, [serialize]);
+  }, [undoEngine, userEdited]);
 
   const endDraft = useCallback(() => {
+    draftEpochRef.current += 1;
     const draft = draftRef.current;
     if (!draft) return;
     restoreDraft();
@@ -234,24 +385,79 @@ export function useAiOpBatchApplier(options: UseAiOpBatchApplierOptions): AiOpBa
     }
   }, [kind, restoreDraft, store, targetId]);
 
-  const draft = useCallback(
-    (ops: readonly unknown[]): boolean => {
+  const draftStep = useCallback(
+    async (ops: readonly unknown[], epoch: number): Promise<boolean> => {
       const current = optionsRef.current;
       if (!current.engine || !current.targetId || batchesRef.current.previewing) return false;
-      if (draftRef.current?.abandoned) return false;
-      if (!draftRef.current) {
-        draftRef.current = { drawn: null, abandoned: false };
+      if (epoch !== draftEpochRef.current) return false;
+      let draft = draftRef.current;
+      if (draft?.abandoned) return false;
+      if (!draft) {
+        draft = {
+          abandoned: false,
+          applied: [],
+          steps: 0,
+          pushes: 0,
+          ids: { next: 0 },
+          before: null,
+          diff: null,
+        };
+        draftRef.current = draft;
         current.onUnsavedAiChangesChange?.(true);
+      }
+      if (draft.pushes > 0 && userEdited()) {
+        draft.abandoned = true;
+        draft.pushes = 0;
+        return false;
+      }
+      const plan =
+        draft.before && draft.diff && draft.pushes > 0
+          ? planDraftStep(draft.applied, ops, draft.steps)
+          : ({ mode: "full" } as const);
+      const submitted = [...ops];
+      if (plan.mode === "suffix") {
+        const base = currentDocument();
+        if (!base || !draft.diff || !draft.before) return false;
+        const rev = revRef.current;
+        const result = await applyPartialOps(
+          current.kind,
+          base,
+          submitted.slice(plan.from),
+          draft.ids,
+        ).catch(() => null);
+        if (epoch !== draftEpochRef.current || revRef.current !== rev) return false;
+        draft.applied = submitted;
+        if (!result) return false;
+        const { added, changed, removed } = result.diff;
+        if (added.length === 0 && changed.length === 0 && removed.length === 0) return false;
+        if (loadDocument(result.document)) draft.pushes += 1;
+        draft.steps += 1;
+        draft.diff = mergeDocDiffs(draft.diff, result.diff);
+        store.set(
+          buildPreviewOverlay(
+            { aiOpBatchId: "draft", targetKind: current.kind, targetId: current.targetId },
+            draft.before,
+            draft.diff,
+          ),
+        );
+        return true;
       }
       if (!restoreDraft()) return false;
       const before = currentDocument();
       if (!before) return false;
-      const result = applyPartialOps(current.kind, before, ops);
+      const rev = revRef.current;
+      const ids: DraftIds = { next: 0 };
+      const result = await applyPartialOps(current.kind, before, submitted, ids).catch(() => null);
+      if (epoch !== draftEpochRef.current || revRef.current !== rev) return false;
+      draft.applied = submitted;
+      draft.ids = ids;
+      draft.steps = 0;
+      draft.before = before;
       if (!result) return false;
       const { added, changed, removed } = result.diff;
       if (added.length === 0 && changed.length === 0 && removed.length === 0) return false;
-      loadDocument(result.document);
-      (draftRef.current as { drawn: string | null }).drawn = serialize();
+      if (loadDocument(result.document)) draft.pushes += 1;
+      draft.diff = result.diff;
       store.set(
         buildPreviewOverlay(
           { aiOpBatchId: "draft", targetKind: current.kind, targetId: current.targetId },
@@ -261,7 +467,15 @@ export function useAiOpBatchApplier(options: UseAiOpBatchApplierOptions): AiOpBa
       );
       return true;
     },
-    [currentDocument, loadDocument, restoreDraft, serialize, store],
+    [currentDocument, loadDocument, restoreDraft, store, userEdited],
+  );
+
+  const draft = useCallback(
+    (ops: readonly unknown[]): Promise<boolean> => {
+      const epoch = draftEpochRef.current;
+      return mutexRef.current.run(() => draftStep(ops, epoch));
+    },
+    [draftStep],
   );
 
   const clearForFresh = useCallback((): boolean => {
@@ -280,22 +494,22 @@ export function useAiOpBatchApplier(options: UseAiOpBatchApplierOptions): AiOpBa
         : { ...(document as FlowJSON), nodes: [], edges: [] };
     current.onUnsavedAiChangesChange?.(true);
     loadDocument(empty);
-    freshRef.current = serialize();
+    markersRef.current.set(FRESH_KEY, revRef.current);
     return true;
-  }, [currentDocument, loadDocument, serialize]);
+  }, [currentDocument, loadDocument]);
 
   const restoreFresh = useCallback(() => {
-    const cleared = freshRef.current;
-    if (cleared === null) return;
-    freshRef.current = null;
-    if (serialize() === cleared) optionsRef.current.engine?.undo();
+    const marker = markersRef.current.get(FRESH_KEY);
+    if (marker === undefined) return;
+    markersRef.current.delete(FRESH_KEY);
+    if (marker === revRef.current) undoEngine(1);
     if (batchesRef.current.applied.length === 0) {
       optionsRef.current.onUnsavedAiChangesChange?.(false);
     }
-  }, [serialize]);
+  }, [undoEngine]);
 
-  const preview = useCallback(
-    async (batch: AiOpBatch): Promise<AiBatchPreviewOutcome> => {
+  const previewInner = useCallback(
+    async (batch: AiOpBatch, exclude?: ReadonlySet<number>): Promise<AiBatchPreviewOutcome> => {
       endDraft();
       const current = optionsRef.current;
       if (batch.targetKind !== current.kind || batch.targetId !== current.targetId) {
@@ -307,7 +521,27 @@ export function useAiOpBatchApplier(options: UseAiOpBatchApplierOptions): AiOpBa
       if (batchesRef.current.previewing) accept();
       const before = currentDocument();
       if (!before) return { ok: false, status: "invalid", detail: "The editor is not ready" };
-      const result = applyBatchToDocument(batch, before);
+      const rev = revRef.current;
+      let result: Awaited<ReturnType<typeof applyBatchToDocument>>;
+      try {
+        result = await applyBatchToDocument(
+          exclude ? filterBatchOps(batch, exclude) : batch,
+          before,
+        );
+      } catch {
+        return {
+          ok: false,
+          status: "invalid",
+          detail: "Could not load the editing tools. Check your connection and try again.",
+        };
+      }
+      if (revRef.current !== rev) {
+        return {
+          ok: false,
+          status: "invalid",
+          detail: "The document changed while preparing the preview. Try again.",
+        };
+      }
       if (!result.ok) {
         const known = statusRef.current.get(batch.aiOpBatchId) ?? batch.status;
         if (known !== "conflict") {
@@ -322,48 +556,102 @@ export function useAiOpBatchApplier(options: UseAiOpBatchApplierOptions): AiOpBa
       setBatchState(withPreview(batchesRef.current, batch.aiOpBatchId));
       current.onUnsavedAiChangesChange?.(true);
       loadDocument(result.document);
+      markersRef.current.set(batch.aiOpBatchId, revRef.current);
       store.set(buildPreviewOverlay(batch, before, result.diff));
       stopWatching();
-      const watched = current.engine as {
-        on: (event: "change", handler: () => void) => () => void;
-      };
-      stopWatchRef.current = watched.on("change", () => {
+      stopWatchRef.current = (current.engine as unknown as ChangeSource).on("change", () => {
+        if (revRef.current === knownRevRef.current) return;
         if (batchesRef.current.previewing === batch.aiOpBatchId) accept();
       });
       const known = statusRef.current.get(batch.aiOpBatchId) ?? batch.status;
-      if (known !== "applied") await patch(batch.aiOpBatchId, { status: "applied" });
-      return { ok: true, diff: result.diff, warnings: result.warnings, skipped: result.skipped };
+      let syncWarning: string | undefined;
+      if (known !== "applied") {
+        const sent = await patch(batch.aiOpBatchId, { status: "applied" });
+        if (sent === "retry") syncWarning = NOT_SYNCED;
+        else if (sent === "conflict") syncWarning = "This AI change was already updated elsewhere.";
+      }
+      return {
+        ok: true,
+        diff: result.diff,
+        warnings: result.warnings,
+        skipped: result.skipped,
+        ...(syncWarning ? { syncWarning } : {}),
+      };
     },
     [accept, currentDocument, endDraft, loadDocument, patch, setBatchState, stopWatching, store],
   );
 
-  const reject = useCallback(async () => {
-    const { previewing } = batchesRef.current;
-    if (!previewing) return;
-    descriptionRef.current = null;
-    nameBaselineRef.current = null;
-    stopWatching();
-    optionsRef.current.engine?.undo();
-    clearOverlay();
-    const next = withRejected(batchesRef.current, previewing);
-    setBatchState(next);
-    restoreFresh();
-    if (next.applied.length === 0) optionsRef.current.onUnsavedAiChangesChange?.(false);
-    await patch(previewing, { status: "rejected" });
-  }, [clearOverlay, patch, restoreFresh, setBatchState, stopWatching]);
+  const revertInner = useCallback(
+    (silent: boolean): string | null => {
+      const { previewing } = batchesRef.current;
+      if (!previewing) return null;
+      descriptionRef.current = null;
+      nameBaselineRef.current = null;
+      stopWatching();
+      undoEngine(1);
+      clearOverlay();
+      markersRef.current.delete(previewing);
+      const next = withRejected(batchesRef.current, previewing);
+      setBatchState(next);
+      if (!silent) {
+        restoreFresh();
+        if (next.applied.length === 0) optionsRef.current.onUnsavedAiChangesChange?.(false);
+      }
+      return previewing;
+    },
+    [clearOverlay, restoreFresh, setBatchState, stopWatching, undoEngine],
+  );
+
+  const preview = useCallback(
+    (batch: AiOpBatch, opts?: AiPreviewOptions) =>
+      mutexRef.current.run(() => previewInner(batch, opts?.exclude)),
+    [previewInner],
+  );
+
+  const repreview = useCallback(
+    (batch: AiOpBatch, opts?: AiPreviewOptions) =>
+      mutexRef.current.run(async () => {
+        if (batchesRef.current.previewing === batch.aiOpBatchId) revertInner(true);
+        return previewInner(batch, opts?.exclude);
+      }),
+    [previewInner, revertInner],
+  );
+
+  const reject = useCallback(
+    () =>
+      mutexRef.current.run(async () => {
+        const previewing = revertInner(false);
+        if (previewing) await patch(previewing, { status: "rejected" });
+      }),
+    [patch, revertInner],
+  );
+
+  const replacePreview = useCallback(
+    (batch: AiOpBatch, opts?: AiPreviewOptions) =>
+      mutexRef.current.run(async () => {
+        const previous = revertInner(false);
+        if (previous) void patch(previous, { status: "rejected" });
+        const outcome = await previewInner(batch, opts?.exclude);
+        return { previous, outcome };
+      }),
+    [patch, previewInner, revertInner],
+  );
 
   const undoAccepted = useCallback(
-    async (aiOpBatchId: string) => {
-      const { previewing, applied } = batchesRef.current;
-      if (previewing !== null || applied[applied.length - 1] !== aiOpBatchId) return false;
-      optionsRef.current.engine?.undo();
-      const next = withRejected(batchesRef.current, aiOpBatchId);
-      setBatchState(next);
-      if (next.applied.length === 0) optionsRef.current.onUnsavedAiChangesChange?.(false);
-      await patch(aiOpBatchId, { status: "rejected" });
-      return true;
-    },
-    [patch, setBatchState],
+    (aiOpBatchId: string) =>
+      mutexRef.current.run(async () => {
+        const { previewing, applied } = batchesRef.current;
+        if (previewing !== null || applied[applied.length - 1] !== aiOpBatchId) return false;
+        if (markersRef.current.get(aiOpBatchId) !== revRef.current) return false;
+        undoEngine(1);
+        markersRef.current.delete(aiOpBatchId);
+        const next = withRejected(batchesRef.current, aiOpBatchId);
+        setBatchState(next);
+        if (next.applied.length === 0) optionsRef.current.onUnsavedAiChangesChange?.(false);
+        await patch(aiOpBatchId, { status: "rejected" });
+        return true;
+      }),
+    [patch, setBatchState, undoEngine],
   );
 
   const trackSnapshot = useCallback(async (work: Promise<void>) => {
@@ -385,6 +673,7 @@ export function useAiOpBatchApplier(options: UseAiOpBatchApplierOptions): AiOpBa
       if (input.status === "saved") setSavedIds((current) => [...current, ...ids]);
       if (input.status === "discarded") setDiscardedIds((current) => [...current, ...ids]);
       clearOverlay();
+      markersRef.current.clear();
       setBatchState(NO_APPLIED_BATCHES);
       optionsRef.current.onUnsavedAiChangesChange?.(false);
       await Promise.all(applied.map((id) => patch(id, input)));
@@ -422,6 +711,7 @@ export function useAiOpBatchApplier(options: UseAiOpBatchApplierOptions): AiOpBa
     loadKeyRef.current = loadKey;
     if (batchesRef.current.applied.length === 0) return;
     clearOverlay();
+    markersRef.current.clear();
     setBatchState(NO_APPLIED_BATCHES);
     optionsRef.current.onUnsavedAiChangesChange?.(false);
   }, [clearOverlay, loadKey, setBatchState]);
@@ -430,6 +720,9 @@ export function useAiOpBatchApplier(options: UseAiOpBatchApplierOptions): AiOpBa
     () => () => {
       stopWatchRef.current?.();
       stopWatchRef.current = null;
+      draftEpochRef.current += 1;
+      draftRef.current = null;
+      markersRef.current.clear();
       if (targetId) store.clear(kind, targetId);
       if (batchesRef.current.applied.length > 0) {
         optionsRef.current.onUnsavedAiChangesChange?.(false);
@@ -447,7 +740,11 @@ export function useAiOpBatchApplier(options: UseAiOpBatchApplierOptions): AiOpBa
     discardedBatchIds: discardedIds,
     hasUnsavedAiChanges: batches.applied.length > 0,
     error,
+    syncPending: sync.retrying,
+    syncError: sync.retrying ? (syncError ?? NOT_SYNCED) : null,
     preview,
+    repreview,
+    replacePreview,
     draft,
     endDraft,
     locked,

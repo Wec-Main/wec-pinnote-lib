@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useOptionalAiRuntime } from "../../../context/AiRuntimeContext";
 import {
+  listAiActionTemplates,
   previewAiActionTemplate,
   resetAiActionTemplate,
   saveAiActionTemplate,
@@ -10,7 +11,13 @@ import type {
   AiActionTemplatePreview,
   AiProviderId,
 } from "../../../types/ai.types";
-import { describeAiError, resolveRoute, type AiRoute } from "../aiHelpers";
+import {
+  aiErrorCode,
+  aiErrorText,
+  describeAiError,
+  resolveRoute,
+  type AiRoute,
+} from "../aiHelpers";
 import {
   TEMPLATE_EFFORTS,
   draftFromTemplate,
@@ -114,6 +121,21 @@ export function usePromptTemplateEditor({
     return { rt: runtime, token: await runtime.getToken() };
   };
 
+  const reloadAfterConflict = async () => {
+    const text = aiErrorText("template_conflict", "This prompt was changed by someone else.");
+    try {
+      const { rt, token } = await withToken();
+      const fresh = (await listAiActionTemplates(rt.apiBaseUrl, token, rt.projectId)).find(
+        (item) => item.actionKey === template.actionKey,
+      );
+      if (fresh) onSaved(fresh);
+    } catch {
+      setMessage({ tone: "error", text });
+      return;
+    }
+    setMessage({ tone: "error", text });
+  };
+
   const save = async (): Promise<boolean> => {
     if (errors.length > 0 || saving) return false;
     setSaving(true);
@@ -125,12 +147,16 @@ export function usePromptTemplateEditor({
         token,
         rt.projectId,
         template.actionKey,
-        draftToRequest(draft),
+        { ...draftToRequest(draft), expectedVersion: template.version },
       );
       onSaved(saved);
       setMessage({ tone: "ok", text: "Saved. New runs use this template." });
       return true;
     } catch (err) {
+      if (aiErrorCode(err) === "template_conflict") {
+        await reloadAfterConflict();
+        return false;
+      }
       setMessage({ tone: "error", text: describeAiError(err, "Could not save the template") });
       return false;
     } finally {

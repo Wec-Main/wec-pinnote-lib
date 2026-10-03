@@ -114,7 +114,9 @@ const delta = (
   kind: "text" | "reasoning" | "status",
   text: string,
   seq: number,
+  part?: [number, number],
 ): AiStreamEvent => ({
+  ...(part ? { part: part[0], parts: part[1] } : {}),
   type: "ai_delta",
   aiSessionId: "s1",
   aiTurnId: "t1",
@@ -240,8 +242,8 @@ describe("session reducer", () => {
   });
 
   it("appends every chunk of a delta the API split under one seq", () => {
-    let draft = reduceDraft(null, delta("text", "Hel", 7));
-    draft = reduceDraft(draft, delta("text", "lo", 7));
+    let draft = reduceDraft(null, delta("text", "Hel", 7, [0, 2]));
+    draft = reduceDraft(draft, delta("text", "lo", 7, [1, 2]));
     expect(draft).toMatchObject({ text: "Hello", seq: 7 });
   });
 
@@ -421,15 +423,15 @@ describe("session reducer", () => {
       "s1",
       delta("text", "a", 1),
     );
-    expect(markDraftStale(fresh).draft?.stale).toBe(true);
+    expect(markDraftStale(fresh).draft?.maybeMissed).toBe(true);
   });
 
   it("tolerates seq jumps from coalesced deltas when fromSeq is absent", () => {
     let state = loadSessionDetail(EMPTY_AI_SESSION_VIEW, detail());
     state = reduceSessionView(state, "s1", delta("text", "Hel", 3));
     state = reduceSessionView(state, "s1", delta("text", "lo", 9));
-    state = reduceSessionView(state, "s1", delta("text", " wor", 15));
-    state = reduceSessionView(state, "s1", delta("text", "ld", 15));
+    state = reduceSessionView(state, "s1", delta("text", " wor", 15, [0, 2]));
+    state = reduceSessionView(state, "s1", delta("text", "ld", 15, [1, 2]));
     expect(state.draft).toMatchObject({ text: "Hello world", seq: 15 });
     expect(state.draft?.stale).toBeUndefined();
     state = reduceSessionView(state, "s1", delta("text", "old", 2));
@@ -564,9 +566,9 @@ describe("op batch applier logic", () => {
     expect(canTransitionOpBatch("proposed", "saved")).toBe(false);
   });
 
-  it("applies to the current local document and builds the overlay with ghosts", () => {
+  it("applies to the current local document and builds the overlay with ghosts", async () => {
     const before = blogDocument();
-    const result = applyBatchToDocument(
+    const result = await applyBatchToDocument(
       batch([
         { op: "removeEntity", entity: "tags" },
         { op: "addEntity", name: "labels" },
@@ -582,8 +584,8 @@ describe("op batch applier logic", () => {
     expect(overlay.ghosts.relationships.map((r) => r.id)).toEqual(["r2"]);
   });
 
-  it("reports a conflict when a ref no longer resolves locally", () => {
-    const result = applyBatchToDocument(
+  it("reports a conflict when a ref no longer resolves locally", async () => {
+    const result = await applyBatchToDocument(
       batch([{ op: "removeEntity", entity: "gone" }]),
       blogDocument(),
     );

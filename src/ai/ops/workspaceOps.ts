@@ -1,8 +1,6 @@
 import type { DataModelEngine, ErdDocumentJSON } from "../../types/dataModel.types";
 import type { FlowJSON } from "../../types/flowchart.types";
 import { createEmptyErdDocument } from "../../utils/erd/erdSerialization";
-import { applyErdOps } from "./applyErdOps";
-import { applyFlowOps } from "./applyFlowOps";
 import { parseErdOps } from "./parseErdOps";
 import { parseFlowOps } from "./parseFlowOps";
 import type { ErdOp, FlowOp, OpError, WorkspaceOp } from "./types";
@@ -36,6 +34,16 @@ export type WorkspaceBoardItem =
   | { op: "updateEpic"; epic: string; title?: string; description?: string }
   | { op: "createUserStory"; tempId?: string; epic: string; title: string; description: string }
   | { op: "updateUserStory"; story: string; title?: string; description?: string };
+
+export interface WorkspaceResumeEntry {
+  id: string;
+  complete: boolean;
+}
+
+export interface WorkspaceApplyOptions {
+  resume?: ReadonlyMap<number, WorkspaceResumeEntry>;
+  onCreated?: (index: number, entry: WorkspaceResumeEntry) => void;
+}
 
 export interface WorkspaceApplyDeps {
   board?(items: WorkspaceBoardItem[]): Promise<{ id: string }[]>;
@@ -139,7 +147,11 @@ export async function applyWorkspaceOps(
   ops: readonly WorkspaceOp[],
   deps: WorkspaceApplyDeps,
   onProgress?: (items: readonly WorkspaceApplyItem[]) => void,
+  options: WorkspaceApplyOptions = {},
 ): Promise<WorkspaceApplyResult> {
+  const resume = options.resume;
+  const created = (index: number, id: string, complete = true) =>
+    options.onCreated?.(index, { id, complete });
   const temps = new Map<string, string>();
   const failedTemps = new Set<string>();
   const items: WorkspaceApplyItem[] = [];
@@ -163,9 +175,10 @@ export async function applyWorkspaceOps(
     throw new Failure(`The ${noun} "${key}" was not found`);
   };
 
-  const buildFlow = (name: string, raw: unknown, base: FlowJSON): FlowJSON => {
+  const buildFlow = async (name: string, raw: unknown, base: FlowJSON): Promise<FlowJSON> => {
     const parsed = parseFlowOps(raw);
     if (!parsed.ok) throw new Failure(firstError(parsed.errors));
+    const { applyFlowOps } = await import("./applyFlowOps");
     const applied = applyFlowOps(base, parsed.ops as FlowOp[]);
     if (!applied.ok) throw new Failure(firstError(applied.errors));
     const meta = { ...applied.document.meta };
@@ -173,9 +186,10 @@ export async function applyWorkspaceOps(
     return { ...applied.document, meta };
   };
 
-  const buildModel = (raw: unknown, base: ErdDocumentJSON): ErdDocumentJSON => {
+  const buildModel = async (raw: unknown, base: ErdDocumentJSON): Promise<ErdDocumentJSON> => {
     const parsed = parseErdOps(raw);
     if (!parsed.ok) throw new Failure(firstError(parsed.errors));
+    const { applyErdOps } = await import("./applyErdOps");
     const applied = applyErdOps(base, parsed.ops as ErdOp[]);
     if (!applied.ok) throw new Failure(firstError(applied.errors));
     return applied.document;
@@ -202,6 +216,13 @@ export async function applyWorkspaceOps(
     for (let i = from; i < to; i++) {
       const op = ops[i]!;
       const item = makeItem(i, op);
+      const resumed = resume?.get(i);
+      if (resumed?.complete) {
+        item.id = resumed.id;
+        if ("tempId" in op && op.tempId) temps.set(op.tempId, resumed.id);
+        items.push(item);
+        continue;
+      }
       try {
         let payload: WorkspaceBoardItem;
         const ref = (value: string, known: typeof deps.epics, noun: string) =>
@@ -253,12 +274,13 @@ export async function applyWorkspaceOps(
     }
     if (sent.length > 0) {
       try {
-        const created = await deps.board!(sent.map((entry) => entry.payload));
+        const board = await deps.board!(sent.map((entry) => entry.payload));
         sent.forEach((entry, i) => {
-          entry.item.id = created[i]?.id;
-          if ("tempId" in entry.op && entry.op.tempId && created[i]) {
-            temps.set(entry.op.tempId, created[i]!.id);
+          entry.item.id = board[i]?.id;
+          if ("tempId" in entry.op && entry.op.tempId && board[i]) {
+            temps.set(entry.op.tempId, board[i]!.id);
           }
+          if (board[i]) created(entry.item.index, board[i]!.id);
           items.push(entry.item);
         });
       } catch (err) {
@@ -291,75 +313,107 @@ export async function applyWorkspaceOps(
       label: workspaceOpLabel(op),
       status: "done",
     };
+    const resumed = resume?.get(index);
+    if (resumed?.complete) {
+      item.id = resumed.id;
+      if ("tempId" in op && op.tempId) temps.set(op.tempId, resumed.id);
+      items.push(item);
+      onProgress?.(items.slice());
+      continue;
+    }
     try {
       switch (op.op) {
         case "createEpic": {
-          const created = await deps.createEpic({
+          const made = await deps.createEpic({
             title: text(op.title),
             description: text(op.description),
           });
-          item.id = created.id;
-          if (op.tempId) temps.set(op.tempId, created.id);
+          item.id = made.id;
+          if (op.tempId) temps.set(op.tempId, made.id);
+          created(index, made.id);
           break;
         }
         case "updateEpic": {
           const id = resolve(op.epic, deps.epics, "epic");
           await deps.updateEpic(id, { title: op.title, description: op.description });
           item.id = id;
+          created(index, id);
           break;
         }
         case "createUserStory": {
           const epicId = resolve(op.epic, deps.epics, "epic");
-          const created = await deps.createUserStory(epicId, {
+          const made = await deps.createUserStory(epicId, {
             title: text(op.title),
             description: text(op.description),
           });
-          item.id = created.id;
-          if (op.tempId) temps.set(op.tempId, created.id);
+          item.id = made.id;
+          if (op.tempId) temps.set(op.tempId, made.id);
+          created(index, made.id);
           break;
         }
         case "updateUserStory": {
           const id = resolve(op.story, deps.stories, "user story");
           await deps.updateUserStory(id, { title: op.title, description: op.description });
           item.id = id;
+          created(index, id);
           break;
         }
         case "createFlow": {
-          buildFlow(op.name, op.ops, EMPTY_FLOW);
-          const created = await deps.createFlow({
-            name: text(op.name),
-            description: text(op.description) || undefined,
-          });
-          item.id = created.id;
-          if (op.tempId) temps.set(op.tempId, created.id);
-          const loaded = await deps.loadFlow(created.id);
+          await buildFlow(op.name, op.ops, EMPTY_FLOW);
+          let flowId = resumed?.id;
+          if (!flowId) {
+            const made = await deps.createFlow({
+              name: text(op.name),
+              description: text(op.description) || undefined,
+            });
+            flowId = made.id;
+            created(index, flowId, false);
+          }
+          item.id = flowId;
+          if (op.tempId) temps.set(op.tempId, flowId);
+          const loaded = await deps.loadFlow(flowId);
+          if (resumed && loaded.document.nodes.length > 0) {
+            created(index, flowId);
+            break;
+          }
           await deps.saveFlow(
-            created.id,
+            flowId,
             loaded.revision,
-            buildFlow(text(op.name), op.ops, loaded.document),
+            await buildFlow(text(op.name), op.ops, loaded.document),
           );
+          created(index, flowId);
           break;
         }
         case "createDataModel": {
           const engine = op.engine ?? "na";
-          buildModel(op.ops, createEmptyErdDocument(engine, text(op.name)));
+          await buildModel(op.ops, createEmptyErdDocument(engine, text(op.name)));
           const overview = op.ops.find((item) => item.op === "setModelDescription");
-          const created = await deps.createDataModel({
-            name: text(op.name),
-            description:
-              text(op.description) ||
-              (overview?.op === "setModelDescription" ? text(overview.description) : "") ||
-              undefined,
-            engine,
-          });
-          item.id = created.id;
-          if (op.tempId) temps.set(op.tempId, created.id);
-          const loaded = await deps.loadDataModel(created.id);
+          let modelId = resumed?.id;
+          if (!modelId) {
+            const made = await deps.createDataModel({
+              name: text(op.name),
+              description:
+                text(op.description) ||
+                (overview?.op === "setModelDescription" ? text(overview.description) : "") ||
+                undefined,
+              engine,
+            });
+            modelId = made.id;
+            created(index, modelId, false);
+          }
+          item.id = modelId;
+          if (op.tempId) temps.set(op.tempId, modelId);
+          const loaded = await deps.loadDataModel(modelId);
+          if (resumed && loaded.document.entities.length > 0) {
+            created(index, modelId);
+            break;
+          }
           await deps.saveDataModel(
-            created.id,
+            modelId,
             loaded.revision,
-            buildModel(op.ops, loaded.document),
+            await buildModel(op.ops, loaded.document),
           );
+          created(index, modelId);
           break;
         }
         default:

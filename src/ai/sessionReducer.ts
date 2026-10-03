@@ -22,6 +22,7 @@ export interface AiStreamingDraft {
   reasoning: string;
   status: string;
   seq: number;
+  lastPart?: number;
   stale?: boolean;
   maybeMissed?: boolean;
 }
@@ -52,6 +53,25 @@ export const EMPTY_AI_SESSION_VIEW: AiSessionViewState = {
 };
 
 const isActive = (turn: AiTurn) => AI_ACTIVE_TURN_STATUSES.includes(turn.status);
+
+const TURN_RANK: Readonly<Record<AiTurn["status"], number>> = {
+  queued: 0,
+  dispatched: 1,
+  running: 2,
+  completed: 3,
+  failed: 3,
+  interrupted: 3,
+  cancelled: 3,
+};
+
+export function isStaleTurn(existing: AiTurn | null | undefined, incoming: AiTurn): boolean {
+  if (!existing || existing.aiTurnId !== incoming.aiTurnId) return false;
+  const existingRank = TURN_RANK[existing.status];
+  const incomingRank = TURN_RANK[incoming.status];
+  if (incomingRank !== existingRank) return incomingRank < existingRank;
+  if (existingRank === 3) return time(incoming.finishedAt) < time(existing.finishedAt);
+  return false;
+}
 
 const time = (value: string | null | undefined) => (value ? Date.parse(value) || 0 : 0);
 
@@ -132,7 +152,7 @@ export function reduceSessionList(
     const { turn } = event;
     if (!sessions.some((s) => s.aiSessionId === turn.aiSessionId)) return sessions as AiSession[];
     return sessions.map((s) =>
-      s.aiSessionId === turn.aiSessionId
+      s.aiSessionId === turn.aiSessionId && !isStaleTurn(s.activeTurn, turn)
         ? { ...s, activeTurn: nextActiveTurn(s.activeTurn, turn) }
         : s,
     );
@@ -263,8 +283,8 @@ export function prependMessages(
 }
 
 export function markDraftStale(state: AiSessionViewState): AiSessionViewState {
-  if (!state.draft || state.draft.stale) return state;
-  return { ...state, draft: { ...state.draft, stale: true } };
+  if (!state.draft || state.draft.maybeMissed) return state;
+  return { ...state, draft: { ...state.draft, maybeMissed: true } };
 }
 
 export function isSeqGap(previousSeq: number, fromSeq: number | undefined): boolean {
@@ -281,11 +301,20 @@ export function reduceDraft(
         draft && draft.aiTurnId === event.aiTurnId
           ? draft
           : { aiTurnId: event.aiTurnId, text: "", reasoning: "", status: "", seq: -1 };
+      const multipart = typeof event.parts === "number" && event.parts > 1;
+      const part = typeof event.part === "number" ? event.part : undefined;
       if (event.seq < base.seq) return draft;
-      const maybeMissed = base.maybeMissed || isSeqGap(base.seq, event.fromSeq) || undefined;
-      const withSeq = maybeMissed
-        ? { ...base, seq: event.seq, maybeMissed }
-        : { ...base, seq: event.seq };
+      if (event.seq === base.seq) {
+        if (!multipart || part === undefined || part <= (base.lastPart ?? -1)) return draft;
+      }
+      const maybeMissed =
+        base.maybeMissed ||
+        (event.seq > base.seq && isSeqGap(base.seq, event.fromSeq)) ||
+        undefined;
+      const withSeq: AiStreamingDraft = { ...base, seq: event.seq };
+      if (maybeMissed) withSeq.maybeMissed = maybeMissed;
+      if (multipart && part !== undefined) withSeq.lastPart = part;
+      else delete withSeq.lastPart;
       if (event.kind === "status") return { ...withSeq, status: event.text };
       if (event.kind === "reasoning") {
         return { ...withSeq, reasoning: base.reasoning + event.text };
@@ -324,7 +353,7 @@ export function reduceDraft(
   }
 }
 
-function sessionOfEvent(event: AiStreamEvent): string | null {
+export function sessionOfEvent(event: AiStreamEvent): string | null {
   switch (event.type) {
     case "ai_session.upserted":
       return event.session.aiSessionId;
@@ -341,6 +370,7 @@ function sessionOfEvent(event: AiStreamEvent): string | null {
       return event.batch.aiSessionId;
     case "ai_comment_draft.upserted":
       return event.draft.aiSessionId;
+    case "ai_resync":
     case "ai_connectors.updated":
     case "ai_connector_login.updated":
       return null;
@@ -359,6 +389,7 @@ export function reduceSessionView(
   const draft = reduceDraft(state.draft, event);
   const withDraft = draft === state.draft ? state : { ...state, draft };
   if (event.type === "ai_turn.upserted") {
+    if (isStaleTurn(withDraft.turns[event.turn.aiTurnId], event.turn)) return withDraft;
     const turns = { ...withDraft.turns, [event.turn.aiTurnId]: event.turn };
     const meta = withDraft.meta && {
       ...withDraft.meta,
@@ -373,6 +404,7 @@ export function reduceSessionView(
   if (!meta) return withDraft;
   switch (event.type) {
     case "ai_session.upserted":
+      if (time(event.session.updatedAt) < time(meta.session.updatedAt)) return withDraft;
       return { ...withDraft, meta: { ...meta, session: event.session } };
     case "ai_message.upserted": {
       const messages = upsertMessage(withDraft.messages, event.message);

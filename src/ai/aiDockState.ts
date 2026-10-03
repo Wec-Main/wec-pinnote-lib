@@ -70,7 +70,7 @@ export function useAiDockControl(initialOpen = false): AiDockControl {
       },
       setBadge,
     }),
-    [open, focusSignal, badge, work],
+    [open, focusSignal, badge, work, setWork],
   );
 }
 

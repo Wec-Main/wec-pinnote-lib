@@ -149,6 +149,16 @@ describe("prompt template logic", () => {
     expect(validateDraft(draftFromTemplate(chat), chat)).toEqual([]);
   });
 
+  it("accepts xhigh effort and rejects a model id the server would refuse", () => {
+    const draft = draftFromTemplate(normalizeAiActionTemplate(dto));
+    expect(validateDraft({ ...draft, effort: "xhigh" })).not.toContain(
+      "Effort must be one of: default, none, minimal, low, medium, high, xhigh, max.",
+    );
+    expect(validateDraft({ ...draft, model: "-bad model" })).toContain(
+      "Model id contains characters the server does not accept.",
+    );
+  });
+
   it("mirrors the server template checks", () => {
     const mapped = normalizeAiActionTemplate(dto);
     const draft = draftFromTemplate(mapped);
@@ -159,7 +169,7 @@ describe("prompt template logic", () => {
           systemPrompt: " ",
           userTemplate: "{{input}} {{nope}}",
           outputFormat: "markdown",
-          effort: "xhigh",
+          effort: "ultra",
           inputSpec: { ...draft.inputSpec, include: ["model", "comments"] },
         },
         mapped,
@@ -167,7 +177,7 @@ describe("prompt template logic", () => {
     ).toEqual([
       "The system prompt is required.",
       "Output must be one of: json.",
-      "Effort must be one of: low, medium, high.",
+      "Effort must be one of: default, none, minimal, low, medium, high, xhigh, max.",
       "These input fields are not allowed: comments.",
       "Unknown placeholders: nope.",
     ]);

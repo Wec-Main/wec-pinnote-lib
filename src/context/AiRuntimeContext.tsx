@@ -9,7 +9,7 @@ import {
   type ReactNode,
 } from "react";
 import { AiStreamHub, type AiReconnectListener, type AiStreamListener } from "../ai/AiStreamHub";
-import { useAiStream } from "../hooks/useAiStream";
+import { useAiStreamConnection } from "../hooks/useAiStream";
 import { useTokenGetter } from "../hooks/useTokenGetter";
 import { fetchAiMe } from "../services/aiApi";
 import { AnnotationApiError } from "../types/annotation.types";
@@ -21,7 +21,12 @@ import {
   readResource,
   removeResource,
 } from "../utils/resourceCache";
-import type { AiConnector, AiMe, AiStreamEvent } from "../types/ai.types";
+import {
+  AI_ACTIVE_TURN_STATUSES,
+  type AiConnector,
+  type AiMe,
+  type AiStreamEvent,
+} from "../types/ai.types";
 import type { StreamConnectionState } from "../types/stream.types";
 
 export interface AiRuntimeContextValue {
@@ -40,7 +45,26 @@ export interface AiRuntimeContextValue {
   connection: StreamConnectionState;
 }
 
+export type AiRuntimeActions = Pick<
+  AiRuntimeContextValue,
+  | "apiBaseUrl"
+  | "projectId"
+  | "enabled"
+  | "currentUserId"
+  | "getToken"
+  | "refreshMe"
+  | "mergeConnectors"
+  | "subscribe"
+> & { reconnect: () => void };
+
+export type AiRuntimeState = Pick<
+  AiRuntimeContextValue,
+  "me" | "meLoading" | "meError" | "meRetrying" | "connection"
+>;
+
 export const AiRuntimeContext = createContext<AiRuntimeContextValue | null>(null);
+export const AiRuntimeActionsContext = createContext<AiRuntimeActions | null>(null);
+export const AiRuntimeStateContext = createContext<AiRuntimeState | null>(null);
 
 export interface AiRuntimeProviderProps {
   apiBaseUrl: string;
@@ -180,8 +204,24 @@ export function AiRuntimeProvider({
     }
   }, []);
 
+  const activeTurnsRef = useRef(new Set<string>());
+  const lastDeltaAtRef = useRef(0);
+  const keepAlive = useCallback(
+    () => activeTurnsRef.current.size > 0 || Date.now() - lastDeltaAtRef.current < 45000,
+    [],
+  );
+
   const handleEvent = useCallback(
     (event: AiStreamEvent) => {
+      if (event.type === "ai_delta") {
+        lastDeltaAtRef.current = Date.now();
+      } else if (event.type === "ai_turn.upserted") {
+        if (AI_ACTIVE_TURN_STATUSES.includes(event.turn.status)) {
+          activeTurnsRef.current.add(event.turn.aiTurnId);
+        } else {
+          activeTurnsRef.current.delete(event.turn.aiTurnId);
+        }
+      }
       if (event.type === "ai_connectors.updated") {
         mergeConnectors(event.connectors);
       } else if (
@@ -197,18 +237,20 @@ export function AiRuntimeProvider({
   );
 
   const handleReconnect = useCallback(() => {
+    activeTurnsRef.current.clear();
     refreshMe();
     hub.reconnected();
   }, [hub, refreshMe]);
 
   const meReady = me !== null;
-  const connection = useAiStream({
+  const { state: connection, reconnect } = useAiStreamConnection({
     apiBaseUrl,
     projectId,
     getAuthToken,
     enabled: enabled && meReady,
     onEvent: handleEvent,
     onReconnect: handleReconnect,
+    keepAlive,
   });
 
   const subscribe = useCallback(
@@ -217,21 +259,17 @@ export function AiRuntimeProvider({
     [hub],
   );
 
-  const value = useMemo<AiRuntimeContextValue>(
+  const actions = useMemo<AiRuntimeActions>(
     () => ({
       apiBaseUrl,
       projectId,
       enabled,
       currentUserId,
       getToken,
-      me,
-      meLoading,
-      meError,
-      meRetrying,
       refreshMe,
       mergeConnectors,
       subscribe,
-      connection,
+      reconnect,
     }),
     [
       apiBaseUrl,
@@ -239,19 +277,64 @@ export function AiRuntimeProvider({
       enabled,
       currentUserId,
       getToken,
-      me,
-      meLoading,
-      meError,
-      meRetrying,
       refreshMe,
       mergeConnectors,
       subscribe,
-      connection,
+      reconnect,
     ],
   );
 
-  return <AiRuntimeContext.Provider value={value}>{children}</AiRuntimeContext.Provider>;
+  const volatile = useMemo<AiRuntimeState>(
+    () => ({ me, meLoading, meError, meRetrying, connection }),
+    [me, meLoading, meError, meRetrying, connection],
+  );
+
+  const value = useMemo<AiRuntimeContextValue>(
+    () => ({ ...actions, ...volatile }),
+    [actions, volatile],
+  );
+
+  return (
+    <AiRuntimeActionsContext.Provider value={actions}>
+      <AiRuntimeStateContext.Provider value={volatile}>
+        <AiRuntimeContext.Provider value={value}>{children}</AiRuntimeContext.Provider>
+      </AiRuntimeStateContext.Provider>
+    </AiRuntimeActionsContext.Provider>
+  );
 }
+
+function useLegacyActions(): AiRuntimeActions | null {
+  const legacy = useContext(AiRuntimeContext);
+  return useMemo(() => (legacy ? { ...legacy, reconnect: noopReconnect } : null), [legacy]);
+}
+
+export function useAiRuntimeActions(): AiRuntimeActions {
+  const actions = useContext(AiRuntimeActionsContext);
+  const legacy = useLegacyActions();
+  if (actions) return actions;
+  if (!legacy) {
+    throw new Error("useAiRuntimeActions must be used within AiRuntimeProvider");
+  }
+  return legacy;
+}
+
+export function useAiRuntimeState(): AiRuntimeState {
+  const state = useContext(AiRuntimeStateContext);
+  const legacy = useContext(AiRuntimeContext);
+  if (state) return state;
+  if (!legacy) {
+    throw new Error("useAiRuntimeState must be used within AiRuntimeProvider");
+  }
+  return legacy;
+}
+
+export function useOptionalAiRuntimeActions(): AiRuntimeActions | null {
+  const actions = useContext(AiRuntimeActionsContext);
+  const legacy = useLegacyActions();
+  return actions ?? legacy;
+}
+
+function noopReconnect(): void {}
 
 export function useAiRuntime(): AiRuntimeContextValue {
   const value = useContext(AiRuntimeContext);
@@ -259,6 +342,11 @@ export function useAiRuntime(): AiRuntimeContextValue {
     throw new Error("useAiRuntime must be used within AiRuntimeProvider");
   }
   return value;
+}
+
+export function useAiReconnect(): () => void {
+  const actions = useContext(AiRuntimeActionsContext);
+  return actions ? actions.reconnect : noopReconnect;
 }
 
 export function useOptionalAiRuntime(): AiRuntimeContextValue | null {

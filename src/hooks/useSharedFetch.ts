@@ -63,8 +63,18 @@ export function useSharedFetch<T>(
   const errorRef = useRef<unknown>(null);
   const loadingRef = useRef(false);
   const ownerRef = useRef<(() => CacheEntry<unknown>) | null>(null);
+  const keyRef = useRef(key);
+  if (keyRef.current !== key) {
+    keyRef.current = key;
+    dataRef.current = null;
+    errorRef.current = null;
+    loadingRef.current = key !== null;
+  }
 
   const applyEntry = useCallback((entry: CacheEntry<unknown>) => {
+    if (keyRef.current === null) {
+      return;
+    }
     if (entry.result && "value" in entry.result) {
       dataRef.current = entry.result.value as T;
       errorRef.current = null;

@@ -17,6 +17,11 @@ export class AiStreamHub {
   }
 
   emit = (event: AiStreamEvent): void => {
+    if (this.listeners.size === 0) return;
+    if (this.listeners.size === 1) {
+      for (const listener of this.listeners) listener(event);
+      return;
+    }
     for (const listener of [...this.listeners]) listener(event);
   };
 
