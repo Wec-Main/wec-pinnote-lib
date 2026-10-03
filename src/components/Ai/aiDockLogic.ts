@@ -1,9 +1,11 @@
+import { getOpKind } from "../../ai/ops/registry";
 import type { AiQuestion } from "../../types/ai.types";
 import { toQuestions } from "./aiQuestions";
 import { useCallback, useEffect, useRef, type RefObject } from "react";
 import type {
   AiActionResult,
   AiActionKey,
+  AiEditorTargetKind,
   AiOpBatch,
   AiOpBatchTargetKind,
   AiReviewFinding,
@@ -18,22 +20,8 @@ export interface DockChip {
   needsSelection: boolean;
 }
 
-const ERD_CHIPS: readonly DockChip[] = [
-  { id: "generate", label: "Generate", needsPrompt: true, needsSelection: false },
-  { id: "edit", label: "Edit selection", needsPrompt: true, needsSelection: true },
-  { id: "review", label: "Review model", needsPrompt: false, needsSelection: false },
-  { id: "explain", label: "Explain", needsPrompt: false, needsSelection: false },
-];
-
-const FLOW_CHIPS: readonly DockChip[] = [
-  { id: "generate", label: "Generate", needsPrompt: true, needsSelection: false },
-  { id: "edit", label: "Edit selection", needsPrompt: true, needsSelection: true },
-  { id: "explain_doc", label: "Explain flow", needsPrompt: false, needsSelection: false },
-  { id: "explain", label: "Explain", needsPrompt: false, needsSelection: true },
-];
-
-export function dockChips(kind: AiOpBatchTargetKind): readonly DockChip[] {
-  return kind === "data_model" ? ERD_CHIPS : FLOW_CHIPS;
+export function dockChips(kind: AiEditorTargetKind): readonly DockChip[] {
+  return getOpKind(kind)?.dockChips ?? [];
 }
 
 export interface DockDocumentState {

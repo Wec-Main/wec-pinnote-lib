@@ -24,6 +24,7 @@ import {
   type AppliedBatches,
   type DraftIds,
 } from "./opBatchApplier";
+import { getOpKind } from "./ops/registry";
 import type { DocDiff } from "./ops/types";
 import { isOpBatchStatusConflict, reconcileStatusConflict } from "./opBatchConflict";
 import { PatchQueue, type PatchQueueState, type PatchSendResult } from "./patchQueue";
@@ -481,17 +482,9 @@ export function useAiOpBatchApplier(options: UseAiOpBatchApplierOptions): AiOpBa
   const clearForFresh = useCallback((): boolean => {
     const current = optionsRef.current;
     const document = currentDocument();
-    if (!current.engine || !document || batchesRef.current.previewing) return false;
-    const empty =
-      current.kind === "data_model"
-        ? {
-            ...(document as ErdDocumentJSON),
-            entities: [],
-            relationships: [],
-            enums: [],
-            notes: [],
-          }
-        : { ...(document as FlowJSON), nodes: [], edges: [] };
+    const plugin = getOpKind(current.kind);
+    if (!current.engine || !document || !plugin || batchesRef.current.previewing) return false;
+    const empty = plugin.clearContent(document) as ErdDocumentJSON | FlowJSON;
     current.onUnsavedAiChangesChange?.(true);
     loadDocument(empty);
     markersRef.current.set(FRESH_KEY, revRef.current);
