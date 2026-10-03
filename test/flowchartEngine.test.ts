@@ -58,7 +58,7 @@ describe("FlowEngine", () => {
     expect(engine.canConnect({ source: end.id, target: proc.id }).valid).toBe(false);
     expect(engine.canConnect({ source: proc.id, target: start.id }).valid).toBe(false);
     expect(engine.addEdge({ source: start.id, target: proc.id })).not.toBeNull();
-    expect(engine.addEdge({ source: start.id, target: proc.id })).toBeNull(); // duplicate
+    expect(engine.addEdge({ source: start.id, target: proc.id })).toBeNull();
   });
 
   it("removes connected edges with a node", () => {
@@ -135,7 +135,7 @@ describe("FlowEngine", () => {
   it("interactive connection snaps to the nearest handle", () => {
     const { engine, start, proc } = simpleFlow();
     engine.startConnection({ nodeId: start.id, handleId: "out", kind: "source" }, { x: 90, y: 56 });
-    engine.updateConnection({ x: 75, y: 152 }); // inside the process node, near its top edge
+    engine.updateConnection({ x: 75, y: 152 });
     expect(engine.getState().connection?.candidate).toEqual({
       nodeId: proc.id,
       handleId: "in-top",
@@ -157,15 +157,25 @@ describe("FlowEngine", () => {
     expect(other.getState().canUndo).toBe(false);
   });
 
-  it("drops legacy flow-level notes when a loaded flow is saved again", () => {
+  it("saves flow-level notes in meta and restores them on load", () => {
     const { engine } = simpleFlow();
-    const legacy = { ...engine.toJSON(), meta: { name: "Checkout", notes: "Old notes" } };
+    let changes = 0;
+    engine.on("change", () => changes++);
+    engine.setFlowNotes("Covers guest checkout only");
+    expect(changes).toBe(1);
+    expect(engine.toJSON().meta).toMatchObject({ notes: "Covers guest checkout only" });
 
     const other = new FlowEngine();
-    other.loadFlow(parseFlow(JSON.stringify(legacy)));
+    other.loadFlow(parseFlow(JSON.stringify(engine.toJSON())));
+    expect(other.getState().flowNotes).toBe("Covers guest checkout only");
+  });
 
-    expect(other.getState().flowName).toBe("Checkout");
-    expect(other.toJSON().meta).not.toHaveProperty("notes");
+  it("clears notes when loading a flow that has none", () => {
+    const engine = new FlowEngine();
+    engine.setFlowNotes("Stale");
+    engine.loadFlow(parseFlow(JSON.stringify({ version: 1, nodes: [], edges: [] })));
+    expect(engine.getState().flowNotes).toBe("");
+    expect(engine.toJSON().meta).not.toHaveProperty("notes");
   });
 
   it("emits change events", () => {

@@ -1,12 +1,14 @@
+import { useState } from "react";
 import { useErdEngine, useErdState } from "../../../../context/ErdContext";
 import { useErdEditSession } from "../../../../hooks/erd/useErdEditSession";
-import { Switch } from "../../../primitives";
+import { Switch, Tabs } from "../../../primitives";
 import { Icon } from "../../../WecFlow/FlowIcons";
 import { FieldTable } from "./FieldTable";
 import { IndexEditor } from "./IndexEditor";
 import { CollapsibleSection, PanelHeader, optionalText } from "./PanelParts";
 
 export function EntityProperties({ entityId }: { entityId: string }) {
+  const [tab, setTab] = useState("general");
   const engine = useErdEngine();
   const session = useErdEditSession();
   const entity = useErdState((s) => s.entityLookup.get(entityId));
@@ -29,6 +31,11 @@ export function EntityProperties({ entityId }: { entityId: string }) {
     return fieldName ? `${owner?.name ?? "?"}.${fieldName}` : (owner?.name ?? "?");
   };
 
+  const tabs = [
+    { id: "general", label: "General" },
+    { id: "fields", label: `Fields (${entity.fields.length})` },
+  ];
+
   return (
     <>
       <PanelHeader title="Entity" icon={<Icon name="database" size={14} />} />
@@ -41,70 +48,80 @@ export function EntityProperties({ entityId }: { entityId: string }) {
           ))}
         </div>
       )}
-      <section className="wpn-flowchart-ui__section">
-        <label className="wpn-flowchart-ui__field">
-          <span className="wpn-flowchart-ui__field-label">Name</span>
-          <input
-            className="wpn-flowchart-ui__input"
-            value={entity.name}
-            disabled={readOnly}
-            onChange={(e) => engine.updateEntity(entityId, { name: e.target.value })}
-            {...session}
-          />
-        </label>
-        <label className="wpn-flowchart-ui__field">
-          <span className="wpn-flowchart-ui__field-label">Schema</span>
-          <input
-            className="wpn-flowchart-ui__input"
-            value={entity.schema ?? "public"}
-            disabled={readOnly}
-            onChange={(e) => engine.updateEntity(entityId, { schema: e.target.value })}
-            {...session}
-          />
-        </label>
-        <label className="wpn-flowchart-ui__field">
-          <span className="wpn-flowchart-ui__field-label">Comment</span>
-          <textarea
-            className="wpn-flowchart-ui__input wpn-erd__textarea"
-            value={entity.comment ?? ""}
-            disabled={readOnly}
-            onChange={(e) =>
-              engine.updateEntity(entityId, { comment: optionalText(e.target.value) })
-            }
-            {...session}
-          />
-        </label>
-        <div className="wpn-flowchart-ui__switch-row">
-          <span>Collapsed</span>
-          <Switch
-            label="Collapsed"
-            checked={entity.collapsed ?? false}
-            disabled={readOnly}
-            onChange={(collapsed) => engine.updateEntity(entityId, { collapsed })}
-          />
-        </div>
-      </section>
-      <CollapsibleSection title={`Fields (${entity.fields.length})`}>
-        <FieldTable entity={entity} />
-      </CollapsibleSection>
-      <CollapsibleSection title={`Indexes (${entity.indexes.length})`}>
-        <IndexEditor entity={entity} />
-      </CollapsibleSection>
-      <CollapsibleSection title={`Relationships (${related.length})`}>
-        {related.length === 0 && <p className="wpn-flowchart-ui__muted">No relationships.</p>}
-        {related.map((rel) => (
-          <button
-            key={rel.id}
-            type="button"
-            className="wpn-flowchart-properties__endpoint"
-            onClick={() => engine.select("relationship", rel.id)}
-          >
-            <strong>{describe(rel.sourceEntityId, rel.sourceFieldId)}</strong>
-            <span>→</span>
-            <strong>{describe(rel.targetEntityId, rel.targetFieldId)}</strong>
-          </button>
-        ))}
-      </CollapsibleSection>
+      <Tabs tabs={tabs} activeTabId={tab} onChange={setTab} ariaLabel="Entity sections" />
+      {tab === "general" ? (
+        <>
+          <section className="wpn-flowchart-ui__section">
+            <label className="wpn-flowchart-ui__field">
+              <span className="wpn-flowchart-ui__field-label">Name</span>
+              <input
+                className="wpn-flowchart-ui__input"
+                value={entity.name}
+                disabled={readOnly}
+                onChange={(e) => engine.updateEntity(entityId, { name: e.target.value })}
+                {...session}
+              />
+            </label>
+            <label className="wpn-flowchart-ui__field">
+              <span className="wpn-flowchart-ui__field-label">Schema</span>
+              <input
+                className="wpn-flowchart-ui__input"
+                value={entity.schema ?? "public"}
+                disabled={readOnly}
+                onChange={(e) => engine.updateEntity(entityId, { schema: e.target.value })}
+                {...session}
+              />
+            </label>
+            <label className="wpn-flowchart-ui__field wpn-flowchart-ui__field-grow">
+              <span className="wpn-flowchart-ui__field-label">Comments</span>
+              <textarea
+                className="wpn-flowchart-ui__input wpn-flowchart-ui__input-grow"
+                style={{ minHeight: 240 }}
+                placeholder="What does this entity store? Rules, ownership, notes…"
+                value={entity.comment ?? ""}
+                disabled={readOnly}
+                onChange={(e) =>
+                  engine.updateEntity(entityId, { comment: optionalText(e.target.value) })
+                }
+                {...session}
+              />
+            </label>
+            <div className="wpn-flowchart-ui__switch-row">
+              <span>Collapsed</span>
+              <Switch
+                label="Collapsed"
+                checked={entity.collapsed ?? false}
+                disabled={readOnly}
+                onChange={(collapsed) => engine.updateEntity(entityId, { collapsed })}
+              />
+            </div>
+          </section>
+        </>
+      ) : (
+        <>
+          <CollapsibleSection title="Fields">
+            <FieldTable entity={entity} />
+          </CollapsibleSection>
+          <CollapsibleSection title={`Indexes (${entity.indexes.length})`}>
+            <IndexEditor entity={entity} />
+          </CollapsibleSection>
+          <CollapsibleSection title={`Relationships (${related.length})`}>
+            {related.length === 0 && <p className="wpn-flowchart-ui__muted">No relationships.</p>}
+            {related.map((rel) => (
+              <button
+                key={rel.id}
+                type="button"
+                className="wpn-flowchart-properties__endpoint"
+                onClick={() => engine.select("relationship", rel.id)}
+              >
+                <strong>{describe(rel.sourceEntityId, rel.sourceFieldId)}</strong>
+                <span>→</span>
+                <strong>{describe(rel.targetEntityId, rel.targetFieldId)}</strong>
+              </button>
+            ))}
+          </CollapsibleSection>
+        </>
+      )}
       {!readOnly && (
         <section className="wpn-flowchart-ui__section wpn-flowchart-properties__actions">
           <button

@@ -18,13 +18,6 @@ export interface PositionedItem {
 const MUTATION_DEBOUNCE_MS = 120;
 const MUTATION_MAX_WAIT_MS = 400;
 
-// A modal typically dims its whole backdrop with a large, translucent scrim
-// (covering the full viewport, or close to it) behind an opaque card. That
-// scrim shouldn't count as "covering" a pin on its own — a pin sitting on the
-// dimmed backdrop, away from the actual dialog card, is still visible to the
-// user and not actually obstructed. Only a near-opaque element should count
-// as truly blocking. CSS `opacity` dims everything an element paints
-// (including its own background fill), so the two combine multiplicatively.
 const OPAQUE_ALPHA_THRESHOLD = 0.9;
 
 function effectiveAlpha(element: Element): number {
@@ -39,11 +32,6 @@ function effectiveAlpha(element: Element): number {
   return opacity * backgroundAlpha;
 }
 
-// A host app can render its own dialog on top of an annotated page at any
-// time, anywhere in the DOM (typically portaled to document.body, not
-// nested under the anchor). elementsFromPoint gives the real paint-order
-// stack at that pixel, which is the only reliable way to tell "is our pin's
-// anchor actually still on top here" regardless of the host's own z-index.
 function isCoveredByForeignElement(x: number, y: number, anchor: Element | null): boolean {
   const stack = document.elementsFromPoint(x, y);
   for (const element of stack) {
@@ -130,13 +118,6 @@ export function useAnnotationPositions(items: PositionedItem[]): Map<string, Pin
     let debounceTimer = 0;
     let maxWaitTimer = 0;
 
-    // Re-resolve anchors to live elements on every compute, rather than once
-    // up front: a host can unmount and remount the DOM behind an anchor (e.g.
-    // closing and reopening a dialog re-creates its inputs/buttons as brand
-    // new nodes). A cached one-time resolution would keep pointing at the
-    // old, now-detached element forever — getBoundingClientRect() on a
-    // detached node returns an all-zero rect, which both misplaces the pin
-    // and makes it look "covered" (nothing relates it to anything at 0,0).
     const compute = () => {
       scheduled = false;
       window.clearTimeout(maxWaitTimer);
@@ -186,10 +167,6 @@ export function useAnnotationPositions(items: PositionedItem[]): Map<string, Pin
       typeof ResizeObserver === "undefined" ? null : new ResizeObserver(schedule);
     resizeObserver?.observe(document.documentElement);
 
-    // Only used to pick which nodes to watch for fine-grained resize/mutation
-    // signals below — compute() above never relies on this snapshot itself,
-    // so it going stale after a remount just means those specific observers
-    // go quiet; the document.body observer further down still catches it.
     const observationTargets = collectObservationTargets(resolveTargets(items));
     for (const target of observationTargets) {
       resizeObserver?.observe(target);
@@ -212,15 +189,6 @@ export function useAnnotationPositions(items: PositionedItem[]): Map<string, Pin
         attributeFilter: ["style", "class", "hidden", ANNOTATION_SCOPE_ATTRIBUTE],
       });
     }
-    // A host dialog is usually mounted somewhere in document.body that isn't
-    // an ancestor of any anchor (e.g. a portal appended near the end of
-    // body), so the anchor-scoped observers above would never see it appear.
-    // Watch the whole body too, so opening/closing a host dialog anywhere
-    // re-runs the occlusion check above. Re-observing document.body replaces
-    // (rather than merges with) any options the loop above already set for
-    // it, so this uses the same full option set to avoid silently dropping
-    // attribute watching on body (a common place for a host to toggle a
-    // "modal open" class).
     mutationObserver?.observe(document.body, {
       childList: true,
       subtree: true,
@@ -296,12 +264,6 @@ export function useFloatingPanel(
     };
     scheduleRef.current = schedule;
 
-    // Synchronous on the very first measurement (before paint, unlike the
-    // rAF-deferred schedule() below) so the panel's initial position is
-    // already correct on its first painted frame — never a visible flash at
-    // the (0,0)/hidden fallback. Later updates (resize/scroll/mutation) go
-    // through the throttled schedule() instead, which is fine since the
-    // panel is already visibly positioned by then.
     update();
     window.addEventListener("resize", schedule);
     window.addEventListener("scroll", schedule, { capture: true, passive: true });

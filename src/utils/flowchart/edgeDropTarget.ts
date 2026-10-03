@@ -2,7 +2,6 @@ import type { Rect, XYPosition } from "../../types/flowchart.types";
 
 export interface EdgeSegment {
   edgeId: string;
-  /** Polyline approximating the drawn connection, in flow coordinates. */
   points: XYPosition[];
 }
 
@@ -12,7 +11,6 @@ export interface EdgeDropHit {
   point: XYPosition;
 }
 
-/** Closest point on segment AB to P, and its distance. */
 export function closestPointOnSegment(
   point: XYPosition,
   a: XYPosition,
@@ -38,10 +36,6 @@ function pointInRect(point: XYPosition, rect: Rect): boolean {
   );
 }
 
-/**
- * Nearest connection to a point, within `tolerance`. Returns null when the
- * point sits on a node, so dropping onto a node never splices an edge.
- */
 export function findEdgeDropTarget(
   point: XYPosition,
   segments: EdgeSegment[],

@@ -4,12 +4,11 @@ import { AnnotationApiError } from "../types/annotation.types";
 import { fetchSseTicket } from "../services/streamApi";
 import { normalizeApiBase } from "../services/httpClient";
 import { parseStreamEnvelope } from "../utils/streamPayloadGuards";
+import { withJitter } from "../utils/backoff";
 
 const RESYNC_COOLDOWN_MS = 5000;
 const RECONNECT_DELAY_MS = 2000;
 const MAX_RECONNECT_DELAY_MS = 30000;
-const TICKET_REFRESH_MARGIN_MS = 10000;
-const MIN_TICKET_REFRESH_DELAY_MS = 1000;
 
 export type StreamTokenGetter = () =>
   string | undefined | null | Promise<string | undefined | null>;
@@ -20,7 +19,6 @@ export interface SseStreamOptions {
   pageKey: string;
   eventTypes: readonly StreamEventType[];
   getAuthToken: StreamTokenGetter | undefined;
-  sessionKey: string;
   enabled: boolean;
   onEvent: (event: StreamEvent) => void;
   onResync: () => void;
@@ -46,7 +44,6 @@ export function useSseStream({
   pageKey,
   eventTypes,
   getAuthToken,
-  sessionKey,
   enabled,
   onEvent,
   onResync,
@@ -80,7 +77,6 @@ export function useSseStream({
     let reconnectDelay = RECONNECT_DELAY_MS;
     let openedOnce = false;
     let ticketController: AbortController | null = null;
-    let ticketRefreshTimer: ReturnType<typeof setTimeout> | null = null;
 
     const resync = () => {
       const now = Date.now();
@@ -118,29 +114,6 @@ export function useSseStream({
       }
     };
 
-    const clearTicketRefreshTimer = () => {
-      if (ticketRefreshTimer) {
-        clearTimeout(ticketRefreshTimer);
-        ticketRefreshTimer = null;
-      }
-    };
-
-    const scheduleTicketRefresh = (expiresInSeconds: number) => {
-      clearTicketRefreshTimer();
-      const delay = Math.max(
-        expiresInSeconds * 1000 - TICKET_REFRESH_MARGIN_MS,
-        MIN_TICKET_REFRESH_DELAY_MS,
-      );
-      ticketRefreshTimer = setTimeout(() => {
-        ticketRefreshTimer = null;
-        if (stopped) {
-          return;
-        }
-        reconnectDelay = RECONNECT_DELAY_MS;
-        void connect();
-      }, delay);
-    };
-
     const scheduleReconnect = () => {
       if (stopped || reconnectTimer) {
         return;
@@ -149,7 +122,7 @@ export function useSseStream({
       reconnectTimer = setTimeout(() => {
         reconnectTimer = null;
         void connect();
-      }, reconnectDelay);
+      }, withJitter(reconnectDelay));
       reconnectDelay = Math.min(reconnectDelay * 2, MAX_RECONNECT_DELAY_MS);
     };
 
@@ -188,7 +161,6 @@ export function useSseStream({
         }
         next.close();
         source = null;
-        clearTicketRefreshTimer();
         scheduleReconnect();
       });
 
@@ -234,7 +206,6 @@ export function useSseStream({
         const controller = new AbortController();
         ticketController = controller;
         let ticket: string;
-        let expiresInSeconds: number;
         try {
           const issued = await fetchSseTicket(
             apiBaseUrl,
@@ -244,7 +215,6 @@ export function useSseStream({
             controller.signal,
           );
           ticket = issued.ticket;
-          expiresInSeconds = issued.expiresInSeconds;
         } catch (err) {
           if (stopped) {
             return;
@@ -262,7 +232,6 @@ export function useSseStream({
           return;
         }
         openSource(ticket);
-        scheduleTicketRefresh(expiresInSeconds);
       } finally {
         connecting = false;
       }
@@ -289,7 +258,6 @@ export function useSseStream({
     return () => {
       stopped = true;
       clearReconnectTimer();
-      clearTicketRefreshTimer();
       ticketController?.abort();
       window.removeEventListener("online", reconnectNow);
       document.removeEventListener("visibilitychange", handleVisibilityChange);
@@ -299,7 +267,7 @@ export function useSseStream({
       retiringSource = null;
       setState("closed");
     };
-  }, [apiBaseUrl, enabled, eventTypesKey, pageKey, projectId, sessionKey]);
+  }, [apiBaseUrl, enabled, eventTypesKey, pageKey, projectId]);
 
   return state;
 }

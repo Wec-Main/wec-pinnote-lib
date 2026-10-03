@@ -1,12 +1,13 @@
-import { useRef, useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
 import { Icon, Spinner, Tooltip } from "../primitives";
 import { useEscapeKey } from "../../hooks/useEscapeKey";
 import { useFocusTrap } from "../../hooks/useFocusTrap";
 import { useScrimDismiss } from "../../hooks/useScrimDismiss";
 import type { Epic } from "../../types/epicFlow.types";
 
-const TITLE_MAX = 100;
-const DESCRIPTION_MAX = 500;
+const TITLE_MAX = 1000;
+const DESCRIPTION_MAX = 35000;
+const WARN_RATIO = 0.9;
 
 interface EpicFormModalProps {
   mode: "create" | "edit";
@@ -28,6 +29,14 @@ export function EpicFormModal({
   const [touched, setTouched] = useState(false);
   const dialogRef = useRef<HTMLFormElement>(null);
   const titleInputRef = useRef<HTMLInputElement>(null);
+  const descriptionRef = useRef<HTMLTextAreaElement>(null);
+
+  useEffect(() => {
+    const el = descriptionRef.current;
+    if (!el) return;
+    el.style.height = "auto";
+    el.style.height = `${el.scrollHeight}px`;
+  }, [description]);
 
   const dismiss = () => {
     if (!busy) {
@@ -102,7 +111,15 @@ export function EpicFormModal({
                 onChange={(event) => setTitle(event.target.value)}
                 placeholder="e.g. AI-Powered Shopping Experience"
               />
-              <span className="wpn-epicflow-modal__counter">
+              <span
+                className={
+                  title.length >= TITLE_MAX
+                    ? "wpn-epicflow-modal__counter wpn-epicflow-modal__counter--limit"
+                    : title.length >= TITLE_MAX * WARN_RATIO
+                      ? "wpn-epicflow-modal__counter wpn-epicflow-modal__counter--warn"
+                      : "wpn-epicflow-modal__counter"
+                }
+              >
                 {title.length}/{TITLE_MAX}
               </span>
               {touched && !titleValid ? (
@@ -115,14 +132,24 @@ export function EpicFormModal({
                 Notes <span className="wpn-epicflow-modal__required">*</span>
               </span>
               <textarea
+                ref={descriptionRef}
                 className="wpn-epicflow-modal__input wpn-epicflow-modal__textarea"
                 value={description}
                 maxLength={DESCRIPTION_MAX}
                 rows={4}
+                style={{ overflowY: "hidden" }}
                 onChange={(event) => setDescription(event.target.value)}
                 placeholder="Describe the goal and scope of this epic..."
               />
-              <span className="wpn-epicflow-modal__counter">
+              <span
+                className={
+                  description.length >= DESCRIPTION_MAX
+                    ? "wpn-epicflow-modal__counter wpn-epicflow-modal__counter--limit"
+                    : description.length >= DESCRIPTION_MAX * WARN_RATIO
+                      ? "wpn-epicflow-modal__counter wpn-epicflow-modal__counter--warn"
+                      : "wpn-epicflow-modal__counter"
+                }
+              >
                 {description.length}/{DESCRIPTION_MAX}
               </span>
               {touched && !descriptionValid ? (

@@ -9,7 +9,6 @@ import {
 import { createClientId } from "../utils/format";
 import {
   FLUSH_INTERVAL_MS,
-  HEARTBEAT_INTERVAL_MS,
   INGEST_TOKEN_RENEW_MARGIN_MS,
   MAX_QUEUED_VISITS,
   enqueueBounded,
@@ -54,7 +53,7 @@ interface TrackerSettings {
   getToken: () => Promise<string | undefined>;
 }
 
-const MINT_RETRY_MS = HEARTBEAT_INTERVAL_MS;
+const MINT_RETRY_MS = 60000;
 const CLIENT_ID_PATTERN = /^[A-Za-z0-9_-]{8,64}$/;
 const MAX_PAGE_KEY_LENGTH = 512;
 const MAX_URL_LENGTH = 2048;
@@ -65,6 +64,10 @@ const MAX_VIEWPORT = 20000;
 
 function storageKey(projectId: string, suffix: "session" | "last-view" | "queue"): string {
   return `wpn-analytics:${projectId}:${suffix}`;
+}
+
+function ingestTokenKey(apiBaseUrl: string, projectId: string, sessionKey: string): string {
+  return `wpn-analytics:ingest-token:${apiBaseUrl}:${projectId}:${sessionKey}`;
 }
 
 function readStorage(key: string): string | null {
@@ -120,6 +123,24 @@ function readLastView(projectId: string): LastView | undefined {
     return undefined;
   }
   return { pageKey: candidate.pageKey, leftAtMs: candidate.leftAtMs };
+}
+
+function readStoredIngestToken(key: string): HeldIngestToken | null {
+  const parsed = parseStored(key);
+  if (!parsed || typeof parsed !== "object") {
+    return null;
+  }
+  const candidate = parsed as Record<string, unknown>;
+  if (
+    typeof candidate.token !== "string" ||
+    candidate.token.length === 0 ||
+    typeof candidate.expiresAtMs !== "number" ||
+    candidate.expiresAtMs - Date.now() <= INGEST_TOKEN_RENEW_MARGIN_MS
+  ) {
+    writeStorage(key, null);
+    return null;
+  }
+  return { token: candidate.token, expiresAtMs: candidate.expiresAtMs };
 }
 
 function takePersistedQueue(projectId: string, sessionKey: string): PageVisitRecord[] {
@@ -183,15 +204,15 @@ function createPageVisitTracker(settings: TrackerSettings): PageVisitTracker {
   const { apiBaseUrl, projectId, sessionKey, getToken } = settings;
   const abort = new AbortController();
   const sessionId = readOrCreateSessionId(projectId);
+  const tokenKey = ingestTokenKey(apiBaseUrl, projectId, sessionKey);
   let queue = takePersistedQueue(projectId, sessionKey);
   let currentPageKey = "";
   let openView: OpenPageView | null = null;
   let openTitle: string | null = null;
   let previousUrl: string | null = null;
-  let heldToken: HeldIngestToken | null = null;
+  let heldToken: HeldIngestToken | null = readStoredIngestToken(tokenKey);
   let minting: Promise<HeldIngestToken | null> | null = null;
   let mintBlockedUntilMs = 0;
-  let lastSentAtMs = 0;
   let sending = false;
   let scrollFrame = 0;
   let flushTimer: ReturnType<typeof setInterval> | undefined;
@@ -212,6 +233,7 @@ function createPageVisitTracker(settings: TrackerSettings): PageVisitTracker {
       }
       const minted = await mintIngestToken(apiBaseUrl, authToken, projectId, abort.signal);
       heldToken = { token: minted.token, expiresAtMs: Date.parse(minted.expiresAt) };
+      writeStorage(tokenKey, JSON.stringify(heldToken));
       return heldToken;
     } catch {
       mintBlockedUntilMs = Date.now() + MINT_RETRY_MS;
@@ -236,14 +258,19 @@ function createPageVisitTracker(settings: TrackerSettings): PageVisitTracker {
     return minting;
   };
 
+  const dropToken = () => {
+    heldToken = null;
+    writeStorage(tokenKey, null);
+  };
+
   const flush = async () => {
-    if (sending || abort.signal.aborted) {
+    if (sending || abort.signal.aborted || queue.length === 0) {
       return;
     }
     sending = true;
     try {
       const held = await ensureToken();
-      if (!held || abort.signal.aborted) {
+      if (!held || abort.signal.aborted || queue.length === 0) {
         return;
       }
       do {
@@ -251,10 +278,9 @@ function createPageVisitTracker(settings: TrackerSettings): PageVisitTracker {
         queue = remaining;
         try {
           await sendVisitBatch(apiBaseUrl, { token: held.token, visits: batch }, "fetch");
-          lastSentAtMs = Date.now();
         } catch (error) {
           if (error instanceof AnnotationApiError && error.status === 401) {
-            heldToken = null;
+            dropToken();
           }
           if (!isPermanentRejection(error)) {
             requeue(batch);
@@ -283,7 +309,6 @@ function createPageVisitTracker(settings: TrackerSettings): PageVisitTracker {
       queue = remaining;
       sendVisitBatch(apiBaseUrl, { token: held.token, visits: batch }, mode).catch(() => undefined);
     }
-    lastSentAtMs = now;
   };
 
   const openPageView = (pageKey: string, resumed: boolean) => {
@@ -347,17 +372,16 @@ function createPageVisitTracker(settings: TrackerSettings): PageVisitTracker {
   const onVisibilityChange = () => {
     if (isPageVisible()) {
       openPageView(currentPageKey, true);
-      void flush();
+      if (queue.length > 0) {
+        void flush();
+      }
       return;
     }
     hide();
   };
 
   const onTick = () => {
-    if (!isPageVisible()) {
-      return;
-    }
-    if (queue.length > 0 || Date.now() - lastSentAtMs >= HEARTBEAT_INTERVAL_MS) {
+    if (isPageVisible() && queue.length > 0) {
       void flush();
     }
   };
@@ -370,7 +394,11 @@ function createPageVisitTracker(settings: TrackerSettings): PageVisitTracker {
       window.addEventListener("scroll", onScroll, { passive: true });
       flushTimer = setInterval(onTick, FLUSH_INTERVAL_MS);
       openPageView(pageKey, false);
-      void flush();
+      if (queue.length > 0) {
+        void flush();
+      } else {
+        void ensureToken();
+      }
     },
     changePage(pageKey) {
       if (pageKey === currentPageKey) {

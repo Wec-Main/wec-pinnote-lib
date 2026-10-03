@@ -1,4 +1,4 @@
-import { memo, useEffect } from "react";
+import { memo, useEffect, useMemo, useState } from "react";
 import { useErdEngine, useErdState } from "../../../context/ErdContext";
 import type { ErdValidationIssue } from "../../../utils/erd/erdValidator";
 import { cx } from "../../../utils/flowchart/shallow";
@@ -6,6 +6,8 @@ import { Icon } from "../../WecFlow/FlowIcons";
 
 const REVALIDATE_DELAY_MS = 250;
 const FOCUS_OPTIONS = { padding: 160, maxZoom: 1.1 } as const;
+
+type IssueFilter = "all" | "error" | "warning";
 
 export const ErdValidationPanel = memo(function ErdValidationPanel() {
   const engine = useErdEngine();
@@ -15,6 +17,11 @@ export const ErdValidationPanel = memo(function ErdValidationPanel() {
   const enums = useErdState((s) => s.enums);
   const modelEngine = useErdState((s) => s.engine);
   const open = result !== null;
+  const [filter, setFilter] = useState<IssueFilter>("all");
+  const shown = useMemo(
+    () => (result?.issues ?? []).filter((issue) => filter === "all" || issue.severity === filter),
+    [filter, result],
+  );
 
   useEffect(() => {
     if (!open) return;
@@ -25,6 +32,11 @@ export const ErdValidationPanel = memo(function ErdValidationPanel() {
   if (!result) return null;
 
   const focusIssue = (issue: ErdValidationIssue) => {
+    if (issue.entityId && issue.fieldId) {
+      engine.focusField(issue.entityId, issue.fieldId);
+      engine.fitView({ ids: [issue.entityId], ...FOCUS_OPTIONS });
+      return;
+    }
     if (issue.relationshipId) {
       const rel = engine.getRelationship(issue.relationshipId);
       engine.select("relationship", issue.relationshipId);
@@ -73,8 +85,36 @@ export const ErdValidationPanel = memo(function ErdValidationPanel() {
         </button>
       </div>
       {result.issues.length > 0 && (
+        <div className="wpn-erd-validation__tabs" role="tablist" aria-label="Filter issues">
+          {(
+            [
+              ["all", `All ${result.issues.length}`],
+              ["error", `Errors ${result.errorCount}`],
+              ["warning", `Warnings ${result.warningCount}`],
+            ] as const
+          ).map(([value, label]) => (
+            <button
+              key={value}
+              type="button"
+              role="tab"
+              aria-selected={filter === value}
+              className={cx(
+                "wpn-erd-validation__tab",
+                filter === value && "wpn-erd-validation__tab--active",
+              )}
+              onClick={() => setFilter(value)}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+      )}
+      {shown.length === 0 && result.issues.length > 0 && (
+        <p className="wpn-erd-validation__empty">Nothing in this filter.</p>
+      )}
+      {shown.length > 0 && (
         <ul className="wpn-flowchart-validation__list">
-          {result.issues.map((issue) => (
+          {shown.map((issue) => (
             <li key={issue.id}>
               <button
                 type="button"
@@ -88,7 +128,12 @@ export const ErdValidationPanel = memo(function ErdValidationPanel() {
                     `wpn-flowchart-validation__${issue.severity}`,
                   )}
                 />
-                <span className="wpn-flowchart-validation__message">{issue.message}</span>
+                <span className="wpn-flowchart-validation__message">
+                  {issue.message}
+                  {issue.hint ? (
+                    <span className="wpn-erd-validation__hint">{issue.hint}</span>
+                  ) : null}
+                </span>
                 {focusable(issue) && <Icon name="chevron" size={14} />}
               </button>
             </li>

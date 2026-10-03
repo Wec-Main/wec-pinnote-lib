@@ -6,6 +6,7 @@ import type {
   FlowPin,
   FlowSummary,
   FlowVersionRecord,
+  FlowVersionWithDocument,
 } from "../types/flowPin.types";
 import type { FlowJSON } from "../types/flowchart.types";
 
@@ -24,6 +25,18 @@ export function resolveDefaultFlow(
     method: "POST",
     body: JSON.stringify({ projectId, projectVersionId }),
     signal,
+  });
+}
+
+export function createFlow(
+  apiBaseUrl: string,
+  authToken: string | undefined,
+  projectId: string,
+  input: { name: string; description?: string; projectVersionId?: string },
+): Promise<Flow> {
+  return request<Flow>(buildUrl(apiBaseUrl, "/flows"), authToken, {
+    method: "POST",
+    body: JSON.stringify({ projectId, ...input }),
   });
 }
 
@@ -108,6 +121,33 @@ export function publishFlow(
     {
       method: "POST",
     },
+  );
+}
+
+export function listFlowVersions(
+  apiBaseUrl: string,
+  authToken: string | undefined,
+  flowId: string,
+  signal?: AbortSignal,
+): Promise<FlowVersionRecord[]> {
+  return request<FlowVersionRecord[]>(
+    buildUrl(apiBaseUrl, flowPath(flowId, "/versions")),
+    authToken,
+    { signal },
+  );
+}
+
+export function fetchFlowVersionDocument(
+  apiBaseUrl: string,
+  authToken: string | undefined,
+  flowId: string,
+  versionId: string,
+  signal?: AbortSignal,
+): Promise<FlowVersionWithDocument> {
+  return request<FlowVersionWithDocument>(
+    buildUrl(apiBaseUrl, flowPath(flowId, `/versions/${encodeURIComponent(versionId)}`)),
+    authToken,
+    { signal },
   );
 }
 

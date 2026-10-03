@@ -78,7 +78,14 @@ export function useFloatingPosition(
     const update = () => setPosition(measure(anchor, panel, placement));
     update();
     window.addEventListener("resize", update);
-    return () => window.removeEventListener("resize", update);
+
+    const resizeObserver = new ResizeObserver(update);
+    resizeObserver.observe(panel);
+
+    return () => {
+      window.removeEventListener("resize", update);
+      resizeObserver.disconnect();
+    };
   }, [open, placement, anchorRef, panelRef]);
 
   return position;

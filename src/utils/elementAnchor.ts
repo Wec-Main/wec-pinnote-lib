@@ -6,10 +6,6 @@ import { measureContentRect } from "./contentRect";
 
 const SKIP_TAGS = new Set(["HTML", "BODY", "HEAD", "SCRIPT", "STYLE", "LINK", "META", "NOSCRIPT"]);
 
-// A box is considered wider/taller than its content (i.e. alignment is
-// visibly positioning the content within it, rather than the content simply
-// filling the box) once the content rect drops below this fraction of the
-// element's own box in either dimension.
 const CONTENT_FIT_THRESHOLD = 0.9;
 
 function clamp01(value: number): number {

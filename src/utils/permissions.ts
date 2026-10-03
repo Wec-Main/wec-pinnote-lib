@@ -82,3 +82,15 @@ export function canPublishVersions(actorRole: UserManagementRole): boolean {
 export function canExportData(actorRole: UserManagementRole): boolean {
   return actorRole === "super_admin" || actorRole === "admin";
 }
+
+export function canUseAi(_actorRole: UserManagementRole): boolean {
+  return true;
+}
+
+export function canApplyAiModelOps(actorRole: UserManagementRole): boolean {
+  return actorRole !== "reviewer";
+}
+
+export function canManageAiTemplates(actorRole: UserManagementRole): boolean {
+  return actorRole === "super_admin" || actorRole === "admin";
+}

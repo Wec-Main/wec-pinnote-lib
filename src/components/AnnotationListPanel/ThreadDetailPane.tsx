@@ -8,35 +8,19 @@ import { AnnotationStatusSelect } from "../AnnotationStatusSelect";
 import { AnnotationThread } from "../AnnotationThread";
 import { buildRenamedPath } from "../AnnotationThreadPanel/AnnotationThreadPanel";
 import { ConfirmDialog } from "../UserManagement/ConfirmDialog";
+import { Icon, Tooltip } from "../primitives";
 import type { AnnotationComment } from "../../types/annotation.types";
+import { fitTitleInputHeight, focusTitleInputAtEnd } from "../../utils/titleInput";
+import { AnnotationAiActions } from "../Ai/AnnotationAiActions";
 
-// `Icon` has no generic "kebab menu" glyph (see Icon.tsx's IconName union) —
-// `CommentSummaryCard`'s own "..." menu trigger uses the same plain
-// character for its overflow menu, so this reuses that convention.
 const MENU_GLYPH = "⋮";
-
-function fitTitleInputHeight(element: HTMLTextAreaElement | null) {
-  if (!element) {
-    return;
-  }
-  element.style.height = "auto";
-  element.style.height = `${element.scrollHeight}px`;
-}
-
-function focusTitleInputAtEnd(element: HTMLTextAreaElement | null) {
-  if (!element) {
-    return;
-  }
-  fitTitleInputHeight(element);
-  element.focus();
-  element.setSelectionRange(element.value.length, element.value.length);
-}
 
 interface ThreadDetailPaneProps {
   annotationId: string | null;
+  onClose: () => void;
 }
 
-export function ThreadDetailPane({ annotationId }: ThreadDetailPaneProps) {
+export function ThreadDetailPane({ annotationId, onClose }: ThreadDetailPaneProps) {
   const {
     annotations,
     allAnnotations,
@@ -58,13 +42,10 @@ export function ThreadDetailPane({ annotationId }: ThreadDetailPaneProps) {
   const [editingTitle, setEditingTitle] = useState(false);
   const [titleValue, setTitleValue] = useState("");
   const [menuOpen, setMenuOpen] = useState(false);
+  const [replySeed, setReplySeed] = useState<{ text: string; key: number } | null>(null);
 
   if (!annotation) {
-    return (
-      <div className="wpn-thread-detail wpn-thread-detail--empty">
-        <p className="wpn-muted">Select a comment to view the conversation.</p>
-      </div>
-    );
+    return null;
   }
 
   const title = annotationLabel(annotation);
@@ -175,6 +156,16 @@ export function ThreadDetailPane({ annotationId }: ThreadDetailPaneProps) {
             </div>
           ) : null}
         </span>
+        <Tooltip label="Close preview" placement="bottom">
+          <button
+            type="button"
+            className="wpn-icon-btn"
+            aria-label="Close preview"
+            onClick={onClose}
+          >
+            <Icon name="close" />
+          </button>
+        </Tooltip>
       </div>
 
       <div className="wpn-thread-detail__scroll">
@@ -192,10 +183,18 @@ export function ThreadDetailPane({ annotationId }: ThreadDetailPaneProps) {
       </div>
 
       <div className="wpn-thread-detail__composer">
+        <AnnotationAiActions
+          annotation={annotation}
+          onDraftReply={(text) =>
+            setReplySeed((current) => ({ text, key: (current?.key ?? 0) + 1 }))
+          }
+        />
         <AnnotationReplyComposer
           replyTarget={replyTarget}
           onCancelReply={() => setReplyTarget(null)}
           onSubmit={sendReply}
+          seed={replySeed}
+          annotationId={annotation.id}
         />
       </div>
 

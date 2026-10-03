@@ -1,1 +1,1 @@
-export { CommentMessage } from "./CommentMessage";
+export { CommentMessage, ReferenceChip, ReferenceIcon } from "./CommentMessage";

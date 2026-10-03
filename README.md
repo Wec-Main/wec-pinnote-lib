@@ -317,6 +317,24 @@ Creating an annotation, sending or replying, editing, deleting a comment, changi
 
 ---
 
+## AI agents (Claude and Codex)
+
+AI chat, the inline AI bar in the data-model and flow editors, and the comment-thread actions (summarise, draft reply) run on a **Claude** or **Codex** account. The agents run inside the Pinnote API server; there is nothing to install or run on the user's computer. Each agent can be connected two ways: **personally** (the user's own subscription or API key, used only by them) or **shared** by an admin for the whole organization (used by everyone without their own connection). A user's own connection always wins.
+
+Agents are connected in **Settings → Integrations**, which has two tabs:
+
+- **Connectors** — one card per agent saying which account is in use ("Using your account" / "Using your organization's shared account · connected by …" / "Not connected"), with the user's own **Connect** / **Disconnect**. Admins also get a separate **Shared with everyone** row per card (**Connect for everyone** / **Disconnect shared**, confirmed because it affects everyone without their own connection). **Connect** opens the _Connect {agent}_ dialog: admins pick **Connect for: Just me | Everyone**, then a method card (subscription or API key):
+  - Claude subscription: a three-step guide — **Open Claude sign-in** (new tab), copy the code Claude shows, paste it (with a **Paste** button) and **Connect**. A chip shows when the sign-in link expires and offers a new one.
+  - Codex subscription: copy the one-time device code, **Open ChatGPT** and approve there; the dialog finishes by itself from the AI stream.
+  - API key: paste an Anthropic / OpenAI key (show / hide) and **Save and connect**.
+
+  Closing the dialog (Esc, ×, Cancel) cancels a sign-in that is still running. Below the cards is the default model for new chats.
+- **Connections** — **Your connections** (Check now, Reconnect, Disconnect) and **Shared with your organization** (connected by; manageable by admins, read-only for everyone else).
+
+Until an agent is connected, AI entry points say "Connect Claude or Codex in Settings → Integrations, or ask an admin to connect it for everyone" and link there (`useAiUi().openIntegrations("connectors")`). Connector state comes from `GET /ai/me` (`me.connectors`, `me.systemConnectors`) and is kept live by the `ai_connectors.updated` and `ai_connector_login.updated` stream events — nothing is polled. The routes are listed in [docs/api-contract.md](docs/api-contract.md#ai-connectors-api-contract).
+
+---
+
 ## Public API
 
 Core annotation overlay:
@@ -355,7 +373,7 @@ Real-time updates:
 Clients and services, for hosts that call the API directly: `createAnnotationApi`, `useAnnotationApi`,
 `createAuthApi`, `useAuthSessions`, `AnnotationApiError`, plus the user, organization/project, tag,
 annotation-tag, audit and analytics request functions (for example `fetchUsers`, `fetchProjects`,
-`fetchTags`, `fetchAuditPage`, `fetchAnalyticsSummary`, `downloadAnalyticsVisitsCsv`).
+`fetchTags`, `fetchAuditPage`, `fetchAnalyticsOverview`, `downloadAnalyticsVisitsCsv`).
 
 Every exported type (`Annotation`, `AnnotationComment`, `CreateCommentRequest`, `AuthSession`, `ManagedUser`, `Organization`, `ProjectTag`, `AuditRecord`, `AnnotationContextValue` and its `Data`/`Ui`/`Auth` slices, `AuthSessionsValue`, `Epic`, `UserStory`, and their request/response shapes) is available from the package root and discoverable through editor autocomplete; this README does not duplicate the type signatures.
 

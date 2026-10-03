@@ -360,175 +360,183 @@ export function UserManagementPanel() {
         </div>
       ) : null}
 
-      <div className="wpn-users-table-wrap">
-        <table
-          className={["wpn-users-table", loading && loaded ? "wpn-users-table--refetching" : ""]
-            .filter(Boolean)
-            .join(" ")}
-        >
-          <colgroup>
-            <col className="wpn-users-table__col-name" />
-            <col />
-            <col />
-            <col />
-            <col />
-            <col />
-            <col className="wpn-users-table__col-actions" />
-          </colgroup>
-          <thead>
-            <tr>
-              <th scope="col">Name</th>
-              <th scope="col">Role</th>
-              <th scope="col">Project</th>
-              <th scope="col">Category</th>
-              <th scope="col">Last active</th>
-              <th scope="col">Status</th>
-              <th scope="col" className="wpn-users-table__actions-head">
-                Actions
-              </th>
-            </tr>
-          </thead>
-          <tbody>
-            {loading && !loaded ? (
-              <TableSkeleton
-                rows={Math.min(pageSize, 5)}
-                columns={["identity", "pill", "text", "text", "text", "pill", "actions"]}
-                label="Loading users..."
-              />
-            ) : loadError && users.length === 0 ? (
+      <div className="wpn-table-card">
+        <div className="wpn-users-table-wrap">
+          <table
+            className={["wpn-users-table", loading && loaded ? "wpn-users-table--refetching" : ""]
+              .filter(Boolean)
+              .join(" ")}
+          >
+            <colgroup>
+              <col className="wpn-users-table__col-name" />
+              <col />
+              <col />
+              <col />
+              <col />
+              <col />
+              <col className="wpn-users-table__col-actions" />
+            </colgroup>
+            <thead>
               <tr>
-                <td colSpan={7} className="wpn-users-table__empty">
-                  <span>{loadError}</span>
-                  <button type="button" className="wpn-btn wpn-btn--ghost" onClick={reload}>
-                    <Icon name="refresh" className="wpn-btn__icon" />
-                    Retry
-                  </button>
-                </td>
+                <th scope="col">Name</th>
+                <th scope="col">Role</th>
+                <th scope="col">Project</th>
+                <th scope="col">Category</th>
+                <th scope="col">Last active</th>
+                <th scope="col">Status</th>
+                <th scope="col" className="wpn-users-table__actions-head">
+                  Actions
+                </th>
               </tr>
-            ) : users.length === 0 ? (
-              <tr>
-                <td colSpan={7} className="wpn-users-table__empty">
-                  <Icon name="users" className="wpn-users-table__empty-icon" />
-                  <span>No users match your search.</span>
-                  {filtersActive ? (
-                    <button type="button" className="wpn-btn wpn-btn--ghost" onClick={resetFilters}>
+            </thead>
+            <tbody>
+              {loading && !loaded ? (
+                <TableSkeleton
+                  rows={Math.min(pageSize, 5)}
+                  columns={["identity", "pill", "text", "text", "text", "pill", "actions"]}
+                  label="Loading users..."
+                />
+              ) : loadError && users.length === 0 ? (
+                <tr>
+                  <td colSpan={7} className="wpn-users-table__empty">
+                    <span>{loadError}</span>
+                    <button type="button" className="wpn-btn wpn-btn--ghost" onClick={reload}>
                       <Icon name="refresh" className="wpn-btn__icon" />
-                      Clear filters
+                      Retry
                     </button>
-                  ) : null}
-                </td>
-              </tr>
-            ) : (
-              users.map((user) => (
-                <tr key={user.id}>
-                  <td>
-                    <div className="wpn-users-identity">
-                      <span className="wpn-avatar wpn-avatar--fallback">
-                        {getInitials(`${user.firstName} ${user.lastName}`)}
-                      </span>
-                      <span className="wpn-users-identity__copy">
-                        <span className="wpn-users-identity__name">
-                          {user.firstName} {user.lastName}
-                        </span>
-                        <span className="wpn-users-identity__email">{user.email}</span>
-                      </span>
-                    </div>
-                  </td>
-                  <td>
-                    <span className={`wpn-users-pill wpn-users-pill--role-${user.roleId}`}>
-                      {roleLabel(user.roleId)}
-                    </span>
-                  </td>
-                  <td>
-                    {user.projects.length === 0 ? (
-                      <span className="wpn-users-projects__empty">N/A</span>
-                    ) : (
-                      <span className="wpn-users-projects">
-                        {user.projects.map((project) => (
-                          <span key={project.id} className="wpn-users-projects__item">
-                            {project.name}
-                          </span>
-                        ))}
-                      </span>
-                    )}
-                  </td>
-                  <td>
-                    {user.category ? (
-                      <span className="wpn-users-org__country">{categoryLabel(user.category)}</span>
-                    ) : (
-                      <span className="wpn-users-projects__empty">N/A</span>
-                    )}
-                  </td>
-                  <td className="wpn-users-table__muted">
-                    {user.lastActiveAt ? formatRelativeTime(user.lastActiveAt) : "Never"}
-                  </td>
-                  <td>
-                    <span className={`wpn-users-pill wpn-users-pill--status-${user.status}`}>
-                      {userStatusLabel(user.status)}
-                    </span>
-                  </td>
-                  <td>
-                    <div className="wpn-users-actions">
-                      {canEditUser(actorRole, actorId ?? "", user) ? (
-                        <>
-                          <Tooltip label="Edit user" placement="left">
-                            <button
-                              type="button"
-                              className="wpn-users-action"
-                              aria-label={`Edit ${user.firstName} ${user.lastName}`}
-                              onClick={() => openEdit(user)}
-                            >
-                              <Icon name="edit" />
-                            </button>
-                          </Tooltip>
-                          <Tooltip label="Reset password" placement="left">
-                            <button
-                              type="button"
-                              className="wpn-users-action"
-                              aria-label={`Reset password for ${user.firstName} ${user.lastName}`}
-                              onClick={() => setResetTarget(user)}
-                            >
-                              <Icon name="key" />
-                            </button>
-                          </Tooltip>
-                        </>
-                      ) : null}
-                      {canDeleteUser(actorRole, actorId ?? "", user) ? (
-                        <Tooltip label="Delete user" placement="left">
-                          <button
-                            type="button"
-                            className="wpn-users-action wpn-users-action--danger"
-                            aria-label={`Delete ${user.firstName} ${user.lastName}`}
-                            onClick={() => setPending({ kind: "delete", user })}
-                          >
-                            <Icon name="trash" />
-                          </button>
-                        </Tooltip>
-                      ) : null}
-                      {canEditUser(actorRole, actorId ?? "", user) ||
-                      canDeleteUser(actorRole, actorId ?? "", user) ? null : (
-                        <span className="wpn-users-actions__none">View only</span>
-                      )}
-                    </div>
                   </td>
                 </tr>
-              ))
-            )}
-          </tbody>
-        </table>
-      </div>
+              ) : users.length === 0 ? (
+                <tr>
+                  <td colSpan={7} className="wpn-users-table__empty">
+                    <Icon name="users" className="wpn-users-table__empty-icon" />
+                    <span>No users match your search.</span>
+                    {filtersActive ? (
+                      <button
+                        type="button"
+                        className="wpn-btn wpn-btn--ghost"
+                        onClick={resetFilters}
+                      >
+                        <Icon name="refresh" className="wpn-btn__icon" />
+                        Clear filters
+                      </button>
+                    ) : null}
+                  </td>
+                </tr>
+              ) : (
+                users.map((user) => (
+                  <tr key={user.id}>
+                    <td>
+                      <div className="wpn-users-identity">
+                        <span className="wpn-avatar wpn-avatar--fallback">
+                          {getInitials(`${user.firstName} ${user.lastName}`)}
+                        </span>
+                        <span className="wpn-users-identity__copy">
+                          <span className="wpn-users-identity__name">
+                            {user.firstName} {user.lastName}
+                          </span>
+                          <span className="wpn-users-identity__email">{user.email}</span>
+                        </span>
+                      </div>
+                    </td>
+                    <td>
+                      <span className={`wpn-users-pill wpn-users-pill--role-${user.roleId}`}>
+                        {roleLabel(user.roleId)}
+                      </span>
+                    </td>
+                    <td>
+                      {user.projects.length === 0 ? (
+                        <span className="wpn-users-projects__empty">N/A</span>
+                      ) : (
+                        <span className="wpn-users-projects">
+                          {user.projects.map((project) => (
+                            <span key={project.id} className="wpn-users-projects__item">
+                              {project.name}
+                            </span>
+                          ))}
+                        </span>
+                      )}
+                    </td>
+                    <td>
+                      {user.category ? (
+                        <span className="wpn-users-org__country">
+                          {categoryLabel(user.category)}
+                        </span>
+                      ) : (
+                        <span className="wpn-users-projects__empty">N/A</span>
+                      )}
+                    </td>
+                    <td className="wpn-users-table__muted">
+                      {user.lastActiveAt ? formatRelativeTime(user.lastActiveAt) : "Never"}
+                    </td>
+                    <td>
+                      <span className={`wpn-users-pill wpn-users-pill--status-${user.status}`}>
+                        {userStatusLabel(user.status)}
+                      </span>
+                    </td>
+                    <td>
+                      <div className="wpn-users-actions">
+                        {canEditUser(actorRole, actorId ?? "", user) ? (
+                          <>
+                            <Tooltip label="Edit user" placement="left">
+                              <button
+                                type="button"
+                                className="wpn-users-action wpn-users-action--primary"
+                                aria-label={`Edit ${user.firstName} ${user.lastName}`}
+                                onClick={() => openEdit(user)}
+                              >
+                                <Icon name="edit" />
+                              </button>
+                            </Tooltip>
+                            <Tooltip label="Reset password" placement="left">
+                              <button
+                                type="button"
+                                className="wpn-users-action"
+                                aria-label={`Reset password for ${user.firstName} ${user.lastName}`}
+                                onClick={() => setResetTarget(user)}
+                              >
+                                <Icon name="key" />
+                              </button>
+                            </Tooltip>
+                          </>
+                        ) : null}
+                        {canDeleteUser(actorRole, actorId ?? "", user) ? (
+                          <Tooltip label="Delete user" placement="left">
+                            <button
+                              type="button"
+                              className="wpn-users-action wpn-users-action--danger"
+                              aria-label={`Delete ${user.firstName} ${user.lastName}`}
+                              onClick={() => setPending({ kind: "delete", user })}
+                            >
+                              <Icon name="trash" />
+                            </button>
+                          </Tooltip>
+                        ) : null}
+                        {canEditUser(actorRole, actorId ?? "", user) ||
+                        canDeleteUser(actorRole, actorId ?? "", user) ? null : (
+                          <span className="wpn-users-actions__none">View only</span>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
 
-      <TablePagination
-        page={page}
-        pageSize={pageSize}
-        totalItems={total}
-        itemLabel="users"
-        onPageChange={setPage}
-        onPageSizeChange={(next) => {
-          setPageSize(next);
-          setPage(1);
-        }}
-      />
+        <TablePagination
+          page={page}
+          pageSize={pageSize}
+          totalItems={total}
+          itemLabel="users"
+          onPageChange={setPage}
+          onPageSizeChange={(next) => {
+            setPageSize(next);
+            setPage(1);
+          }}
+        />
+      </div>
 
       {formOpen ? (
         <UserFormModal

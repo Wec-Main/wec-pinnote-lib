@@ -18,7 +18,13 @@ describe("visibleSettingsTabs", () => {
   });
 
   it("shows admins the projects tab alongside users", () => {
-    expect(tabIds("admin")).toEqual(["users", "projects"]);
+    expect(tabIds("admin")).toEqual(["users", "projects", "integrations"]);
+  });
+
+  it("shows the integrations tab to every role", () => {
+    for (const role of ["super_admin", "admin", "contributor", "reviewer", "developer"] as const) {
+      expect(tabIds(role)).toContain("integrations");
+    }
   });
 
   it("keeps projects hidden from contributors", () => {

@@ -1,15 +1,12 @@
 import { useMemo } from "react";
-import { fetchAnalyticsTrends } from "../../../services/analyticsApi";
-import type { AnalyticsFilters, TrendDay } from "../../../types/analytics.types";
+import type { TrendDay } from "../../../types/analytics.types";
 import { trendChartGeometry } from "../../../utils/trendChart";
 import { dashboardNumberFormat } from "./dashboardFormat";
 import { hasTrendActivity, widgetView } from "./dashboardStatus";
 import { WidgetMessage } from "./DashboardWidgetMessage";
-import { useDashboardFetch } from "./useDashboardFetch";
 
 interface TrendsChartProps {
-  filters: AnalyticsFilters;
-  reloadToken: number;
+  days: TrendDay[] | null;
 }
 
 type TrendSeriesKey = "visits" | "logins" | "comments";
@@ -70,21 +67,20 @@ function chartSummary(days: TrendDay[], totals: Record<TrendSeriesKey, number>):
   return `Daily trends from ${first.day} to ${last.day}: ${counts}.`;
 }
 
-export function TrendsChart({ filters, reloadToken }: TrendsChartProps) {
-  const { data, loading, loaded, error } = useDashboardFetch(
-    [filters, reloadToken],
-    (apiBaseUrl, authToken, signal) => fetchAnalyticsTrends(apiBaseUrl, authToken, filters, signal),
-    "Unable to load analytics trends.",
-  );
-
-  const days = useMemo(() => data?.days ?? [], [data]);
+export function TrendsChart({ days: loadedDays }: TrendsChartProps) {
+  const days = useMemo(() => loadedDays ?? [], [loadedDays]);
   const geometry = useMemo(
     () => trendChartGeometry(days.map(toTrendPoint), SERIES_KEYS, CHART_DIMENSIONS),
     [days],
   );
   const totals = useMemo(() => seriesTotals(days), [days]);
   const plotHeight = geometry.plotBottom - geometry.plotTop;
-  const view = widgetView({ loading, loaded, error, isEmpty: !hasTrendActivity(days) });
+  const view = widgetView({
+    loading: loadedDays === null,
+    loaded: loadedDays !== null,
+    error: null,
+    isEmpty: !hasTrendActivity(days),
+  });
 
   return (
     <section className="wpn-dashboard-section wpn-dashboard-trends">
@@ -92,8 +88,6 @@ export function TrendsChart({ filters, reloadToken }: TrendsChartProps) {
 
       {view === "loading" ? (
         <span className="wpn-skeleton wpn-dashboard-trends__skeleton" />
-      ) : view === "error" ? (
-        <WidgetMessage tone="error" icon="alert" title={error ?? ""} />
       ) : view === "empty" ? (
         <WidgetMessage tone="empty" icon="history" title="No activity in this range" />
       ) : (

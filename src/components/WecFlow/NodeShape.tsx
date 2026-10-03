@@ -2,6 +2,8 @@ import { memo } from "react";
 import type { NodeShape as Shape } from "../../utils/flowchart/nodeTypes";
 import { parallelogramSkew } from "../../utils/flowchart/geometry";
 
+export const LANE_HEADER_SIZE = 32;
+
 interface Props {
   shape: Shape;
   width: number;
@@ -69,6 +71,42 @@ export const NodeShape = memo(function NodeShape({ shape, width: w, height: h }:
           <ellipse cx={w * 0.68} cy={h * 0.55} rx={rx * 0.85} ry={ry * 0.85} />
           <ellipse cx={w * 0.5} cy={h * 0.4} rx={rx} ry={ry} />
           <rect x={w * 0.15} y={h * 0.45} width={w * 0.7} height={h * 0.45} />
+        </g>
+      );
+      break;
+    }
+    case "actor": {
+      const fh = Math.max(24, h - 26);
+      const cx = w / 2;
+      const head = Math.min(fh * 0.22, w * 0.24);
+      const headCy = head + 2;
+      const bodyTop = headCy + head + Math.max(3, fh * 0.05);
+      const half = Math.min(w / 2 - 2, head * 1.9);
+      el = (
+        <g className="wpn-flowchart-node__actor">
+          <circle cx={cx} cy={headCy} r={head} />
+          <path
+            d={`M${cx - half},${fh - 1} C${cx - half},${bodyTop} ${cx + half},${bodyTop} ${cx + half},${fh - 1} Z`}
+          />
+        </g>
+      );
+      break;
+    }
+    case "swimlane":
+    case "swimlaneVertical": {
+      const band = LANE_HEADER_SIZE;
+      const vertical = shape === "swimlaneVertical";
+      el = (
+        <g>
+          <rect x={1} y={1} width={Math.max(0, w - 2)} height={Math.max(0, h - 2)} rx={6} />
+          <rect
+            className="wpn-flowchart-node__lane-header"
+            x={1}
+            y={1}
+            width={vertical ? Math.max(0, w - 2) : band}
+            height={vertical ? band : Math.max(0, h - 2)}
+            rx={6}
+          />
         </g>
       );
       break;

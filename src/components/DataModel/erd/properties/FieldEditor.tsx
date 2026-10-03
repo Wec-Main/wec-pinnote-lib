@@ -40,6 +40,7 @@ export function FieldEditor({
   const session = useErdEditSession();
   const readOnly = useErdState((s) => s.readOnly);
   const modelEngine = useErdState((s) => s.engine);
+  const enums = useErdState((s) => s.enums);
   const catalog = typeCatalogFor(modelEngine);
   const inCatalog = catalog.some((entry) => entry.value === field.type);
   const [customMode, setCustomMode] = useState(!inCatalog);
@@ -127,6 +128,18 @@ export function FieldEditor({
               changeType(value);
             }}
           />
+          {(enums.length > 0 || field.enumId) && (
+            <SelectField
+              label="Enum"
+              value={field.enumId ?? ""}
+              options={[
+                { value: "", label: "None" },
+                ...enums.map((entry) => ({ value: entry.id, label: entry.name })),
+              ]}
+              disabled={readOnly}
+              onChange={(value) => patch({ enumId: value === "" ? undefined : value })}
+            />
+          )}
           {customMode && (
             <label className="wpn-flowchart-ui__field">
               <span className="wpn-flowchart-ui__field-label">Custom type</span>

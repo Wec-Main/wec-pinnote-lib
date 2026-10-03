@@ -95,6 +95,7 @@ export interface FlowState {
   canUndo: boolean;
   canRedo: boolean;
   flowName: string;
+  flowNotes: string;
 
   registryVersion: number;
 }
@@ -155,6 +156,10 @@ const CONNECT_RADIUS = 28;
 const isEdgePathType = (value: unknown): value is EdgePathType =>
   value === "bezier" || value === "straight" || value === "step";
 
+function savedNotes(meta: FlowJSON["meta"]): string {
+  return typeof meta?.notes === "string" ? meta.notes : "";
+}
+
 function savedEdgeType(meta: FlowJSON["meta"]): EdgePathType | undefined {
   const value = meta?.edgeType;
   return isEdgePathType(value) ? value : undefined;
@@ -210,6 +215,7 @@ export class FlowEngine {
       canUndo: false,
       canRedo: false,
       flowName: initial.meta?.name ?? "Untitled flow",
+      flowNotes: savedNotes(initial.meta),
       registryVersion: 0,
     });
     this.pendingFitView = !initial.viewport && nodes.length > 0;
@@ -679,10 +685,6 @@ export class FlowEngine {
     return true;
   }
 
-  /**
-   * Rewires an existing node into a connection: the edge is replaced by
-   * source -> node -> target. The node keeps its current position.
-   */
   insertExistingNodeOnEdge(edgeId: string, nodeId: string): boolean {
     const s = this.getState();
     const edge = s.edgeLookup.get(edgeId);
@@ -1106,6 +1108,7 @@ export class FlowEngine {
       issueNodeIds: EMPTY_MAP,
       issueEdgeIds: EMPTY_MAP,
       flowName: flow.meta?.name ?? this.getState().flowName,
+      flowNotes: savedNotes(flow.meta),
       defaultEdgeType: savedEdgeType(flow.meta) ?? this.getState().defaultEdgeType,
     });
     if (flow.viewport) this.setViewport(flow.viewport);
@@ -1117,6 +1120,7 @@ export class FlowEngine {
     this.clearValidation();
     this.store.setState({
       flowName: name,
+      flowNotes: "",
       selectedNodeIds: EMPTY_SET,
       selectedEdgeIds: EMPTY_SET,
     });
@@ -1131,12 +1135,21 @@ export class FlowEngine {
       nodes: s.nodes,
       edges: s.edges,
       viewport: s.viewport,
-      meta: { name: s.flowName, edgeType: s.defaultEdgeType },
+      meta: {
+        name: s.flowName,
+        edgeType: s.defaultEdgeType,
+        ...(s.flowNotes ? { notes: s.flowNotes } : {}),
+      },
     };
   }
 
   setFlowName(name: string): void {
     this.store.setState({ flowName: name });
+    this.events.emit("change", this.getSnapshot());
+  }
+
+  setFlowNotes(notes: string): void {
+    this.store.setState({ flowNotes: notes });
     this.events.emit("change", this.getSnapshot());
   }
 

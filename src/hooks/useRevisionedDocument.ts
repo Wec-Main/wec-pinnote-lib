@@ -39,6 +39,8 @@ export interface UseRevisionedDocumentOptions<T> {
   adapter: RevisionedDocumentAdapter<T>;
   onSaved?: (name: string) => void;
   onSaveFailed?: (documentId: string, message: string) => void;
+  autosave?: boolean;
+  holdAutosave?: boolean;
 }
 
 export interface RevisionedDocumentState<T> {
@@ -49,6 +51,8 @@ export interface RevisionedDocumentState<T> {
   saveError: string | null;
   saveState: DocumentSaveState;
   savedCount: number;
+  hasUnsavedChanges: boolean;
+  revision: number | null;
   scheduleSave: (document: T) => void;
   save: (document: T) => Promise<void>;
   publish: (document: T) => Promise<void>;
@@ -84,7 +88,13 @@ export function useRevisionedDocument<T>(
   const [saveError, setSaveError] = useState<string | null>(null);
   const [saveState, setSaveState] = useState<DocumentSaveState>("idle");
   const [savedCount, setSavedCount] = useState(0);
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+  const [revision, setRevision] = useState<number | null>(null);
   const [reloadToken, setReloadToken] = useState(0);
+  const autosave = options.autosave !== false;
+  const holdAutosave = options.holdAutosave === true;
+  const holdRef = useRef(holdAutosave);
+  holdRef.current = holdAutosave;
 
   const optionsRef = useRef(options);
   optionsRef.current = options;
@@ -129,6 +139,8 @@ export function useRevisionedDocument<T>(
         setError(null);
         setSaveError(null);
         setSaveState("idle");
+        setHasUnsavedChanges(false);
+        setRevision(record.revision);
         setStatus("ready");
       })
       .catch((err: unknown) => {
@@ -177,6 +189,7 @@ export function useRevisionedDocument<T>(
           revisionsRef.current.set(target.documentId, saved.revision);
         }
         if (isShown()) {
+          setRevision(saved.revision);
           setSaveError(null);
           setSaveState(pendingRef.current ? "pending" : "saved");
           setSavedCount((count) => count + 1);
@@ -216,18 +229,42 @@ export function useRevisionedDocument<T>(
   const scheduleSave = useCallback(
     (next: T) => {
       const target = currentTarget();
-      if (!target || JSON.stringify(next) === lastSentRef.current) {
+      if (!target) {
+        return;
+      }
+      if (JSON.stringify(next) === lastSentRef.current) {
+        if ((!autosave || holdRef.current) && pendingRef.current) {
+          pendingRef.current = null;
+          setHasUnsavedChanges(false);
+          setSaveState((state) => (state === "pending" ? "idle" : state));
+        }
         return;
       }
       pendingRef.current = { target, document: next };
       setSaveState((state) => (state === "saving" || state === "error" ? state : "pending"));
+      if (!autosave || holdRef.current) {
+        clearTimer();
+        setHasUnsavedChanges(true);
+        return;
+      }
       clearTimer();
       timerRef.current = setTimeout(() => {
         timerRef.current = null;
-        flushPending().catch(() => undefined);
+        if (holdRef.current) {
+          setHasUnsavedChanges(true);
+          return;
+        }
+        flushPending().then(
+          () => {
+            if (!pendingRef.current) {
+              setHasUnsavedChanges(false);
+            }
+          },
+          () => undefined,
+        );
       }, AUTOSAVE_DELAY_MS);
     },
-    [clearTimer, currentTarget, flushPending],
+    [autosave, clearTimer, currentTarget, flushPending],
   );
 
   const save = useCallback(
@@ -235,15 +272,31 @@ export function useRevisionedDocument<T>(
       clearTimer();
       pendingRef.current = null;
       const target = currentTarget();
-      return target ? persist(target, next) : Promise.resolve();
+      if (!target) {
+        return Promise.resolve();
+      }
+      return persist(target, next).then(
+        () => {
+          if (!pendingRef.current) {
+            setHasUnsavedChanges(false);
+          }
+        },
+        (err: unknown) => {
+          if (!autosave || holdRef.current) {
+            setHasUnsavedChanges(true);
+          }
+          throw err;
+        },
+      );
     },
-    [clearTimer, currentTarget, persist],
+    [autosave, clearTimer, currentTarget, persist],
   );
 
   const publish = useCallback(
     async (next: T) => {
       const before = currentTarget();
-      await save(next);
+      const unchanged = !pendingRef.current && JSON.stringify(next) === lastSentRef.current;
+      if (!unchanged) await save(next);
       const after = currentTarget();
       if (!before || !after || before.documentId !== after.documentId) {
         return;
@@ -254,11 +307,30 @@ export function useRevisionedDocument<T>(
     [currentTarget, getToken, save],
   );
 
-  useEffect(() => () => void flushPending().catch(() => undefined), [documentId, flushPending]);
+  useEffect(() => {
+    if (holdAutosave && timerRef.current) {
+      clearTimer();
+      if (pendingRef.current) {
+        setHasUnsavedChanges(true);
+      }
+    }
+  }, [holdAutosave, clearTimer]);
+
+  useEffect(
+    () => () => {
+      if (autosave && !holdRef.current) {
+        void flushPending().catch(() => undefined);
+      } else {
+        pendingRef.current = null;
+      }
+    },
+    [autosave, documentId, flushPending],
+  );
 
   const reload = useCallback(() => {
     clearTimer();
     pendingRef.current = null;
+    setHasUnsavedChanges(false);
     loadGenerationRef.current += 1;
     setReloadToken((token) => token + 1);
   }, [clearTimer]);
@@ -284,6 +356,8 @@ export function useRevisionedDocument<T>(
     saveError,
     saveState,
     savedCount,
+    hasUnsavedChanges,
+    revision,
     scheduleSave,
     save,
     publish,

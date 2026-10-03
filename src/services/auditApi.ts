@@ -9,7 +9,7 @@ function isAuditPage(payload: unknown): payload is AuditPage {
   const page = payload as Record<string, unknown>;
   return (
     Array.isArray(page.entries) &&
-    typeof page.total === "number" &&
+    (typeof page.total === "number" || page.total === null) &&
     typeof page.limit === "number" &&
     typeof page.offset === "number"
   );

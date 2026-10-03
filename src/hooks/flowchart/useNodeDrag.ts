@@ -2,6 +2,7 @@ import { useCallback } from "react";
 import type { Rect, XYPosition } from "../../types/flowchart.types";
 import { snapToAlignment } from "../../utils/flowchart/alignment";
 import { getBounds } from "../../utils/flowchart/geometry";
+import { isLaneShape } from "../../utils/flowchart/nodeTypes";
 import { useFlowContext } from "../../context/FlowContext";
 import { dropTargetEdgeStore } from "../../components/WecFlow/EdgeRenderer";
 import { useEdgeDropTarget } from "./useEdgeDropTarget";
@@ -28,20 +29,34 @@ export function useNodeDrag(nodeId: string) {
       if (engine.getState().readOnly) return;
 
       const { selectedNodeIds, nodes } = engine.getState();
+      const laneRects = nodes
+        .filter((n) => selectedNodeIds.has(n.id) && isLaneShape(engine.getDefinition(n.type).shape))
+        .map((n) => engine.getNodeRect(n));
+      const insideLane = (r: Rect) =>
+        laneRects.some(
+          (lane) =>
+            r.x >= lane.x &&
+            r.y >= lane.y &&
+            r.x + r.width <= lane.x + lane.width &&
+            r.y + r.height <= lane.y + lane.height,
+        );
       const starts: Record<string, XYPosition> = {};
       const others: Rect[] = [];
       for (const n of nodes) {
-        if (selectedNodeIds.has(n.id)) starts[n.id] = n.position;
-        else if (others.length < GUIDE_CANDIDATE_LIMIT) others.push(engine.getNodeRect(n));
+        if (selectedNodeIds.has(n.id)) {
+          starts[n.id] = n.position;
+          continue;
+        }
+        const rect = engine.getNodeRect(n);
+        if (laneRects.length > 0 && insideLane(rect)) starts[n.id] = n.position;
+        else if (others.length < GUIDE_CANDIDATE_LIMIT) others.push(rect);
       }
       const startBounds = getBounds(
         nodes.filter((n) => selectedNodeIds.has(n.id)).map((n) => engine.getNodeRect(n)),
       );
 
-      // A single node can be dropped onto a connection to be spliced into it.
-      // Its own edges stay untouched; the connection's ends rewire through it.
       const draggingIds = new Set(Object.keys(starts));
-      const spliceCandidate = draggingIds.size === 1;
+      const spliceCandidate = draggingIds.size === 1 && laneRects.length === 0;
 
       startDrag(e, {
         onStart: () => engine.beginInteraction(),

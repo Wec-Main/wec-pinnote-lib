@@ -1,7 +1,7 @@
 import { memo, useEffect, useRef, useState, type CSSProperties } from "react";
 import { useFlowEngine } from "../../context/FlowContext";
 import type { HandleSide } from "../../types/flowchart.types";
-import type { NodeTypeDefinition } from "../../utils/flowchart/nodeTypes";
+import { isLaneShape, type NodeTypeDefinition } from "../../utils/flowchart/nodeTypes";
 import { cx } from "../../utils/flowchart/shallow";
 import { Icon, NodeIcon } from "./FlowIcons";
 
@@ -34,9 +34,10 @@ function TypePicker({
     .list()
     .filter(
       (def) =>
-        q === "" ||
-        def.label.toLowerCase().includes(q) ||
-        (def.description ?? "").toLowerCase().includes(q),
+        !isLaneShape(def.shape) &&
+        (q === "" ||
+          def.label.toLowerCase().includes(q) ||
+          (def.description ?? "").toLowerCase().includes(q)),
     );
   const [first] = matches;
 

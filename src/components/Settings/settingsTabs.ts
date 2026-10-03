@@ -2,7 +2,8 @@ import type { IconName } from "../primitives";
 import type { UserManagementRole } from "../../types/userManagement.types";
 import { canManageOrganizations, canManageTags, canViewProjects } from "../../utils/permissions";
 
-export type SettingsTab = "users" | "organizations" | "projects" | "tags" | "audit" | "dashboard";
+export type SettingsTab =
+  "users" | "organizations" | "projects" | "tags" | "integrations" | "audit" | "dashboard";
 
 interface SettingsTabDefinition {
   id: SettingsTab;
@@ -15,18 +16,17 @@ const ALL_TABS: SettingsTabDefinition[] = [
   { id: "organizations", label: "Organizations", icon: "building" },
   { id: "projects", label: "Projects", icon: "folder" },
   { id: "tags", label: "Tags", icon: "epic" },
+  { id: "integrations", label: "Integrations", icon: "plug" },
   { id: "audit", label: "Audit history", icon: "history" },
   { id: "dashboard", label: "Dashboard", icon: "layers" },
 ];
 
-// Tags is hidden from the settings nav per product request, without removing
-// the underlying feature/code.
 const HIDDEN_TABS = new Set<SettingsTab>(["tags"]);
 
 export function visibleSettingsTabs(role: UserManagementRole): SettingsTabDefinition[] {
   let tabs = ALL_TABS;
   if (!canManageOrganizations(role)) {
-    const allowed = new Set<SettingsTab>(["users"]);
+    const allowed = new Set<SettingsTab>(["users", "integrations"]);
     if (canViewProjects(role)) {
       allowed.add("projects");
     }

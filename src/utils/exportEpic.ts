@@ -4,7 +4,6 @@ export interface EpicExport extends Epic {
   userStories: UserStory[];
 }
 
-/** Builds the export payload for one epic: epic fields plus all of its user stories, ordered by position. */
 export function buildEpicExport(epic: Epic, allUserStories: UserStory[]): EpicExport {
   const userStories = allUserStories
     .filter((story) => story.epicId === epic.id)
@@ -13,7 +12,6 @@ export function buildEpicExport(epic: Epic, allUserStories: UserStory[]): EpicEx
   return { ...epic, userStories };
 }
 
-/** Filename like `epic-<title-slug>.json`, falling back to the epic id. */
 export function epicExportFilename(epic: Pick<Epic, "id" | "title">): string {
   const slug = epic.title
     .toLowerCase()

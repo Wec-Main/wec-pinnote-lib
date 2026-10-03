@@ -14,6 +14,7 @@ interface LauncherButtonProps {
   blocked?: boolean;
   dragHandlers: LauncherDragHandlers;
   onActivate: () => void;
+  onIntent?: () => void;
   children: ReactNode;
 }
 
@@ -23,6 +24,7 @@ export function LauncherButton({
   blocked = false,
   dragHandlers,
   onActivate,
+  onIntent,
   children,
 }: LauncherButtonProps) {
   const tooltip = blocked ? "Log in first" : label;
@@ -42,6 +44,8 @@ export function LauncherButton({
         aria-disabled={blocked}
         {...dragHandlers}
         onClick={onActivate}
+        onPointerEnter={onIntent}
+        onFocus={onIntent}
       >
         <span className="wpn-launcher-item__icon-wrap">{children}</span>
       </button>

@@ -16,6 +16,7 @@ export interface ErdToolbarProps {
   onPublish?: ErdCommitHandler;
   onNameCommit?: (name: string) => void;
   saveIndicator?: ReactNode;
+  toolbarActions?: ReactNode;
 }
 
 const GHOST_ICON_BUTTON = cx(
@@ -34,13 +35,15 @@ export const ErdToolbar = memo(function ErdToolbar({
   onPublish,
   onNameCommit,
   saveIndicator,
+  toolbarActions,
 }: ErdToolbarProps) {
   const engine = useErdEngine();
   const canUndo = useErdState((s) => s.canUndo);
   const canRedo = useErdState((s) => s.canRedo);
   const readOnly = useErdState((s) => s.readOnly);
   const name = useErdState((s) => s.name);
-  const validating = useErdState((s) => s.validation !== null);
+  const validation = useErdState((s) => s.validation);
+  const validating = validation !== null;
   const [confirmingPublish, setConfirmingPublish] = useState(false);
   const [busy, setBusy] = useState(false);
 
@@ -111,12 +114,32 @@ export const ErdToolbar = memo(function ErdToolbar({
           className={cx("wpn-flowchart-ui__btn", validating && "wpn-flowchart-ui__btn-active")}
           aria-pressed={validating}
           onClick={() => (validating ? engine.clearValidation() : engine.validate())}
-          title="Check the data model for problems"
+          title="Check the data model against all rules"
         >
           <Icon name="check" /> Validate
+          {validation ? (
+            <span
+              className={cx(
+                "wpn-erd-validate-badge",
+                validation.errorCount > 0
+                  ? "wpn-erd-validate-badge--error"
+                  : validation.warningCount > 0
+                    ? "wpn-erd-validate-badge--warning"
+                    : "wpn-erd-validate-badge--ok",
+              )}
+              aria-label={`${validation.errorCount} errors, ${validation.warningCount} warnings`}
+            >
+              {validation.errorCount > 0
+                ? validation.errorCount
+                : validation.warningCount > 0
+                  ? validation.warningCount
+                  : "✓"}
+            </span>
+          ) : null}
         </button>
       </div>
       <div className="wpn-flowchart-toolbar__actions">
+        {toolbarActions}
         {saveIndicator}
         <button
           type="button"

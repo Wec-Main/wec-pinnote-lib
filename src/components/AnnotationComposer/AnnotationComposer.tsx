@@ -1,4 +1,4 @@
-import { useRef, useState, type FormEvent } from "react";
+import { useMemo, useRef, useState, type FormEvent } from "react";
 import { useAnnotationData, useAnnotationUi } from "../../context/AnnotationContext";
 import { useFloatingPanel } from "../../hooks/useAnnotationPosition";
 import { usePointerDrag } from "../../hooks/flowchart/usePointerDrag";
@@ -8,13 +8,16 @@ import {
   type DraftAnnotation,
 } from "../../types/annotation.types";
 import { useMentionCandidates } from "../../hooks/useMentionCandidates";
-import { encodeMentions } from "../../utils/mentions";
+import { useReferenceCandidates } from "../../hooks/useReferenceCandidates";
+import { encodeMentions, referencesInMessage } from "../../utils/mentions";
 import { AnnotationStatusSelect } from "../AnnotationStatusSelect";
 import { ComposerHint, ComposerHintInfo } from "../ComposerHint";
 import { AddToContextCheckbox } from "../AddToContextCheckbox";
 import { MentionTextarea } from "../MentionTextarea";
+import { ReferenceChip } from "../CommentMessage";
 import { Icons } from "../../assets/icons";
 import { Tooltip } from "../primitives";
+import { fitTitleInputHeight, focusTitleInputAtEnd } from "../../utils/titleInput";
 
 const DEFAULT_COMPOSER_WIDTH = 460;
 const MIN_COMPOSER_WIDTH = 320;
@@ -54,6 +57,11 @@ function DraftComposer({ draft, x, y }: DraftComposerProps) {
   const [width, setWidth] = useState<number | null>(null);
   const startDrag = usePointerDrag();
   const candidates = useMentionCandidates();
+  const references = useReferenceCandidates();
+  const linked = useMemo(
+    () => referencesInMessage(encodeMentions(message, [], references.references)),
+    [message, references.references],
+  );
 
   const startWidthDrag = (event: React.PointerEvent) => {
     if (event.button !== 0) {
@@ -81,7 +89,11 @@ function DraftComposer({ draft, x, y }: DraftComposerProps) {
     }
     setSubmitting(true);
     try {
-      await submitDraft(encodeMentions(trimmed, candidates), status, addToContext);
+      await submitDraft(
+        encodeMentions(trimmed, candidates, references.references),
+        status,
+        addToContext,
+      );
     } catch {
       setSubmitting(false);
     }
@@ -117,10 +129,15 @@ function DraftComposer({ draft, x, y }: DraftComposerProps) {
       <div className="wpn-panel__header">
         <span className="wpn-panel__title-group">
           {editingLabel ? (
-            <input
+            <textarea
+              ref={focusTitleInputAtEnd}
               className="wpn-panel__title-input"
+              rows={1}
               value={labelValue}
-              onChange={(event) => setLabelValue(event.target.value)}
+              onChange={(event) => {
+                setLabelValue(event.target.value);
+                fitTitleInputHeight(event.target);
+              }}
               onBlur={commitLabel}
               onKeyDown={(event) => {
                 if (event.key === "Enter") {
@@ -130,7 +147,6 @@ function DraftComposer({ draft, x, y }: DraftComposerProps) {
                   setEditingLabel(false);
                 }
               }}
-              autoFocus
             />
           ) : (
             <span className="wpn-panel__title">{draft.label}</span>
@@ -203,22 +219,40 @@ function DraftComposer({ draft, x, y }: DraftComposerProps) {
           value={message}
           onChange={changeMessage}
           candidates={candidates}
-          placeholder="Add your comment... Type @ to mention someone"
+          references={references.references}
+          referencesLoading={references.loading}
+          onReferenceTrigger={references.request}
+          placeholder="Add your comment… @ to mention, # to tag an epic, flow or data model"
           ariaLabel="Comment"
           rows={3}
           maxLength={COMMENT_MAX_LENGTH}
-          menuPlacement="below"
           autoFocus
           onEnter={() => void send()}
           onFocusChange={setFocused}
         />
-        <AddToContextCheckbox
-          className="wpn-context-check--composer"
-          checked={addToContext}
-          onChange={setAddToContext}
-          disabled={submitting}
-        />
-        {focused || hovered ? <ComposerHint length={message.length} /> : null}
+        {linked.length > 0 ? (
+          <div className="wpn-composer__linked" aria-label="Tagged items">
+            <span className="wpn-composer__linked-label">Tagged</span>
+            {linked.map((reference) => (
+              <ReferenceChip
+                key={`${reference.kind}:${reference.id}`}
+                kind={reference.kind}
+                id={reference.id}
+                name={reference.name}
+                interactive={false}
+              />
+            ))}
+          </div>
+        ) : null}
+        <div className="wpn-composer-context-row">
+          <AddToContextCheckbox
+            className="wpn-context-check--composer"
+            checked={addToContext}
+            onChange={setAddToContext}
+            disabled={submitting}
+          />
+          {focused || hovered ? <ComposerHint length={message.length} /> : null}
+        </div>
         <div className="wpn-panel__composer">
           <div className="wpn-panel__toolbar">
             <div className="wpn-thread-panel__brand">

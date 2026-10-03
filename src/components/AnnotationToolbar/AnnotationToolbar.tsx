@@ -10,7 +10,10 @@ import { Icons } from "../../assets/icons";
 import { Icon, LiveStatus, Tooltip } from "../primitives";
 import { LauncherButton, type LauncherDragHandlers } from "./LauncherButton";
 import { PublishVersionButton } from "./PublishVersionButton";
+import { useOptionalAiRuntime } from "../../context/AiRuntimeContext";
+import { prefetchAiMe } from "../../ai/prefetch";
 import { ExportDialogButton } from "./ExportDialogButton";
+import { useAiUi } from "../Ai/AiUiContext";
 import { isBoolean, usePersistentState } from "../../hooks/usePersistentState";
 
 const EDGE = 8;
@@ -71,9 +74,16 @@ export function AnnotationToolbar() {
     requestCancelDraft,
   } = useAnnotationUi();
   const { activeAccount } = useAnnotationAuth();
-  // Guarantees the refresh icon visibly spins for at least one rotation on
-  // every click, even when the reload resolves before the CSS animation
-  // (tied to `loading`) would otherwise have a chance to show.
+  const aiRuntime = useOptionalAiRuntime();
+  const warmSettings = () => {
+    if (!activeAccount || !aiRuntime || !aiRuntime.enabled) return;
+    void prefetchAiMe({
+      apiBaseUrl: aiRuntime.apiBaseUrl,
+      projectId: aiRuntime.projectId,
+      getToken: aiRuntime.getToken,
+    });
+  };
+  const aiPanelOpen = useAiUi()?.panelOpen ?? false;
   const [spinning, setSpinning] = useState(false);
   const spinTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   useEffect(
@@ -293,6 +303,7 @@ export function AnnotationToolbar() {
         active={userManagementOpen}
         blocked={loggedOut}
         dragHandlers={launcherDragHandlers}
+        onIntent={warmSettings}
         onActivate={guardedClick(() => {
           if (!loggedOut) {
             setUserManagementOpen(!userManagementOpen);
@@ -411,7 +422,14 @@ export function AnnotationToolbar() {
           "wpn-toolbar",
           barExpanded ? "" : "wpn-toolbar--collapsed",
           position ? "wpn-toolbar--placed" : "",
-          commentsFullScreenOpen ? "wpn-toolbar--hidden" : "",
+          commentsFullScreenOpen ||
+          epicFlowOpen ||
+          flowOpen ||
+          dataModelOpen ||
+          userManagementOpen ||
+          aiPanelOpen
+            ? "wpn-toolbar--hidden"
+            : "",
         ]
           .filter(Boolean)
           .join(" ")}
@@ -482,8 +500,6 @@ export function AnnotationToolbar() {
             <AnnotationVisibilityToggle />
             <PublishVersionButton />
             <ExportDialogButton />
-            {/* Comments only load for a signed-in actor, so refreshing and the
-                failure it would report are meaningless while logged out. */}
             {loggedOut ? null : (
               <>
                 <span className="wpn-toolbar__divider" aria-hidden="true" />

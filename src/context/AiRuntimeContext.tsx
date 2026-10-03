@@ -1,0 +1,266 @@
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
+import { AiStreamHub, type AiReconnectListener, type AiStreamListener } from "../ai/AiStreamHub";
+import { useAiStream } from "../hooks/useAiStream";
+import { useTokenGetter } from "../hooks/useTokenGetter";
+import { fetchAiMe } from "../services/aiApi";
+import { AnnotationApiError } from "../types/annotation.types";
+import { withJitter } from "../utils/backoff";
+import { aiMeCacheKey } from "../ai/cacheKeys";
+import {
+  fetchResource,
+  mutateResource,
+  readResource,
+  removeResource,
+} from "../utils/resourceCache";
+import type { AiConnector, AiMe, AiStreamEvent } from "../types/ai.types";
+import type { StreamConnectionState } from "../types/stream.types";
+
+export interface AiRuntimeContextValue {
+  apiBaseUrl: string;
+  projectId: string;
+  enabled: boolean;
+  currentUserId: string | null;
+  getToken: () => Promise<string | undefined>;
+  me: AiMe | null;
+  meLoading: boolean;
+  meError: string | null;
+  meRetrying: boolean;
+  refreshMe: () => void;
+  mergeConnectors: (connectors: AiConnector[]) => void;
+  subscribe: (listener: AiStreamListener, onReconnect?: AiReconnectListener) => () => void;
+  connection: StreamConnectionState;
+}
+
+export const AiRuntimeContext = createContext<AiRuntimeContextValue | null>(null);
+
+export interface AiRuntimeProviderProps {
+  apiBaseUrl: string;
+  projectId: string;
+  getAuthToken: (() => string | Promise<string>) | undefined;
+  enabled: boolean;
+  sessionKey?: string | null;
+  currentUserId?: string | null;
+  children?: ReactNode;
+}
+
+const ME_RETRY_BASE_MS = 2000;
+const ME_RETRY_MAX_MS = 30000;
+const ME_TTL_MS = 20000;
+
+export function isRetryableAiMeError(err: unknown): boolean {
+  if (!(err instanceof AnnotationApiError)) return true;
+  return err.status === 408 || err.status === 429 || err.status >= 500;
+}
+
+export function mergeAiConnectors(current: AiConnector[], updates: AiConnector[]): AiConnector[] {
+  const byProvider = new Map(updates.map((connector) => [connector.provider, connector]));
+  const merged = current.map((connector) => byProvider.get(connector.provider) ?? connector);
+  for (const connector of updates) {
+    if (!current.some((existing) => existing.provider === connector.provider)) {
+      merged.push(connector);
+    }
+  }
+  return merged;
+}
+
+export function mergeAiMeConnectors(me: AiMe, connectors: AiConnector[]): AiMe {
+  return { ...me, connectors: mergeAiConnectors(me.connectors ?? [], connectors) };
+}
+
+function describe(err: unknown): string {
+  return err instanceof Error && err.message ? err.message : "Could not reach the server";
+}
+
+export function AiRuntimeProvider({
+  apiBaseUrl,
+  projectId,
+  getAuthToken,
+  enabled,
+  sessionKey = null,
+  currentUserId = null,
+  children,
+}: AiRuntimeProviderProps) {
+  const getToken = useTokenGetter(getAuthToken);
+  const [hub] = useState(() => new AiStreamHub());
+  const meCacheKey = aiMeCacheKey(apiBaseUrl, projectId, sessionKey);
+  const meCacheKeyRef = useRef(meCacheKey);
+  meCacheKeyRef.current = meCacheKey;
+  const [me, setMe] = useState<AiMe | null>(() =>
+    enabled && projectId ? (readResource<AiMe>(meCacheKey).data ?? null) : null,
+  );
+  const [meLoading, setMeLoading] = useState(false);
+  const [meError, setMeError] = useState<string | null>(null);
+  const [meToken, setMeToken] = useState(0);
+  const [meRetryAttempt, setMeRetryAttempt] = useState(0);
+  const [meRetrying, setMeRetrying] = useState(false);
+
+  const refreshMe = useCallback(() => setMeToken((token) => token + 1), []);
+  const meKey = `${apiBaseUrl}|${projectId}|${sessionKey ?? ""}`;
+  const meKeyRef = useRef(meKey);
+
+  useEffect(() => {
+    if (meKeyRef.current !== meKey) {
+      meKeyRef.current = meKey;
+      setMe(readResource<AiMe>(meCacheKey).data ?? null);
+    }
+    if (!enabled || !projectId) {
+      setMe(null);
+      setMeLoading(false);
+      setMeError(null);
+      setMeRetrying(false);
+      return;
+    }
+    const controller = new AbortController();
+    const cached = readResource<AiMe>(meCacheKey);
+    if (cached.hasData && cached.data) setMe(cached.data);
+    setMeLoading(true);
+    void fetchResource<AiMe>(
+      meCacheKey,
+      (signal) =>
+        getToken().then((authToken) => fetchAiMe(apiBaseUrl, authToken, projectId, signal)),
+      { retries: 0, ttlMs: ME_TTL_MS, force: meToken > 0 },
+    ).then(() => {
+      if (controller.signal.aborted) return;
+      const snapshot = readResource<AiMe>(meCacheKey);
+      if (snapshot.error) {
+        const retryable = isRetryableAiMeError(snapshot.error);
+        if (!retryable) {
+          setMe(null);
+          removeResource(meCacheKey);
+        }
+        setMeError(describe(snapshot.error));
+        setMeLoading(false);
+        setMeRetrying(retryable);
+        return;
+      }
+      if (snapshot.data) setMe(snapshot.data);
+      setMeError(null);
+      setMeLoading(false);
+      setMeRetryAttempt(0);
+      setMeRetrying(false);
+    });
+    return () => controller.abort();
+  }, [apiBaseUrl, enabled, getToken, meKey, meCacheKey, meToken, projectId, sessionKey]);
+
+  useEffect(() => {
+    if (!enabled || !meRetrying) return;
+    const delay = withJitter(Math.min(ME_RETRY_BASE_MS * 2 ** meRetryAttempt, ME_RETRY_MAX_MS));
+    const retry = () => {
+      setMeRetryAttempt((attempt) => attempt + 1);
+      refreshMe();
+    };
+    const timer = window.setTimeout(retry, delay);
+    const onVisible = () => {
+      if (document.visibilityState === "visible") retry();
+    };
+    window.addEventListener("online", retry);
+    document.addEventListener("visibilitychange", onVisible);
+    return () => {
+      window.clearTimeout(timer);
+      window.removeEventListener("online", retry);
+      document.removeEventListener("visibilitychange", onVisible);
+    };
+  }, [enabled, meRetrying, meRetryAttempt, refreshMe]);
+
+  const mergeConnectors = useCallback((connectors: AiConnector[]) => {
+    setMe((current) => (current ? mergeAiMeConnectors(current, connectors) : current));
+    const key = meCacheKeyRef.current;
+    const cached = readResource<AiMe>(key).data;
+    if (cached) {
+      mutateResource<AiMe>(key, mergeAiMeConnectors(cached, connectors));
+    }
+  }, []);
+
+  const handleEvent = useCallback(
+    (event: AiStreamEvent) => {
+      if (event.type === "ai_connectors.updated") {
+        mergeConnectors(event.connectors);
+      } else if (
+        event.type === "ai_connector_login.updated" &&
+        event.state === "succeeded" &&
+        event.connector
+      ) {
+        mergeConnectors([event.connector]);
+      }
+      hub.emit(event);
+    },
+    [hub, mergeConnectors],
+  );
+
+  const handleReconnect = useCallback(() => {
+    refreshMe();
+    hub.reconnected();
+  }, [hub, refreshMe]);
+
+  const meReady = me !== null;
+  const connection = useAiStream({
+    apiBaseUrl,
+    projectId,
+    getAuthToken,
+    enabled: enabled && meReady,
+    onEvent: handleEvent,
+    onReconnect: handleReconnect,
+  });
+
+  const subscribe = useCallback(
+    (listener: AiStreamListener, onReconnect?: AiReconnectListener) =>
+      hub.subscribe(listener, onReconnect),
+    [hub],
+  );
+
+  const value = useMemo<AiRuntimeContextValue>(
+    () => ({
+      apiBaseUrl,
+      projectId,
+      enabled,
+      currentUserId,
+      getToken,
+      me,
+      meLoading,
+      meError,
+      meRetrying,
+      refreshMe,
+      mergeConnectors,
+      subscribe,
+      connection,
+    }),
+    [
+      apiBaseUrl,
+      projectId,
+      enabled,
+      currentUserId,
+      getToken,
+      me,
+      meLoading,
+      meError,
+      meRetrying,
+      refreshMe,
+      mergeConnectors,
+      subscribe,
+      connection,
+    ],
+  );
+
+  return <AiRuntimeContext.Provider value={value}>{children}</AiRuntimeContext.Provider>;
+}
+
+export function useAiRuntime(): AiRuntimeContextValue {
+  const value = useContext(AiRuntimeContext);
+  if (!value) {
+    throw new Error("useAiRuntime must be used within AiRuntimeProvider");
+  }
+  return value;
+}
+
+export function useOptionalAiRuntime(): AiRuntimeContextValue | null {
+  return useContext(AiRuntimeContext);
+}

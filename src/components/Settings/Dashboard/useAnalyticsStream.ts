@@ -7,20 +7,21 @@ import { normalizeApiBase } from "../../../services/httpClient";
 import { AnnotationApiError } from "../../../types/annotation.types";
 import {
   INITIAL_RECONNECT_DELAY_MS,
+  createReloadScheduler,
   nextReconnectDelay,
   parseAnalyticsChange,
   streamStateAfterFailure,
-  type AnalyticsChangeKind,
   type AnalyticsStreamState,
 } from "./analyticsStreamState";
+import { withJitter } from "../../../utils/backoff";
 
 export interface AnalyticsStreamOptions {
   apiBaseUrl: string;
-  authToken: string | undefined;
+  getToken: () => Promise<string | undefined>;
+  identity: string;
   scope: AnalyticsStreamScope;
   enabled: boolean;
-  onChange: (kinds: AnalyticsChangeKind[]) => void;
-  onResync: () => void;
+  onReload: () => void;
 }
 
 function analyticsStreamUrl(apiBaseUrl: string, ticket: string): string {
@@ -34,19 +35,23 @@ function failureStatus(err: unknown): number | undefined {
   return err instanceof AnnotationApiError ? err.status : undefined;
 }
 
+function isHidden(): boolean {
+  return document.visibilityState === "hidden";
+}
+
 export function useAnalyticsStream({
   apiBaseUrl,
-  authToken,
+  getToken,
+  identity,
   scope,
   enabled,
-  onChange,
-  onResync,
+  onReload,
 }: AnalyticsStreamOptions): AnalyticsStreamState {
   const [state, setState] = useState<AnalyticsStreamState>("connecting");
-  const onChangeRef = useRef(onChange);
-  const onResyncRef = useRef(onResync);
-  onChangeRef.current = onChange;
-  onResyncRef.current = onResync;
+  const onReloadRef = useRef(onReload);
+  onReloadRef.current = onReload;
+  const getTokenRef = useRef(getToken);
+  getTokenRef.current = getToken;
   const { organizationId, projectId } = scope;
 
   useEffect(() => {
@@ -54,12 +59,9 @@ export function useAnalyticsStream({
       setState("connecting");
       return;
     }
-    if (!authToken) {
-      setState("offline");
-      return;
-    }
 
     const ticketScope: AnalyticsStreamScope = { organizationId, projectId };
+    const scheduler = createReloadScheduler({ reload: () => onReloadRef.current() });
     let stopped = false;
     let connecting = false;
     let source: EventSource | null = null;
@@ -67,6 +69,7 @@ export function useAnalyticsStream({
     let reconnectDelay = INITIAL_RECONNECT_DELAY_MS;
     let openedOnce = false;
     let ticketController: AbortController | null = null;
+    let paused = false;
 
     const clearReconnectTimer = () => {
       if (reconnectTimer) {
@@ -76,21 +79,20 @@ export function useAnalyticsStream({
     };
 
     const scheduleReconnect = () => {
-      if (stopped || reconnectTimer) {
+      if (stopped || reconnectTimer || isHidden()) {
         return;
       }
       setState("reconnecting");
       reconnectTimer = setTimeout(() => {
         reconnectTimer = null;
         void connect();
-      }, reconnectDelay);
+      }, withJitter(reconnectDelay));
       reconnectDelay = nextReconnectDelay(reconnectDelay);
     };
 
     const handleChange = (event: MessageEvent<string>) => {
-      const kinds = parseAnalyticsChange(event.data);
-      if (kinds) {
-        onChangeRef.current(kinds);
+      if (parseAnalyticsChange(event.data)) {
+        scheduler.change();
       }
     };
 
@@ -102,7 +104,7 @@ export function useAnalyticsStream({
         reconnectDelay = INITIAL_RECONNECT_DELAY_MS;
         setState("live");
         if (openedOnce) {
-          onResyncRef.current();
+          scheduler.resync();
         }
         openedOnce = true;
       });
@@ -117,14 +119,14 @@ export function useAnalyticsStream({
       });
 
       next.addEventListener("resync", () => {
-        onResyncRef.current();
+        scheduler.resync();
       });
 
       next.addEventListener("analytics.changed", handleChange as EventListener);
     };
 
     async function connect(): Promise<void> {
-      if (stopped || connecting) {
+      if (stopped || connecting || source || isHidden()) {
         return;
       }
       connecting = true;
@@ -132,17 +134,25 @@ export function useAnalyticsStream({
       const controller = new AbortController();
       ticketController = controller;
       try {
+        const authToken = (await getTokenRef.current()) || undefined;
+        if (stopped || controller.signal.aborted) {
+          return;
+        }
+        if (!authToken) {
+          setState("offline");
+          return;
+        }
         const { ticket } = await fetchAnalyticsStreamTicket(
           apiBaseUrl,
           authToken,
           ticketScope,
           controller.signal,
         );
-        if (!stopped) {
+        if (!stopped && !controller.signal.aborted) {
           openSource(ticket);
         }
       } catch (err) {
-        if (stopped) {
+        if (stopped || controller.signal.aborted) {
           return;
         }
         if (streamStateAfterFailure(failureStatus(err)) === "offline") {
@@ -151,13 +161,15 @@ export function useAnalyticsStream({
         }
         scheduleReconnect();
       } finally {
-        ticketController = null;
-        connecting = false;
+        if (ticketController === controller) {
+          ticketController = null;
+          connecting = false;
+        }
       }
     }
 
     const reconnectNow = () => {
-      if (stopped || connecting || source) {
+      if (stopped || connecting || source || isHidden()) {
         return;
       }
       clearReconnectTimer();
@@ -165,18 +177,42 @@ export function useAnalyticsStream({
       void connect();
     };
 
+    const pause = () => {
+      paused = true;
+      scheduler.cancel();
+      clearReconnectTimer();
+      ticketController?.abort();
+      ticketController = null;
+      connecting = false;
+      source?.close();
+      source = null;
+      setState("paused");
+    };
+
     const handleVisibilityChange = () => {
-      if (document.visibilityState === "visible") {
-        reconnectNow();
+      if (isHidden()) {
+        pause();
+        return;
       }
+      if (paused) {
+        paused = false;
+        openedOnce = false;
+        scheduler.reloadNow();
+      }
+      reconnectNow();
     };
 
     window.addEventListener("online", reconnectNow);
     document.addEventListener("visibilitychange", handleVisibilityChange);
-    void connect();
+    if (isHidden()) {
+      setState("paused");
+    } else {
+      void connect();
+    }
 
     return () => {
       stopped = true;
+      scheduler.cancel();
       clearReconnectTimer();
       ticketController?.abort();
       window.removeEventListener("online", reconnectNow);
@@ -184,7 +220,7 @@ export function useAnalyticsStream({
       source?.close();
       source = null;
     };
-  }, [apiBaseUrl, authToken, enabled, organizationId, projectId]);
+  }, [apiBaseUrl, enabled, identity, organizationId, projectId]);
 
   return state;
 }

@@ -11,6 +11,10 @@
 }
 
 .wpn-root {
+  --wpn-table-head-bg: #1f1d36;
+  --wpn-table-head-text: rgba(226, 224, 255, 0.62);
+  --wpn-section-head-bg: #1c1a33;
+  --wpn-section-head-border: rgba(165, 160, 255, 0.14);
   --wpn-accent: #5b4dff;
   --wpn-accent-strong: #4338ca;
   --wpn-accent-soft: rgba(91, 77, 255, 0.12);
@@ -151,9 +155,6 @@ body.wpn-mode-active {
   z-index: 5;
 }
 
-/* Default bottom-left corner for a launcher that hasn't been explicitly
-   dragged elsewhere. Also used while the toolbar is open, so the two never
-   stack on the same coordinates. */
 .wpn-toolbar--launcher-docked {
   top: auto;
   bottom: 16px;
@@ -161,7 +162,6 @@ body.wpn-mode-active {
   transform: none;
 }
 
-/* Only while the toolbar is open is the launcher's own drag disabled. */
 .wpn-toolbar--launcher-locked {
   cursor: default;
 }
@@ -234,9 +234,6 @@ body.wpn-mode-active {
   padding: 4px;
 }
 
-/* Hidden for as long as the Comments panel's Full Screen ("Expand panel")
-   mode is open — keeps the toolbar mounted (drag position, expanded state,
-   etc. untouched) rather than unmounting it. */
 .wpn-toolbar--hidden {
   display: none;
 }
@@ -358,7 +355,8 @@ body.wpn-mode-active {
 }
 
 .wpn-launcher-item--blocked,
-.wpn-toolbar__list--blocked {
+.wpn-toolbar__list--blocked,
+.wpn-toolbar__eye--blocked {
   opacity: 0.45;
   cursor: not-allowed;
 }
@@ -367,7 +365,9 @@ body.wpn-mode-active {
   background: transparent;
 }
 
-.wpn-toggle--blocked:hover {
+.wpn-toggle--blocked:hover,
+.wpn-toolbar__list--blocked:hover,
+.wpn-toolbar__eye--blocked:hover {
   background: transparent;
 }
 
@@ -505,8 +505,6 @@ body.wpn-mode-active {
 }
 
 .wpn-toolbar__list,
-/* A failed load is recoverable, so it reads as a warning to act on rather than
-   an error shouting in red. */
 .wpn-toolbar__retry {
   display: inline-flex;
   align-items: center;
@@ -817,7 +815,6 @@ body.wpn-mode-active {
 }
 
 .wpn-composer .wpn-status {
-  /* Status picker hidden on the new-comment composer per product request; keep markup/logic intact. */
   display: none;
 }
 
@@ -847,9 +844,6 @@ body.wpn-mode-active {
   width: 460px;
 }
 
-/* Opened from a "Not in this view" comments-list row belonging to a
-   different page — there's no on-page pin position to anchor to, so center
-   it on the viewport instead. */
 .wpn-thread-panel--centered {
   top: 50%;
   left: 50%;
@@ -860,15 +854,29 @@ body.wpn-mode-active {
 
 .wpn-thread-panel__chip {
   display: inline-block;
-  align-self: flex-start;
+  align-self: center;
   flex: none;
-  padding: 1px 6px;
+  margin: 0 4px;
+  padding: 2px 8px;
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.1);
-  color: rgba(255, 255, 255, 0.72);
-  font-size: 9px;
-  font-weight: 650;
+  border: 1px solid rgba(248, 113, 113, 0.55);
+  background: #dc2626;
+  color: #fff;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1.4;
   white-space: nowrap;
+}
+
+.wpn-thread-panel--centered .wpn-panel__header {
+  cursor: grab;
+  touch-action: none;
+}
+
+.wpn-thread-panel--dragging,
+.wpn-thread-panel--dragging .wpn-panel__header {
+  cursor: grabbing;
+  user-select: none;
 }
 
 .wpn-composer__resize-e {
@@ -924,6 +932,49 @@ body.wpn-mode-active {
   color: rgba(255, 255, 255, 0.7);
 }
 
+.wpn-thread-panel__path--editing {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 4px 6px;
+  margin-top: 6px;
+  overflow: visible;
+  white-space: normal;
+}
+
+.wpn-thread-panel__path--editing .wpn-thread-panel__path-label {
+  padding-top: 5px;
+  font-size: 10px;
+}
+
+.wpn-thread-panel__path-input {
+  display: block;
+  flex: 1;
+  min-width: 0;
+  max-height: 72px;
+  padding: 3px 8px;
+  border: 1px solid rgba(255, 255, 255, 0.24);
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.1);
+  color: #fff;
+  font-family: inherit;
+  font-size: 12px;
+  line-height: 1.4;
+  overflow-y: auto;
+  overflow-wrap: anywhere;
+  resize: none;
+  outline: none;
+}
+
+.wpn-thread-panel__path-input:focus {
+  border-color: #c4b5fd;
+  box-shadow: 0 0 0 3px rgba(91, 77, 255, 0.2);
+}
+
+.wpn-thread-panel__path-input::placeholder {
+  color: rgba(255, 255, 255, 0.45);
+}
+
 .wpn-thread-panel .wpn-panel__composer .wpn-panel__toolbar,
 .wpn-composer .wpn-panel__composer .wpn-panel__toolbar,
 .wpn-list-panel .wpn-list-panel__brand {
@@ -963,6 +1014,7 @@ body.wpn-mode-active {
 }
 
 .wpn-thread-panel .wpn-panel__title {
+  flex: 0 1 auto;
   display: -webkit-box;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 3;
@@ -972,7 +1024,8 @@ body.wpn-mode-active {
   overflow-wrap: anywhere;
 }
 
-.wpn-thread-panel .wpn-panel__title-input {
+.wpn-thread-panel .wpn-panel__title-input,
+.wpn-composer .wpn-panel__title-input {
   display: block;
   max-height: 96px;
   overflow-y: auto;
@@ -1249,12 +1302,23 @@ body.wpn-mode-active {
   box-shadow: 0 12px 28px rgba(0, 0, 0, 0.35);
 }
 
-.wpn-mention__menu--above {
-  bottom: calc(100% + 8px);
+.wpn-mention-portal {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 0;
+  height: 0;
 }
 
-.wpn-mention__menu--below {
-  top: calc(100% + 4px);
+.wpn-mention__menu--floating {
+  position: fixed;
+  right: auto;
+  width: 280px;
+  max-width: calc(100vw - 16px);
+  max-height: min(320px, calc(100vh - 16px));
+  overflow-y: auto;
+  font-family: var(--wpn-font);
+  pointer-events: auto;
 }
 
 .wpn-mention__option {
@@ -1307,6 +1371,157 @@ body.wpn-mode-active {
 .wpn-mention-chip--self {
   background: rgba(250, 204, 21, 0.2);
   color: #fde68a;
+}
+
+.wpn-mention__copy {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.wpn-mention__email {
+  overflow: hidden;
+  color: rgba(255, 255, 255, 0.5);
+  font-size: 10.5px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.wpn-mention__group {
+  padding: 6px 8px 2px;
+  color: rgba(255, 255, 255, 0.45);
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.wpn-mention__group:first-child {
+  padding-top: 2px;
+}
+
+.wpn-mention__status {
+  padding: 8px 10px;
+  color: rgba(255, 255, 255, 0.6);
+  font-size: 11.5px;
+}
+
+.wpn-root {
+  --wpn-ref-epic: #c4b5fd;
+  --wpn-ref-epic-bg: rgba(139, 92, 246, 0.2);
+  --wpn-ref-flow: #7dd3fc;
+  --wpn-ref-flow-bg: rgba(14, 165, 233, 0.2);
+  --wpn-ref-dataModel: #6ee7b7;
+  --wpn-ref-dataModel-bg: rgba(16, 185, 129, 0.2);
+}
+
+.wpn-ref-icon {
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  flex: none;
+  border-radius: 6px;
+}
+
+.wpn-ref-icon .wpn-icon {
+  width: 13px;
+  height: 13px;
+}
+
+.wpn-ref-icon--epic,
+.wpn-ref-chip--epic {
+  background: var(--wpn-ref-epic-bg);
+  color: var(--wpn-ref-epic);
+}
+
+.wpn-ref-icon--flow,
+.wpn-ref-chip--flow {
+  background: var(--wpn-ref-flow-bg);
+  color: var(--wpn-ref-flow);
+}
+
+.wpn-ref-icon--dataModel,
+.wpn-ref-chip--dataModel {
+  background: var(--wpn-ref-dataModel-bg);
+  color: var(--wpn-ref-dataModel);
+}
+
+.wpn-ref-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  max-width: 100%;
+  margin: 0 1px;
+  padding: 1px 6px 1px 4px;
+  border: 1px solid currentColor;
+  border-color: color-mix(in srgb, currentColor 35%, transparent);
+  border-radius: 6px;
+  font: inherit;
+  font-size: 0.92em;
+  font-weight: 600;
+  line-height: 1.35;
+  vertical-align: baseline;
+  white-space: nowrap;
+}
+
+.wpn-ref-chip .wpn-ref-chip__icon {
+  width: 11px;
+  height: 11px;
+  flex: none;
+}
+
+.wpn-ref-chip__type {
+  font-size: 0.82em;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  opacity: 0.75;
+  text-transform: uppercase;
+}
+
+.wpn-ref-chip__name {
+  overflow: hidden;
+  max-width: 220px;
+  text-overflow: ellipsis;
+}
+
+.wpn-ref-chip--link {
+  cursor: pointer;
+  transition:
+    filter 120ms ease,
+    border-color 120ms ease;
+}
+
+.wpn-ref-chip--link:hover {
+  border-color: currentColor;
+  filter: brightness(1.15);
+}
+
+.wpn-ref-chip--link:focus-visible {
+  outline: 2px solid var(--wpn-focus-ring);
+  outline-offset: 1px;
+}
+
+.wpn-composer__linked {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+  padding: 8px 2px 0;
+  font-size: 11.5px;
+}
+
+.wpn-composer__linked-label {
+  margin-right: 2px;
+  color: rgba(255, 255, 255, 0.55);
+  font-size: 10px;
+  font-weight: 650;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+.wpn-mention__menu .wpn-mention__option {
+  min-width: 0;
 }
 
 .wpn-thread-panel .wpn-action-icon {
@@ -1497,8 +1712,24 @@ body.wpn-mode-active {
   padding: 0 2px 4px;
 }
 
+.wpn-composer-context-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.wpn-composer-context-row .wpn-composer-hint {
+  padding: 0;
+  flex: none;
+}
+
 .wpn-composer .wpn-composer-hint {
   padding: 6px 2px 0;
+}
+
+.wpn-composer .wpn-composer-context-row .wpn-composer-hint {
+  padding: 0;
 }
 
 .wpn-composer .wpn-btn {
@@ -1659,6 +1890,23 @@ body.wpn-mode-active {
 
 .wpn-comment__meta strong {
   font-weight: 700;
+}
+
+.wpn-comment__word-count {
+  margin-left: auto;
+  color: rgba(255, 255, 255, 0.45);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  transition: color 0.15s;
+}
+
+.wpn-comment__word-count--warn {
+  color: #fbbf24;
+}
+
+.wpn-comment__word-count--limit {
+  color: #f87171;
 }
 
 .wpn-comment__meta time,
@@ -2081,11 +2329,6 @@ body.wpn-mode-active {
   max-height: none;
   overflow: hidden;
   color: #fff;
-  /* Solid, not translucent like the base .wpn-panel — this panel stays
-     anchored to a tall, fixed area (both `top` and `bottom` set) regardless
-     of how much content it has, so an empty/short result list would
-     otherwise leave the page behind visibly bleeding through the gap below
-     the footer. */
   background: #15132a;
   border: 1px solid rgba(255, 255, 255, 0.16);
 }
@@ -2116,9 +2359,6 @@ body.wpn-mode-active {
   min-height: 0;
 }
 
-/* Centers a lone status message (loading/empty) in the space above the
-   footer; has no effect once real list content is present, since that
-   content isn't a direct .wpn-muted child. */
 .wpn-list-panel__content > .wpn-muted {
   margin: auto;
   text-align: center;
@@ -2162,7 +2402,7 @@ body.wpn-mode-active {
 
 .wpn-epicflow-panel {
   position: fixed;
-  top: 72px;
+  top: 16px;
   left: 16px;
   right: 16px;
   bottom: 72px;
@@ -2539,9 +2779,17 @@ body.wpn-epicflow-resizing {
 
 .wpn-epicflow-card__row {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: space-between;
   gap: 12px;
+}
+
+.wpn-epicflow-card__title-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1 1 auto;
+  min-width: 0;
 }
 
 .wpn-epicflow-card__title {
@@ -2549,8 +2797,10 @@ body.wpn-epicflow-resizing {
   font-weight: 700;
   line-height: 1.4;
   overflow-wrap: anywhere;
-  min-width: 0;
-  flex: 1 1 auto;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: var(--title-clamp, 999);
+  overflow: hidden;
 }
 
 .wpn-epicflow-card__desc {
@@ -2693,11 +2943,12 @@ body.wpn-epicflow-resizing {
   flex-direction: column;
   gap: 8px;
   padding: 4px 2px;
+  flex-shrink: 0;
 }
 
 .wpn-epicflow-detail--editing {
   height: 100%;
-  min-height: 0;
+  min-height: 280px;
 }
 
 .wpn-epicflow-detail--editing .wpn-epicflow-modal__field:last-child {
@@ -2709,8 +2960,9 @@ body.wpn-epicflow-resizing {
   .wpn-epicflow-modal__field:last-child
   textarea.wpn-epicflow-modal__textarea {
   flex: 1;
-  min-height: 0;
+  min-height: 120px;
   resize: none;
+  overflow-y: auto;
 }
 
 .wpn-epicflow-detail__row {
@@ -2728,10 +2980,22 @@ body.wpn-epicflow-resizing {
   overflow-wrap: anywhere;
 }
 
+.wpn-epicflow-detail__desc-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
 .wpn-epicflow-detail__desc {
   font-size: 12.5px;
   line-height: 1.6;
   color: rgba(255, 255, 255, 0.7);
+  white-space: pre-wrap;
+  overflow-wrap: break-word;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: var(--desc-clamp, 999);
+  overflow: hidden;
 }
 
 .wpn-epicflow-detail__meta {
@@ -2993,9 +3257,18 @@ body.wpn-epicflow-resizing {
 }
 
 .wpn-epicflow-modal__counter {
-  align-self: flex-end;
   color: rgba(255, 255, 255, 0.62);
   font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  transition: color 0.15s;
+}
+
+.wpn-epicflow-modal__counter--warn {
+  color: #fbbf24;
+}
+
+.wpn-epicflow-modal__counter--limit {
+  color: #f87171;
 }
 
 .wpn-epicflow-modal__tips {
@@ -3340,7 +3613,7 @@ body.wpn-epicflow-resizing {
   --wpn-border: rgba(255, 255, 255, 0.14);
   --wpn-surface: rgba(255, 255, 255, 0.06);
   position: fixed;
-  top: 72px;
+  top: 16px;
   left: 16px;
   right: 16px;
   bottom: 72px;
@@ -3547,7 +3820,15 @@ body.wpn-epicflow-resizing {
 .wpn-flow-stage {
   display: flex;
   flex-direction: column;
+  flex: 1;
   min-height: 0;
+}
+
+.wpn-flow-stage__main {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
 }
 
 .wpn-flow-stage__editor {
@@ -3555,6 +3836,333 @@ body.wpn-epicflow-resizing {
   flex: 1;
   min-height: 0;
   animation: wpn-flow-reveal 320ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+
+.wpn-flow-stage__preview-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 16px;
+  background: rgba(234, 179, 8, 0.13);
+  border-bottom: 1px solid rgba(234, 179, 8, 0.3);
+  flex-shrink: 0;
+}
+
+.wpn-flow-stage__preview-info {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 12px;
+  color: #fbbf24;
+  font-weight: 500;
+}
+
+.wpn-flow-stage__preview-exit {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 12px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 500;
+  color: #fbbf24;
+  background: rgba(234, 179, 8, 0.14);
+  border: 1px solid rgba(234, 179, 8, 0.35);
+  cursor: pointer;
+  transition: background 140ms;
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
+.wpn-flow-stage__preview-exit:hover {
+  background: rgba(234, 179, 8, 0.24);
+}
+
+.wpn-flow-versions-panel {
+  width: 276px;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  border-left: 1px solid var(--wpn-border);
+  background: rgba(10, 10, 14, 0.72);
+  backdrop-filter: blur(12px);
+  overflow: hidden;
+  animation: wpn-flow-versions-slide-in 220ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+@keyframes wpn-flow-versions-slide-in {
+  from { opacity: 0; transform: translateX(20px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+
+.wpn-flow-versions-panel__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 10px 12px 14px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+  flex-shrink: 0;
+}
+
+.wpn-flow-versions-panel__title {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--wpn-text);
+  letter-spacing: 0.01em;
+}
+
+.wpn-flow-versions-panel__list {
+  flex: 1;
+  overflow-y: auto;
+  padding: 8px 6px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.wpn-flow-versions-panel__section-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 6px 5px;
+  font-size: 10.5px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--wpn-muted);
+  user-select: none;
+}
+
+.wpn-flow-versions-panel__section-label--gap {
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.wpn-flow-versions-panel__count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 16px;
+  padding: 0 5px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.08);
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--wpn-muted);
+}
+
+.wpn-flow-versions-panel__empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 24px 16px 8px;
+  text-align: center;
+  color: var(--wpn-muted);
+  font-size: 12.5px;
+  font-weight: 500;
+}
+
+.wpn-flow-versions-panel__empty p {
+  margin: 0;
+}
+
+.wpn-flow-versions-panel__empty-hint {
+  font-size: 11.5px;
+  font-weight: 400;
+  line-height: 1.55;
+  color: rgba(255, 255, 255, 0.3);
+  max-width: 200px;
+}
+
+.wpn-flow-versions-panel__error {
+  display: flex;
+  align-items: flex-start;
+  gap: 7px;
+  padding: 10px 12px;
+  margin: 4px 2px;
+  background: rgba(239, 68, 68, 0.08);
+  border: 1px solid rgba(239, 68, 68, 0.25);
+  border-radius: 7px;
+  color: #f87171;
+  font-size: 11.5px;
+  line-height: 1.5;
+}
+
+.wpn-flow-versions-panel__error svg {
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+
+.wpn-flow-versions-panel__skeleton {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 2px 0;
+}
+
+.wpn-flow-version-skeleton {
+  height: 52px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.04);
+  animation: wpn-flow-skeleton-pulse 1.4s ease-in-out infinite;
+}
+
+.wpn-flow-version-skeleton:nth-child(2) { animation-delay: 0.15s; opacity: 0.7; }
+.wpn-flow-version-skeleton:nth-child(3) { animation-delay: 0.3s; opacity: 0.45; }
+
+@keyframes wpn-flow-skeleton-pulse {
+  0%, 100% { opacity: 0.4; }
+  50%       { opacity: 0.65; }
+}
+
+.wpn-flow-version-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 10px;
+  border-radius: 8px;
+  cursor: pointer;
+  border: 1px solid transparent;
+  background: transparent;
+  text-align: left;
+  transition: background 120ms, border-color 120ms;
+  width: 100%;
+  position: relative;
+}
+
+.wpn-flow-version-item:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.wpn-flow-version-item--active {
+  background: rgba(91, 77, 255, 0.12);
+  border-color: rgba(91, 77, 255, 0.35);
+}
+
+.wpn-flow-version-item--active:hover:not(:disabled) {
+  background: rgba(91, 77, 255, 0.16);
+}
+
+.wpn-flow-version-item--draft-active {
+  background: rgba(16, 185, 129, 0.1);
+  border-color: rgba(16, 185, 129, 0.38);
+}
+
+.wpn-flow-version-item--draft-active:hover:not(:disabled) {
+  background: rgba(16, 185, 129, 0.14);
+}
+
+.wpn-flow-version-item:disabled {
+  cursor: default;
+  opacity: 0.55;
+}
+
+.wpn-flow-version-item__avatar {
+  width: 34px;
+  height: 34px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: rgba(255, 255, 255, 0.6);
+  font-size: 10.5px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
+  flex-shrink: 0;
+  transition: background 120ms, border-color 120ms, color 120ms;
+}
+
+.wpn-flow-version-item__avatar--draft {
+  background: rgba(16, 185, 129, 0.15);
+  border-color: rgba(16, 185, 129, 0.3);
+  color: #34d399;
+}
+
+.wpn-flow-version-item--draft-active .wpn-flow-version-item__avatar--draft {
+  background: rgba(16, 185, 129, 0.25);
+  border-color: rgba(16, 185, 129, 0.5);
+  color: #6ee7b7;
+}
+
+.wpn-flow-version-item__avatar--active,
+.wpn-flow-version-item--active .wpn-flow-version-item__avatar {
+  background: var(--wpn-accent);
+  border-color: var(--wpn-accent);
+  color: #fff;
+}
+
+.wpn-flow-version-item__info {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.wpn-flow-version-item__name {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12.5px;
+  font-weight: 500;
+  color: var(--wpn-text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  line-height: 1;
+}
+
+.wpn-flow-version-item--draft-active .wpn-flow-version-item__name {
+  color: #6ee7b7;
+}
+
+.wpn-flow-version-item__sub {
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.38);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  line-height: 1;
+}
+
+.wpn-flow-version-item__chip {
+  display: inline-flex;
+  align-items: center;
+  height: 15px;
+  padding: 0 5px;
+  border-radius: 4px;
+  background: rgba(91, 77, 255, 0.22);
+  border: 1px solid rgba(91, 77, 255, 0.4);
+  color: #a5b4fc;
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  flex-shrink: 0;
+}
+
+.wpn-flow-version-item__indicator {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--wpn-accent);
+  flex-shrink: 0;
+  box-shadow: 0 0 6px rgba(91, 77, 255, 0.7);
+}
+
+.wpn-flow-version-item--draft-active .wpn-flow-version-item__indicator {
+  background: #34d399;
+  box-shadow: 0 0 6px rgba(16, 185, 129, 0.7);
 }
 
 .wpn-flow-save {
@@ -4061,7 +4669,7 @@ body.wpn-epicflow-resizing {
   flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
-  gap: 10px;
+  gap: 12px;
 }
 
 .wpn-searchbar__form {
@@ -4069,7 +4677,7 @@ body.wpn-epicflow-resizing {
   align-items: center;
   flex: 1;
   min-width: 260px;
-  max-width: 460px;
+  max-width: 512px;
 }
 
 .wpn-searchbar__field {
@@ -4082,24 +4690,28 @@ body.wpn-epicflow-resizing {
 
 .wpn-searchbar__icon {
   position: absolute;
-  left: 10px;
-  width: 15px;
-  height: 15px;
-  color: rgba(255, 255, 255, 0.55);
+  left: 12px;
+  width: 16px;
+  height: 16px;
+  color: rgba(255, 255, 255, 0.45);
   pointer-events: none;
 }
 
 .wpn-searchbar__input {
   width: 100%;
-  height: 34px;
-  padding: 0 30px 0 32px;
-  border: 1px solid rgba(255, 255, 255, 0.16);
+  height: 36px;
+  padding: 0 32px 0 36px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
   border-right: 0;
-  border-radius: 8px 0 0 8px;
-  background: rgba(255, 255, 255, 0.08);
+  border-radius: 10px 0 0 10px;
+  background: rgba(255, 255, 255, 0.06);
   color: #fff;
-  font-size: 13px;
+  font-size: 12px;
+  font-weight: 500;
   outline: none;
+  transition:
+    border-color 0.15s ease,
+    box-shadow 0.15s ease;
 }
 
 .wpn-searchbar__input::placeholder {
@@ -4107,7 +4719,8 @@ body.wpn-epicflow-resizing {
 }
 
 .wpn-searchbar__input:focus {
-  border-color: #c4b5fd;
+  border-color: var(--wpn-accent);
+  box-shadow: 0 0 0 3px rgba(91, 77, 255, 0.22);
 }
 
 .wpn-searchbar__clear {
@@ -4139,13 +4752,13 @@ body.wpn-epicflow-resizing {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  height: 34px;
+  height: 36px;
   padding: 0 16px;
   border: 0;
-  border-radius: 0 8px 8px 0;
+  border-radius: 0 10px 10px 0;
   background: var(--wpn-accent);
   color: #fff;
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 600;
   cursor: pointer;
 }
@@ -4163,15 +4776,14 @@ body.wpn-epicflow-resizing {
 }
 
 .wpn-pagination {
-  display: flex;
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
   align-items: center;
-  justify-content: space-between;
-  gap: 10px;
+  gap: 12px;
   padding-top: 10px;
   border-top: 1px solid rgba(255, 255, 255, 0.1);
   font-size: 12px;
-  color: rgba(255, 255, 255, 0.6);
+  color: rgba(255, 255, 255, 0.55);
 }
 
 .wpn-pagination__summary {
@@ -4179,21 +4791,37 @@ body.wpn-epicflow-resizing {
   white-space: nowrap;
 }
 
+.wpn-pagination__summary strong {
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.88);
+}
+
 .wpn-pagination__nav {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
+  justify-content: center;
   gap: 4px;
+}
+
+@media (max-width: 720px) {
+  .wpn-pagination {
+    grid-template-columns: 1fr;
+  }
+
+  .wpn-pagination__nav {
+    justify-content: flex-start;
+  }
 }
 
 .wpn-pagination__arrow {
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  height: 28px;
-  padding: 0 9px;
+  height: 32px;
+  padding: 0 10px;
   border: 1px solid rgba(255, 255, 255, 0.16);
-  border-radius: 7px;
+  border-radius: 8px;
   background: transparent;
   color: rgba(255, 255, 255, 0.82);
   font-size: 12px;
@@ -4219,11 +4847,11 @@ body.wpn-epicflow-resizing {
 .wpn-pagination__page {
   display: grid;
   place-items: center;
-  width: 28px;
-  height: 28px;
+  width: 32px;
+  height: 32px;
   padding: 0;
   border: 1px solid rgba(255, 255, 255, 0.16);
-  border-radius: 7px;
+  border-radius: 8px;
   background: transparent;
   color: rgba(255, 255, 255, 0.82);
   font-size: 12px;
@@ -4254,8 +4882,18 @@ body.wpn-epicflow-resizing {
 .wpn-pagination__size {
   display: inline-flex;
   align-items: center;
+  justify-content: flex-end;
   gap: 8px;
   white-space: nowrap;
+}
+
+.wpn-pagination__size .wpn-select {
+  min-width: 0;
+  width: 56px;
+}
+
+.wpn-pagination__size .wpn-select__trigger {
+  padding: 0 8px;
 }
 
 .wpn-users-panel {
@@ -4327,24 +4965,9 @@ body.wpn-epicflow-resizing {
   gap: 4px;
 }
 
-.wpn-users-panel .wpn-searchbar__input,
-.wpn-audit-panel .wpn-searchbar__input,
-.wpn-users-panel .wpn-searchbar__submit,
-.wpn-audit-panel .wpn-searchbar__submit,
-.wpn-users-panel .wpn-searchbar__trailing .wpn-select__trigger,
-.wpn-audit-panel .wpn-searchbar__trailing .wpn-select__trigger,
-.wpn-users-panel .wpn-users-create,
-.wpn-audit-panel .wpn-users-create {
-  height: 32px;
+.wpn-searchbar__trailing .wpn-select__trigger {
+  height: 36px;
   font-size: 12px;
-}
-
-.wpn-users-panel .wpn-searchbar__submit,
-.wpn-audit-panel .wpn-searchbar__submit,
-.wpn-users-panel .wpn-users-create,
-.wpn-audit-panel .wpn-users-create {
-  padding: 0 13px;
-  font-weight: 550;
 }
 
 .wpn-users-panel .wpn-searchbar__trailing .wpn-select__option-label,
@@ -4362,15 +4985,15 @@ body.wpn-epicflow-resizing {
   align-items: center;
   justify-content: center;
   gap: 6px;
-  height: 32px;
-  padding: 0 13px;
-  border: 1px solid rgba(255, 255, 255, 0.18);
-  border-radius: 8px;
-  background: rgba(255, 255, 255, 0.06);
-  color: rgba(255, 255, 255, 0.82);
+  height: 36px;
+  padding: 0 14px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.04);
+  color: rgba(255, 255, 255, 0.85);
   font-family: inherit;
   font-size: 12px;
-  font-weight: 550;
+  font-weight: 600;
   white-space: nowrap;
   cursor: pointer;
   transition:
@@ -4400,13 +5023,13 @@ body.wpn-epicflow-resizing {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  height: 34px;
+  height: 36px;
   padding: 0 14px;
   border: 0;
-  border-radius: 8px;
+  border-radius: 10px;
   background: var(--wpn-accent);
   color: #fff;
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 600;
   cursor: pointer;
 }
@@ -4479,15 +5102,15 @@ body.wpn-epicflow-resizing {
   position: sticky;
   top: 0;
   z-index: 1;
-  padding: 10px 12px;
+  padding: 12px 16px;
   text-align: left;
-  font-size: 11px;
-  font-weight: 600;
+  font-size: 10.5px;
+  font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 0.04em;
-  color: rgba(255, 255, 255, 0.55);
-  background: #191919;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+  letter-spacing: 0.06em;
+  color: var(--wpn-table-head-text);
+  background: var(--wpn-table-head-bg);
+  border-bottom: 1px solid var(--wpn-section-head-border);
   white-space: nowrap;
 }
 
@@ -4512,13 +5135,87 @@ body.wpn-epicflow-resizing {
 }
 
 .wpn-users-table tbody td {
-  padding: 10px 12px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+  padding: 14px 16px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  font-size: 12.5px;
   vertical-align: middle;
 }
 
+.wpn-users-table thead th:first-child,
+.wpn-users-table tbody td:first-child {
+  padding-left: 20px;
+}
+
+.wpn-users-table tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+.wpn-users-table tbody tr {
+  transition: background-color 0.15s ease;
+}
+
 .wpn-users-table tbody tr:hover {
-  background: rgba(255, 255, 255, 0.05);
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.wpn-table-date {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+}
+
+.wpn-table-date__icon {
+  width: 14px;
+  height: 14px;
+  flex: none;
+  color: rgba(255, 255, 255, 0.4);
+}
+
+.wpn-table-card {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.025);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.25);
+}
+
+.wpn-searchbar + .wpn-table-card,
+.wpn-audit-filters + .wpn-table-card,
+.wpn-users-notice + .wpn-table-card {
+  margin-top: 4px;
+}
+
+.wpn-comments-full__section > .wpn-searchbar {
+  margin-bottom: 16px;
+}
+
+.wpn-table-card > .wpn-inline-error,
+.wpn-table-card > .wpn-muted {
+  flex: none;
+  margin: 12px 16px 0;
+}
+
+.wpn-table-card .wpn-users-table-wrap {
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+}
+
+.wpn-table-card > .wpn-comments-full__grid {
+  padding: 16px;
+}
+
+.wpn-table-card > .wpn-pagination {
+  flex: none;
+  margin-top: auto;
+  padding: 10px 16px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.03);
 }
 
 .wpn-users-table__muted {
@@ -5204,6 +5901,23 @@ body.wpn-epicflow-resizing {
 .wpn-users-action:hover {
   background: rgba(255, 255, 255, 0.12);
   color: #fff;
+}
+
+.wpn-users-action--primary {
+  border-color: var(--wpn-accent);
+  background: var(--wpn-accent);
+  color: #fff;
+}
+
+.wpn-users-action--primary:hover {
+  border-color: var(--wpn-accent-strong);
+  background: var(--wpn-accent-strong);
+  color: #fff;
+}
+
+.wpn-users-action--primary:focus-visible {
+  outline: 2px solid var(--wpn-focus-ring);
+  outline-offset: 2px;
 }
 
 .wpn-users-action--danger {
@@ -6172,8 +6886,6 @@ body.wpn-epicflow-resizing {
   border-radius: 10px;
 }
 
-/* Carries only a pulsing dot, so it collapses to a circular badge rather than a
-   wide text pill that pushes the toolbar's controls sideways. */
 .wpn-toolbar__live {
   display: inline-grid;
   place-items: center;
@@ -6433,7 +7145,7 @@ body.wpn-epicflow-resizing {
 
 .wpn-settings-panel {
   position: fixed;
-  top: 72px;
+  top: 16px;
   left: 16px;
   right: 16px;
   bottom: 72px;
@@ -6702,12 +7414,7 @@ body.wpn-epicflow-resizing {
   color: #fff;
 }
 
-.wpn-settings-panel .wpn-searchbar__input,
 .wpn-settings-panel .wpn-select__control {
-  font-size: 12.5px;
-}
-
-.wpn-settings-panel .wpn-users-create {
   font-size: 12.5px;
 }
 
@@ -6753,9 +7460,6 @@ body.wpn-epicflow-resizing {
 }
 
 .wpn-list-panel--expanded {
-  /* The top toolbar always hides itself while this mode is open (see
-     wpn-toolbar--hidden), so this claims the space that would've been
-     reserved below it instead of leaving it empty. */
   top: 16px;
   right: 16px;
   bottom: 72px;
@@ -7286,12 +7990,6 @@ body.wpn-epicflow-resizing {
   grid-template-columns: repeat(4, minmax(0, 1fr));
 }
 
-/* ---------------------------------------------------------------------- */
-/* Comments panel — Full Screen master-detail view (CommentsFullScreenView) */
-/* Minimize mode never renders these classes — see AnnotationListPanel.tsx's */
-/* `if (expanded)` branch — so none of this affects the docked panel.       */
-/* ---------------------------------------------------------------------- */
-
 .wpn-comments-full {
   flex: 1;
   min-height: 0;
@@ -7304,7 +8002,7 @@ body.wpn-epicflow-resizing {
   display: flex;
   flex-direction: column;
   gap: 6px;
-  padding: 14px 12px;
+  padding: 0 12px 14px;
   border-right: 1px solid rgba(255, 255, 255, 0.12);
   overflow-y: auto;
 }
@@ -7316,18 +8014,19 @@ body.wpn-epicflow-resizing {
   background: rgba(255, 255, 255, 0.12);
 }
 
-.wpn-comments-sidebar__heading {
+.wpn-comments-sidebar__heading,
+.wpn-comments-full__section-head {
+  flex: none;
+  box-sizing: border-box;
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 0 8px 12px;
+  min-height: 52px;
+  padding: 0 16px;
+  background: var(--wpn-section-head-bg);
+  border-bottom: 1px solid var(--wpn-section-head-border);
   font-size: 14px;
   font-weight: 700;
-}
-
-.wpn-comments-sidebar__heading-icon {
-  width: 16px;
-  height: 16px;
 }
 
 .wpn-comments-sidebar__subheading {
@@ -7397,11 +8096,14 @@ body.wpn-epicflow-resizing {
 }
 
 .wpn-thread-detail__header {
+  box-sizing: border-box;
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 14px 16px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+  min-height: 52px;
+  padding: 8px 16px;
+  background: var(--wpn-section-head-bg);
+  border-bottom: 1px solid var(--wpn-section-head-border);
 }
 
 .wpn-thread-detail__title {
@@ -7424,7 +8126,11 @@ body.wpn-epicflow-resizing {
   color: inherit;
   font: inherit;
   font-size: 13px;
+  line-height: 1.4;
   padding: 2px 6px;
+  max-height: 96px;
+  overflow-y: auto;
+  overflow-wrap: anywhere;
 }
 
 .wpn-thread-detail__menu {
@@ -7560,15 +8266,29 @@ body.wpn-epicflow-resizing {
   font-weight: 700;
 }
 
+.wpn-comments-sidebar__heading {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  margin: 0 -12px 8px;
+}
+
 .wpn-comments-full__section-head {
-  display: flex;
-  align-items: center;
   justify-content: space-between;
-  gap: 8px;
-  margin-bottom: 12px;
+}
+
+.wpn-comments-full__section-icon,
+.wpn-comments-sidebar__heading-icon {
+  width: 16px;
+  height: 16px;
+  flex: none;
+  color: #a5b4fc;
 }
 
 .wpn-comments-full__section-head .wpn-comments-full__section-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
   margin: 0;
 }
 
@@ -7795,7 +8515,11 @@ body.wpn-epicflow-resizing {
 }
 
 .wpn-comments-list-table__col-updated {
-  width: 110px;
+  width: 140px;
+}
+
+.wpn-comments-list-table__col-actions {
+  width: 210px;
 }
 
 .wpn-comments-list-table tbody tr {
@@ -7819,6 +8543,56 @@ body.wpn-epicflow-resizing {
   font: inherit;
   text-align: left;
   cursor: pointer;
+}
+
+.wpn-comments-list-table__cell {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.wpn-comments-list-table__message-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.wpn-comments-list-table__message {
+  margin: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: var(--clamp, 3);
+  color: rgba(255, 255, 255, 0.55);
+  font-size: 12px;
+  line-height: 1.5;
+  word-break: break-word;
+}
+
+.wpn-comments-list-table__toggle {
+  align-self: flex-start;
+  margin: 0;
+  padding: 0;
+  text-align: left;
+  border: 0;
+  background: none;
+  color: #a5b4fc;
+  font-family: inherit;
+  font-size: 11.5px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.wpn-comments-list-table__toggle:hover {
+  color: #c7d2fe;
+  text-decoration: underline;
+}
+
+.wpn-comments-list-table__toggle:focus-visible {
+  outline: 2px solid rgba(129, 140, 248, 0.8);
+  outline-offset: 2px;
+  border-radius: 3px;
 }
 
 .wpn-comments-list-table__reveal {
@@ -8031,11 +8805,6 @@ body.wpn-epicflow-resizing {
   gap: 6px;
 }
 
-/* The panel's width is user-resizable (280–760px, plus a full-grid expanded
-   mode), so at narrower widths the two switches alone can already fill the
-   row — wrap rather than force Clear to fit for that reason, and keep it a
-   compact pill (not the flex:1 full-width stretch .wpn-chip-toggle gets by
-   default) wherever it lands. */
 .wpn-list-panel__filter-actions .wpn-chip-toggle--clear {
   flex: 0 0 auto;
 }
@@ -8053,8 +8822,6 @@ body.wpn-epicflow-resizing {
   white-space: nowrap;
 }
 
-/* Used in the sidebar, stacked full-width like the nav items above it
-   instead of an inline pill. */
 .wpn-filter-switch--block {
   display: flex;
   width: 100%;
@@ -8068,8 +8835,6 @@ body.wpn-epicflow-resizing {
   background: rgba(255, 255, 255, 0.06);
 }
 
-/* This panel is purple-themed throughout — use the shared accent instead of
-   the Switch primitive's default green "on" state so it matches. */
 .wpn-filter-switch .wpn-switch--on .wpn-switch__track {
   background: var(--wpn-accent);
   border-color: rgba(129, 140, 248, 0.7);
@@ -8351,7 +9116,7 @@ body.wpn-epicflow-resizing {
   cursor: default;
 }
 
-.wpn-refocus-grace {
+.wpn-page-interaction {
   position: fixed;
   top: 12px;
   left: 12px;
@@ -9923,7 +10688,7 @@ body.wpn-epicflow-resizing {
 }
 
 .wpn-flow-list-tab__col-actions {
-  width: 200px;
+  width: 300px;
 }
 
 .wpn-users-table .wpn-flow-list-tab__nodes {
@@ -9932,6 +10697,7 @@ body.wpn-epicflow-resizing {
 
 .wpn-flow-list-tab .wpn-users-actions {
   flex-wrap: nowrap;
+  white-space: nowrap;
 }
 
 .wpn-flow-list-tab .wpn-users-action--labeled {
@@ -9991,4 +10757,13 @@ body.wpn-epicflow-resizing {
 .wpn-context-check:has(.wpn-context-check__input:disabled) {
   cursor: default;
   opacity: 0.7;
+}
+
+.wpn-flow-panel__status {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  justify-content: center;
+  min-width: 0;
+  padding: 0 12px;
 }

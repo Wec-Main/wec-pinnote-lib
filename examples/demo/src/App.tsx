@@ -3,7 +3,6 @@ import { AnnotationProvider, type AnnotationUser } from "wec-pinnote-lib";
 import { DEMO_CONFIG } from "./config";
 import { createInMemoryAnnotationApi } from "./mock/inMemoryAnnotationApi";
 import { createInMemoryAuthApi } from "./mock/inMemoryAuthApi";
-import { seedSampleFlow } from "./mock/sampleFlow";
 import { HomePage } from "./pages/HomePage";
 import { LoginPage } from "./pages/LoginPage";
 
@@ -24,13 +23,6 @@ export function App() {
     () => (DEMO_CONFIG.useMockApi ? createInMemoryAuthApi() : undefined),
     [],
   );
-
-  useState(() => {
-    if (DEMO_CONFIG.useMockApi) {
-      seedSampleFlow(DEMO_CONFIG.projectId);
-    }
-    return null;
-  });
 
   const go = (path: "/login" | "/home") => {
     window.history.pushState({}, "", path);

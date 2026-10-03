@@ -19,6 +19,7 @@ interface UseFlowDocumentOptions {
   flowId: string | null;
   onSaved?: (flowName: string) => void;
   onSaveFailed?: (flowId: string, message: string) => void;
+  holdAutosave?: boolean;
 }
 
 export type FlowDocumentState = RevisionedDocumentState<FlowJSON>;
@@ -37,5 +38,10 @@ const flowAdapter: RevisionedDocumentAdapter<FlowJSON> = {
 
 export function useFlowDocument(options: UseFlowDocumentOptions): FlowDocumentState {
   const { flowId, ...rest } = options;
-  return useRevisionedDocument({ ...rest, documentId: flowId, adapter: flowAdapter });
+  return useRevisionedDocument({
+    ...rest,
+    documentId: flowId,
+    adapter: flowAdapter,
+    autosave: false,
+  });
 }

@@ -32,7 +32,24 @@ export interface CreateEpicRequest extends EpicFlowFormInput {
 
 export type CreateUserStoryRequest = EpicFlowFormInput;
 
+export type BoardBatchItem =
+  | { op: "createEpic"; tempId?: string; title: string; description: string }
+  | { op: "updateEpic"; epic: string; title?: string; description?: string }
+  | { op: "createUserStory"; tempId?: string; epic: string; title: string; description: string }
+  | { op: "updateUserStory"; story: string; title?: string; description?: string };
+
+export interface BoardBatchResultItem {
+  index: number;
+  op: BoardBatchItem["op"];
+  id: string;
+}
+
 export interface EpicFlowApiClient {
+  batchBoard(
+    projectId: string,
+    items: BoardBatchItem[],
+    signal?: AbortSignal,
+  ): Promise<{ items: BoardBatchResultItem[] }>;
   getEpics(projectId: string, signal?: AbortSignal): Promise<Epic[]>;
   createEpic(data: CreateEpicRequest, signal?: AbortSignal): Promise<Epic>;
   updateEpic(epicId: string, data: EpicFlowFormInput, signal?: AbortSignal): Promise<Epic>;
@@ -90,6 +107,15 @@ export function createEpicFlowApi(config: EpicFlowApiConfig): EpicFlowApiClient 
   }
 
   return {
+    batchBoard(projectId, items, signal) {
+      return call<{ items: BoardBatchResultItem[] }>({
+        method: "POST",
+        path: "/epics/batch",
+        body: { projectId, items },
+        signal,
+      });
+    },
+
     getEpics(projectId, signal) {
       return call<Epic[]>({
         method: "GET",

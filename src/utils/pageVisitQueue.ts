@@ -1,7 +1,6 @@
 import type { OpenPageView, PageVisitRecord } from "../types/pageVisit.types";
 
 export const FLUSH_INTERVAL_MS = 5000;
-export const HEARTBEAT_INTERVAL_MS = 60000;
 export const CONTINUATION_WINDOW_MS = 5000;
 export const MAX_BATCH_VISITS = 50;
 export const MAX_BATCH_BYTES = 60000;

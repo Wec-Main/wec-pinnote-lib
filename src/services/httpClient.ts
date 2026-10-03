@@ -1,10 +1,12 @@
 import { AnnotationApiError } from "../types/annotation.types";
 import { actorHeaders } from "./actorIdentity";
+import { notModified, withEtag, type ConditionalResult } from "../utils/resourceCache";
 
 export const UNAUTHORIZED_EVENT = "wpn:unauthorized";
 
 const UNAUTHORIZED_STATUS = 401;
 const NO_CONTENT_STATUS = 204;
+const NOT_MODIFIED_STATUS = 304;
 const ABSOLUTE_URL = /^https?:\/\//i;
 const PLACEHOLDER_ORIGIN = "http://local.invalid";
 const API_PREFIX = "/api/v1/pinnote";
@@ -25,6 +27,7 @@ export interface RequestPolicy {
   fallbackMessage?: (status: number) => string;
   createError?: ApiErrorFactory;
   reportUnauthorized?: boolean;
+  acceptNotModified?: boolean;
 }
 
 export function reportUnauthorized(status: number, token: string | undefined): void {
@@ -99,6 +102,10 @@ async function send(
     },
   });
 
+  if (policy.acceptNotModified && response.status === NOT_MODIFIED_STATUS) {
+    return response;
+  }
+
   if (!response.ok) {
     if (policy.reportUnauthorized !== false) {
       reportUnauthorized(response.status, authToken);
@@ -124,6 +131,38 @@ export async function request<T>(
   }
   try {
     return JSON.parse(text) as T;
+  } catch {
+    throw createError("Response body is not valid JSON", response.status, text);
+  }
+}
+
+export async function requestConditional<T>(
+  url: string,
+  authToken: string | undefined,
+  etag: string | null,
+  init?: RequestInit,
+  policy: RequestPolicy = {},
+): Promise<ConditionalResult<T>> {
+  const response = await send(
+    url,
+    authToken,
+    {
+      ...init,
+      headers: { ...(etag ? { "If-None-Match": etag } : {}), ...init?.headers },
+    },
+    { ...policy, acceptNotModified: true },
+  );
+  const responseEtag = response.headers.get("ETag");
+  if (response.status === NOT_MODIFIED_STATUS) {
+    return notModified<T>(responseEtag ?? etag);
+  }
+  const createError = policy.createError ?? defaultCreateError;
+  const text = response.status === NO_CONTENT_STATUS ? "" : await response.text();
+  if (!text.trim()) {
+    throw createError("Expected a response body but received none", response.status, null);
+  }
+  try {
+    return withEtag(JSON.parse(text) as T, responseEtag);
   } catch {
     throw createError("Response body is not valid JSON", response.status, text);
   }

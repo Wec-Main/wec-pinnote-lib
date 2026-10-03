@@ -22,7 +22,14 @@ export type NodeShape =
   | "hexagon"
   | "cylinder"
   | "cloud"
+  | "actor"
+  | "swimlane"
+  | "swimlaneVertical"
   | "text";
+
+export function isLaneShape(shape: NodeShape): boolean {
+  return shape === "swimlane" || shape === "swimlaneVertical";
+}
 
 export type NodeRole = "start" | "end" | "default";
 
@@ -82,7 +89,10 @@ export type BuiltInIcon =
   | "triangleShape"
   | "hexagonShape"
   | "cylinderShape"
-  | "cloudShape";
+  | "cloudShape"
+  | "actor"
+  | "swimlaneH"
+  | "swimlaneV";
 
 export interface NodeTypeDefinition {
   type: string;
@@ -355,6 +365,48 @@ export const builtInNodeTypes: NodeTypeDefinition[] = [
     resizable: true,
     handles: inOut(),
     defaultData: { label: "Text" },
+  },
+  {
+    type: "actor",
+    label: "Person",
+    description: "A user, role or external actor",
+    category: "General",
+    color: "#ec4899",
+    icon: "actor",
+    shape: "actor",
+    defaultSize: { width: 90, height: 120 },
+    minSize: { width: 50, height: 70 },
+    resizable: true,
+    handles: inOut(),
+    defaultData: { label: "User" },
+  },
+  {
+    type: "swimlane",
+    label: "Horizontal Swimlane",
+    description: "A row grouping the steps one person or team owns",
+    category: "General",
+    color: "#8b5cf6",
+    icon: "swimlaneH",
+    shape: "swimlane",
+    defaultSize: { width: 720, height: 200 },
+    minSize: { width: 200, height: 80 },
+    resizable: true,
+    handles: [],
+    defaultData: { label: "Lane" },
+  },
+  {
+    type: "swimlaneVertical",
+    label: "Vertical Swimlane",
+    description: "A column grouping the steps one person or team owns",
+    category: "General",
+    color: "#06b6d4",
+    icon: "swimlaneV",
+    shape: "swimlaneVertical",
+    defaultSize: { width: 240, height: 520 },
+    minSize: { width: 100, height: 160 },
+    resizable: true,
+    handles: [],
+    defaultData: { label: "Lane" },
   },
 ];
 

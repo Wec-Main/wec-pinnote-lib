@@ -14,10 +14,15 @@ import {
 import {
   encodeMentions,
   mentionsToPlainText,
+  referencesInMessage,
   splitMentions,
   type MentionCandidate,
 } from "../../utils/mentions";
 import { useMentionCandidates } from "../../hooks/useMentionCandidates";
+import {
+  useReferenceCandidates,
+  type ReferenceCandidatesResult,
+} from "../../hooks/useReferenceCandidates";
 import { AddToContextCheckbox } from "../AddToContextCheckbox";
 import { CommentMessage } from "../CommentMessage";
 import { CommentQuote } from "../CommentQuote";
@@ -32,11 +37,6 @@ interface AnnotationThreadProps {
   onDelete: (comment: AnnotationComment) => void;
   onReply: (comment: AnnotationComment) => void;
   onEditingChange?: (editing: boolean) => void;
-  // When on, renders the first comment as a standalone "root" block, then a
-  // "N replies" label, then the rest of the comments in a connected list —
-  // used by the Full Screen detail pane. Off (the default) keeps every
-  // comment in one flat list, as the floating thread popup and Minimize mode
-  // have always rendered it.
   separateReplies?: boolean;
 }
 
@@ -51,6 +51,7 @@ function CommentItem({
   comment,
   quoted,
   candidates,
+  references,
   currentUser,
   deletesAnnotation,
   canDeleteAnnotation,
@@ -63,6 +64,7 @@ function CommentItem({
   comment: AnnotationComment;
   quoted: AnnotationComment | undefined;
   candidates: MentionCandidate[];
+  references: ReferenceCandidatesResult;
   currentUser: AnnotationUser;
   deletesAnnotation: boolean;
   canDeleteAnnotation: boolean;
@@ -108,12 +110,18 @@ function CommentItem({
       segment.kind === "mention" ? [{ id: segment.userId, name: segment.name }] : [],
     );
     setEditing(false);
-    onEdit(comment.id, encodeMentions(trimmed, [...candidates, ...previouslyMentioned])).catch(
-      () => {
-        setValue(trimmed);
-        setEditing(true);
-      },
-    );
+    const previouslyReferenced = referencesInMessage(comment.message);
+    onEdit(
+      comment.id,
+      encodeMentions(
+        trimmed,
+        [...candidates, ...previouslyMentioned],
+        [...references.references, ...previouslyReferenced],
+      ),
+    ).catch(() => {
+      setValue(trimmed);
+      setEditing(true);
+    });
   };
 
   return (
@@ -123,7 +131,19 @@ function CommentItem({
         <div className="wpn-comment__meta">
           <strong>{comment.createdBy.name}</strong>
           <time dateTime={comment.createdAt}>{formatTimestamp(comment.createdAt)}</time>
-          {editing ? null : (
+          {editing ? (
+            <span
+              className={
+                value.length >= COMMENT_MAX_LENGTH
+                  ? "wpn-comment__word-count wpn-comment__word-count--limit"
+                  : value.length >= COMMENT_MAX_LENGTH * 0.9
+                    ? "wpn-comment__word-count wpn-comment__word-count--warn"
+                    : "wpn-comment__word-count"
+              }
+            >
+              {value.length}/{COMMENT_MAX_LENGTH}
+            </span>
+          ) : (
             <div className="wpn-comment__actions wpn-comment__actions--inline">
               <button
                 type="button"
@@ -182,6 +202,9 @@ function CommentItem({
               value={value}
               onChange={setValue}
               candidates={candidates}
+              references={references.references}
+              referencesLoading={references.loading}
+              onReferenceTrigger={references.request}
               ariaLabel="Edit comment"
               rows={2}
               maxLength={COMMENT_MAX_LENGTH}
@@ -260,6 +283,7 @@ export function AnnotationThread({
 }: AnnotationThreadProps) {
   const [dirtyEditIds, setDirtyEditIds] = useState<Set<string>>(new Set());
   const candidates = useMentionCandidates();
+  const references = useReferenceCandidates();
 
   useEffect(() => {
     onEditingChange?.(dirtyEditIds.size > 0);
@@ -290,6 +314,7 @@ export function AnnotationThread({
       comment={comment}
       quoted={annotation.comments.find((item) => item.id === comment.replyToId)}
       candidates={candidates}
+      references={references}
       currentUser={currentUser}
       deletesAnnotation={deletesAnnotation}
       canDeleteAnnotation={canDelete}

@@ -1,43 +1,24 @@
-import { useEffect } from "react";
-import { fetchAnalyticsPages } from "../../../services/analyticsApi";
-import type { AnalyticsFilters, PageVisitRow } from "../../../types/analytics.types";
+import type { PageVisitRow } from "../../../types/analytics.types";
 import { TableSkeleton } from "../../primitives";
 import { dashboardNumberFormat, formatDuration } from "./dashboardFormat";
-import { DASHBOARD_TOP_LIMIT } from "./dashboardLimits";
 import { widgetView } from "./dashboardStatus";
 import { WidgetMessageRow } from "./DashboardWidgetMessage";
-import { useDashboardFetch } from "./useDashboardFetch";
 
 const TOP_PAGES_COLUMNS = 4;
 
 interface TopPagesTableProps {
-  filters: AnalyticsFilters;
-  reloadToken: number;
+  rows: PageVisitRow[] | null;
+  refreshing: boolean;
   projectName: (projectId: string) => string;
-  onPagesLoaded: (pages: PageVisitRow[]) => void;
 }
 
-export function TopPagesTable({
-  filters,
-  reloadToken,
-  projectName,
-  onPagesLoaded,
-}: TopPagesTableProps) {
-  const { data, loading, loaded, error } = useDashboardFetch(
-    [filters, reloadToken],
-    (apiBaseUrl, authToken, signal) =>
-      fetchAnalyticsPages(apiBaseUrl, authToken, filters, DASHBOARD_TOP_LIMIT, 0, signal),
-    "Unable to load top pages.",
-  );
-
-  useEffect(() => {
-    if (data) {
-      onPagesLoaded(data.pages);
-    }
-  }, [data, onPagesLoaded]);
-
-  const rows = data?.pages ?? [];
-  const view = widgetView({ loading, loaded, error, isEmpty: rows.length === 0 });
+export function TopPagesTable({ rows, refreshing, projectName }: TopPagesTableProps) {
+  const view = widgetView({
+    loading: rows === null,
+    loaded: rows !== null,
+    error: null,
+    isEmpty: rows?.length === 0,
+  });
 
   return (
     <section className="wpn-dashboard-section wpn-dashboard-top__panel">
@@ -48,7 +29,7 @@ export function TopPagesTable({
           className={[
             "wpn-users-table",
             "wpn-dashboard-ranked",
-            loading && loaded ? "wpn-users-table--refetching" : "",
+            refreshing ? "wpn-users-table--refetching" : "",
           ]
             .filter(Boolean)
             .join(" ")}
@@ -74,13 +55,6 @@ export function TopPagesTable({
                 columns={["text", "text", "text", "text"]}
                 label="Loading top pages..."
               />
-            ) : view === "error" ? (
-              <WidgetMessageRow
-                colSpan={TOP_PAGES_COLUMNS}
-                tone="error"
-                icon="alert"
-                title={error ?? ""}
-              />
             ) : view === "empty" ? (
               <WidgetMessageRow
                 colSpan={TOP_PAGES_COLUMNS}
@@ -89,7 +63,7 @@ export function TopPagesTable({
                 title="No pages ranked yet"
               />
             ) : (
-              rows.map((row, index) => (
+              (rows ?? []).map((row, index) => (
                 <tr key={`${row.projectId}:${row.pageKey}`} className="wpn-dashboard-reveal">
                   <td className="wpn-dashboard-ranked__rank wpn-users-table__muted">{index + 1}</td>
                   <td className="wpn-dashboard-pages__page" title={row.pageKey}>

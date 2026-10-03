@@ -52,7 +52,6 @@ export function ExportDialog({ currentVersionId, onClose }: ExportDialogProps) {
   const [busy, setBusy] = useState(false);
   const [exportError, setExportError] = useState<string | null>(null);
 
-  // Newest first; default to the latest version unless the user picked another.
   const sorted = versions ? [...versions].sort((a, b) => b.versionNumber - a.versionNumber) : [];
   const selected = sorted.find((v) => v.id === picked) ?? sorted[0];
 
@@ -89,7 +88,6 @@ export function ExportDialog({ currentVersionId, onClose }: ExportDialogProps) {
       const files = allFiles.filter((file) =>
         targets.some((target) => file.filename.startsWith(EXPORT_FILE_PREFIX[target] ?? "")),
       );
-      // Browsers may block simultaneous downloads, so space them out.
       for (const [index, file] of files.entries()) {
         if (index > 0) {
           await sleep(DOWNLOAD_DELAY_MS);

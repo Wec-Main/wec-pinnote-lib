@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useAnnotationContext, type VersionedLayer } from "../../context/AnnotationContext";
 import { useEscapeKey } from "../../hooks/useEscapeKey";
 import { useOutsidePointerDown } from "../../hooks/useOutsidePointerDown";
@@ -43,6 +43,12 @@ export function AnnotationVisibilityToggle() {
   useEscapeKey(close, open);
 
   const loggedOut = !activeAccount;
+
+  useEffect(() => {
+    if (loggedOut) {
+      setOpen(false);
+    }
+  }, [loggedOut]);
   const anyLayerVersioned =
     project?.annotationVersioningEnabled !== false || project?.flowVersioningEnabled !== false;
   const { versions, error: versionsError } = useProjectVersionList(open && anyLayerVersioned);
@@ -79,6 +85,7 @@ export function AnnotationVisibilityToggle() {
       label: projectVersionLabel(version),
       shortcut: version.id === project?.currentProjectVersionId ? "Current" : version.status,
       checked: version.id === definition.selectedVersionId,
+      disabled: loggedOut,
       onSelect: () =>
         selectLayerVersion(
           definition.layer,
@@ -98,16 +105,16 @@ export function AnnotationVisibilityToggle() {
         checked: definition.visible,
         shortcut: String(definition.count),
         variant: "switch",
+        disabled: loggedOut,
         onToggle: definition.onToggle,
       };
     }
-    // The on/off switch lives on the layer row itself, so the right-hand flyout
-    // lists the versions chooser alone.
     return {
       type: "submenu",
       id: `${definition.layer}-menu`,
       label: definition.label,
       icon: definition.icon,
+      disabled: loggedOut,
       toggle: { label: toggleLabel, checked: definition.visible, onToggle: definition.onToggle },
       items: versionItems(definition),
     };
@@ -159,7 +166,7 @@ export function AnnotationVisibilityToggle() {
           <Icon name="layers" className="wpn-toggle__icon" />
         </button>
       </Tooltip>
-      {open ? (
+      {open && !loggedOut ? (
         <MenuPanel
           items={items}
           placement="bottom-start"

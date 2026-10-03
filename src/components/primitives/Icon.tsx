@@ -53,9 +53,89 @@ export type IconName =
   | "grid"
   | "list"
   | "arrowUpRight"
-  | "open";
+  | "send"
+  | "open"
+  | "plug"
+  | "sparkles"
+  | "stop"
+  | "x"
+  | "thumbsUp"
+  | "thumbsDown"
+  | "arrowDown"
+  | "archive"
+  | "sidebar"
+  | "save"
+  | "undo"
+  | "panelCompact"
+  | "panelExpanded"
+  | "panelMax"
+  | "more"
+  | "newChat"
+  | "pin";
 
 const PATHS: Record<IconName, ReactElement> = {
+  more: (
+    <>
+      <circle cx="5" cy="12" r="1.4" fill="currentColor" stroke="none" />
+      <circle cx="12" cy="12" r="1.4" fill="currentColor" stroke="none" />
+      <circle cx="19" cy="12" r="1.4" fill="currentColor" stroke="none" />
+    </>
+  ),
+  pin: (
+    <>
+      <path d="M12 17v5" />
+      <path d="M9 10.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24V16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V7a1 1 0 0 1 1-1 2 2 0 0 0 0-4H8a2 2 0 0 0 0 4 1 1 0 0 1 1 1z" />
+    </>
+  ),
+  newChat: (
+    <>
+      <path d="M12 4H6a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-6" />
+      <path d="M18.4 2.6a2 2 0 0 1 2.9 2.9L12.5 14.3 9 15l.7-3.5 8.7-8.9Z" />
+    </>
+  ),
+  panelCompact: (
+    <>
+      <rect x="3" y="4" width="18" height="16" rx="2" />
+      <path d="M3 15h18" />
+    </>
+  ),
+  panelExpanded: (
+    <>
+      <rect x="3" y="4" width="18" height="16" rx="2" />
+      <path d="M3 10.5h18" />
+    </>
+  ),
+  panelMax: (
+    <>
+      <rect x="3" y="4" width="18" height="16" rx="2" />
+      <path d="M3 7.5h18" />
+    </>
+  ),
+  save: (
+    <>
+      <path d="M5 3h11l3 3v13a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2Z" />
+      <path d="M7 3v5h8V3M7 21v-7h10v7" />
+    </>
+  ),
+  undo: (
+    <>
+      <path d="M9 14 4 9l5-5" />
+      <path d="M4 9h10a6 6 0 0 1 0 12h-3" />
+    </>
+  ),
+  plug: (
+    <>
+      <path d="M9 3v4M15 3v4" />
+      <path d="M6.5 7h11v3.5a5.5 5.5 0 0 1-11 0V7Z" />
+      <path d="M12 16v5" />
+    </>
+  ),
+  sparkles: (
+    <>
+      <path d="M10 3.5 11.6 8a2 2 0 0 0 1.2 1.2L17.5 11l-4.7 1.7a2 2 0 0 0-1.2 1.2L10 18.5l-1.6-4.6a2 2 0 0 0-1.2-1.2L2.5 11l4.7-1.8A2 2 0 0 0 8.4 8L10 3.5Z" />
+      <path d="M18 3v4M16 5h4M19 16v3M17.5 17.5h3" />
+    </>
+  ),
   open: (
     <>
       <path d="M13.5 4.5h6v6" />
@@ -344,6 +424,45 @@ const PATHS: Record<IconName, ReactElement> = {
     <>
       <path d="M7 17 17 7" />
       <path d="M8.5 7H17v8.5" />
+    </>
+  ),
+  send: (
+    <>
+      <path d="M12 19V5" />
+      <path d="m5.5 11.5 6.5-6.5 6.5 6.5" />
+    </>
+  ),
+  stop: <rect x="6.5" y="6.5" width="11" height="11" rx="2.5" fill="currentColor" stroke="none" />,
+  x: <path d="M7 7l10 10M17 7 7 17" />,
+  thumbsUp: (
+    <>
+      <path d="M7 10v10H4.5A1.5 1.5 0 0 1 3 18.5v-7A1.5 1.5 0 0 1 4.5 10H7Z" />
+      <path d="M7 10l4-7a2.2 2.2 0 0 1 2.6 2.6L13 9h5.3a2 2 0 0 1 2 2.4l-1.4 7A2 2 0 0 1 16.9 20H7" />
+    </>
+  ),
+  thumbsDown: (
+    <>
+      <path d="M17 14V4h2.5A1.5 1.5 0 0 1 21 5.5v7a1.5 1.5 0 0 1-1.5 1.5H17Z" />
+      <path d="M17 14l-4 7a2.2 2.2 0 0 1-2.6-2.6L11 15H5.7a2 2 0 0 1-2-2.4l1.4-7A2 2 0 0 1 7.1 4H17" />
+    </>
+  ),
+  arrowDown: (
+    <>
+      <path d="M12 5v14" />
+      <path d="m6 13 6 6 6-6" />
+    </>
+  ),
+  archive: (
+    <>
+      <rect x="3" y="4" width="18" height="5" rx="1.5" />
+      <path d="M5 9v9.5A1.5 1.5 0 0 0 6.5 20h11a1.5 1.5 0 0 0 1.5-1.5V9" />
+      <path d="M10 13h4" />
+    </>
+  ),
+  sidebar: (
+    <>
+      <rect x="3" y="4" width="18" height="16" rx="2" />
+      <path d="M9 4v16" />
     </>
   ),
 };

@@ -1,4 +1,4 @@
-import { memo, type CSSProperties, type DragEvent } from "react";
+import { memo, useState, type CSSProperties, type DragEvent } from "react";
 import { useErdEngine, useErdState } from "../../../context/ErdContext";
 import {
   ENTITY_DEFAULT_WIDTH,
@@ -27,10 +27,18 @@ function viewportCenter(
 }
 
 type PaletteKind = "entity" | "note";
+type OutlineKind = "entity" | "enum" | "note";
+
+const FOCUS_OPTIONS = { padding: 0.4, maxZoom: 1 };
 
 export const ErdPalette = memo(function ErdPalette({ style }: { style?: CSSProperties }) {
   const engine = useErdEngine();
   const readOnly = useErdState((s) => s.readOnly);
+  const entities = useErdState((s) => s.entities);
+  const enums = useErdState((s) => s.enums);
+  const notes = useErdState((s) => s.notes);
+  const selection = useErdState((s) => s.selection);
+  const [query, setQuery] = useState("");
 
   const addEntity = () => {
     const position = viewportCenter(engine, engine.getState().entities.length, {
@@ -44,6 +52,53 @@ export const ErdPalette = memo(function ErdPalette({ style }: { style?: CSSPrope
     engine.select("note", engine.addNote({ position }).id);
   };
 
+  const addEnum = () => {
+    engine.select("enum", engine.addEnum().id);
+  };
+
+  const outlineGroups: {
+    kind: OutlineKind;
+    title: string;
+    icon: "database" | "puzzle" | "textShape";
+    items: { id: string; label: string }[];
+  }[] = [
+    {
+      kind: "entity",
+      title: "Entities",
+      icon: "database",
+      items: entities.map((entity) => ({ id: entity.id, label: entity.name })),
+    },
+    {
+      kind: "enum",
+      title: "Enums",
+      icon: "puzzle",
+      items: enums.map((entry) => ({ id: entry.id, label: entry.name })),
+    },
+    {
+      kind: "note",
+      title: "Notes",
+      icon: "textShape",
+      items: notes.map((note, index) => ({
+        id: note.id,
+        label: note.text.trim().split("\n")[0]?.slice(0, 40) || `Note ${index + 1}`,
+      })),
+    },
+  ];
+  const needle = query.trim().toLowerCase();
+  const total = entities.length + enums.length + notes.length;
+
+  const isSelected = (kind: OutlineKind, id: string) =>
+    kind === "entity"
+      ? selection.entityIds.has(id)
+      : kind === "note"
+        ? selection.noteIds.has(id)
+        : selection.enumId === id;
+
+  const focusItem = (kind: OutlineKind, id: string) => {
+    engine.select(kind, id);
+    if (kind !== "enum") engine.fitView({ ids: [id], ...FOCUS_OPTIONS });
+  };
+
   const dragStart = (kind: PaletteKind) => (event: DragEvent) => {
     event.dataTransfer.setData(ERD_PALETTE_DRAG_MIME, kind);
     event.dataTransfer.effectAllowed = "copy";
@@ -52,7 +107,7 @@ export const ErdPalette = memo(function ErdPalette({ style }: { style?: CSSPrope
   const draggableItem = (
     kind: PaletteKind,
     label: string,
-    icon: "database" | "textShape",
+    icon: "database" | "puzzle" | "textShape",
     add: () => void,
   ) => (
     <button
@@ -88,7 +143,65 @@ export const ErdPalette = memo(function ErdPalette({ style }: { style?: CSSPrope
           <div className="wpn-flowchart-ui__section-title">Add</div>
           {draggableItem("entity", "Entity", "database", addEntity)}
           {draggableItem("note", "Note", "textShape", addNote)}
+          {!readOnly && (
+            <button
+              type="button"
+              className="wpn-flowchart-sidebar__item"
+              title="Add an enum type"
+              onClick={addEnum}
+            >
+              <span className="wpn-erd__palette-icon" aria-hidden="true">
+                <Icon name="puzzle" size={18} />
+              </span>
+              <span className="wpn-flowchart-sidebar__item-text">
+                <span className="wpn-flowchart-sidebar__item-label">Enum</span>
+              </span>
+            </button>
+          )}
         </div>
+        {total > 0 && (
+          <div className="wpn-flowchart-sidebar__group wpn-erd__outline">
+            <div className="wpn-flowchart-ui__section-title">In this model ({total})</div>
+            {total > 6 && (
+              <input
+                type="search"
+                className="wpn-flowchart-ui__input wpn-erd__outline-search"
+                placeholder="Search…"
+                aria-label="Search model objects"
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+              />
+            )}
+            {outlineGroups.map((group) => {
+              const items = group.items.filter(
+                (item) => !needle || item.label.toLowerCase().includes(needle),
+              );
+              if (items.length === 0) return null;
+              return (
+                <div key={group.kind} className="wpn-erd__outline-group">
+                  <div className="wpn-erd__outline-title">
+                    {group.title} ({items.length})
+                  </div>
+                  {items.map((item) => (
+                    <button
+                      key={item.id}
+                      type="button"
+                      className={cx(
+                        "wpn-erd__outline-item",
+                        isSelected(group.kind, item.id) && "wpn-erd__outline-item--active",
+                      )}
+                      aria-pressed={isSelected(group.kind, item.id)}
+                      onClick={() => focusItem(group.kind, item.id)}
+                    >
+                      <Icon name={group.icon} size={14} />
+                      <span className="wpn-erd__outline-label">{item.label || "Untitled"}</span>
+                    </button>
+                  ))}
+                </div>
+              );
+            })}
+          </div>
+        )}
       </div>
     </aside>
   );

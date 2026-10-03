@@ -1,4 +1,3 @@
-/** Triggers a browser download of `data` as a pretty-printed .json file. */
 export function downloadJson(filename: string, data: unknown): void {
   const name = filename.endsWith('.json') ? filename : `${filename}.json`;
   const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });

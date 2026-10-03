@@ -1,0 +1,840 @@
+import {
+  memo,
+  useCallback,
+  useId,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
+import type { AiSessionState } from "../../hooks/useAiSession";
+import type { AiStreamingDraft } from "../../ai/sessionReducer";
+import type {
+  AiMention,
+  AiCommentDraft,
+  AiMessage,
+  AiOpBatch,
+  AiTurn,
+  AiUsage,
+} from "../../types/ai.types";
+import { useSkeletonGate } from "../../hooks/useSkeletonGate";
+import { Icon, Spinner } from "../primitives";
+import { TranscriptSkeleton } from "../loading/ScreenSkeletons";
+import { formatElapsed, formatTokens } from "./AiActivity";
+import { AiMentionChip } from "./AiComposer";
+import { AiMarkdown } from "./AiMarkdown";
+import { BatchCard } from "./BatchCard";
+import { WorkspaceBatchCard } from "./WorkspaceBatchCard";
+import { isWorkspaceBatch } from "./useAiWorkspaceApplier";
+import { DraftCommentCard } from "./DraftCommentCard";
+import { aiErrorActions, aiErrorText, isActiveTurn, type AiErrorAction } from "./aiHelpers";
+import { useAiCardActions } from "./useAiCardActions";
+
+export type AiFeedback = "up" | "down";
+
+export interface AiTranscriptProps {
+  session: AiSessionState;
+  currentUserId: string | null;
+  canApplyModelOps: boolean;
+  compact?: boolean;
+  emptyHint?: ReactNode;
+  canSwitchProvider?: boolean;
+  onRetry?: () => void;
+  onRetryWithProvider?: () => void;
+  onEditLast?: (message: AiMessage) => void;
+  onOpenIntegrations?: () => void;
+  onFeedback?: (aiMessageId: string, value: AiFeedback | null) => void;
+}
+
+export const NEAR_BOTTOM_PX = 80;
+
+export interface ScrollMetrics {
+  scrollTop: number;
+  scrollHeight: number;
+  clientHeight: number;
+}
+
+export function isNearBottom(metrics: ScrollMetrics, threshold = NEAR_BOTTOM_PX): boolean {
+  return metrics.scrollHeight - metrics.scrollTop - metrics.clientHeight <= threshold;
+}
+
+export function shouldAutoScroll(wasNearBottom: boolean, ownNewMessage: boolean): boolean {
+  return wasNearBottom || ownNewMessage;
+}
+
+export function restoredScrollTop(
+  before: { scrollTop: number; scrollHeight: number },
+  nextScrollHeight: number,
+): number {
+  return Math.max(0, nextScrollHeight - (before.scrollHeight - before.scrollTop));
+}
+
+export type ToolStepStatus = "running" | "done" | "failed" | "stopped";
+
+export function resolveToolStatus(
+  status: "running" | "ok" | "error",
+  turnActive: boolean,
+  turn: AiTurn | undefined,
+): ToolStepStatus {
+  if (status === "ok") return "done";
+  if (status === "error") return "failed";
+  if (turnActive) return "running";
+  return turn?.status === "failed" ? "failed" : "stopped";
+}
+
+export function turnFailureText(turn: AiTurn): string | null {
+  if (turn.status === "interrupted" || turn.status === "cancelled") {
+    return turn.errorCode && turn.errorCode !== "interrupted"
+      ? aiErrorText(turn.errorCode, "Stopped.")
+      : "Stopped.";
+  }
+  if (turn.status !== "failed") return null;
+  return aiErrorText(turn.errorCode, turn.errorMessage || "The turn failed.");
+}
+
+export function hasUsage(usage: AiUsage): boolean {
+  return Boolean(
+    usage.inputTokens || usage.outputTokens || usage.cachedInputTokens || usage.costUsd,
+  );
+}
+
+export function usageText(usage: AiUsage): string {
+  const parts: string[] = [];
+  if (usage.inputTokens) {
+    const cached = usage.cachedInputTokens
+      ? ` (${formatTokens(usage.cachedInputTokens)} cached)`
+      : "";
+    parts.push(`${formatTokens(usage.inputTokens)} in${cached}`);
+  }
+  if (usage.outputTokens) parts.push(`${formatTokens(usage.outputTokens)} out`);
+  if (usage.costUsd) parts.push(`$${usage.costUsd < 0.01 ? "<0.01" : usage.costUsd.toFixed(2)}`);
+  return parts.join(" · ");
+}
+
+type Row =
+  | { kind: "user"; key: string; message: AiMessage }
+  | { kind: "turn"; key: string; aiTurnId: string | null; messages: AiMessage[] };
+
+function buildRows(order: readonly string[], byId: Readonly<Record<string, AiMessage>>): Row[] {
+  const rows: Row[] = [];
+  for (const id of order) {
+    const message = byId[id];
+    if (!message) continue;
+    if (message.role === "user") {
+      rows.push({ kind: "user", key: message.aiMessageId, message });
+      continue;
+    }
+    const last = rows[rows.length - 1];
+    if (
+      last &&
+      last.kind === "turn" &&
+      last.aiTurnId !== null &&
+      last.aiTurnId === message.aiTurnId
+    ) {
+      last.messages.push(message);
+    } else {
+      rows.push({
+        kind: "turn",
+        key: message.aiTurnId
+          ? `turn:${message.aiTurnId}:${message.aiMessageId}`
+          : message.aiMessageId,
+        aiTurnId: message.aiTurnId,
+        messages: [message],
+      });
+    }
+  }
+  return rows;
+}
+
+function textOf(message: AiMessage): string {
+  return message.content.type === "text" ? message.content.text : "";
+}
+
+function copyText(text: string): void {
+  const clipboard = typeof navigator !== "undefined" ? navigator.clipboard : undefined;
+  void clipboard?.writeText(text).catch(() => undefined);
+}
+
+function ToolbarButton({
+  label,
+  icon,
+  onClick,
+  pressed,
+}: {
+  label: string;
+  icon: Parameters<typeof Icon>[0]["name"];
+  onClick: () => void;
+  pressed?: boolean;
+}) {
+  return (
+    <button
+      type="button"
+      className="wpn-ai-msgbar__btn"
+      aria-label={label}
+      title={label}
+      aria-pressed={pressed}
+      onClick={onClick}
+    >
+      <Icon name={icon} />
+    </button>
+  );
+}
+
+function CopyButton({ text }: { text: string }) {
+  const [copied, setCopied] = useState(false);
+  return (
+    <ToolbarButton
+      label={copied ? "Copied" : "Copy"}
+      icon={copied ? "check" : "copy"}
+      onClick={() => {
+        copyText(text);
+        setCopied(true);
+        setTimeout(() => setCopied(false), 1500);
+      }}
+    />
+  );
+}
+
+interface UserRowProps {
+  message: AiMessage;
+  canEdit: boolean;
+  onEdit?: (message: AiMessage) => void;
+  onOpenMention?: (mention: AiMention) => void;
+}
+
+const LONG_MESSAGE_CHARS = 480;
+const LONG_MESSAGE_LINES = 8;
+
+const UserRow = memo(function UserRow({ message, canEdit, onEdit, onOpenMention }: UserRowProps) {
+  const { content } = message;
+  const [expanded, setExpanded] = useState(false);
+  if (content.type !== "text") return null;
+  const long =
+    content.text.length > LONG_MESSAGE_CHARS ||
+    content.text.split("\n").length > LONG_MESSAGE_LINES;
+  return (
+    <div className="wpn-ai-transcript__item wpn-ai-row wpn-ai-row--user">
+      <div className="wpn-ai-msg wpn-ai-msg--user">
+        <div className="wpn-ai-msg__bubble">
+          {content.mentions?.length ? (
+            <span className="wpn-ai-chips">
+              {content.mentions.map((mention) => (
+                <AiMentionChip
+                  key={`${mention.kind}:${mention.id}`}
+                  mention={mention}
+                  onOpen={onOpenMention}
+                />
+              ))}
+            </span>
+          ) : null}
+          <p
+            className={[
+              "wpn-ai-msg__text",
+              long && !expanded ? "wpn-ai-msg__text--clamped" : "",
+            ].join(" ")}
+          >
+            {content.text}
+          </p>
+          {long ? (
+            <button
+              type="button"
+              className="wpn-ai-msg__more"
+              aria-expanded={expanded}
+              onClick={() => setExpanded((value) => !value)}
+            >
+              {expanded ? "Show less" : "Show more"}
+            </button>
+          ) : null}
+        </div>
+      </div>
+      <div
+        className="wpn-ai-msgbar wpn-ai-msgbar--user"
+        role="toolbar"
+        aria-label="Message actions"
+      >
+        <CopyButton text={content.text} />
+        {canEdit && onEdit ? (
+          <ToolbarButton label="Edit and resend" icon="edit" onClick={() => onEdit(message)} />
+        ) : null}
+      </div>
+    </div>
+  );
+});
+
+function StepList({
+  messages,
+  active,
+  turn,
+}: {
+  messages: AiMessage[];
+  active: boolean;
+  turn: AiTurn | undefined;
+}) {
+  return (
+    <ol className="wpn-ai-steps wpn-ai-turn__steps">
+      {messages.map((message) => {
+        if (message.content.type !== "tool") return null;
+        const status = resolveToolStatus(message.content.status, active, turn);
+        return (
+          <li
+            key={message.aiMessageId}
+            className={`wpn-ai-step wpn-ai-step--${status}`}
+            data-status={status}
+          >
+            {status === "running" ? (
+              <Spinner className="wpn-ai-step__spinner" />
+            ) : (
+              <span
+                className={`wpn-ai-step__badge wpn-ai-step__badge--${status}`}
+                aria-hidden="true"
+              >
+                <Icon name={status === "done" ? "check" : status === "failed" ? "x" : "stop"} />
+              </span>
+            )}
+            <span className="wpn-ai-step__body">
+              <span className="wpn-ai-step__label">
+                {message.content.summary || message.content.name}
+              </span>
+            </span>
+            <span className="wpn-sr-only">
+              {status === "running"
+                ? "in progress"
+                : status === "done"
+                  ? "done"
+                  : status === "failed"
+                    ? "failed"
+                    : "stopped"}
+            </span>
+          </li>
+        );
+      })}
+    </ol>
+  );
+}
+
+function workedMs(messages: AiMessage[], turn: AiTurn | undefined): number {
+  const start = Date.parse(turn?.startedAt ?? turn?.createdAt ?? messages[0]?.createdAt ?? "");
+  const lastMessage = messages[messages.length - 1];
+  const end = Date.parse(turn?.finishedAt ?? lastMessage?.updatedAt ?? "");
+  return Number.isFinite(start) && Number.isFinite(end) ? Math.max(0, end - start) : 0;
+}
+
+interface TurnRowProps {
+  messages: AiMessage[];
+  turn: AiTurn | undefined;
+  active: boolean;
+  isLast: boolean;
+  opBatches: readonly AiOpBatch[];
+  commentDrafts: readonly AiCommentDraft[];
+  canApplyModelOps: boolean;
+  canSwitchProvider: boolean;
+  feedback: AiFeedback | undefined;
+  onFeedback: (aiMessageId: string, value: AiFeedback | null) => void;
+  onRetry?: () => void;
+  onRetryWithProvider?: () => void;
+  onOpenIntegrations?: () => void;
+}
+
+function sameMessages(a: AiMessage[], b: AiMessage[]): boolean {
+  if (a === b) return true;
+  if (a.length !== b.length) return false;
+  return a.every((message, index) => message === b[index]);
+}
+
+function turnRowEqual(prev: TurnRowProps, next: TurnRowProps): boolean {
+  return (
+    sameMessages(prev.messages, next.messages) &&
+    prev.turn === next.turn &&
+    prev.active === next.active &&
+    prev.isLast === next.isLast &&
+    prev.opBatches === next.opBatches &&
+    prev.commentDrafts === next.commentDrafts &&
+    prev.canApplyModelOps === next.canApplyModelOps &&
+    prev.canSwitchProvider === next.canSwitchProvider &&
+    prev.feedback === next.feedback &&
+    prev.onFeedback === next.onFeedback &&
+    prev.onRetry === next.onRetry &&
+    prev.onRetryWithProvider === next.onRetryWithProvider &&
+    prev.onOpenIntegrations === next.onOpenIntegrations
+  );
+}
+
+export function FailureActions({
+  code,
+  canSwitchProvider,
+  onRetry,
+  onRetryWithProvider,
+  onOpenIntegrations,
+}: {
+  code: string | null | undefined;
+  canSwitchProvider: boolean;
+  onRetry?: () => void;
+  onRetryWithProvider?: () => void;
+  onOpenIntegrations?: () => void;
+}) {
+  const actions = aiErrorActions(code).filter((action: AiErrorAction) => {
+    if (action === "retry") return Boolean(onRetry);
+    if (action === "switch_provider") return canSwitchProvider && Boolean(onRetryWithProvider);
+    return Boolean(onOpenIntegrations);
+  });
+  if (actions.length === 0) return null;
+  return (
+    <div className="wpn-ai-failure__actions">
+      {actions.map((action) =>
+        action === "retry" ? (
+          <button key={action} type="button" className="wpn-btn wpn-btn--ghost" onClick={onRetry}>
+            <Icon name="refresh" className="wpn-btn__icon" />
+            Retry
+          </button>
+        ) : action === "switch_provider" ? (
+          <button
+            key={action}
+            type="button"
+            className="wpn-btn wpn-btn--ghost"
+            onClick={onRetryWithProvider}
+          >
+            <Icon name="sparkles" className="wpn-btn__icon" />
+            Retry with other provider
+          </button>
+        ) : (
+          <button
+            key={action}
+            type="button"
+            className="wpn-btn wpn-btn--ghost"
+            onClick={onOpenIntegrations}
+          >
+            <Icon name="plug" className="wpn-btn__icon" />
+            Open Integrations
+          </button>
+        ),
+      )}
+    </div>
+  );
+}
+
+const TurnRow = memo(function TurnRow({
+  messages,
+  turn,
+  active,
+  isLast,
+  opBatches,
+  commentDrafts,
+  canApplyModelOps,
+  canSwitchProvider,
+  feedback,
+  onFeedback,
+  onRetry,
+  onRetryWithProvider,
+  onOpenIntegrations,
+}: TurnRowProps) {
+  const actions = useAiCardActions();
+  const [expanded, setExpanded] = useState(false);
+  const stepsId = useId();
+  const tools = messages.filter((message) => message.content.type === "tool");
+  const rest = messages.filter((message) => message.content.type !== "tool");
+  const answer = rest.map(textOf).filter(Boolean).join("\n\n");
+  const lastAssistant = [...rest].reverse().find((message) => message.content.type === "text");
+  const failure = turn && !active ? turnFailureText(turn) : null;
+  const failed = turn?.status === "failed";
+  const showSteps = active || expanded;
+
+  return (
+    <div className="wpn-ai-transcript__item wpn-ai-row wpn-ai-row--assistant">
+      {tools.length > 0 ? (
+        <div className={["wpn-ai-turn__activity", active ? "wpn-ai-running-glow" : ""].join(" ")}>
+          {active ? null : (
+            <button
+              type="button"
+              className="wpn-ai-activity__toggle"
+              aria-expanded={expanded}
+              aria-controls={stepsId}
+              onClick={() => setExpanded((open) => !open)}
+            >
+              <span>
+                {failed ? "Failed after" : "Worked for"} {formatElapsed(workedMs(messages, turn))} ·{" "}
+                {tools.length} step{tools.length === 1 ? "" : "s"}
+              </span>
+              <Icon name="chevronDown" className="wpn-ai-activity__chevron" />
+            </button>
+          )}
+          <div id={stepsId} hidden={!showSteps}>
+            <StepList messages={tools} active={active} turn={turn} />
+          </div>
+        </div>
+      ) : null}
+      {rest.map((message) => {
+        const { content } = message;
+        switch (content.type) {
+          case "text":
+            return (
+              <div key={message.aiMessageId} className="wpn-ai-msg wpn-ai-msg--assistant">
+                <AiMarkdown text={content.text} />
+              </div>
+            );
+          case "notice":
+            return (
+              <p
+                key={message.aiMessageId}
+                className={`wpn-ai-notice wpn-ai-notice--${content.level}`}
+              >
+                {content.level !== "info" ? <Icon name="alert" /> : null}{" "}
+                {content.code ? aiErrorText(content.code, content.text) : content.text}
+              </p>
+            );
+          case "op_batch": {
+            const batch = opBatches.find((item) => item.aiOpBatchId === content.aiOpBatchId);
+            if (batch && isWorkspaceBatch(batch)) {
+              return (
+                <WorkspaceBatchCard
+                  key={message.aiMessageId}
+                  batch={batch}
+                  canApply={canApplyModelOps}
+                />
+              );
+            }
+            return batch ? (
+              <BatchCard
+                key={message.aiMessageId}
+                batch={batch}
+                canApply={canApplyModelOps}
+                onPreview={actions.previewBatch}
+                onReject={actions.rejectBatch}
+                onOpen={actions.openBatch}
+              />
+            ) : null;
+          }
+          case "comment_draft": {
+            const draft = commentDrafts.find(
+              (item) => item.aiCommentDraftId === content.aiCommentDraftId,
+            );
+            return draft ? (
+              <DraftCommentCard
+                key={message.aiMessageId}
+                draft={draft}
+                onPost={actions.postDraft}
+                onDiscard={actions.discardDraft}
+                onOpenAnnotation={actions.openAnnotation}
+              />
+            ) : null;
+          }
+          default:
+            return null;
+        }
+      })}
+      {failure ? (
+        <div
+          className={[
+            "wpn-ai-failure",
+            failed ? "wpn-ai-failure--error" : "wpn-ai-failure--info",
+          ].join(" ")}
+          data-code={turn?.errorCode ?? undefined}
+          role={failed ? "alert" : undefined}
+        >
+          <p className={`wpn-ai-notice wpn-ai-notice--${failed ? "error" : "info"}`}>
+            {failed ? <Icon name="alert" /> : null} {failure}
+          </p>
+          {isLast ? (
+            <FailureActions
+              code={failed ? turn?.errorCode : "interrupted"}
+              canSwitchProvider={canSwitchProvider}
+              onRetry={onRetry}
+              onRetryWithProvider={onRetryWithProvider}
+              onOpenIntegrations={onOpenIntegrations}
+            />
+          ) : null}
+        </div>
+      ) : null}
+      {!active && turn?.usage && hasUsage(turn.usage) ? (
+        <p className="wpn-ai-turn__usage">{usageText(turn.usage)}</p>
+      ) : null}
+      {!active && (answer || (isLast && onRetry)) ? (
+        <div className="wpn-ai-msgbar" role="toolbar" aria-label="Response actions">
+          {answer ? <CopyButton text={answer} /> : null}
+          {isLast && onRetry && !failure ? (
+            <ToolbarButton label="Retry" icon="refresh" onClick={onRetry} />
+          ) : null}
+          {lastAssistant ? (
+            <>
+              <ToolbarButton
+                label="Good response"
+                icon="thumbsUp"
+                pressed={feedback === "up"}
+                onClick={() =>
+                  onFeedback(lastAssistant.aiMessageId, feedback === "up" ? null : "up")
+                }
+              />
+              <ToolbarButton
+                label="Bad response"
+                icon="thumbsDown"
+                pressed={feedback === "down"}
+                onClick={() =>
+                  onFeedback(lastAssistant.aiMessageId, feedback === "down" ? null : "down")
+                }
+              />
+            </>
+          ) : null}
+        </div>
+      ) : null}
+    </div>
+  );
+}, turnRowEqual);
+
+interface LiveDraftProps {
+  draft: AiStreamingDraft | null;
+  turn: AiTurn;
+}
+
+const LiveDraft = memo(function LiveDraft({ draft, turn }: LiveDraftProps) {
+  const own = draft && draft.aiTurnId === turn.aiTurnId ? draft : null;
+  if (turn.status === "queued") {
+    return (
+      <div className="wpn-ai-transcript__item wpn-ai-transcript__live">
+        <p className="wpn-ai-livestatus">Queued. It starts when the current turn finishes.</p>
+      </div>
+    );
+  }
+  return (
+    <div className="wpn-ai-transcript__item wpn-ai-transcript__live">
+      {own?.reasoning ? (
+        <details className="wpn-ai-reasoning">
+          <summary>Reasoning</summary>
+          <p>{own.reasoning}</p>
+        </details>
+      ) : null}
+      {own?.text ? (
+        <div className="wpn-ai-msg wpn-ai-msg--assistant wpn-ai-msg--streaming">
+          <AiMarkdown text={own.text} streaming />
+        </div>
+      ) : null}
+      <p className="wpn-ai-livestatus">
+        <Spinner /> <span className="wpn-ai-shimmer">{own?.status || "Thinking…"}</span>
+      </p>
+    </div>
+  );
+});
+
+export function AiTranscript({
+  session,
+  currentUserId,
+  canApplyModelOps,
+  compact = false,
+  emptyHint,
+  canSwitchProvider = false,
+  onRetry,
+  onRetryWithProvider,
+  onEditLast,
+  onOpenIntegrations,
+  onFeedback,
+}: AiTranscriptProps) {
+  const { detail, messages, draft, turns, loading, error, loadingOlder, loadOlder } = session;
+  const { openMention } = useAiCardActions();
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const nearBottomRef = useRef(true);
+  const restoreRef = useRef<{ scrollTop: number; scrollHeight: number } | null>(null);
+  const firstIdRef = useRef<string | undefined>(undefined);
+  const lastIdRef = useRef<string | undefined>(undefined);
+  const [showJump, setShowJump] = useState(false);
+  const [feedback, setFeedback] = useState<Record<string, AiFeedback>>({});
+
+  const showSkeleton = useSkeletonGate(loading && !detail);
+  const rows = useMemo(() => buildRows(messages.order, messages.byId), [messages]);
+  const activeTurn = detail?.session.activeTurn ?? null;
+  const live = activeTurn && isActiveTurn(activeTurn) ? activeTurn : null;
+  const firstId = messages.order[0];
+  const lastId = messages.order[messages.order.length - 1];
+  const lastMessage = lastId ? messages.byId[lastId] : undefined;
+
+  const handleFeedback = useCallback(
+    (aiMessageId: string, value: AiFeedback | null) => {
+      setFeedback((current) => {
+        const next = { ...current };
+        if (value) next[aiMessageId] = value;
+        else delete next[aiMessageId];
+        return next;
+      });
+      onFeedback?.(aiMessageId, value);
+    },
+    [onFeedback],
+  );
+
+  const contentKey = `${messages.order.length}:${lastId ?? ""}:${lastMessage?.updatedAt ?? ""}:${
+    draft?.text.length ?? 0
+  }:${draft?.status ?? ""}:${live?.status ?? ""}`;
+
+  useLayoutEffect(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    const prepended = firstId !== firstIdRef.current && lastId === lastIdRef.current;
+    const appendedOwn =
+      lastId !== lastIdRef.current &&
+      lastMessage?.role === "user" &&
+      Boolean(currentUserId) &&
+      lastMessage.authorId === currentUserId;
+    firstIdRef.current = firstId;
+    lastIdRef.current = lastId;
+    const restore = restoreRef.current;
+    if (restore && prepended) {
+      restoreRef.current = null;
+      el.scrollTop = restoredScrollTop(restore, el.scrollHeight);
+      return;
+    }
+    if (shouldAutoScroll(nearBottomRef.current, appendedOwn)) {
+      el.scrollTop = el.scrollHeight;
+      nearBottomRef.current = true;
+      setShowJump(false);
+    } else {
+      setShowJump(true);
+    }
+  }, [contentKey, currentUserId, firstId, lastId, lastMessage]);
+
+  const onScroll = () => {
+    const el = scrollRef.current;
+    if (!el) return;
+    const near = isNearBottom(el);
+    nearBottomRef.current = near;
+    if (near) setShowJump(false);
+  };
+
+  const jumpToLatest = () => {
+    const el = scrollRef.current;
+    if (!el) return;
+    if (typeof el.scrollTo === "function")
+      el.scrollTo({ top: el.scrollHeight, behavior: "smooth" });
+    else el.scrollTop = el.scrollHeight;
+    nearBottomRef.current = true;
+    setShowJump(false);
+  };
+
+  const loadEarlier = () => {
+    const el = scrollRef.current;
+    if (el) restoreRef.current = { scrollTop: el.scrollTop, scrollHeight: el.scrollHeight };
+    void loadOlder().catch(() => {
+      restoreRef.current = null;
+    });
+  };
+
+  if (!detail) {
+    return (
+      <div
+        className={[
+          "wpn-ai-transcript",
+          "wpn-ai-transcript--empty",
+          compact ? "wpn-ai-transcript--compact" : "",
+        ].join(" ")}
+      >
+        {showSkeleton ? (
+          <div role="status" aria-label="Loading conversation" className="wpn-skeleton-slot">
+            <TranscriptSkeleton />
+          </div>
+        ) : loading ? null : error ? (
+          <div className="wpn-ai-failure">
+            <p className="wpn-ai-notice wpn-ai-notice--error" role="alert">
+              <Icon name="alert" /> {error}
+            </p>
+            <button type="button" className="wpn-btn wpn-btn--ghost" onClick={session.reload}>
+              <Icon name="refresh" className="wpn-btn__icon" />
+              Try again
+            </button>
+          </div>
+        ) : (
+          emptyHint
+        )}
+      </div>
+    );
+  }
+
+  const lastTurnRowIndex = rows.reduce(
+    (found, row, index) => (row.kind === "turn" ? index : found),
+    -1,
+  );
+  const lastUserIndex = rows.reduce(
+    (found, row, index) => (row.kind === "user" ? index : found),
+    -1,
+  );
+  const lastTurnRow = rows[lastTurnRowIndex];
+  const lastTurnId = lastTurnRow?.kind === "turn" ? lastTurnRow.aiTurnId : null;
+  const lastTurn = lastTurnId ? turns[lastTurnId] : undefined;
+  const presence =
+    live && live.userId !== currentUserId ? `${live.userName ?? "A teammate"} is asking AI…` : null;
+  const statusText = live
+    ? "AI is responding"
+    : lastTurn?.status === "failed"
+      ? "The AI turn failed"
+      : "";
+  const idle = !live;
+
+  return (
+    <div className="wpn-ai-transcript-wrap">
+      <div
+        ref={scrollRef}
+        className={["wpn-ai-transcript", compact ? "wpn-ai-transcript--compact" : ""].join(" ")}
+        onScroll={onScroll}
+        role="region"
+        aria-label="AI conversation"
+        tabIndex={0}
+        data-testid="ai-transcript"
+      >
+        {detail.hasMoreMessages ? (
+          <button
+            type="button"
+            className="wpn-ai-link wpn-ai-transcript__older"
+            disabled={loadingOlder}
+            onClick={loadEarlier}
+          >
+            {loadingOlder ? "Loading…" : "Load earlier messages"}
+          </button>
+        ) : null}
+        {rows.length === 0 && !live ? emptyHint : null}
+        {rows.map((row, index) => {
+          if (row.kind === "user") {
+            return (
+              <UserRow
+                key={row.key}
+                message={row.message}
+                canEdit={idle && index === lastUserIndex && row.message.authorId === currentUserId}
+                onEdit={onEditLast}
+                onOpenMention={openMention}
+              />
+            );
+          }
+          const turn = row.aiTurnId ? turns[row.aiTurnId] : undefined;
+          const active = Boolean(live && row.aiTurnId === live.aiTurnId);
+          const isLast = index === lastTurnRowIndex && idle;
+          const lastAssistant = [...row.messages]
+            .reverse()
+            .find((message) => message.content.type === "text");
+          return (
+            <TurnRow
+              key={row.key}
+              messages={row.messages}
+              turn={turn}
+              active={active}
+              isLast={isLast}
+              opBatches={detail.opBatches}
+              commentDrafts={detail.commentDrafts}
+              canApplyModelOps={canApplyModelOps}
+              canSwitchProvider={canSwitchProvider}
+              feedback={lastAssistant ? feedback[lastAssistant.aiMessageId] : undefined}
+              onFeedback={handleFeedback}
+              onRetry={isLast ? onRetry : undefined}
+              onRetryWithProvider={isLast ? onRetryWithProvider : undefined}
+              onOpenIntegrations={isLast ? onOpenIntegrations : undefined}
+            />
+          );
+        })}
+        {live ? <LiveDraft draft={draft} turn={live} /> : null}
+        {presence ? <p className="wpn-ai-presence">{presence}</p> : null}
+      </div>
+      {showJump ? (
+        <button type="button" className="wpn-ai-jump" onClick={jumpToLatest}>
+          <Icon name="arrowDown" />
+          Jump to latest
+        </button>
+      ) : null}
+      <p className="wpn-sr-only" role="status" aria-live="polite">
+        {statusText}
+      </p>
+    </div>
+  );
+}

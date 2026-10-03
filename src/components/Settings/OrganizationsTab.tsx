@@ -7,11 +7,20 @@ import {
   updateOrganization,
 } from "../../services/organizationsApi";
 import type { Organization, OrganizationDraft } from "../../types/organization.types";
-import { Icon, ListSearchBar, RefreshButton, TableSkeleton, Tooltip } from "../primitives";
+import {
+  Icon,
+  ListSearchBar,
+  RefreshButton,
+  TablePagination,
+  TableSkeleton,
+  Tooltip,
+} from "../primitives";
 import { ConfirmDialog } from "../UserManagement/ConfirmDialog";
 import { OrganizationFormModal } from "./OrganizationFormModal";
 import { countryLabel } from "../../data/userManagementOptions";
+import { useClientPagination } from "../../hooks/useClientPagination";
 import { useResourceTable } from "./useResourceTable";
+import { organizationsTableKey } from "./settingsCache";
 import { invalidateSharedFetch } from "../../hooks/useSharedFetch";
 
 export function OrganizationsTab() {
@@ -22,6 +31,7 @@ export function OrganizationsTab() {
   const {
     items: organizations,
     loading,
+    refreshing,
     loaded,
     error: loadError,
     notice,
@@ -62,6 +72,7 @@ export function OrganizationsTab() {
     draftLabel: (draft) => draft.companyName,
     itemLabel: (organization) => organization.companyName,
     deps: [config.apiBaseUrl, authToken],
+    cacheKey: organizationsTableKey(config.apiBaseUrl, authToken),
   });
 
   const visible = useMemo(() => {
@@ -75,6 +86,7 @@ export function OrganizationsTab() {
         organization.slug.toLowerCase().includes(needle),
     );
   }, [organizations, query]);
+  const { pageItems, paginationProps } = useClientPagination(visible);
 
   return (
     <div className="wpn-settings-tab">
@@ -89,7 +101,7 @@ export function OrganizationsTab() {
         placeholder="Search organizations"
         trailing={
           <>
-            <RefreshButton label="Refresh organizations" loading={loading} onRefresh={reload} />
+            <RefreshButton label="Refresh organizations" loading={loading || refreshing} onRefresh={reload} />
             <button type="button" className="wpn-users-create" onClick={() => open()}>
               <Icon name="plus" className="wpn-users-create__icon" />
               New organization
@@ -107,95 +119,101 @@ export function OrganizationsTab() {
         </div>
       ) : null}
 
-      <div className="wpn-users-table-wrap">
-        <table
-          className={["wpn-users-table", loading && loaded ? "wpn-users-table--refetching" : ""]
-            .filter(Boolean)
-            .join(" ")}
-        >
-          <thead>
-            <tr>
-              <th>Organization</th>
-              <th>Slug</th>
-              <th>Country</th>
-              <th>Status</th>
-              <th className="wpn-users-table__actions-head">Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {loading && !loaded ? (
-              <TableSkeleton
-                rows={5}
-                columns={["identity", "text", "text", "pill", "actions"]}
-                label="Loading organizations"
-              />
-            ) : loadError && organizations.length === 0 ? (
+      <div className="wpn-table-card">
+        <div className="wpn-users-table-wrap">
+          <table
+            className={["wpn-users-table", loading && loaded ? "wpn-users-table--refetching" : ""]
+              .filter(Boolean)
+              .join(" ")}
+          >
+            <thead>
               <tr>
-                <td colSpan={5} className="wpn-users-table__empty">
-                  <Icon name="alert" className="wpn-users-table__empty-icon" />
-                  <span>{loadError}</span>
-                  <button type="button" className="wpn-btn wpn-btn--ghost" onClick={reload}>
-                    Retry
-                  </button>
-                </td>
+                <th>Organization</th>
+                <th>Slug</th>
+                <th>Country</th>
+                <th>Status</th>
+                <th className="wpn-users-table__actions-head">Actions</th>
               </tr>
-            ) : visible.length === 0 ? (
-              <tr>
-                <td colSpan={5} className="wpn-users-table__empty">
-                  <Icon name="building" className="wpn-users-table__empty-icon" />
-                  <span>No organizations yet.</span>
-                </td>
-              </tr>
-            ) : (
-              visible.map((organization) => (
-                <tr key={organization.id}>
-                  <td>
-                    <div className="wpn-users-identity">
-                      <div className="wpn-users-identity__copy">
-                        <span className="wpn-users-identity__name">{organization.companyName}</span>
-                      </div>
-                    </div>
-                  </td>
-                  <td className="wpn-users-muted">{organization.slug}</td>
-                  <td className="wpn-users-muted">
-                    {organization.countryCode ? countryLabel(organization.countryCode) : "—"}
-                  </td>
-                  <td>
-                    <span
-                      className={`wpn-users-pill wpn-users-pill--status-${organization.status}`}
-                    >
-                      {organization.status}
-                    </span>
-                  </td>
-                  <td>
-                    <div className="wpn-users-actions">
-                      <Tooltip label="Edit" placement="left">
-                        <button
-                          type="button"
-                          className="wpn-users-action"
-                          aria-label={`Edit ${organization.companyName}`}
-                          onClick={() => open(organization)}
-                        >
-                          <Icon name="edit" />
-                        </button>
-                      </Tooltip>
-                      <Tooltip label="Delete" placement="left">
-                        <button
-                          type="button"
-                          className="wpn-users-action wpn-users-action--danger"
-                          aria-label={`Delete ${organization.companyName}`}
-                          onClick={() => askDelete(organization)}
-                        >
-                          <Icon name="trash" />
-                        </button>
-                      </Tooltip>
-                    </div>
+            </thead>
+            <tbody>
+              {loading && !loaded ? (
+                <TableSkeleton
+                  rows={5}
+                  columns={["identity", "text", "text", "pill", "actions"]}
+                  label="Loading organizations"
+                />
+              ) : loadError && organizations.length === 0 ? (
+                <tr>
+                  <td colSpan={5} className="wpn-users-table__empty">
+                    <Icon name="alert" className="wpn-users-table__empty-icon" />
+                    <span>{loadError}</span>
+                    <button type="button" className="wpn-btn wpn-btn--ghost" onClick={reload}>
+                      Retry
+                    </button>
                   </td>
                 </tr>
-              ))
-            )}
-          </tbody>
-        </table>
+              ) : visible.length === 0 ? (
+                <tr>
+                  <td colSpan={5} className="wpn-users-table__empty">
+                    <Icon name="building" className="wpn-users-table__empty-icon" />
+                    <span>No organizations yet.</span>
+                  </td>
+                </tr>
+              ) : (
+                pageItems.map((organization) => (
+                  <tr key={organization.id}>
+                    <td>
+                      <div className="wpn-users-identity">
+                        <div className="wpn-users-identity__copy">
+                          <span className="wpn-users-identity__name">
+                            {organization.companyName}
+                          </span>
+                        </div>
+                      </div>
+                    </td>
+                    <td className="wpn-users-muted">{organization.slug}</td>
+                    <td className="wpn-users-muted">
+                      {organization.countryCode ? countryLabel(organization.countryCode) : "—"}
+                    </td>
+                    <td>
+                      <span
+                        className={`wpn-users-pill wpn-users-pill--status-${organization.status}`}
+                      >
+                        {organization.status}
+                      </span>
+                    </td>
+                    <td>
+                      <div className="wpn-users-actions">
+                        <Tooltip label="Edit" placement="left">
+                          <button
+                            type="button"
+                            className="wpn-users-action wpn-users-action--primary"
+                            aria-label={`Edit ${organization.companyName}`}
+                            onClick={() => open(organization)}
+                          >
+                            <Icon name="edit" />
+                          </button>
+                        </Tooltip>
+                        <Tooltip label="Delete" placement="left">
+                          <button
+                            type="button"
+                            className="wpn-users-action wpn-users-action--danger"
+                            aria-label={`Delete ${organization.companyName}`}
+                            onClick={() => askDelete(organization)}
+                          >
+                            <Icon name="trash" />
+                          </button>
+                        </Tooltip>
+                      </div>
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+
+        <TablePagination {...paginationProps} itemLabel="organizations" />
       </div>
 
       {formOpen ? (

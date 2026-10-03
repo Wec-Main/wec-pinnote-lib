@@ -7,6 +7,7 @@ import {
   type AnimationEvent,
 } from "react";
 import { useAnnotationAuth, useAnnotationContext } from "../../context/AnnotationContext";
+import { AiWorkSlotContext } from "../Ai/AiWorkSlot";
 import { Icon, Tooltip } from "../primitives";
 import { ConfirmDialog } from "../UserManagement/ConfirmDialog";
 import { FlowDocumentEditor } from "../WecFlow/FlowDocumentEditor";
@@ -24,10 +25,11 @@ interface FlowPinPanelProps {
 }
 
 export function FlowPinPanel({ flowPin, originX, originY, onDelete }: FlowPinPanelProps) {
-  const { config, syncFlowPinName, selectFlowPin } = useAnnotationContext();
+  const { config, syncFlowPinName, selectFlowPin, guardFlowLeave } = useAnnotationContext();
   const { hostAuthenticated, activeAccount } = useAnnotationAuth();
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const [closing, setClosing] = useState(false);
+  const [aiWorkSlot, setAiWorkSlot] = useState<HTMLElement | null>(null);
   const panelRef = useRef<HTMLDivElement>(null);
   const originRef = useRef({ x: originX, y: originY });
   originRef.current = { x: originX, y: originY };
@@ -96,13 +98,14 @@ export function FlowPinPanel({ flowPin, originX, originY, onDelete }: FlowPinPan
             </span>
             <span className="wpn-panel__title">{flowPin.name}</span>
           </span>
+          <div className="wpn-flow-panel__status" ref={setAiWorkSlot} />
           <div className="wpn-flow-panel__header-actions">
             <Tooltip label="Close" placement="bottom">
               <button
                 type="button"
                 className="wpn-icon-btn wpn-icon-btn--danger"
                 aria-label="Close Flow"
-                onClick={close}
+                onClick={() => guardFlowLeave("pin", close)}
               >
                 <Icon name="close" />
               </button>
@@ -111,11 +114,15 @@ export function FlowPinPanel({ flowPin, originX, originY, onDelete }: FlowPinPan
         </div>
 
         <div className="wpn-flow-panel__body">
-          <FlowDocumentEditor
-            flowDocument={flowDocument}
-            signedIn={signedIn}
-            onDelete={() => setConfirmingDelete(true)}
-          />
+          <AiWorkSlotContext.Provider value={aiWorkSlot}>
+            <FlowDocumentEditor
+              flowDocument={flowDocument}
+              flowId={flowPin.flowId}
+              source="pin"
+              signedIn={signedIn}
+              onDelete={() => setConfirmingDelete(true)}
+            />
+          </AiWorkSlotContext.Provider>
         </div>
       </div>
       {confirmingDelete ? (

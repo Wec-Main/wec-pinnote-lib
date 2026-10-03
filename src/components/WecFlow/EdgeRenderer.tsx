@@ -9,6 +9,7 @@ import { findHandle, getHandlePosition, oppositeSide } from "../../utils/flowcha
 import { cx, shallowEqual } from "../../utils/flowchart/shallow";
 import { Icon } from "./FlowIcons";
 import { lineStyleOptions } from "./lineStyles";
+import { aiMarkClass, useAiPreviewMark } from "../Ai/AiPreviewScope";
 
 const useEdgeIds = () => useFlowState((s) => s.edges.map((e) => e.id), shallowEqual);
 
@@ -37,12 +38,10 @@ function useHoveredEdgeId(): string | null {
 export interface EdgeDropTarget {
   edgeId: string;
   distance: number;
-  /** Insertion point on the line, in screen pixels. */
   x: number;
   y: number;
 }
 
-/** Edge currently under a palette drag, highlighted as the insert target. */
 export const dropTargetEdgeStore = (() => {
   let current: EdgeDropTarget | null = null;
   const listeners = new Set<() => void>();
@@ -96,6 +95,7 @@ const EdgeItem = memo(function EdgeItem({
   const reconnecting = useFlowState((s) => s.connection?.reconnecting === id);
   const dropTarget = useDropTargetEdge()?.edgeId === id;
   const onPointerDown = useEdgeSelect(id);
+  const aiMark = useAiPreviewMark("flow", id);
   if (!geometry) return null;
   const marker = selected ? "selected" : issue === "error" ? "error" : "default";
   return (
@@ -107,6 +107,7 @@ const EdgeItem = memo(function EdgeItem({
         geometry.edge.animated && "wpn-flowchart-edge__animated",
         reconnecting && "wpn-flowchart-edge__reconnecting",
         dropTarget && "wpn-flowchart-edge__drop-target",
+        aiMarkClass(aiMark),
       )}
       data-edge-id={id}
       onPointerEnter={() => hoverStore.set(id)}

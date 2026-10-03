@@ -52,6 +52,24 @@ export function fetchUsers(
   return withUnauthorizedRetry(getAuthToken, (token) => request<UserPage>(url, token, { signal }));
 }
 
+export interface MentionCandidateRecord {
+  id: string;
+  name: string;
+  avatarUrl?: string;
+}
+
+export function fetchMentionCandidates(
+  apiBaseUrl: string,
+  getAuthToken: AuthTokenGetter | undefined,
+  projectId: string,
+  signal?: AbortSignal,
+): Promise<MentionCandidateRecord[]> {
+  const url = buildUrl(apiBaseUrl, "/users/mention-candidates", { projectId });
+  return withUnauthorizedRetry(getAuthToken, (token) =>
+    request<{ users: MentionCandidateRecord[] }>(url, token, { signal }),
+  ).then((page) => page.users);
+}
+
 function toPayload(projectId: string, draft: ManagedUserDraft) {
   const phone = draft.phone.trim();
   return { ...draft, projectId, phone: phone || undefined };

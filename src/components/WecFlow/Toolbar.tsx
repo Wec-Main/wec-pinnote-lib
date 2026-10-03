@@ -94,10 +94,12 @@ export const Toolbar = memo(function Toolbar({
     setCommitting(true);
     try {
       await handler(engine.toJSON());
-      if (action === "publish") {
-        engine.setReadOnly(true);
-      }
-      notify(action === "publish" ? `"${flowName}" published` : `"${flowName}" saved`, "success");
+      notify(
+        action === "publish"
+          ? `"${flowName}" published — now editing next draft`
+          : `"${flowName}" saved`,
+        "success",
+      );
       setPending(null);
     } catch (e) {
       notify(e instanceof Error && e.message ? e.message : `Could not ${action} the flow`, "error");
@@ -236,9 +238,9 @@ export const Toolbar = memo(function Toolbar({
           onCancel={() => setPending(null)}
         >
           <p>
-            Publishing replaces the live version of <strong>{flowName}</strong> with this one (
-            {plural(nodeCount, "node")}, {plural(edgeCount, "connection")}). The flow becomes
-            read-only once published.
+            This will save and publish <strong>{flowName}</strong> ({plural(nodeCount, "node")},{" "}
+            {plural(edgeCount, "connection")}) as a version snapshot. You can keep editing the draft
+            after publishing.
           </p>
         </ConfirmDialog>
       )}

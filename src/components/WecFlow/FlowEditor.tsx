@@ -35,6 +35,8 @@ export interface FlowEditorProps extends FlowEngineOptions {
   brand?: ReactNode;
   toolbarActions?: ReactNode;
 
+  overlay?: ReactNode;
+
   onSave?: FlowCommitHandler;
 
   onPublish?: FlowCommitHandler;
@@ -65,6 +67,7 @@ function EditorLayout({
   background,
   brand,
   toolbarActions,
+  overlay,
   onSave,
   onPublish,
   onDelete,
@@ -181,6 +184,7 @@ function EditorLayout({
               <Icon name="chevron" size={14} />
             </button>
           )}
+          {overlay}
         </main>
         {showProperties && propertiesOpen && (
           <>

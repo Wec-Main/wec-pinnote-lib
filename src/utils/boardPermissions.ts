@@ -2,20 +2,18 @@ import type { Annotation, AnnotationComment, AnnotationUser } from "../types/ann
 
 const MODERATOR_ROLES = new Set(["admin", "super_admin"]);
 
-function owns(entity: { createdBy: AnnotationUser }, currentUser: AnnotationUser): boolean {
-  return entity.createdBy.id === currentUser.id;
+function isOwnerOrModerator(ownerId: string | null, currentUser: AnnotationUser): boolean {
+  return ownerId === currentUser.id || MODERATOR_ROLES.has(currentUser.role ?? "");
 }
 
 export function canEditComment(comment: AnnotationComment, currentUser: AnnotationUser): boolean {
-  return owns(comment, currentUser) || MODERATOR_ROLES.has(currentUser.role ?? "");
+  return isOwnerOrModerator(comment.createdBy.id, currentUser);
 }
 
-export function canDeleteComment(comment: AnnotationComment, currentUser: AnnotationUser): boolean {
-  return owns(comment, currentUser) || MODERATOR_ROLES.has(currentUser.role ?? "");
-}
+export const canDeleteComment = canEditComment;
 
 export function canDeleteAnnotation(annotation: Annotation, currentUser: AnnotationUser): boolean {
-  return owns(annotation, currentUser) || MODERATOR_ROLES.has(currentUser.role ?? "");
+  return isOwnerOrModerator(annotation.createdBy.id, currentUser);
 }
 
 export function canEditBoardItem(): boolean {
@@ -26,5 +24,5 @@ export function canDeleteBoardItem(
   createdById: string | null,
   currentUser: AnnotationUser,
 ): boolean {
-  return createdById === currentUser.id || MODERATOR_ROLES.has(currentUser.role ?? "");
+  return isOwnerOrModerator(createdById, currentUser);
 }

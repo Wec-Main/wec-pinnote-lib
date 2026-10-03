@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useAnnotationData, useAnnotationUi } from "../../context/AnnotationContext";
 import { Icons } from "../../assets/icons";
-import { Icon, SearchableSelect, Switch, Tooltip } from "../primitives";
+import { Icon, RefreshingIndicator, SearchableSelect, Switch, Tooltip } from "../primitives";
+import { AnnotationListSkeleton } from "../loading/ScreenSkeletons";
+import { useSkeletonGate } from "../../hooks/useSkeletonGate";
 import { usePersistentState } from "../../hooks/usePersistentState";
 import { useAnnotationPresence } from "../../hooks/useAnnotationPresence";
 import { isBoolean, isNumber } from "../../utils/valueGuards";
@@ -64,17 +66,11 @@ export function AnnotationListPanel() {
     false,
     isBoolean,
   );
-  // Persisted (not local to CommentsFullScreenView) so it survives the
-  // panel briefly unmounting — e.g. while "open on page" temporarily hides
-  // the list to reveal a pin, the chosen grid/list layout isn't lost.
   const [viewMode, setViewMode] = usePersistentState(
     `wpn-ui:${config.projectId}:commentsViewMode`,
     "list",
     isCommentsViewMode,
   );
-  // The top toolbar hides itself, and the Full Screen panel claims the
-  // space that would've been reserved for it, for as long as Full Screen
-  // mode is open — not tied to any particular thread being selected.
   useEffect(() => {
     setCommentsFullScreenOpen(expanded);
     return () => setCommentsFullScreenOpen(false);
@@ -176,6 +172,8 @@ export function AnnotationListPanel() {
       }),
     [openReplies],
   );
+
+  const showSkeleton = useSkeletonGate(loading && allThreads.length === 0);
 
   if (expanded) {
     return (
@@ -337,7 +335,11 @@ export function AnnotationListPanel() {
       </div>
 
       <div className="wpn-list-panel__content">
-        {loading ? <p className="wpn-muted">Loading annotations...</p> : null}
+        {showSkeleton ? <AnnotationListSkeleton /> : null}
+        <RefreshingIndicator
+          active={loading && allThreads.length > 0}
+          label="Refreshing comments"
+        />
         {error ? (
           <div className="wpn-inline-error">
             <span>{error}</span>

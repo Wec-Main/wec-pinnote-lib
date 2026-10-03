@@ -34,7 +34,7 @@ export interface AuditQuery {
 
 export interface AuditPage {
   entries: AuditRecord[];
-  total: number;
+  total: number | null;
   limit: number;
   offset: number;
 }

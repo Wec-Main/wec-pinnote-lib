@@ -10,16 +10,16 @@ export interface DashboardError {
 const ANALYTICS_UNAVAILABLE_STATUS = 503;
 
 export function deriveDashboardStatus({
-  summaryLoaded,
+  overviewLoaded,
   error,
 }: {
-  summaryLoaded: boolean;
+  overviewLoaded: boolean;
   error: DashboardError | null;
 }): DashboardStatus {
   if (error) {
     return error.status === ANALYTICS_UNAVAILABLE_STATUS ? "unavailable" : "error";
   }
-  return summaryLoaded ? "ready" : "loading";
+  return overviewLoaded ? "ready" : "loading";
 }
 
 export type WidgetView = "loading" | "error" | "empty" | "ready";
@@ -47,22 +47,18 @@ export function hasTrendActivity(days: readonly TrendDay[]): boolean {
   return days.some((day) => day.visits > 0 || day.logins > 0 || day.comments > 0);
 }
 
-export type DashboardSection =
-  "summary" | "pages" | "trends" | "topPages" | "topUsers" | "visitLog";
+export type DashboardSection = "overview" | "pages" | "visitLog";
 
 export const ALL_DASHBOARD_SECTIONS: readonly DashboardSection[] = [
-  "summary",
+  "overview",
   "pages",
-  "trends",
-  "topPages",
-  "topUsers",
   "visitLog",
 ];
 
 export type SectionReloads = Readonly<Record<DashboardSection, number>>;
 
 export function initialSectionReloads(): SectionReloads {
-  return { summary: 0, pages: 0, trends: 0, topPages: 0, topUsers: 0, visitLog: 0 };
+  return { overview: 0, pages: 0, visitLog: 0 };
 }
 
 export function bumpSections(

@@ -12,6 +12,7 @@ import { entityHeight, type ErdSide } from "../../../utils/erd/erdGeometry";
 import { cx } from "../../../utils/flowchart/shallow";
 import { Icon } from "../../WecFlow/FlowIcons";
 import { FieldRow } from "./FieldRow";
+import { aiMarkClass, useAiPreviewMark } from "../../Ai/AiPreviewScope";
 
 type ConnectionStatus = "idle" | "source" | "connectable" | "valid" | "invalid";
 
@@ -42,6 +43,7 @@ export const EntityNode = memo(function EntityNode({ id }: { id: string }) {
     return "connectable";
   });
   const onPointerDown = useErdNodeDrag(id, "entity");
+  const aiMark = useAiPreviewMark("data_model", id);
   if (!entity) return null;
 
   const style = {
@@ -62,6 +64,7 @@ export const EntityNode = memo(function EntityNode({ id }: { id: string }) {
         entity.collapsed && "wpn-erd-entity--collapsed",
         issue && `wpn-erd-entity--issue-${issue}`,
         connectionStatus !== "idle" && `wpn-erd-entity--connection-${connectionStatus}`,
+        aiMarkClass(aiMark),
       )}
       style={style}
       data-entity-id={id}

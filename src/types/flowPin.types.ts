@@ -61,3 +61,7 @@ export interface FlowVersionRecord {
   publishedByUser: string | null;
   publishedAt: string;
 }
+
+export interface FlowVersionWithDocument extends FlowVersionRecord {
+  document: FlowJSON;
+}

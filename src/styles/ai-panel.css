@@ -1,0 +1,909 @@
+.wpn-flow-panel.wpn-ai-panel,
+.wpn-ai-dialog.wpn-ai-dialog,
+.wpn-ai-bar,
+.wpn-ai-scope,
+.wpn-ai-fab {
+  --wpn-ai-accent: #5b4dff;
+  --wpn-ai-accent-strong: #4338ca;
+  --wpn-ai-on-accent: #ffffff;
+  --wpn-ai-accent-soft: rgb(91 77 255 / 0.14);
+  --wpn-ai-accent-text: #b3abff;
+  --wpn-ai-glow: rgb(91 77 255 / 0.35);
+  --wpn-ai-panel-bg: #131318;
+  --wpn-ai-panel-side: #0f0f13;
+  --wpn-ai-panel-raised: #1b1b22;
+  --wpn-accent: var(--wpn-ai-accent);
+  --wpn-accent-strong: var(--wpn-ai-accent-strong);
+  --wpn-accent-soft: var(--wpn-ai-accent-soft);
+}
+
+.wpn-ai-dialog.wpn-ai-dialog {
+  background: var(--wpn-ai-panel-bg);
+}
+
+.wpn-flow-panel.wpn-ai-panel {
+  top: 8px;
+  left: 8px;
+  right: 8px;
+  background: var(--wpn-ai-panel-bg);
+  border-color: rgb(255 255 255 / 0.1);
+  border-radius: 14px;
+  box-shadow:
+    0 24px 64px rgb(0 0 0 / 0.55),
+    0 2px 8px rgb(0 0 0 / 0.35);
+}
+
+.wpn-ai-panel .wpn-flow-panel__header {
+  min-height: 52px;
+  padding: 8px 12px 8px 16px;
+  background: var(--wpn-ai-panel-bg);
+  border-bottom: 1px solid rgb(255 255 255 / 0.08);
+}
+
+.wpn-ai-panel .wpn-flow-panel__brand {
+  gap: 10px;
+  min-width: 0;
+}
+
+.wpn-ai-panel .wpn-flow-panel__brand-icon {
+  display: inline-grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  background: linear-gradient(135deg, #6d5dff, #4338ca);
+  color: #fff;
+  box-shadow: 0 4px 12px rgb(91 77 255 / 0.35);
+}
+
+.wpn-ai-panel .wpn-flow-panel__brand-icon .wpn-icon {
+  width: 16px;
+  height: 16px;
+}
+
+.wpn-ai-panel .wpn-panel__title {
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  white-space: nowrap;
+}
+
+.wpn-ai-panel .wpn-ai-panel__session-title {
+  max-width: min(420px, 40vw);
+  margin-left: 2px;
+  padding: 4px 8px;
+  border: 0;
+  border-left: 1px solid rgb(255 255 255 / 0.12);
+  border-radius: 0 6px 6px 0;
+  background: none;
+  color: var(--wpn-ai-muted);
+  font: inherit;
+  font-size: 13px;
+  cursor: text;
+}
+
+.wpn-ai-panel .wpn-ai-panel__session-title:hover {
+  background: rgb(255 255 255 / 0.05);
+  color: var(--wpn-ai-text);
+}
+
+.wpn-ai-panel .wpn-flow-panel__header-actions {
+  gap: 6px;
+}
+
+.wpn-ai-panel .wpn-flow-panel__body.wpn-ai-panel__body {
+  background: var(--wpn-ai-panel-bg);
+}
+
+.wpn-ai-panel .wpn-ai-sessions {
+  width: 272px;
+  padding: 12px 10px 8px;
+  gap: 10px;
+  background: var(--wpn-ai-panel-side);
+  border-right: 1px solid rgb(255 255 255 / 0.07);
+}
+
+.wpn-ai-panel .wpn-ai-panel__main {
+  border-left: 0;
+  background: var(--wpn-ai-panel-bg);
+}
+
+.wpn-ai-sessions__head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.wpn-ai-sessions .wpn-ai-sessions__new {
+  flex: 1;
+  justify-content: center;
+  height: 36px;
+  padding: 0 12px;
+  border-radius: 9px;
+  background: var(--wpn-ai-accent);
+  color: var(--wpn-ai-on-accent);
+  font-weight: 600;
+  box-shadow: 0 4px 14px rgb(91 77 255 / 0.3);
+  transition:
+    background 140ms ease,
+    transform 140ms ease;
+}
+
+.wpn-ai-sessions .wpn-ai-sessions__new:hover:not(:disabled) {
+  background: var(--wpn-ai-accent-strong);
+}
+
+.wpn-ai-sessions .wpn-ai-sessions__new:active {
+  transform: scale(0.98);
+}
+
+.wpn-ai-sessions__tools {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.wpn-ai-sessions .wpn-ai-sessions__search {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 34px;
+  padding: 0 10px;
+  border: 1px solid rgb(255 255 255 / 0.1);
+  border-radius: 8px;
+  background: rgb(255 255 255 / 0.04);
+  color: var(--wpn-ai-muted);
+  transition: border-color 140ms ease;
+}
+
+.wpn-ai-sessions .wpn-ai-sessions__search:focus-within {
+  border-color: rgb(91 77 255 / 0.6);
+}
+
+.wpn-ai-sessions__search-icon {
+  flex: none;
+  width: 14px;
+  height: 14px;
+}
+
+.wpn-ai-sessions__search input {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  outline: none;
+  background: none;
+  color: var(--wpn-ai-text);
+  font: inherit;
+  font-size: 12.5px;
+}
+
+.wpn-ai-sessions__search input::placeholder {
+  color: var(--wpn-ai-muted);
+}
+
+.wpn-ai-sessions__tools > * {
+  width: 100%;
+}
+
+.wpn-ai-sessions__label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 8px 0;
+  color: var(--wpn-ai-muted);
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.wpn-ai-panel .wpn-ai-sessions__list {
+  margin-top: -6px;
+  padding: 0;
+  gap: 4px;
+}
+
+.wpn-ai-panel .wpn-ai-session-row {
+  width: 100%;
+  min-height: 48px;
+  border-radius: 8px;
+  transition: background 120ms ease;
+}
+
+.wpn-ai-panel .wpn-ai-session-row:hover {
+  background: rgb(255 255 255 / 0.05);
+}
+
+.wpn-ai-panel .wpn-ai-session-row--selected,
+.wpn-ai-panel .wpn-ai-session-row--selected:hover {
+  background: var(--wpn-ai-accent-soft);
+  box-shadow: inset 2px 0 0 var(--wpn-ai-accent);
+}
+
+.wpn-ai-panel .wpn-ai-session-row .wpn-ai-session,
+.wpn-ai-panel .wpn-ai-session-row .wpn-ai-session:hover {
+  width: 100%;
+  gap: 3px;
+  padding: 8px 4px 8px 12px;
+  border-radius: 8px;
+  background: none;
+}
+
+.wpn-ai-panel .wpn-ai-session__title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--wpn-ai-text);
+}
+
+.wpn-ai-session__text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.wpn-ai-panel .wpn-ai-session-row .wpn-ai-session__pin {
+  flex: none;
+  width: 13px;
+  height: 13px;
+  margin-right: 2px;
+  color: var(--wpn-ai-muted);
+}
+
+.wpn-ai-session__menu {
+  display: inline-flex;
+  flex: none;
+  margin-right: 4px;
+}
+
+.wpn-ai-session__more.wpn-icon-btn {
+  width: 26px;
+  height: 26px;
+  border-radius: 6px;
+  color: var(--wpn-ai-muted);
+  opacity: 0;
+  transition:
+    opacity 120ms ease,
+    background 120ms ease;
+}
+
+.wpn-ai-session-row:hover .wpn-ai-session__more,
+.wpn-ai-session-row--selected .wpn-ai-session__more,
+.wpn-ai-session__menu--open .wpn-ai-session__more,
+.wpn-ai-session__more:focus-visible {
+  opacity: 1;
+}
+
+.wpn-ai-session__more.wpn-icon-btn:hover,
+.wpn-ai-session__menu--open .wpn-ai-session__more.wpn-icon-btn {
+  background: rgb(255 255 255 / 0.1);
+  color: var(--wpn-ai-text);
+}
+
+.wpn-ai-session__portal {
+  display: contents;
+}
+
+.wpn-ai-panel .wpn-ai-session__meta {
+  overflow: hidden;
+  color: var(--wpn-ai-muted);
+  font-size: 11px;
+  line-height: 1.35;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.wpn-ai-session__menu-panel {
+  font-family:
+    var(--wpn-font, ui-sans-serif),
+    system-ui,
+    -apple-system,
+    "Segoe UI",
+    sans-serif;
+  min-width: 180px;
+  padding: 6px;
+  border-radius: 12px;
+}
+
+.wpn-ai-session__menu-panel .wpn-menu__item {
+  gap: 10px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  font-size: 13px;
+}
+
+.wpn-ai-panel .wpn-ai-transcript {
+  padding: 20px 24px 16px;
+  gap: 16px;
+}
+
+.wpn-ai-msg--user .wpn-ai-msg__bubble {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+  max-width: 85%;
+  padding: 10px 14px;
+  border: 1px solid rgb(91 77 255 / 0.3);
+  border-radius: 14px 14px 4px 14px;
+  background: rgb(91 77 255 / 0.14);
+  color: var(--wpn-ai-text);
+}
+
+.wpn-ai-msg--user .wpn-ai-msg__bubble .wpn-ai-msg__text {
+  max-width: none;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: none;
+  color: inherit;
+  font-size: 13px;
+  line-height: 1.55;
+}
+
+.wpn-ai-msg__text--clamped {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 8;
+  mask-image: linear-gradient(180deg, #000 70%, transparent);
+}
+
+.wpn-ai-msg__more {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: #b3abff;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.wpn-ai-msg__more:hover {
+  text-decoration: underline;
+}
+
+.wpn-ai-msg__bubble .wpn-ai-chips {
+  padding: 0;
+}
+
+.wpn-ai-composer {
+  gap: 8px;
+}
+
+.wpn-ai-panel .wpn-ai-composer {
+  padding: 12px 24px 20px;
+  border-top: 0;
+}
+
+.wpn-ai-composer__box {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--wpn-ai-border);
+  border-radius: 14px;
+  background: rgb(var(--wpn-ai-ink) / 0.04);
+  transition:
+    border-color 150ms ease,
+    box-shadow 150ms ease;
+}
+
+.wpn-ai-panel .wpn-ai-composer__box,
+.wpn-ai-dialog .wpn-ai-composer__box {
+  background: var(--wpn-ai-panel-raised);
+}
+
+.wpn-ai-composer__box:focus-within {
+  border-color: rgb(91 77 255 / 0.6);
+  box-shadow: 0 0 0 3px rgb(91 77 255 / 0.15);
+}
+
+.wpn-ai-composer__box .wpn-ai-composer__field {
+  min-height: 48px;
+  padding: 12px 14px 4px;
+  border: 0;
+  border-radius: 14px 14px 0 0;
+  background: none;
+}
+
+.wpn-ai-composer__box .wpn-ai-composer__field:focus {
+  border: 0;
+}
+
+.wpn-ai-composer__box .wpn-ai-composer__bar {
+  flex-wrap: nowrap;
+  padding: 4px 8px 8px 12px;
+}
+
+.wpn-ai-composer__box .wpn-ai-composer__tools {
+  margin-left: auto;
+  min-width: 0;
+}
+
+.wpn-ai-composer__send {
+  display: inline-grid;
+  place-items: center;
+  flex: none;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: 0;
+  border-radius: 999px;
+  background: #5b4dff;
+  color: #fff;
+  cursor: pointer;
+  box-shadow: 0 2px 8px rgb(91 77 255 / 0.35);
+  transition:
+    background 120ms ease,
+    transform 160ms var(--wpn-ai-ease-spring, ease),
+    opacity 140ms ease;
+}
+
+.wpn-ai-composer__send:hover:not(:disabled) {
+  background: #4338ca;
+  transform: scale(1.06);
+}
+
+.wpn-ai-composer__send:disabled {
+  opacity: 0.35;
+  box-shadow: none;
+  cursor: default;
+}
+
+.wpn-ai-composer__send .wpn-btn__icon {
+  width: 16px;
+  height: 16px;
+  margin: 0;
+}
+
+.wpn-ai-composer__send:focus-visible {
+  outline: 2px solid #b3abff;
+  outline-offset: 2px;
+}
+
+.wpn-ai-composer__box .wpn-ai-composer__tools .wpn-ai-switcher {
+  max-width: 100%;
+}
+
+.wpn-ai-mention-menu.wpn-mention__menu {
+  top: auto;
+  bottom: calc(100% + 8px);
+  right: auto;
+  display: flex;
+  flex-direction: column;
+  width: min(340px, 100%);
+  max-width: 340px;
+  padding: 6px;
+  border: 1px solid rgb(255 255 255 / 0.12);
+  border-radius: 12px;
+  background: #18181f;
+  box-shadow:
+    0 16px 40px rgb(0 0 0 / 0.5),
+    0 2px 6px rgb(0 0 0 / 0.3);
+  font-size: 13px;
+  animation: wpn-ai-mention-in 140ms ease-out both;
+}
+
+@keyframes wpn-ai-mention-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.wpn-ai-mention-menu__search {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 34px;
+  margin-bottom: 6px;
+  padding: 0 10px;
+  border: 1px solid rgb(255 255 255 / 0.12);
+  border-radius: 8px;
+  background: rgb(255 255 255 / 0.05);
+  color: rgb(255 255 255 / 0.5);
+  transition:
+    border-color 140ms ease,
+    box-shadow 140ms ease;
+}
+
+.wpn-ai-mention-menu__search:focus-within {
+  border-color: rgb(91 77 255 / 0.65);
+  box-shadow: 0 0 0 3px rgb(91 77 255 / 0.15);
+}
+
+.wpn-ai-mention-menu__search-icon {
+  flex: none;
+  width: 14px;
+  height: 14px;
+}
+
+.wpn-ai-mention-menu__search input {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  outline: none;
+  background: none;
+  color: #fff;
+  font: inherit;
+  font-size: 13px;
+}
+
+.wpn-ai-mention-menu__search input::placeholder {
+  color: rgb(255 255 255 / 0.4);
+}
+
+.wpn-ai-mention-menu__search input::-webkit-search-cancel-button {
+  filter: invert(1) opacity(0.5);
+}
+
+.wpn-ai-mention-menu .wpn-mention__menu-title {
+  padding: 4px 8px 6px;
+  color: rgb(255 255 255 / 0.5);
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.wpn-ai-mention-menu .wpn-mention__list {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  max-height: 264px;
+  margin: 0;
+  padding: 0;
+  overflow-y: auto;
+  list-style: none;
+  overscroll-behavior: contain;
+}
+
+.wpn-ai-mention-menu .wpn-mention__option {
+  gap: 10px;
+  padding: 6px 8px;
+  border-radius: 8px;
+  color: rgb(255 255 255 / 0.88);
+  font-size: 13px;
+}
+
+.wpn-ai-mention-menu .wpn-mention__option--active {
+  background: rgb(91 77 255 / 0.18);
+  color: #fff;
+}
+
+.wpn-ai-mention-menu .wpn-mention__avatar {
+  width: 26px;
+  height: 26px;
+  border-radius: 7px;
+}
+
+.wpn-ai-mention-menu .wpn-mention__avatar--fallback {
+  border-radius: 999px;
+  background: rgb(91 77 255 / 0.25);
+  color: #d4d0ff;
+  font-size: 10px;
+}
+
+.wpn-ai-mention-menu__kind {
+  display: grid;
+  place-items: center;
+  background: rgb(91 77 255 / 0.16);
+  color: #b3abff;
+}
+
+.wpn-ai-mention-menu__kind .wpn-icon {
+  width: 14px;
+  height: 14px;
+}
+
+.wpn-ai-mention-menu .wpn-mention__name {
+  line-height: 1.3;
+}
+
+.wpn-ai-mention-menu .wpn-mention__name strong {
+  color: #b3abff;
+  font-weight: 600;
+}
+
+.wpn-ai-mention-menu .wpn-mention__email {
+  font-size: 11px;
+  line-height: 1.3;
+}
+
+.wpn-ai-mention-menu .wpn-mention__empty {
+  margin: 0;
+  padding: 10px 8px;
+  color: rgb(255 255 255 / 0.5);
+  font-size: 12.5px;
+}
+
+.wpn-ai-mention-menu .wpn-mention__footer {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 6px;
+  padding: 6px 8px 2px;
+  border-top: 1px solid rgb(255 255 255 / 0.08);
+  color: rgb(255 255 255 / 0.45);
+  font-size: 11px;
+}
+
+.wpn-ai-mention-menu .wpn-mention__footer kbd {
+  display: inline-grid;
+  place-items: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 4px;
+  border: 1px solid rgb(255 255 255 / 0.14);
+  border-radius: 4px;
+  background: rgb(255 255 255 / 0.06);
+  color: rgb(255 255 255 / 0.7);
+  font-family: inherit;
+  font-size: 10.5px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .wpn-ai-mention-menu.wpn-mention__menu {
+    animation: none;
+  }
+}
+
+.wpn-ai-chips {
+  gap: 6px;
+  margin: 0;
+  list-style: none;
+}
+
+.wpn-ai-composer__box .wpn-ai-chips {
+  padding: 10px 12px 0;
+}
+
+.wpn-ai-chips > li {
+  display: inline-flex;
+  list-style: none;
+}
+
+.wpn-ai-mention {
+  max-width: 240px;
+  height: 24px;
+  gap: 6px;
+  padding: 0 4px 0 8px;
+  border: 1px solid rgb(91 77 255 / 0.3);
+  border-radius: 8px;
+  background: rgb(91 77 255 / 0.14);
+  color: #d4d0ff;
+  font-size: 12px;
+  font-weight: 500;
+  animation: wpn-ai-mention-pop 160ms ease-out both;
+}
+
+.wpn-ai-msg__bubble .wpn-ai-mention {
+  padding-right: 8px;
+}
+
+.wpn-ai-mention--user {
+  border-color: rgb(56 189 248 / 0.3);
+  background: rgb(56 189 248 / 0.14);
+  color: #bae6fd;
+}
+
+.wpn-ai-mention__icon {
+  flex: none;
+  width: 13px;
+  height: 13px;
+  color: #b3abff;
+}
+
+.wpn-ai-mention__badge {
+  display: inline-grid;
+  place-items: center;
+  flex: none;
+  width: 16px;
+  height: 16px;
+  border-radius: 999px;
+  background: rgb(56 189 248 / 0.3);
+  color: #e0f2fe;
+  font-size: 8.5px;
+  font-weight: 700;
+}
+
+.wpn-ai-mention__label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.wpn-ai-mention .wpn-ai-mention__remove {
+  display: inline-grid;
+  place-items: center;
+  flex: none;
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  border: 0;
+  border-radius: 999px;
+  background: none;
+  color: inherit;
+  opacity: 0.6;
+  cursor: pointer;
+}
+
+.wpn-ai-mention .wpn-ai-mention__remove:hover {
+  background: rgb(255 255 255 / 0.12);
+  opacity: 1;
+}
+
+.wpn-ai-mention__remove .wpn-icon {
+  width: 11px;
+  height: 11px;
+}
+
+@keyframes wpn-ai-mention-pop {
+  from {
+    opacity: 0;
+    transform: scale(0.92);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.wpn-ai-composer__box {
+  position: relative;
+}
+
+.wpn-ai-composer__box--sending::before {
+  content: "";
+  position: absolute;
+  top: -1px;
+  left: 14px;
+  right: 14px;
+  height: 2px;
+  border-radius: 2px;
+  background: linear-gradient(90deg, transparent, #5b4dff 40%, #b3abff 60%, transparent);
+  background-size: 50% 100%;
+  background-repeat: no-repeat;
+  animation: wpn-ai-send-sweep 1s ease-in-out infinite;
+}
+
+.wpn-ai-composer__box--sending .wpn-ai-composer__field {
+  opacity: 0.6;
+}
+
+@keyframes wpn-ai-send-sweep {
+  from {
+    background-position: -60% 0;
+  }
+  to {
+    background-position: 160% 0;
+  }
+}
+
+.wpn-ai-dock__prompt-text {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .wpn-ai-mention,
+  .wpn-ai-composer__box--sending::before {
+    animation: none;
+  }
+}
+
+.wpn-ai-fab {
+  background: linear-gradient(135deg, #7c6bff 0%, #5b4dff 45%, #2f7cf6 100%);
+}
+
+.wpn-ai-fab.wpn-ai-fab--open {
+  background: linear-gradient(135deg, #8b7dff 0%, #4338ca 100%);
+}
+
+.wpn-ai-fab .wpn-ai-fab__badge {
+  background: #ef4444;
+  color: #fff;
+}
+
+.wpn-ai-livestatus {
+  margin: 0;
+  color: var(--wpn-ai-muted);
+  font-size: 12px;
+}
+
+@media (hover: none) {
+  .wpn-ai-msgbar {
+    opacity: 1;
+  }
+}
+
+.wpn-ai-bar .wpn-ai-bar__row {
+  flex-wrap: wrap;
+  min-width: 0;
+}
+
+.wpn-ai-bar .wpn-ai-bar__scope,
+.wpn-ai-bar .wpn-ai-bar__route {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.wpn-ai-sessions .wpn-skeleton {
+  --wpn-skeleton-ink: 255 255 255;
+}
+
+.wpn-ai-sessions .wpn-skeleton-session {
+  padding: 10px 12px;
+}
+
+.wpn-ai-sessions .wpn-ai-sessions__empty .wpn-ai-link {
+  color: var(--wpn-ai-accent-text);
+  font-weight: 600;
+}
+
+.wpn-ai-session__kind {
+  flex: none;
+  width: 13px;
+  height: 13px;
+  color: #b3abff;
+}
+
+.wpn-ai-mention .wpn-ai-mention__open {
+  display: inline-flex;
+  align-items: center;
+  gap: inherit;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+
+.wpn-ai-mention .wpn-ai-mention__open:hover .wpn-ai-mention__label {
+  text-decoration: underline;
+}
+
+.wpn-ai-mention .wpn-ai-mention__open:focus-visible {
+  outline: 2px solid rgb(91 77 255 / 0.7);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+.wpn-ai-composer__send--stop {
+  background: var(--wpn-ai-text, #fff);
+  color: var(--wpn-ai-surface, #111);
+  animation: wpn-ai-stop-pulse 1.6s ease-in-out infinite;
+}
+
+.wpn-ai-composer__send--stop:hover:not(:disabled) {
+  filter: brightness(0.9);
+}
+
+@keyframes wpn-ai-stop-pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgb(var(--wpn-ai-ink, 255 255 255) / 0.28);
+  }
+  50% {
+    box-shadow: 0 0 0 6px rgb(var(--wpn-ai-ink, 255 255 255) / 0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .wpn-ai-composer__send--stop {
+    animation: none;
+  }
+}

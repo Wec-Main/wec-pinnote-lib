@@ -63,6 +63,9 @@ export async function sendVisitBatch(
   batch: IngestBatch,
   mode: VisitSendMode,
 ): Promise<void> {
+  if (batch.visits.length === 0) {
+    return;
+  }
   const url = buildUrl(apiBaseUrl, "/analytics/visits");
   const body = JSON.stringify(batch);
   if (mode === "beacon" && sendBeaconIfPossible(url, body)) {

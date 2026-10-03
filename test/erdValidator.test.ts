@@ -168,3 +168,168 @@ describe("validateErd", () => {
     expect(result.issues.find((issue) => issue.code === "empty-entity-name")?.entityId).toBe("a");
   });
 });
+
+describe("validateErd: extended rules", () => {
+  const severityOf = (input: ErdSnapshot, code: ErdIssueCode) =>
+    validateErd(input).issues.find((issue) => issue.code === code)?.severity;
+
+  const parent = entity("p", [pk("p_id")], { name: "parents" });
+  const child = (type = "integer") =>
+    entity("c", [pk("c_id"), field("c_pid", { name: "parent_id", type })], { name: "children" });
+  const link = (overrides = {}) =>
+    relationship("r", "p", "c", { sourceFieldId: "p_id", targetFieldId: "c_pid", ...overrides });
+
+  it("warns on an empty model", () => {
+    expect(codes(snapshot())).toEqual(["empty-model"]);
+    expect(severityOf(snapshot(), "empty-model")).toBe("warning");
+  });
+
+  it("reports every issue with a hint where one helps", () => {
+    const result = validateErd(snapshot({ entities: [entity("u", [], { name: "user" })] }));
+    expect(result.issues.find((issue) => issue.code === "reserved-word")?.hint).toBeTruthy();
+  });
+
+  it("flags reserved words and names over the engine limit", () => {
+    const long = "x".repeat(64);
+    const found = codes(
+      snapshot({
+        entities: [
+          entity("a", [pk("a_id"), field("a_f", { name: "order" })], { name: "user" }),
+          entity("b", [pk("b_id")], { name: long }),
+        ],
+      }),
+    );
+    expect(found.filter((code) => code === "reserved-word")).toHaveLength(2);
+    expect(found).toContain("name-too-long");
+    expect(
+      severityOf(
+        snapshot({ entities: [entity("b", [pk("b_id")], { name: long })] }),
+        "name-too-long",
+      ),
+    ).toBe("error");
+  });
+
+  it("flags mixed naming styles against the dominant one", () => {
+    const found = validateErd(
+      snapshot({
+        entities: [
+          entity("a", [pk("a1")], { name: "order_items" }),
+          entity("b", [pk("b1")], { name: "customer_orders" }),
+          entity("c", [pk("c1")], { name: "ProductCategory" }),
+        ],
+        relationships: [relationship("r1", "a", "b"), relationship("r2", "b", "c")],
+      }),
+    ).issues.filter((issue) => issue.code === "mixed-naming-style");
+    expect(found).toHaveLength(1);
+    expect(found[0]?.entityId).toBe("c");
+  });
+
+  it("checks field types against the database engine", () => {
+    const model = (engine: ErdSnapshot["engine"], type: string, extra = {}) =>
+      snapshot({
+        engine,
+        entities: [
+          entity("a", [field("a_f", { name: "f", type, nullable: false, ...extra }), pk("a_id")], {
+            name: "t",
+          }),
+        ],
+      });
+    expect(codes(model("postgres", "datetime"))).toContain("unsupported-type");
+    expect(codes(model("mysql", "bytea"))).toContain("unsupported-type");
+    expect(codes(model("na", "datetime"))).not.toContain("unsupported-type");
+    expect(codes(model("mysql", "varchar"))).toContain("missing-length");
+    expect(codes(model("postgres", "varchar"))).not.toContain("missing-length");
+    expect(codes(model("postgres", "varchar", { length: 0 }))).toContain("invalid-length");
+    expect(codes(model("postgres", "decimal", { precision: 4, scale: 6 }))).toContain(
+      "invalid-precision",
+    );
+    expect(codes(model("postgres", "decimal", { precision: 10, scale: 2 }))).not.toContain(
+      "invalid-precision",
+    );
+  });
+
+  it("rejects a nullable primary key", () => {
+    const found = validateErd(
+      snapshot({
+        entities: [entity("a", [field("a_id", { name: "id", primaryKey: true, nullable: true })])],
+      }),
+    ).issues.find((issue) => issue.code === "primary-key-nullable");
+    expect(found?.severity).toBe("error");
+    expect(found?.fieldId).toBe("a_id");
+  });
+
+  it("validates relationship fields, types, uniqueness and indexes", () => {
+    const ok = snapshot({
+      entities: [
+        parent,
+        entity("c", [pk("c_id"), field("c_pid", { name: "parent_id" })], {
+          name: "children",
+          indexes: [
+            { id: "i", name: "children_parent_id_idx", fieldIds: ["c_pid"], unique: false },
+          ],
+        }),
+      ],
+      relationships: [link()],
+    });
+    expect(validateErd(ok).issues).toEqual([]);
+
+    expect(
+      codes(snapshot({ entities: [parent, child("uuid")], relationships: [link()] })),
+    ).toContain("relationship-type-mismatch");
+    expect(codes(snapshot({ entities: [parent, child()], relationships: [link()] }))).toContain(
+      "foreign-key-without-index",
+    );
+    expect(
+      codes(
+        snapshot({
+          entities: [parent, child()],
+          relationships: [link({ targetFieldId: "gone" })],
+        }),
+      ),
+    ).toContain("relationship-missing-field");
+    const nonUnique = entity("p", [pk("p_pk", "pk"), field("p_id", { name: "code" })], {
+      name: "parents",
+    });
+    expect(
+      severityOf(
+        snapshot({ entities: [nonUnique, child()], relationships: [link()] }),
+        "referenced-field-not-unique",
+      ),
+    ).toBe("error");
+  });
+
+  it("flags duplicate, self and many-to-many relationships and orphan entities", () => {
+    const found = codes(
+      snapshot({
+        entities: [parent, child(), entity("o", [pk("o_id")], { name: "loners" })],
+        relationships: [
+          link(),
+          relationship("r2", "p", "c", { sourceFieldId: "p_id", targetFieldId: "c_pid" }),
+          relationship("r3", "p", "p"),
+          relationship("r4", "p", "c", { cardinality: "many-to-many" }),
+        ],
+      }),
+    );
+    expect(found).toContain("duplicate-relationship");
+    expect(found).toContain("self-relationship");
+    expect(found).toContain("many-to-many-without-join-table");
+    expect(found).toContain("orphan-entity");
+  });
+
+  it("lists errors before warnings", () => {
+    const severities = validateErd(
+      snapshot({
+        entities: [
+          entity("a", [], { name: "user" }),
+          entity("b", [field("b_f", { name: "x", type: "datetime" }), pk("b_id")], {
+            name: "ok_name",
+          }),
+        ],
+      }),
+    ).issues.map((issue) => issue.severity);
+    expect(severities).toEqual(
+      [...severities].sort((a, b) => (a === b ? 0 : a === "error" ? -1 : 1)),
+    );
+    expect(severities[0]).toBe("error");
+  });
+});

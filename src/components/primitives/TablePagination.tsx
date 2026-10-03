@@ -3,10 +3,10 @@ import { SearchableSelect, type SelectOption } from "./SearchableSelect";
 import { Tooltip } from "./Tooltip";
 
 const PAGE_SIZE_OPTIONS: SelectOption[] = [
-  { value: "5", label: "5" },
   { value: "10", label: "10" },
   { value: "25", label: "25" },
   { value: "50", label: "50" },
+  { value: "100", label: "100" },
 ];
 
 type PageSlot = number | "ellipsis-start" | "ellipsis-end";
@@ -65,7 +65,14 @@ export function TablePagination({
   return (
     <div className="wpn-pagination">
       <div className="wpn-pagination__summary">
-        {totalItems === 0 ? `No ${itemLabel}` : `${start}–${end} of ${totalItems} ${itemLabel}`}
+        {totalItems === 0 ? (
+          `No ${itemLabel}`
+        ) : (
+          <>
+            <strong>{start}</strong>–<strong>{end}</strong> of <strong>{totalItems}</strong>{" "}
+            {itemLabel}
+          </>
+        )}
       </div>
 
       <div className="wpn-pagination__nav">
@@ -112,8 +119,8 @@ export function TablePagination({
             disabled={safePage >= totalPages || totalItems === 0}
             onClick={() => onPageChange(safePage + 1)}
           >
-            <Icon name="chevronRight" className="wpn-pagination__arrow-icon" />
             Next
+            <Icon name="chevronRight" className="wpn-pagination__arrow-icon" />
           </button>
         </Tooltip>
       </div>

@@ -11,12 +11,14 @@ import {
   ListSearchBar,
   RefreshButton,
   SearchableSelect,
+  TablePagination,
   TableSkeleton,
   Tooltip,
 } from "../primitives";
 import { ConfirmDialog } from "../UserManagement/ConfirmDialog";
 import { TagFormModal } from "./TagFormModal";
 import { TagDetailsModal } from "./TagDetailsModal";
+import { useClientPagination } from "../../hooks/useClientPagination";
 import { useResourceTable } from "./useResourceTable";
 import { TAG_STATUS_OPTIONS } from "./tagOptions";
 
@@ -97,6 +99,7 @@ export function TagsTab() {
         (tag.createdByName ?? "").toLowerCase().includes(needle),
     );
   }, [tags, query]);
+  const { pageItems, paginationProps } = useClientPagination(visible);
 
   return (
     <div className="wpn-settings-tab">
@@ -152,115 +155,119 @@ export function TagsTab() {
         </div>
       ) : null}
 
-      <div className="wpn-users-table-wrap">
-        <table
-          className={["wpn-users-table", loading && loaded ? "wpn-users-table--refetching" : ""]
-            .filter(Boolean)
-            .join(" ")}
-        >
-          <thead>
-            <tr>
-              <th>Tag name</th>
-              <th>Colour</th>
-              <th>Created by</th>
-              <th>Updated on</th>
-              <th>Status</th>
-              <th className="wpn-users-table__actions-head">Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {loading && !loaded ? (
-              <TableSkeleton
-                rows={5}
-                columns={["identity", "pill", "text", "text", "pill", "actions"]}
-                label="Loading tags"
-              />
-            ) : loadError && tags.length === 0 ? (
+      <div className="wpn-table-card">
+        <div className="wpn-users-table-wrap">
+          <table
+            className={["wpn-users-table", loading && loaded ? "wpn-users-table--refetching" : ""]
+              .filter(Boolean)
+              .join(" ")}
+          >
+            <thead>
               <tr>
-                <td colSpan={6} className="wpn-users-table__empty">
-                  <Icon name="alert" className="wpn-users-table__empty-icon" />
-                  <span>{loadError}</span>
-                  <button type="button" className="wpn-btn wpn-btn--ghost" onClick={reload}>
-                    Retry
-                  </button>
-                </td>
+                <th>Tag name</th>
+                <th>Colour</th>
+                <th>Created by</th>
+                <th>Updated on</th>
+                <th>Status</th>
+                <th className="wpn-users-table__actions-head">Actions</th>
               </tr>
-            ) : visible.length === 0 ? (
-              <tr>
-                <td colSpan={6} className="wpn-users-table__empty">
-                  <Icon name="folder" className="wpn-users-table__empty-icon" />
-                  <span>
-                    {projects.length === 0
-                      ? "Create a project before adding tags."
-                      : "No tags yet."}
-                  </span>
-                </td>
-              </tr>
-            ) : (
-              visible.map((tag) => (
-                <tr key={tag.id}>
-                  <td>
-                    <div className="wpn-users-identity">
-                      <span className="wpn-tag-dot" style={{ backgroundColor: tag.color }} />
-                      <div className="wpn-users-identity__copy">
-                        <span className="wpn-users-identity__name">{tag.name}</span>
-                        <span className="wpn-users-identity__email">
-                          {projectName(tag.projectId)}
-                        </span>
-                      </div>
-                    </div>
-                  </td>
-                  <td>
-                    <span className="wpn-tag-chip" style={{ backgroundColor: tag.color }}>
-                      {tag.color}
-                    </span>
-                  </td>
-                  <td className="wpn-users-muted">{tag.createdByName ?? "—"}</td>
-                  <td className="wpn-users-muted">{formatTimestamp(tag.updatedAt)}</td>
-                  <td>
-                    <span className={`wpn-users-pill wpn-users-pill--status-${tag.status}`}>
-                      {tag.status}
-                    </span>
-                  </td>
-                  <td>
-                    <div className="wpn-users-actions">
-                      <Tooltip label="View" placement="left">
-                        <button
-                          type="button"
-                          className="wpn-users-action"
-                          aria-label={`View ${tag.name}`}
-                          onClick={() => setViewTarget(tag)}
-                        >
-                          <Icon name="eye" />
-                        </button>
-                      </Tooltip>
-                      <Tooltip label="Edit" placement="left">
-                        <button
-                          type="button"
-                          className="wpn-users-action"
-                          aria-label={`Edit ${tag.name}`}
-                          onClick={() => open(tag)}
-                        >
-                          <Icon name="edit" />
-                        </button>
-                      </Tooltip>
-                      <Tooltip label="Delete" placement="left">
-                        <button
-                          type="button"
-                          className="wpn-users-action wpn-users-action--danger"
-                          aria-label={`Delete ${tag.name}`}
-                          onClick={() => askDelete(tag)}
-                        >
-                          <Icon name="trash" />
-                        </button>
-                      </Tooltip>
-                    </div>
+            </thead>
+            <tbody>
+              {loading && !loaded ? (
+                <TableSkeleton
+                  rows={5}
+                  columns={["identity", "pill", "text", "text", "pill", "actions"]}
+                  label="Loading tags"
+                />
+              ) : loadError && tags.length === 0 ? (
+                <tr>
+                  <td colSpan={6} className="wpn-users-table__empty">
+                    <Icon name="alert" className="wpn-users-table__empty-icon" />
+                    <span>{loadError}</span>
+                    <button type="button" className="wpn-btn wpn-btn--ghost" onClick={reload}>
+                      Retry
+                    </button>
                   </td>
                 </tr>
-              ))
-            )}
-          </tbody>
-        </table>
+              ) : visible.length === 0 ? (
+                <tr>
+                  <td colSpan={6} className="wpn-users-table__empty">
+                    <Icon name="folder" className="wpn-users-table__empty-icon" />
+                    <span>
+                      {projects.length === 0
+                        ? "Create a project before adding tags."
+                        : "No tags yet."}
+                    </span>
+                  </td>
+                </tr>
+              ) : (
+                pageItems.map((tag) => (
+                  <tr key={tag.id}>
+                    <td>
+                      <div className="wpn-users-identity">
+                        <span className="wpn-tag-dot" style={{ backgroundColor: tag.color }} />
+                        <div className="wpn-users-identity__copy">
+                          <span className="wpn-users-identity__name">{tag.name}</span>
+                          <span className="wpn-users-identity__email">
+                            {projectName(tag.projectId)}
+                          </span>
+                        </div>
+                      </div>
+                    </td>
+                    <td>
+                      <span className="wpn-tag-chip" style={{ backgroundColor: tag.color }}>
+                        {tag.color}
+                      </span>
+                    </td>
+                    <td className="wpn-users-muted">{tag.createdByName ?? "—"}</td>
+                    <td className="wpn-users-muted">{formatTimestamp(tag.updatedAt)}</td>
+                    <td>
+                      <span className={`wpn-users-pill wpn-users-pill--status-${tag.status}`}>
+                        {tag.status}
+                      </span>
+                    </td>
+                    <td>
+                      <div className="wpn-users-actions">
+                        <Tooltip label="View" placement="left">
+                          <button
+                            type="button"
+                            className="wpn-users-action"
+                            aria-label={`View ${tag.name}`}
+                            onClick={() => setViewTarget(tag)}
+                          >
+                            <Icon name="eye" />
+                          </button>
+                        </Tooltip>
+                        <Tooltip label="Edit" placement="left">
+                          <button
+                            type="button"
+                            className="wpn-users-action wpn-users-action--primary"
+                            aria-label={`Edit ${tag.name}`}
+                            onClick={() => open(tag)}
+                          >
+                            <Icon name="edit" />
+                          </button>
+                        </Tooltip>
+                        <Tooltip label="Delete" placement="left">
+                          <button
+                            type="button"
+                            className="wpn-users-action wpn-users-action--danger"
+                            aria-label={`Delete ${tag.name}`}
+                            onClick={() => askDelete(tag)}
+                          >
+                            <Icon name="trash" />
+                          </button>
+                        </Tooltip>
+                      </div>
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+
+        <TablePagination {...paginationProps} itemLabel="tags" />
       </div>
 
       {formOpen ? (

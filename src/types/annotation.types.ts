@@ -19,9 +19,6 @@ export interface AnnotationAnchor {
   fallbackY: number;
   viewportWidth: number;
   viewportHeight: number;
-  // When true, relativeX/relativeY were computed (and must be re-applied)
-  // against the target element's rendered text content rather than its own
-  // border box — set once at creation time, see measureContentRect().
   contentRelative?: boolean;
 }
 
@@ -64,7 +61,7 @@ export interface CreateAnnotationRequest {
   status?: AnnotationStatus;
 }
 
-export const COMMENT_MAX_LENGTH = 5000;
+export const COMMENT_MAX_LENGTH = 35000;
 
 export interface CreateCommentRequest {
   message: string;
@@ -125,7 +122,6 @@ export interface AnnotationEventCallbacks {
 }
 
 export interface AnnotationConfig extends AnnotationEventCallbacks {
-  // Defaults to the library's own WEC_PINNOTE_API_URL env value when omitted.
   apiBaseUrl?: string;
   projectId: string;
   projectVersionId?: string;
@@ -140,6 +136,7 @@ export interface AnnotationConfig extends AnnotationEventCallbacks {
   apiClient?: AnnotationApiClient;
   authClient?: AuthApiClient;
   trackPageVisits?: boolean;
+  ai?: { enabled?: boolean };
 }
 
 export interface ResolvedAnnotationConfig extends AnnotationConfig {

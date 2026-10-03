@@ -69,12 +69,8 @@ describe("resolveElement without scope", () => {
     const { selector } = generateSelector(signInButton);
     const anchor = anchorFor(selector, getElementLabel(signInButton));
 
-    // Sanity check: the generated selector resolves correctly before any layout change.
     expect(resolveElement(anchor)).toBe(signInButton);
 
-    // Redesign: "Sign In" moves ahead of "Cancel". The stored selector
-    // (button:nth-of-type(2)) still uniquely matches one button in the new
-    // layout, but it's now the "Cancel" button, not "Sign In".
     const box = document.querySelector(".box")!;
     box.innerHTML = `<button>Sign In</button><button>Cancel</button>`;
     const relocatedSignIn = document.querySelectorAll("button")[0] as HTMLElement;

@@ -1,5 +1,6 @@
 import { Fragment, useState } from "react";
 import { useAnnotationContext } from "../../../context/AnnotationContext";
+import { useTokenGetter } from "../../../hooks/useTokenGetter";
 import { downloadAnalyticsVisitsCsv, fetchAnalyticsVisits } from "../../../services/analyticsApi";
 import type { AnalyticsFilters, VisitRecord } from "../../../types/analytics.types";
 import { formatRelativeTime, formatTimestamp } from "../../../utils/format";
@@ -119,7 +120,8 @@ export function VisitLogTable({
   pageOptions,
   projectName,
 }: VisitLogTableProps) {
-  const { config, activeAccount } = useAnnotationContext();
+  const { config } = useAnnotationContext();
+  const getToken = useTokenGetter(config.getAuthToken);
   const [userId, setUserId] = useState("");
   const [pageKey, setPageKey] = useState("");
   const [page, setPage] = useState(1);
@@ -161,7 +163,10 @@ export function VisitLogTable({
   const exportCsv = () => {
     setExporting(true);
     setExportError(null);
-    downloadAnalyticsVisitsCsv(config.apiBaseUrl, activeAccount?.token, query)
+    getToken()
+      .then((authToken) =>
+        downloadAnalyticsVisitsCsv(config.apiBaseUrl, authToken || undefined, query),
+      )
       .then((blob) => {
         saveBlob(blob, exportFileName(filters));
         setExporting(false);

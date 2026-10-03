@@ -6,7 +6,6 @@ import { Icon, MenuPanel, Tooltip, type IconName, type MenuItemDefinition } from
 
 type AnnotationMode = "annotate" | "tag" | "flow";
 
-// "tag" is temporarily hidden from the mode menu and cycle order — see setMode/items below.
 const MODE_CYCLE: (AnnotationMode | null)[] = [null, "annotate", "flow"];
 
 const MODE_ICON: Record<AnnotationMode, IconName> = {
@@ -130,7 +129,7 @@ export function AnnotationModeButton() {
     return () => document.removeEventListener("keydown", handleKeyDown, true);
   }, []);
 
-  const items: MenuItemDefinition[] = (["annotate", /* "tag", */ "flow"] as const).map((mode) => ({
+  const items: MenuItemDefinition[] = (["annotate",  "flow"] as const).map((mode) => ({
     type: "action",
     id: mode,
     label: MODE_LABEL[mode],

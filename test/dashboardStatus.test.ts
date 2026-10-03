@@ -15,16 +15,16 @@ function day(overrides: Partial<TrendDay> = {}): TrendDay {
 
 describe("deriveDashboardStatus", () => {
   it.each([
-    { summaryLoaded: false, error: { status: 503, message: "x" }, expected: "unavailable" },
-    { summaryLoaded: false, error: { status: 500, message: "x" }, expected: "error" },
-    { summaryLoaded: false, error: { status: null, message: "x" }, expected: "error" },
-    { summaryLoaded: true, error: { status: 503, message: "x" }, expected: "unavailable" },
-    { summaryLoaded: true, error: null, expected: "ready" },
-    { summaryLoaded: false, error: null, expected: "loading" },
+    { overviewLoaded: false, error: { status: 503, message: "x" }, expected: "unavailable" },
+    { overviewLoaded: false, error: { status: 500, message: "x" }, expected: "error" },
+    { overviewLoaded: false, error: { status: null, message: "x" }, expected: "error" },
+    { overviewLoaded: true, error: { status: 503, message: "x" }, expected: "unavailable" },
+    { overviewLoaded: true, error: null, expected: "ready" },
+    { overviewLoaded: false, error: null, expected: "loading" },
   ])(
-    "maps loaded=$summaryLoaded error=$error.status to $expected",
-    ({ summaryLoaded, error, expected }) => {
-      expect(deriveDashboardStatus({ summaryLoaded, error })).toBe(expected);
+    "maps loaded=$overviewLoaded error=$error.status to $expected",
+    ({ overviewLoaded, error, expected }) => {
+      expect(deriveDashboardStatus({ overviewLoaded, error })).toBe(expected);
     },
   );
 });
@@ -58,20 +58,17 @@ describe("hasTrendActivity", () => {
 describe("bumpSections", () => {
   it("raises every counter by one for all sections", () => {
     expect(bumpSections(initialSectionReloads(), ALL_DASHBOARD_SECTIONS)).toEqual({
-      summary: 1,
+      overview: 1,
       pages: 1,
-      trends: 1,
-      topPages: 1,
-      topUsers: 1,
       visitLog: 1,
     });
   });
 
   it("changes only the named section and leaves the input intact", () => {
     const reloads = initialSectionReloads();
-    const next = bumpSections(reloads, ["summary"]);
-    expect(next).toEqual({ ...reloads, summary: 1 });
-    expect(reloads.summary).toBe(0);
+    const next = bumpSections(reloads, ["overview"]);
+    expect(next).toEqual({ ...reloads, overview: 1 });
+    expect(reloads.overview).toBe(0);
   });
 
   it("returns the same reference for no sections", () => {

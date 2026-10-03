@@ -8,6 +8,7 @@ import { Tooltip } from "./Tooltip";
 export interface ModalShellProps {
   title: string;
   subtitle?: string;
+  leading?: ReactNode;
   onClose: () => void;
   footer?: ReactNode;
   children: ReactNode;
@@ -22,6 +23,7 @@ export interface ModalShellProps {
 export function ModalShell({
   title,
   subtitle,
+  leading,
   onClose,
   footer,
   children,
@@ -67,6 +69,7 @@ export function ModalShell({
         className={["wpn-modal-shell", className].filter(Boolean).join(" ")}
       >
         <header className="wpn-modal-shell__header">
+          {leading ? <div className="wpn-modal-shell__leading">{leading}</div> : null}
           <div className="wpn-modal-shell__heading">
             <h2 id={titleId} className="wpn-modal-shell__title">
               {title}

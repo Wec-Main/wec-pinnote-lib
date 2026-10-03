@@ -31,7 +31,6 @@ export interface MenuCheckboxItem {
   icon?: IconName;
   shortcut?: string;
   disabled?: boolean;
-  /** Render an on/off switch instead of a check mark. */
   variant?: "switch";
   onToggle: (checked: boolean) => void;
 }
@@ -57,7 +56,6 @@ export interface MenuSubmenuItem {
   label: string;
   icon?: IconName;
   disabled?: boolean;
-  /** Inline on/off switch beside the row; the flyout then holds only `items`. */
   toggle?: { label: string; checked: boolean; onToggle: (checked: boolean) => void };
   items: MenuItemDefinition[];
 }
@@ -113,6 +111,7 @@ function SubmenuItem({
   onRequestClose,
 }: SubmenuItemProps) {
   const triggerRef = useRef<HTMLButtonElement | null>(null);
+  const wrapRef = useRef<HTMLDivElement | null>(null);
   const setTriggerRef = (element: HTMLButtonElement | null) => {
     triggerRef.current = element;
     registerRef(element);
@@ -124,6 +123,7 @@ function SubmenuItem({
 
   return (
     <div
+      ref={wrapRef}
       className={["wpn-menu__item-wrap", item.toggle ? "wpn-menu__item-wrap--toggle" : ""]
         .filter(Boolean)
         .join(" ")}
@@ -179,7 +179,7 @@ function SubmenuItem({
         <MenuPanel
           items={item.items}
           placement="right-start"
-          anchorRef={triggerRef}
+          anchorRef={wrapRef}
           onRequestClose={onRequestClose}
           onBack={closeAndRefocus}
         />

@@ -1,5 +1,5 @@
 import type { FlowEdge, FlowNode, FlowSnapshot } from "../../types/flowchart.types";
-import type { NodeTypeRegistry } from "./nodeTypes";
+import { isLaneShape, type NodeTypeRegistry } from "./nodeTypes";
 import { checkConnection } from "./connectionRules";
 
 export type IssueSeverity = "error" | "warning";
@@ -61,6 +61,7 @@ export const endNodeRequired: ValidationRule = (ctx) =>
 
 export const disconnectedNodes: ValidationRule = (ctx) =>
   ctx.nodes
+    .filter((n) => !isLaneShape(ctx.registry.get(n.type).shape))
     .filter((n) => !ctx.incoming.get(n.id)?.length && !ctx.outgoing.get(n.id)?.length)
     .map((n) => ({
       code: "disconnected",

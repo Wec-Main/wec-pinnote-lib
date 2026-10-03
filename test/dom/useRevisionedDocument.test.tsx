@@ -33,13 +33,14 @@ let state: RevisionedDocumentState<Doc>;
 let container: HTMLDivElement;
 let root: Root;
 
-function Probe({ documentId }: { documentId: string | null }) {
+function Probe({ documentId, autosave }: { documentId: string | null; autosave?: boolean }) {
   state = useRevisionedDocument<Doc>({
     apiBaseUrl: "https://api.example.com",
     getAuthToken: () => "token",
     sessionKey: "session",
     documentId,
     adapter,
+    autosave,
   });
   return createElement("output", null, state.status);
 }
@@ -52,8 +53,8 @@ async function flush() {
   });
 }
 
-async function mount(documentId: string | null = "doc-1") {
-  act(() => root.render(createElement(Probe, { documentId })));
+async function mount(documentId: string | null = "doc-1", autosave?: boolean) {
+  act(() => root.render(createElement(Probe, { documentId, autosave })));
   await flush();
 }
 
@@ -203,5 +204,43 @@ describe("useRevisionedDocument", () => {
       "doc-2",
       expect.any(AbortSignal),
     );
+  });
+
+  describe("with autosave disabled", () => {
+    it("keeps edits local until save() and reports unsaved changes", async () => {
+      await mount("doc-1", false);
+      act(() => state.scheduleSave({ text: "edited" }));
+      await act(async () => {
+        vi.advanceTimersByTime(AUTOSAVE_DELAY_MS * 5);
+      });
+      await flush();
+      expect(save).not.toHaveBeenCalled();
+      expect(state.hasUnsavedChanges).toBe(true);
+      expect(state.saveState).toBe("pending");
+
+      await act(async () => {
+        await state.save({ text: "edited" });
+      });
+      expect(save).toHaveBeenCalledTimes(1);
+      expect(state.hasUnsavedChanges).toBe(false);
+      expect(state.saveState).toBe("saved");
+    });
+
+    it("clears the unsaved flag when edits return to the saved content", async () => {
+      await mount("doc-1", false);
+      act(() => state.scheduleSave({ text: "edited" }));
+      expect(state.hasUnsavedChanges).toBe(true);
+      act(() => state.scheduleSave({ text: "initial" }));
+      expect(state.hasUnsavedChanges).toBe(false);
+      expect(state.saveState).toBe("idle");
+    });
+
+    it("never writes unsaved edits on unmount", async () => {
+      await mount("doc-1", false);
+      act(() => state.scheduleSave({ text: "edited" }));
+      act(() => root.render(createElement("div")));
+      await flush();
+      expect(save).not.toHaveBeenCalled();
+    });
   });
 });

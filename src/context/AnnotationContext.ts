@@ -18,6 +18,7 @@ import type {
 import type { ProjectTag } from "../types/tag.types";
 import type { Project } from "../types/organization.types";
 import type { DraftFlowPin, FlowPin } from "../types/flowPin.types";
+import type { ReferenceTarget } from "../utils/mentions";
 
 export type VersionedLayer = "comments" | "flows";
 
@@ -29,12 +30,6 @@ export interface DiscardPrompt {
 export interface AnnotationDataContextValue {
   config: ResolvedAnnotationConfig;
   api: AnnotationApiClient;
-  // The effective project version for every version-scoped fetch/create:
-  // config.projectVersionId (an explicit host override) when set, otherwise
-  // the project's live current_project_version_id, resolved fresh and
-  // re-resolved whenever reloadCurrentProjectVersion() runs — e.g. after
-  // Settings -> Versioning activates a different version. This is what a
-  // component should read instead of config.projectVersionId directly.
   projectVersionId: string | undefined;
   reloadCurrentProjectVersion: () => void;
   project: Project | null;
@@ -49,10 +44,6 @@ export interface AnnotationDataContextValue {
   error: string | null;
   connectionState: StreamConnectionState;
   retry: () => void;
-  // Every annotation across the whole project, regardless of page — used by
-  // the toolbar comment count and the comments list panel. Refetched (not
-  // live-streamed); see reloadAllAnnotations. Pin rendering, drafting, and
-  // per-page live updates all continue to use `annotations` above.
   allAnnotations: Annotation[];
   allAnnotationsLoading: boolean;
   allAnnotationsError: string | null;
@@ -94,16 +85,16 @@ export interface AnnotationDataContextValue {
   syncFlowPinName: (flowPinId: string, name: string) => void;
 }
 
+export type FlowEditorSource = "panel" | "pin";
+
 export interface AnnotationUiContextValue {
   modeEnabled: boolean;
   setModeEnabled: (enabled: boolean) => void;
   selectedId: string | null;
   selectAnnotation: (id: string | null) => void;
   revealAnnotation: (id: string) => void;
-  // Reveals an annotation's on-page pin and temporarily hides the comments
-  // list panel (whatever mode it's in) so the pin isn't obscured; the panel
-  // reopens on its own once that pin's floating thread view is closed.
   revealAnnotationAndHideList: (id: string) => void;
+  closeThread: () => void;
   draft: DraftAnnotation | null;
   startDraft: (anchor: AnnotationAnchor, label: string) => void;
   updateDraftLabel: (label: string) => void;
@@ -148,12 +139,15 @@ export interface AnnotationUiContextValue {
   setAuditHistoryOpen: (open: boolean) => void;
   commentsFullScreenOpen: boolean;
   setCommentsFullScreenOpen: (open: boolean) => void;
-  // Which thread the Full Screen comments view's right-side detail pane
-  // shows — lifted out of that view's own component state (rather than a
-  // local useState there) so it survives the view briefly unmounting, e.g.
-  // while "open on page" temporarily hides the list to reveal a pin.
   commentsFullScreenSelectedThreadId: string | null;
   setCommentsFullScreenSelectedThreadId: (id: string | null) => void;
+  setFlowDirty: (source: FlowEditorSource, dirty: boolean) => void;
+  guardFlowLeave: (scope: FlowEditorSource | "any", proceed: () => void) => void;
+  flowLeaveRequest: FlowEditorSource | null;
+  resolveFlowLeave: (discard: boolean) => void;
+  openReference: (target: ReferenceTarget) => void;
+  referenceRequest: ReferenceTarget | null;
+  consumeReferenceRequest: () => void;
 }
 
 export interface AnnotationAuthContextValue {

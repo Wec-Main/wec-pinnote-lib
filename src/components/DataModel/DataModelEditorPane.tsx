@@ -39,12 +39,14 @@ export function DataModelEditorPane({ dataModelId }: DataModelEditorPaneProps) {
   const sessionKey = hostAuthenticated ? "host" : (activeAccount?.id ?? "");
   const [name, setName] = useState(DEFAULT_NAME);
   const [description, setDescription] = useState("");
+  const [holdAi, setHoldAi] = useState(false);
   const dataModelDocument = useDataModelDocument({
     apiBaseUrl: config.apiBaseUrl,
     getAuthToken: config.getAuthToken,
     sessionKey,
     dataModelId,
     onSaved: setName,
+    holdAutosave: holdAi,
   });
   const { applyRemoteRevision, reload } = dataModelDocument;
   const currentUserId = activeAccount?.id;
@@ -117,6 +119,8 @@ export function DataModelEditorPane({ dataModelId }: DataModelEditorPaneProps) {
 
   return (
     <DataModelDocumentEditor
+      dataModelId={dataModelId}
+      onUnsavedAiChangesChange={setHoldAi}
       dataModelDocument={dataModelDocument}
       name={name}
       signedIn={signedIn}

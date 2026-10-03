@@ -6,7 +6,7 @@ import {
   type KeyboardEvent as ReactKeyboardEvent,
 } from "react";
 import type { AnnotationStatus } from "../../types/annotation.types";
-import { ANNOTATION_STATUS_OPTIONS, statusLabel } from "../../utils/status";
+import { ANNOTATION_STATUS_OPTIONS, statusLabel, type StatusOption } from "../../utils/status";
 import { useEscapeKey } from "../../hooks/useEscapeKey";
 import { Icon } from "../primitives";
 
@@ -14,12 +14,18 @@ interface AnnotationStatusSelectProps {
   value: AnnotationStatus;
   onChange: (status: AnnotationStatus) => void;
   disabled?: boolean;
+  options?: StatusOption[];
 }
 
-export function AnnotationStatusSelect({ value, onChange, disabled }: AnnotationStatusSelectProps) {
+export function AnnotationStatusSelect({
+  value,
+  onChange,
+  disabled,
+  options = ANNOTATION_STATUS_OPTIONS,
+}: AnnotationStatusSelectProps) {
   const [open, setOpen] = useState(false);
   const [activeIndex, setActiveIndex] = useState(() =>
-    ANNOTATION_STATUS_OPTIONS.findIndex((option) => option.value === value),
+    options.findIndex((option) => option.value === value),
   );
   const rootRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
@@ -46,12 +52,12 @@ export function AnnotationStatusSelect({ value, onChange, disabled }: Annotation
   }, open);
 
   const openMenu = () => {
-    setActiveIndex(ANNOTATION_STATUS_OPTIONS.findIndex((option) => option.value === value));
+    setActiveIndex(options.findIndex((option) => option.value === value));
     setOpen(true);
   };
 
   const commit = (index: number) => {
-    const option = ANNOTATION_STATUS_OPTIONS[index];
+    const option = options[index];
     if (option) {
       onChange(option.value);
     }
@@ -68,15 +74,12 @@ export function AnnotationStatusSelect({ value, onChange, disabled }: Annotation
   const handleListKeyDown = (event: ReactKeyboardEvent<HTMLDivElement>) => {
     if (event.key === "ArrowDown") {
       event.preventDefault();
-      setActiveIndex((current) => (current + 1) % ANNOTATION_STATUS_OPTIONS.length);
+      setActiveIndex((current) => (current + 1) % options.length);
       return;
     }
     if (event.key === "ArrowUp") {
       event.preventDefault();
-      setActiveIndex(
-        (current) =>
-          (current - 1 + ANNOTATION_STATUS_OPTIONS.length) % ANNOTATION_STATUS_OPTIONS.length,
-      );
+      setActiveIndex((current) => (current - 1 + options.length) % options.length);
       return;
     }
     if (event.key === "Home") {
@@ -86,7 +89,7 @@ export function AnnotationStatusSelect({ value, onChange, disabled }: Annotation
     }
     if (event.key === "End") {
       event.preventDefault();
-      setActiveIndex(ANNOTATION_STATUS_OPTIONS.length - 1);
+      setActiveIndex(options.length - 1);
       return;
     }
     if (event.key === "Enter" || event.key === " ") {
@@ -95,7 +98,9 @@ export function AnnotationStatusSelect({ value, onChange, disabled }: Annotation
     }
   };
 
-  const activeOption = ANNOTATION_STATUS_OPTIONS[activeIndex];
+  const activeOption = options[activeIndex];
+  const currentLabel =
+    options.find((option) => option.value === value)?.label ?? statusLabel(value);
 
   return (
     <div className="wpn-status" ref={rootRef}>
@@ -104,14 +109,14 @@ export function AnnotationStatusSelect({ value, onChange, disabled }: Annotation
         type="button"
         className={`wpn-status__trigger wpn-tone--${value}`}
         disabled={disabled}
-        aria-label={`Status: ${statusLabel(value)}`}
+        aria-label={`Status: ${currentLabel}`}
         aria-haspopup="listbox"
         aria-expanded={open}
         onClick={() => (open ? close() : openMenu())}
         onKeyDown={handleTriggerKeyDown}
       >
         <span className="wpn-status__dot" />
-        {statusLabel(value)}
+        {currentLabel}
         <svg viewBox="0 0 16 16" className="wpn-status__chevron" aria-hidden="true">
           <path fill="currentColor" d="M4.2 6.2 8 10l3.8-3.8L13 7.4 8 12.4 3 7.4z" />
         </svg>
@@ -131,7 +136,7 @@ export function AnnotationStatusSelect({ value, onChange, disabled }: Annotation
           <div className="wpn-status__menu-title" aria-hidden="true">
             Change status
           </div>
-          {ANNOTATION_STATUS_OPTIONS.map((option, index) => (
+          {options.map((option, index) => (
             <button
               key={option.value}
               id={`${optionIdPrefix}-${option.value}`}

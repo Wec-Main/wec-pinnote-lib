@@ -1,42 +1,94 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   INITIAL_RECONNECT_DELAY_MS,
+  LIVE_RELOAD_THROTTLE_MS,
+  createReloadScheduler,
   liveIndicator,
   nextReconnectDelay,
   parseAnalyticsChange,
-  sectionsForKinds,
   streamStateAfterFailure,
 } from "../src/components/Settings/Dashboard/analyticsStreamState";
-import { ALL_DASHBOARD_SECTIONS } from "../src/components/Settings/Dashboard/dashboardStatus";
 
-describe("sectionsForKinds", () => {
-  it("maps presence to the summary", () => {
-    expect(sectionsForKinds(["presence"])).toEqual(["summary"]);
+describe("createReloadScheduler", () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
   });
 
-  it("maps logins to the summary and trends", () => {
-    expect(sectionsForKinds(["logins"])).toEqual(["summary", "trends"]);
+  afterEach(() => {
+    vi.useRealTimers();
   });
 
-  it("maps visits to every section", () => {
-    expect(sectionsForKinds(["visits"])).toEqual([...ALL_DASHBOARD_SECTIONS]);
+  function setup(random = 0.5) {
+    const reload = vi.fn();
+    const scheduler = createReloadScheduler({ reload, random: () => random });
+    return { reload, scheduler };
+  }
+
+  it("reloads on the first change and throttles the rest to one trailing reload", () => {
+    const { reload, scheduler } = setup();
+
+    scheduler.change();
+    vi.advanceTimersByTime(0);
+    expect(reload).toHaveBeenCalledTimes(1);
+
+    scheduler.change();
+    scheduler.change();
+    vi.advanceTimersByTime(LIVE_RELOAD_THROTTLE_MS - 1);
+    expect(reload).toHaveBeenCalledTimes(1);
+    vi.advanceTimersByTime(1);
+    expect(reload).toHaveBeenCalledTimes(2);
   });
 
-  it("deduplicates in section order", () => {
-    expect(sectionsForKinds(["logins", "presence"])).toEqual(["summary", "trends"]);
+  it("reloads after a jitter of at most five seconds on resync", () => {
+    const { reload, scheduler } = setup(0.999);
+
+    scheduler.resync();
+    vi.advanceTimersByTime(4990);
+    expect(reload).not.toHaveBeenCalled();
+    vi.advanceTimersByTime(10);
+    expect(reload).toHaveBeenCalledTimes(1);
+  });
+
+  it("drops pending reloads on cancel", () => {
+    const { reload, scheduler } = setup();
+
+    scheduler.change();
+    scheduler.cancel();
+    vi.advanceTimersByTime(LIVE_RELOAD_THROTTLE_MS * 2);
+    expect(reload).not.toHaveBeenCalled();
+  });
+
+  it("reloads immediately and restarts the throttle window on reloadNow", () => {
+    const { reload, scheduler } = setup();
+
+    scheduler.reloadNow();
+    expect(reload).toHaveBeenCalledTimes(1);
+    scheduler.change();
+    vi.advanceTimersByTime(LIVE_RELOAD_THROTTLE_MS - 1);
+    expect(reload).toHaveBeenCalledTimes(1);
+    vi.advanceTimersByTime(1);
+    expect(reload).toHaveBeenCalledTimes(2);
   });
 });
 
 describe("parseAnalyticsChange", () => {
-  it.each(["not json", "{}", '{"kinds":[]}', '{"kinds":["comments"]}', "null"])(
-    "rejects %s",
-    (data) => {
-      expect(parseAnalyticsChange(data)).toBeNull();
-    },
-  );
+  it.each([
+    "not json",
+    "{}",
+    '{"kinds":[]}',
+    '{"kinds":["comments"]}',
+    '{"kinds":["presence"]}',
+    "null",
+  ])("rejects %s", (data) => {
+    expect(parseAnalyticsChange(data)).toBeNull();
+  });
 
   it("returns the kinds of a valid change", () => {
     expect(parseAnalyticsChange('{"kinds":["visits","logins"]}')).toEqual(["visits", "logins"]);
+  });
+
+  it("ignores kinds it does not know", () => {
+    expect(parseAnalyticsChange('{"kinds":["visits","presence"]}')).toEqual(["visits"]);
   });
 });
 
@@ -66,6 +118,7 @@ describe("liveIndicator", () => {
     expect(liveIndicator("connecting")).toEqual({ label: "Connecting", tone: "pending" });
     expect(liveIndicator("live")).toEqual({ label: "Live", tone: "live" });
     expect(liveIndicator("reconnecting")).toEqual({ label: "Reconnecting", tone: "pending" });
+    expect(liveIndicator("paused")).toEqual({ label: "Paused", tone: "off" });
     expect(liveIndicator("offline")).toEqual({ label: "Live updates off", tone: "off" });
   });
 });

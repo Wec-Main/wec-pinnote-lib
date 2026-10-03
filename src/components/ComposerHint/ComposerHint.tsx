@@ -62,6 +62,11 @@ export function ComposerHintInfo({ showMentionHint = true }: ComposerHintInfoPro
               <kbd>@</kbd> to mention
             </span>
           ) : null}
+          {showMentionHint ? (
+            <span>
+              <kbd>#</kbd> to tag epic, flow, data model
+            </span>
+          ) : null}
         </span>
       ) : null}
     </span>

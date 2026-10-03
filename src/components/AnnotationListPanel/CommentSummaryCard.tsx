@@ -8,8 +8,6 @@ interface CommentSummaryCardProps {
   thread: CommentThread;
   active: boolean;
   onSelect: (annotationId: string) => void;
-  // Reveals the thread's pin — on the current page if it's there, centered
-  // with a "Not in this view" chip otherwise (same as Minimize mode).
   onRevealOnPage: (annotationId: string) => void;
 }
 

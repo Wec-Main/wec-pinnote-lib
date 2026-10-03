@@ -5,7 +5,8 @@ import { useFocusTrap } from "../../hooks/useFocusTrap";
 import { useScrimDismiss } from "../../hooks/useScrimDismiss";
 import type { Flow } from "../../types/flowPin.types";
 
-const NAME_MAX = 200;
+const NAME_MAX = 1000;
+const WARN_RATIO = 0.9;
 
 interface FlowFormModalProps {
   flow: Flow;
@@ -86,7 +87,15 @@ export function FlowFormModal({ flow, busy = false, onClose, onSubmit }: FlowFor
                 onChange={(event) => setName(event.target.value)}
                 placeholder="e.g. Login page flow"
               />
-              <span className="wpn-epicflow-modal__counter">
+              <span
+                className={
+                  name.length >= NAME_MAX
+                    ? "wpn-epicflow-modal__counter wpn-epicflow-modal__counter--limit"
+                    : name.length >= NAME_MAX * WARN_RATIO
+                      ? "wpn-epicflow-modal__counter wpn-epicflow-modal__counter--warn"
+                      : "wpn-epicflow-modal__counter"
+                }
+              >
                 {name.length}/{NAME_MAX}
               </span>
               {touched && !nameValid ? (

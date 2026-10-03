@@ -8,7 +8,6 @@ import {
 import { createPortal } from "react-dom";
 import { useAnnotationUi } from "../../context/AnnotationContext";
 import { useEscapeKey } from "../../hooks/useEscapeKey";
-import { useRefocusGrace } from "../../hooks/useRefocusGrace";
 import {
   createElementAnchor,
   findAnnotatableElement,
@@ -16,13 +15,26 @@ import {
 } from "../../utils/elementAnchor";
 import { getElementLabel, isLibraryElement } from "../../utils/elementResolver";
 
-function RefocusGraceBadge({ remainingMs }: { remainingMs: number }) {
+const PAUSE_DURATION_MS = 5000;
+const PAUSE_TICK_MS = 200;
+
+function PageInteractionBadge({ remainingMs }: { remainingMs: number }) {
   const seconds = Math.ceil(remainingMs / 1000);
   return createPortal(
-    <div className="wpn-refocus-grace" role="status" aria-live="polite">
+    <div className="wpn-page-interaction" role="status" aria-live="polite">
       Selection paused &middot; {seconds}s
     </div>,
     document.body,
+  );
+}
+
+function isPageInteractionShortcut(event: KeyboardEvent): boolean {
+  return (
+    event.ctrlKey &&
+    !event.metaKey &&
+    !event.altKey &&
+    !event.shiftKey &&
+    event.key.toLowerCase() === "h"
   );
 }
 
@@ -63,8 +75,9 @@ export function AnnotationOverlay() {
   } = useAnnotationUi();
   const placing = modeEnabled || tagModeEnabled || flowPinModeEnabled;
   const pendingDraft = draft ?? tagDraft ?? flowPinDraft;
-  const graceRemainingMs = useRefocusGrace(placing);
-  const suspended = graceRemainingMs > 0;
+  const [pauseDeadline, setPauseDeadline] = useState(0);
+  const [pauseRemainingMs, setPauseRemainingMs] = useState(0);
+  const suspended = pauseRemainingMs > 0 && !pendingDraft;
   const [highlight, setHighlight] = useState<DOMRect | null>(null);
   const [announcement, setAnnouncement] = useState("");
   const overlayRef = useRef<HTMLDivElement>(null);
@@ -100,6 +113,41 @@ export function AnnotationOverlay() {
       setAnnouncement((current) => (current ? "Annotation mode disabled" : current));
     }
   }, [flowPinModeEnabled, placing, tagModeEnabled]);
+
+  useEffect(() => {
+    if (!placing || pendingDraft) {
+      setPauseDeadline(0);
+      return;
+    }
+    const onShortcut = (event: KeyboardEvent) => {
+      if (!isPageInteractionShortcut(event)) {
+        return;
+      }
+      event.preventDefault();
+      event.stopPropagation();
+      setPauseDeadline((current) => (current > Date.now() ? 0 : Date.now() + PAUSE_DURATION_MS));
+    };
+    document.addEventListener("keydown", onShortcut, true);
+    return () => document.removeEventListener("keydown", onShortcut, true);
+  }, [placing, pendingDraft]);
+
+  useEffect(() => {
+    if (!pauseDeadline) {
+      setPauseRemainingMs(0);
+      return;
+    }
+    const tick = () => {
+      const left = pauseDeadline - Date.now();
+      if (left <= 0) {
+        setPauseDeadline(0);
+        return;
+      }
+      setPauseRemainingMs(left);
+    };
+    tick();
+    const interval = window.setInterval(tick, PAUSE_TICK_MS);
+    return () => window.clearInterval(interval);
+  }, [pauseDeadline]);
 
   useEffect(() => {
     if (!pendingDraft) {
@@ -271,7 +319,7 @@ export function AnnotationOverlay() {
           />
         ) : null}
       </div>
-      {suspended ? <RefocusGraceBadge remainingMs={graceRemainingMs} /> : null}
+      {suspended ? <PageInteractionBadge remainingMs={pauseRemainingMs} /> : null}
     </>
   );
 }

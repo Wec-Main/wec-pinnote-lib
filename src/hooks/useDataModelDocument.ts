@@ -24,6 +24,7 @@ interface UseDataModelDocumentOptions {
   dataModelId: string | null;
   onSaved?: (dataModelName: string) => void;
   onSaveFailed?: (dataModelId: string, message: string) => void;
+  holdAutosave?: boolean;
 }
 
 const dataModelAdapter: RevisionedDocumentAdapter<ErdDocumentJSON> = {

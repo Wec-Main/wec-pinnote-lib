@@ -87,12 +87,6 @@ function resolveWithin(
       const matches = Array.from(root.querySelectorAll(selector));
       if (matches.length === 1) {
         const match = matches[0] ?? null;
-        // A layout change can shift sibling structure enough that a stored
-        // nth-of-type path selector still uniquely matches, but now points at
-        // a different element than the one it was created for. Cross-check
-        // against the stored identifier/label before trusting it, the same
-        // way an ambiguous (>1 match) selector already is below — otherwise
-        // fall through to the identifier/label strategies instead.
         if (!elementIdentifier || (match && getElementLabel(match) === elementIdentifier)) {
           return match;
         }
@@ -103,7 +97,6 @@ function resolveWithin(
         }
       }
     } catch {
-      // A stored selector can be invalid CSS; fall through to the other strategies.
     }
   }
 
@@ -151,6 +144,17 @@ function getAssociatedLabelText(element: HTMLElement): string | null {
   return null;
 }
 
+const MAX_TEXT_LABEL_LENGTH = 240;
+
+function clipAtWord(text: string, maxLength: number): string {
+  if (text.length <= maxLength) {
+    return text;
+  }
+  const clipped = text.slice(0, maxLength);
+  const lastSpace = clipped.lastIndexOf(" ");
+  return (lastSpace > maxLength / 2 ? clipped.slice(0, lastSpace) : clipped).trim();
+}
+
 export function getElementLabel(element: Element): string {
   if (!(element instanceof HTMLElement)) {
     return element.tagName.toLowerCase();
@@ -175,9 +179,9 @@ export function getElementLabel(element: Element): string {
     return element.placeholder || element.name || element.type || "input";
   }
 
-  const text = element.textContent?.trim();
+  const text = element.textContent?.replace(/\s+/g, " ").trim();
   if (text) {
-    return text.length > 48 ? `${text.slice(0, 45)}...` : text;
+    return clipAtWord(text, MAX_TEXT_LABEL_LENGTH);
   }
 
   return element.tagName.toLowerCase();

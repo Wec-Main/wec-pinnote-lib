@@ -1,15 +1,23 @@
 import type { AnnotationStatus } from "../types/annotation.types";
 
-export const ANNOTATION_STATUS_OPTIONS: {
+export interface StatusOption {
   value: AnnotationStatus;
   label: string;
   description: string;
-}[] = [
+}
+
+export const ANNOTATION_STATUS_OPTIONS: StatusOption[] = [
   { value: "open", label: "Open", description: "New, waiting for triage" },
   { value: "re-open", label: "Re-Open", description: "Raised again after a fix" },
   { value: "dev-inprogress", label: "Dev-inprogress", description: "Being worked on" },
   { value: "completed", label: "Completed", description: "Fix delivered, ready to verify" },
   { value: "closed", label: "Closed", description: "No further action needed" },
+];
+
+export const THREAD_STATUS_OPTIONS: StatusOption[] = [
+  { value: "open", label: "Open", description: "New, waiting for triage" },
+  { value: "re-open", label: "Re-Open", description: "Raised again after a fix" },
+  { value: "closed", label: "Resolved", description: "Done, no further action needed" },
 ];
 
 export function statusLabel(status: AnnotationStatus): string {

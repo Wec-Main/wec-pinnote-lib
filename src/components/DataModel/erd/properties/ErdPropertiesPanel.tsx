@@ -4,6 +4,7 @@ import type { ErdEngineName } from "../../../../types/dataModel.types";
 import { cx } from "../../../../utils/flowchart/shallow";
 import { Icon } from "../../../WecFlow/FlowIcons";
 import { EntityProperties } from "./EntityProperties";
+import { EnumProperties } from "./EnumProperties";
 import { ModelOverview } from "./ModelOverview";
 import { MultiSelection } from "./MultiSelection";
 import { NoteProperties } from "./NoteProperties";
@@ -28,6 +29,7 @@ export const ErdPropertiesPanel = memo(function ErdPropertiesPanel({
   const entityIds = [...selection.entityIds];
   const noteIds = [...selection.noteIds];
   const relationshipIds = [...selection.relationshipIds];
+  const enumId = selection.enumId;
   const total = entityIds.length + noteIds.length + relationshipIds.length;
 
   let content;
@@ -47,6 +49,8 @@ export const ErdPropertiesPanel = memo(function ErdPropertiesPanel({
     );
   } else if (noteIds[0] !== undefined) {
     content = <NoteProperties key={noteIds[0]} noteId={noteIds[0]} />;
+  } else if (enumId) {
+    content = <EnumProperties key={enumId} enumId={enumId} />;
   } else {
     content = <ModelOverview description={description} onMetaChange={onMetaChange} />;
   }

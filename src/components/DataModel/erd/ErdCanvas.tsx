@@ -13,9 +13,11 @@ import { Icon } from "../../WecFlow/FlowIcons";
 import { ErdBackground, type ErdBackgroundVariant } from "./ErdBackground";
 import { ErdControls, type ErdCanvasMode } from "./ErdControls";
 import { ErdEdgeLayer } from "./ErdEdgeLayer";
+import { ErdMiniMap } from "./ErdMiniMap";
 import { ErdSelectionBox } from "./ErdSelectionBox";
 import { EntityNode } from "./EntityNode";
 import { NoteNode } from "./NoteNode";
+import { ErdAiGhosts } from "../../Ai/ErdAiIntegration";
 
 const WHEEL_LINE_UNIT = 0.05;
 const WHEEL_PAGE_UNIT = 1;
@@ -39,6 +41,7 @@ const ViewportLayer = memo(function ViewportLayer() {
       {entityIds.map((id) => (
         <EntityNode key={id} id={id} />
       ))}
+      <ErdAiGhosts />
     </div>
   );
 });
@@ -75,15 +78,16 @@ function isPaletteDrag(e: React.DragEvent): boolean {
   return e.dataTransfer.types.includes(ERD_PALETTE_DRAG_MIME);
 }
 
-export function ErdCanvas({ children }: { children?: ReactNode }) {
+export function ErdCanvas({ children, onAskAi }: { children?: ReactNode; onAskAi?: () => void }) {
   const { engine, canvasRef, clientToCanvas, clientToFlow } = useErdContext();
   const readOnly = useErdState((s) => s.readOnly);
   const [mode, setMode] = useState<ErdCanvasMode>("pan");
   const [panning, setPanning] = useState(false);
   const [spaceHeld, setSpaceHeld] = useState(false);
   const [grid, setGrid] = useState<ErdBackgroundVariant>("dots");
+  const [miniMapVisible, setMiniMapVisible] = useState(true);
   const startDrag = usePointerDrag();
-  const onShortcutKeyDown = useErdKeyboardShortcuts();
+  const onShortcutKeyDown = useErdKeyboardShortcuts({ onAskAi });
 
   useEffect(() => {
     const el = canvasRef.current;
@@ -243,7 +247,15 @@ export function ErdCanvas({ children }: { children?: ReactNode }) {
       <ErdSelectionBox />
       <EmptyState />
       <ConnectionHint />
-      <ErdControls mode={mode} onModeChange={setMode} grid={grid} onGridChange={setGrid} />
+      <ErdControls
+        mode={mode}
+        onModeChange={setMode}
+        grid={grid}
+        onGridChange={setGrid}
+        miniMapVisible={miniMapVisible}
+        onMiniMapToggle={() => setMiniMapVisible((visible) => !visible)}
+      />
+      {miniMapVisible && <ErdMiniMap />}
       {children && (
         <div
           className="wpn-erd-canvas__overlay"

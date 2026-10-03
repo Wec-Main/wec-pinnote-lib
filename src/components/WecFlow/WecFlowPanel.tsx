@@ -1,4 +1,5 @@
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
+import { AiWorkSlotContext } from "../Ai/AiWorkSlot";
 import { useAnnotationAuth, useAnnotationContext } from "../../context/AnnotationContext";
 import { Icon, Tooltip } from "../primitives";
 import { useFlowDocument } from "../../hooks/useFlowDocument";
@@ -108,6 +109,8 @@ function FlowEditorPane({ flowId }: FlowEditorPaneProps) {
   return (
     <FlowDocumentEditor
       flowDocument={flowDocument}
+      flowId={flowId}
+      source="panel"
       signedIn={signedIn}
       resolveError={errorMessage(flowDocument.error)}
     />
@@ -115,8 +118,19 @@ function FlowEditorPane({ flowId }: FlowEditorPaneProps) {
 }
 
 export function WecFlowPanel() {
-  const { setFlowOpen } = useAnnotationContext();
+  const { setFlowOpen, referenceRequest, consumeReferenceRequest, guardFlowLeave } =
+    useAnnotationContext();
   const [openFlowId, setOpenFlowId] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (referenceRequest?.kind === "flow") {
+      const flowId = referenceRequest.id;
+      consumeReferenceRequest();
+      guardFlowLeave("panel", () => setOpenFlowId(flowId));
+    }
+  }, [consumeReferenceRequest, guardFlowLeave, referenceRequest]);
+
+  const [aiWorkSlot, setAiWorkSlot] = useState<HTMLElement | null>(null);
 
   return (
     <div className="wpn-flow-panel">
@@ -130,13 +144,14 @@ export function WecFlowPanel() {
             <button
               type="button"
               className="wpn-flow-panel__back"
-              onClick={() => setOpenFlowId(null)}
+              onClick={() => guardFlowLeave("panel", () => setOpenFlowId(null))}
             >
               <Icon name="chevronLeft" className="wpn-flow-panel__back-icon" />
               Back to flows
             </button>
           ) : null}
         </span>
+        <div className="wpn-flow-panel__status" ref={setAiWorkSlot} />
         <div className="wpn-flow-panel__header-actions">
           {openFlowId ? (
             <Tooltip label={shortcutList} placement="bottom">
@@ -159,11 +174,13 @@ export function WecFlowPanel() {
       </div>
 
       <div className="wpn-flow-panel__body">
-        {openFlowId ? (
-          <FlowEditorPane flowId={openFlowId} />
-        ) : (
-          <FlowListPanel onOpen={setOpenFlowId} />
-        )}
+        <AiWorkSlotContext.Provider value={aiWorkSlot}>
+          {openFlowId ? (
+            <FlowEditorPane flowId={openFlowId} />
+          ) : (
+            <FlowListPanel onOpen={setOpenFlowId} />
+          )}
+        </AiWorkSlotContext.Provider>
       </div>
     </div>
   );

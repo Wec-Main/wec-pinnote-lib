@@ -50,19 +50,6 @@ export function ModelOverview({
             onBlur={(e) => onMetaChange?.({ name: e.target.value })}
           />
         </label>
-        <label className="wpn-flowchart-ui__field">
-          <span className="wpn-flowchart-ui__field-label">Description</span>
-          <textarea
-            className="wpn-flowchart-ui__input wpn-erd__textarea"
-            value={descriptionDraft}
-            disabled={readOnly}
-            onChange={(e) => setDescriptionDraft(e.target.value)}
-            onBlur={() => {
-              if (descriptionDraft !== description)
-                onMetaChange?.({ description: descriptionDraft });
-            }}
-          />
-        </label>
         <SelectField
           label="Engine"
           value={modelEngine}
@@ -74,6 +61,21 @@ export function ModelOverview({
             onMetaChange?.({ engine: next });
           }}
         />
+        <label className="wpn-flowchart-ui__field wpn-flowchart-ui__field-grow">
+          <span className="wpn-flowchart-ui__field-label">Description</span>
+          <textarea
+            className="wpn-flowchart-ui__input wpn-flowchart-ui__input-grow"
+            style={{ minHeight: 320 }}
+            placeholder="What is this data model for? Context, assumptions, open questions…"
+            value={descriptionDraft}
+            disabled={readOnly}
+            onChange={(e) => setDescriptionDraft(e.target.value)}
+            onBlur={() => {
+              if (descriptionDraft !== description)
+                onMetaChange?.({ description: descriptionDraft });
+            }}
+          />
+        </label>
       </section>
     </>
   );

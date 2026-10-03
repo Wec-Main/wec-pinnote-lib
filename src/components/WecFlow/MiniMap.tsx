@@ -2,6 +2,7 @@ import { memo, useCallback, useMemo, useRef } from "react";
 import { useFlowEngine, useFlowState } from "../../context/FlowContext";
 import { usePointerDrag } from "../../hooks/flowchart/usePointerDrag";
 import { getBounds } from "../../utils/flowchart/geometry";
+import { isLaneShape } from "../../utils/flowchart/nodeTypes";
 
 const WIDTH = 200;
 const HEIGHT = 130;
@@ -17,11 +18,14 @@ export const MiniMap = memo(function MiniMap() {
 
   const rects = useMemo(
     () =>
-      nodes.map((n) => ({
-        id: n.id,
-        rect: engine.getNodeRect(n),
-        color: engine.getDefinition(n.type).color,
-      })),
+      nodes
+        .map((n) => ({
+          id: n.id,
+          rect: engine.getNodeRect(n),
+          color: engine.getDefinition(n.type).color,
+          lane: isLaneShape(engine.getDefinition(n.type).shape),
+        }))
+        .sort((a, b) => Number(b.lane) - Number(a.lane)),
     [engine, nodes],
   );
 
@@ -80,7 +84,7 @@ export const MiniMap = memo(function MiniMap() {
       data-flow-overlay
     >
       <svg ref={svgRef} width={WIDTH} height={HEIGHT} viewBox={`${vbX} ${vbY} ${vbW} ${vbH}`}>
-        {rects.map(({ id, rect, color }) => (
+        {rects.map(({ id, rect, color, lane }) => (
           <rect
             key={id}
             x={rect.x}
@@ -89,7 +93,7 @@ export const MiniMap = memo(function MiniMap() {
             height={rect.height}
             rx={6 * scale}
             fill={selected.has(id) ? "var(--fb-accent)" : color}
-            fillOpacity={selected.has(id) ? 0.9 : 0.55}
+            fillOpacity={selected.has(id) ? 0.9 : lane ? 0.15 : 0.55}
           />
         ))}
         <path

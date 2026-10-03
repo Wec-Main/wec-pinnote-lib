@@ -216,3 +216,121 @@
   gap: 6px;
   margin-bottom: 6px;
 }
+
+.wpn-erd-validation__tabs {
+  display: flex;
+  gap: 4px;
+  padding: 0 10px 8px;
+}
+
+.wpn-erd-validation__tab {
+  padding: 3px 10px;
+  border: 1px solid var(--wpn-flowchart-border);
+  border-radius: 999px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-size: 11.5px;
+  cursor: pointer;
+}
+
+.wpn-erd-validation__tab--active {
+  border-color: var(--wpn-accent);
+  background: var(--wpn-accent-soft, rgb(91 77 255 / 0.14));
+  font-weight: 600;
+}
+
+.wpn-erd-validation__empty {
+  margin: 0;
+  padding: 10px 14px 14px;
+  font-size: 12.5px;
+  opacity: 0.7;
+}
+
+.wpn-erd-validation__hint {
+  display: block;
+  margin-top: 2px;
+  font-size: 11.5px;
+  font-weight: 400;
+  opacity: 0.65;
+}
+
+.wpn-erd-validate-badge {
+  display: inline-grid;
+  place-items: center;
+  min-width: 18px;
+  height: 18px;
+  margin-left: 6px;
+  padding: 0 5px;
+  border-radius: 999px;
+  color: #fff;
+  font-size: 10.5px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.wpn-erd-validate-badge--error {
+  background: var(--wpn-danger, #dc2626);
+}
+
+.wpn-erd-validate-badge--warning {
+  background: #d97706;
+}
+
+.wpn-erd-validate-badge--ok {
+  background: #059669;
+}
+
+.wpn-erd .wpn-erd__outline {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 16px;
+}
+
+.wpn-erd .wpn-erd__outline-group {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.wpn-erd .wpn-erd__outline-title {
+  padding: 6px 4px 2px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--wpn-flowchart-text-muted);
+}
+
+.wpn-erd .wpn-erd__outline-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 6px 8px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-size: 12.5px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.wpn-erd .wpn-erd__outline-item:hover {
+  background: var(--wpn-flowchart-panel-muted);
+}
+
+.wpn-erd .wpn-erd__outline-item--active {
+  background: var(--wpn-accent-soft, rgb(91 77 255 / 0.14));
+  font-weight: 600;
+}
+
+.wpn-erd .wpn-erd__outline-label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

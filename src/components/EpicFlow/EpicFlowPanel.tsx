@@ -12,6 +12,7 @@ import {
   useAnnotationUi,
 } from "../../context/AnnotationContext";
 import { Icon, ListSearchBar, RefreshButton, Tooltip, LiveStatus } from "../primitives";
+import { AiWorkspaceButton } from "../Ai/AiWorkspaceButton";
 import { Icons } from "../../assets/icons";
 import { useEpicFlowApi } from "../../hooks/useEpicFlowApi";
 import { useEpicFlowStream } from "../../hooks/useEpicFlowStream";
@@ -45,7 +46,7 @@ function describeApiError(err: unknown): string {
 
 export function EpicFlowPanel() {
   const { config } = useAnnotationData();
-  const { setEpicFlowOpen } = useAnnotationUi();
+  const { setEpicFlowOpen, referenceRequest, consumeReferenceRequest } = useAnnotationUi();
   const { hostAuthenticated, activeAccount } = useAnnotationAuth();
   const api = useEpicFlowApi(config);
   const [loading, setLoading] = useState(true);
@@ -212,6 +213,16 @@ export function EpicFlowPanel() {
       controller.abort();
     };
   }, [reloadAll]);
+
+  useEffect(() => {
+    if (referenceRequest?.kind === "epic") {
+      setSelectedEpicId(referenceRequest.id);
+      setSelectedUserStoryId(null);
+      setSearchInput("");
+      setQuery("");
+      consumeReferenceRequest();
+    }
+  }, [consumeReferenceRequest, referenceRequest]);
 
   const filteredEpics = useMemo(() => {
     if (!normalizedQuery) {
@@ -411,6 +422,26 @@ export function EpicFlowPanel() {
         </span>
         <div className="wpn-epicflow-panel__header-actions">
           <LiveStatus state={connectionState} />
+          <AiWorkspaceButton
+            mentions={
+              notesTarget
+                ? [
+                    notesTarget.type === "epic"
+                      ? { kind: "epic", id: notesTarget.epic.id, label: notesTarget.epic.title }
+                      : {
+                          kind: "user_story",
+                          id: notesTarget.story.id,
+                          label: notesTarget.story.title,
+                        },
+                  ]
+                : undefined
+            }
+            selection={
+              notesTarget
+                ? [notesTarget.type === "epic" ? notesTarget.epic.id : notesTarget.story.id]
+                : undefined
+            }
+          />
           <Tooltip label={minimized ? "Maximize" : "Minimize"} placement="bottom">
             <button
               type="button"

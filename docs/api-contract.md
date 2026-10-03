@@ -628,6 +628,16 @@ Projects are restricted to `super_admin`. Users and Tags are restricted to `admi
 
 ## Authentication
 
+### Mention candidates
+
+```http
+GET /users/mention-candidates?projectId={projectId}&q={name}&limit=500
+```
+
+Requires a signed-in project member. Returns the same reduced shape as the login picker
+(`{ "users": [{ "id", "name", "avatarUrl"? }] }`) for the people who can be @mentioned in the
+project. `q` (optional, ≤100 chars) narrows by name; `limit` is 1–500 (default 500).
+
 ### List login options
 
 ```http
@@ -635,7 +645,8 @@ GET /auth/users?projectId={projectId}
 ```
 
 No bearer token required. Returns the reduced picker shape used by the login dialog, not the full
-`ManagedUser` record.
+`ManagedUser` record. The library fetches it only when it shows its own login picker (never when
+the host app supplies `getAuthToken`), and does not use it for @mentions.
 
 ```json
 {
@@ -1061,7 +1072,9 @@ GET /audit?projectId=&scope=project&actorUserId=&action=&entityType=&entityId=&p
 Requires `admin` or `super_admin`. `projectId` is required; `scope` is `project` (default) or
 `organization`, and switches whether the query is confined to that project or spans every project
 in the caller's organization. `from`/`to` are ISO 8601 timestamps with an explicit offset. `limit`
-defaults to `50` (max `200`).
+defaults to `50` (max `200`). `total` is counted only for the first page (`offset=0`) and is
+`null` on later pages. `search` is a case-insensitive substring match over actor name/id, action,
+entity id and page key (`%` and `_` match literally), backed by a trigram index (migration 0010).
 
 ```json
 {
@@ -1117,13 +1130,107 @@ This is the one response in the API that uses `{ "message": string }` instead of
 `{ "error": string, "details"?: unknown }` — the connection never reaches the point where the
 usual JSON error body would apply.
 
+The single-use ticket is only checked when the stream opens, and the library does not re-open a
+healthy stream on a timer. Instead the server keeps an open stream honest itself: when the
+user's status, role, token version (sign-out, password reset) or project membership changes, every
+instance re-checks that user's streams and closes the ones no longer allowed; every stream is also
+closed after about an hour (jittered), and all streams are closed on shutdown. The library then
+mints a new ticket — which fails if access was revoked — and reconnects with `lastEventId`, using
+exponential backoff with jitter (2 s doubling to 30 s).
+
+# AI connectors API contract
+
+AI agents (Claude and Codex) run inside the Pinnote API server. Each provider has two connection
+scopes: **personal** (`scope=user`, the user's own subscription or API key, used only by them) and
+**shared** (`scope=system`, the organization's, connected by admins and used by every member
+without a connected personal connector). A turn uses the personal connector if connected, else the
+shared one, else fails with `connector_required`. There is no local bridge, pairing code or
+terminal command, and no organization AI policy (its knobs are server config). All routes need a
+user bearer token and take `?projectId=` like `GET /ai/me`. Types live in `src/types/ai.types.ts`.
+
+```ts
+type AiProviderId = "claude" | "codex";
+type AiConnectorScope = "user" | "system";
+type AiConnectorStatus = "connected" | "signed_out" | "not_installed" | "error";
+interface AiConnector {
+  provider: AiProviderId;
+  status: AiConnectorStatus;
+  auth: "subscription" | "api_key" | null;
+  account: { email: string | null; plan: string | null; organization: string | null } | null;
+  cliVersion: string | null;
+  models: AiModelInfo[];
+  error: string | null;
+  connectedAt: string | null;
+  checkedAt: string | null;
+  lastUsedAt: string | null;
+  scope: AiConnectorScope;
+  connectedBy: { userId: string; name: string } | null; // shared connectors only
+}
+interface AiMe {
+  providers: AiProviderId[]; // enabled on this server
+  connectors: AiConnector[]; // personal, one per provider
+  systemConnectors: AiConnector[]; // the organization's shared ones, one per provider
+  canUseAi: boolean;
+  canApplyModelOps: boolean;
+  canManageSharedAi: boolean; // may connect / disconnect shared connectors
+}
+interface AiLoginStart {
+  loginId: string;
+  provider: AiProviderId;
+  method: "link_paste" | "device_code"; // Claude: link_paste, Codex: device_code
+  url: string | null;
+  userCode: string | null; // Codex device code
+  needsCode: boolean; // Claude: paste `code#state` back
+  expiresAt: string;
+  scope: AiConnectorScope;
+}
+type AiLoginState =
+  | "pending" | "awaiting_code" | "verifying" | "succeeded" | "failed" | "cancelled" | "expired";
+interface AiLoginStatus {
+  loginId: string;
+  provider: AiProviderId;
+  state: AiLoginState;
+  error: string | null;
+  connector: AiConnector | null;
+  scope: AiConnectorScope;
+}
+```
+
+| Route | Returns |
+| --- | --- |
+| `GET /ai/me` | `AiMe` |
+| `GET /ai/connectors?refresh=1` | `AiConnector[]`; `refresh=1` re-checks each agent and publishes `ai_connectors.updated` |
+| `POST /ai/connectors/{provider}/login` (body `{}`) | `AiLoginStart` |
+| `GET /ai/connectors/{provider}/login/{loginId}` | `AiLoginStatus` (fallback only: after a stream reconnect) |
+| `POST /ai/connectors/{provider}/login/{loginId}/code` (body `{ code }`) | `AiLoginStatus` (Claude: `code#state`) |
+| `POST /ai/connectors/{provider}/login/{loginId}/cancel` | `204` |
+| `POST /ai/connectors/{provider}/api-key` (body `{ apiKey }`) | `AiConnector` (validated before it is saved) |
+| `POST /ai/connectors/{provider}/logout` | `AiConnector` |
+
+Every connector route takes `?scope=user|system` (default `user`); `scope=system` acts on the
+organization's shared connector and is `403` unless the user may manage shared AI. Provider routes
+answer `404` for an unknown provider and `403` for a provider the server does not enable.
+
+Nothing is polled. The AI stream (`GET /ai/stream`) sends
+`{ "type": "ai_connectors.updated", "scope": "user" | "system", "connectors": AiConnector[] }`
+(personal changes to that user, shared changes to every user of the organization); the library
+merges it into `me.connectors` or `me.systemConnectors` by provider. Sign-in progress arrives as
+`{ "type": "ai_connector_login.updated", loginId, provider, scope, state, error, connector }` to the
+user who started it; the connect dialog follows it and checks the login once with `GET …/login/{loginId}`
+only after a stream reconnect. Sessions are always `mode: "model"`; a turn sent for an agent with
+no personal or shared connection fails with `connector_required`, and `runtime_busy` /
+`runtime_unavailable` report a busy or unavailable server runtime.
+
 # Analytics API contract
 
 Every endpoint below requires a `super_admin` actor except `POST /analytics/ingest-token` and
 `POST /analytics/visits`, which authenticate a page-visit tracker instead of a dashboard viewer.
-Analytics tables (`page_visits`, `login_events`, `user_presence`, `page_visit_daily`,
-`user_visit_daily`) live in the same database as every other table; a request fails only if those
-tables have not been applied yet.
+Analytics tables (`page_visits`, `login_events`, `page_visit_daily`, `user_visit_daily`,
+`login_daily`, `login_user_daily`) live in the same database as every other table; a request fails
+only if those tables have not been applied yet. Dashboard reads come from the daily rollups; raw
+`page_visits` / `login_events` rows are pruned after `ANALYTICS_RETENTION_DAYS` (default 180).
+Dashboard responses are cached in-process for 30 seconds and sent with
+`Cache-Control: private, max-age=30`. Unknown query parameters are rejected with `400`.
 
 ## Ingest token
 
@@ -1161,91 +1268,67 @@ token and the request, never from the body. Responses:
 
 | Status | Meaning |
 |---|---|
-| 204 | Accepted; an empty `visits` array still refreshes presence |
+| 204 | Accepted; an empty `visits` array is a no-op (the library never sends one) |
 | 400 | Body is not valid JSON, or fails the visit schema |
 | 401 | Missing, invalid or expired ingest token |
 | 413 | Body exceeds 64 KB |
 | 415 | `Content-Type` is not `text/plain` |
-| 429 | More than 240 requests/minute from the caller's IP |
+| 429 | More than 240 requests/minute for the token's user (or the IP when the token is invalid) |
 
-## Summary
+## Overview
 
 ```http
-GET /analytics/summary?organizationId={id}&projectId={id}&from=2026-08-25&to=2026-09-24
+GET /analytics/overview?organizationId={id}&projectId={id}&from=2026-08-25&to=2026-09-24
 ```
 
+Everything the dashboard's KPI cards, trend chart and top-10 lists need, in one response.
 `from`/`to` are UTC `YYYY-MM-DD` dates, `to` inclusive, defaulting to the last 30 days, with a
-366-day maximum span.
+366-day maximum span. `trends.days` has one entry per UTC day, zero-filled. `logins.total` and the
+trend's `logins` count successful logins, `failed` counts failures, and `unique` counts distinct
+users with a successful login.
 
 ```json
 {
   "range": { "from": "2026-08-25", "to": "2026-09-24" },
-  "users": { "total": 42 },
-  "activeNow": 3,
-  "activeUsers": { "dau": 12, "wau": 30, "mau": 40 },
-  "logins": { "total": 58, "unique": 20, "failed": 4 },
-  "comments": { "total": 15 },
-  "annotations": {
-    "total": 90,
-    "byStatus": { "open": 20, "re-open": 5, "dev-inprogress": 10, "completed": 40, "closed": 15 }
+  "kpis": {
+    "users": { "total": 42 },
+    "logins": { "total": 58, "unique": 20, "failed": 4 },
+    "comments": { "total": 15 },
+    "annotations": {
+      "total": 90,
+      "byStatus": { "open": 20, "re-open": 5, "dev-inprogress": 10, "completed": 40, "closed": 15 }
+    }
   },
-  "visits": { "total": 320 }
-}
-```
-
-## Page visits
-
-```http
-GET /analytics/pages?organizationId={id}&projectId={id}&from=2026-08-25&to=2026-09-24&limit=50&offset=0
-```
-
-`limit` is 1–200 (default 50). Rows are ordered by visits descending, then project id, then page
-key; `total` is only computed on the first page (`offset=0`).
-
-```json
-{
-  "pages": [
-    { "projectId": "proj_123", "pageKey": "/board", "visits": 120, "totalDurationMs": 480000, "avgDurationMs": 4000 }
-  ],
-  "total": 34,
-  "limit": 50,
-  "offset": 0
-}
-```
-
-## Trends
-
-```http
-GET /analytics/trends?organizationId={id}&projectId={id}&from=2026-08-25&to=2026-09-24
-```
-
-One entry per UTC day in the range, zero-filled where a day has no rows.
-
-```json
-{
-  "days": [
-    { "day": "2026-08-25", "visits": 12, "logins": 3, "comments": 1 },
-    { "day": "2026-08-26", "visits": 0, "logins": 0, "comments": 0 }
+  "trends": {
+    "days": [
+      { "day": "2026-08-25", "visits": 12, "logins": 3, "comments": 1 },
+      { "day": "2026-08-26", "visits": 0, "logins": 0, "comments": 0 }
+    ]
+  },
+  "topPages": [{ "projectId": "proj_123", "pageKey": "/board", "visits": 120, "avgDurationMs": 4000 }],
+  "topUsers": [
+    { "userId": "6ba7b812-9dad-11d1-80b4-00c04fd430c8", "userName": "Sarath", "visits": 40, "activeDays": 6, "lastVisitDay": "2026-09-24" }
   ]
 }
 ```
 
-## Top users
+`topPages` and `topUsers` hold at most 10 rows each, ordered by visits descending.
+
+## Page visits
 
 ```http
-GET /analytics/users?organizationId={id}&projectId={id}&from=2026-08-25&to=2026-09-24&limit=50&offset=0
+GET /analytics/pages?organizationId={id}&projectId={id}&from=2026-08-25&to=2026-09-24&limit=25&offset=0
 ```
 
-`limit` is 1–200 (default 50). Rows are ordered by visits descending, then user id; `total` is
-only computed on the first page (`offset=0`).
+`limit` is 1–100 (default 25), `offset` 0–10000. Rows are ordered by visits descending, then
+project id, then page key; `total` is only computed on the first page (`offset=0`) and is `null`
+otherwise.
 
 ```json
 {
-  "users": [
-    { "userId": "6ba7b812-9dad-11d1-80b4-00c04fd430c8", "userName": "Sarath", "visits": 40, "activeDays": 6, "lastVisitDay": "2026-09-24" }
-  ],
-  "total": 12,
-  "limit": 50,
+  "pages": [{ "projectId": "proj_123", "pageKey": "/board", "visits": 120, "avgDurationMs": 4000 }],
+  "total": 34,
+  "limit": 25,
   "offset": 0
 }
 ```
@@ -1253,41 +1336,35 @@ only computed on the first page (`offset=0`).
 ## Visit log
 
 ```http
-GET /analytics/visits?organizationId={id}&projectId={id}&from=2026-08-25&to=2026-09-24&userId={id}&pageKey=/board&limit=50&offset=0
+GET /analytics/visits?organizationId={id}&projectId={id}&from=2026-08-25&to=2026-09-24&userId={id}&pageKey=/board&limit=25&offset=0
 ```
 
-`userId` and `pageKey` are optional filters. `limit` is 1–200 (default 50); `limit=201` is a `400`.
-Rows are the raw visit log, ordered by `visitId` descending.
+`userId` and `pageKey` are optional filters. `limit` is 1–100 (default 25), `offset` 0–10000.
+Rows are ordered newest first (`receivedAt`, then `visitId`, descending). Continuation segments
+(a visit resumed after the tab was hidden) are not listed, so "visits" means the same thing here,
+in the export and in the overview. `total` is always a number, read from the daily rollups unless
+both filters are given. Rollups are kept indefinitely while raw rows are pruned after the
+retention window, so for ranges older than that `total` can exceed the rows the list returns.
 
 ```json
 {
   "visits": [
     {
       "visitId": "482910",
-      "sessionId": "s1t2u3v4",
       "userId": "6ba7b812-9dad-11d1-80b4-00c04fd430c8",
       "userName": "Sarath",
-      "organizationId": "6ba7b811-9dad-11d1-80b4-00c04fd430c8",
       "projectId": "proj_123",
       "pageKey": "/board",
       "urlPath": "/board",
-      "title": "Board",
-      "referrer": null,
       "enteredAt": "2026-09-24T10:00:00.000Z",
       "durationMs": 4200,
       "maxScrollDepth": 80,
-      "viewportWidth": 1440,
-      "viewportHeight": 900,
-      "language": "en-US",
-      "timezone": "UTC",
-      "isContinuation": false,
       "ipAddress": "203.0.113.4",
-      "userAgent": "Mozilla/5.0 ...",
-      "receivedAt": "2026-09-24T10:00:04.200Z"
+      "userAgent": "Mozilla/5.0 ..."
     }
   ],
   "total": 320,
-  "limit": 50,
+  "limit": 25,
   "offset": 0
 }
 ```
@@ -1300,7 +1377,7 @@ GET /analytics/visits/export?organizationId={id}&projectId={id}&from=2026-08-25&
 
 Same filters as the visit log, without pagination. Streams `text/csv; charset=utf-8` with
 `Content-Disposition: attachment; filename="page-visits-<from>-<to>.csv"` — a header row followed
-by every matching visit. Formula-leading cells are neutralized. The library's own client fetches
+by every matching visit (continuation segments excluded, at most 100,000 rows). Formula-leading cells are neutralized. The library's own client fetches
 this through `requestBlob`, since the response is a file rather than JSON, and records an
 `analytics.visits-exported` audit row before it starts streaming.
 
@@ -1325,7 +1402,9 @@ filter change mints a new ticket and opens a new stream.
 GET /analytics/events?ticket={ticket}
 ```
 
-A ticket is redeemed once and expires after 60 seconds, so every reconnect mints a fresh one.
+A ticket is redeemed once and expires after 60 seconds, so every reconnect mints a fresh one. As
+with page streams, an open analytics stream is not re-opened on a timer; the server closes it when
+the viewer stops being a super admin or signs out, after about an hour, or on shutdown.
 The response is `text/event-stream`. It starts with a `retry:` hint and a `ready` event, then
 sends change events as they occur, with a `: keep-alive` comment every 25 seconds. Events carry
 no `id`, and there is no replay: a reconnect is followed by a full refetch.
@@ -1336,19 +1415,15 @@ no `id`, and there is no replay: a reconnect is followed by a full refetch.
 | `analytics.changed` | `{ "kinds": ["visits", "logins"] }` | Data in the stream's scope changed |
 | `resync` | `{}` | Changes may have been missed; refetch everything |
 
-The server coalesces changes into one `analytics.changed` event per scope every 5 seconds at
+The server coalesces changes into one `analytics.changed` event per scope every 30 seconds at
 most. It sends `resync` after its database listener reconnects, when a slow client's buffer
-drains, or when too many changes arrive in one window. The client maps each kind to the
-dashboard sections it refetches:
+drains, or when too many changes arrive in one window. Kinds are `visits` and `logins`.
 
-| Kind | Sections refetched |
-|---|---|
-| `visits` | Summary, page visits, trends, top pages, top users, visit log |
-| `presence` | Summary |
-| `logins` | Summary, trends |
-
-An unknown kind or malformed payload is ignored. A reconnect after the first successful open
-refetches every section.
+The library refetches only the overview on `analytics.changed` (at most once every 30 seconds);
+the paged page-visits table and visit log refresh only from the Refresh button. `resync` reloads
+the overview after a random 0–5 second delay. While the tab is hidden the stream is closed; it
+reconnects and reloads the overview once when the tab is visible again. An unknown kind or
+malformed payload is ignored.
 
 | Status | Route | Cause |
 |---|---|---|

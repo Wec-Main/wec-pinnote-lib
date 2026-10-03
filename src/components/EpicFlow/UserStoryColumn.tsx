@@ -1,9 +1,13 @@
+import { useEffect, useState, type CSSProperties } from "react";
 import { Icon, Tooltip } from "../primitives";
 import { EPICFLOW_PAGE_SIZE, ShowMoreButton } from "./ShowMoreButton";
 import { useIncrementalList } from "../../hooks/useIncrementalList";
 import type { UserStory } from "../../types/epicFlow.types";
 import type { AnnotationUser } from "../../types/annotation.types";
 import { canDeleteBoardItem } from "../../utils/boardPermissions";
+
+const TITLE_CLAMP_LINES = 2;
+const TITLE_CHAR_THRESHOLD = 80;
 
 interface UserStoryColumnProps {
   stories: UserStory[];
@@ -33,6 +37,17 @@ export function UserStoryColumn({
     EPICFLOW_PAGE_SIZE,
     stories.findIndex((story) => story.id === selectedUserStoryId),
   );
+  const [expandedTitleId, setExpandedTitleId] = useState<string | null>(null);
+
+  const firstStoryId = stories[0]?.id ?? null;
+  useEffect(() => {
+    setExpandedTitleId(null);
+  }, [firstStoryId]);
+
+  const toggleTitle = (storyId: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setExpandedTitleId((prev) => (prev === storyId ? null : storyId));
+  };
 
   return (
     <div className="wpn-epicflow-column">
@@ -67,61 +82,86 @@ export function UserStoryColumn({
           </p>
         ) : (
           <>
-            {visible.map((story) => (
-              <div
-                key={story.id}
-                role="button"
-                tabIndex={0}
-                aria-pressed={selectedUserStoryId === story.id}
-                className={[
-                  "wpn-epicflow-card",
-                  selectedUserStoryId === story.id ? "wpn-epicflow-card--selected" : "",
-                ]
-                  .filter(Boolean)
-                  .join(" ")}
-                onClick={() => onSelect(story.id)}
-                onKeyDown={(event) => {
-                  if (event.key === "Enter" || event.key === " ") {
-                    event.preventDefault();
-                    onSelect(story.id);
-                  }
-                }}
-              >
-                <div className="wpn-epicflow-card__row">
-                  <span className="wpn-epicflow-card__title">{story.title}</span>
-                  <div className="wpn-epicflow-card__actions">
-                    <Tooltip label="Edit user story" placement="bottom">
-                      <button
-                        type="button"
-                        className="wpn-epicflow-card__action-btn"
-                        aria-label="Edit user story"
-                        onClick={(event) => {
-                          event.stopPropagation();
-                          onEdit(story);
-                        }}
+            {visible.map((story) => {
+              const isExpanded = expandedTitleId === story.id;
+              const isLong = story.title.length > TITLE_CHAR_THRESHOLD;
+              return (
+                <div
+                  key={story.id}
+                  role="button"
+                  tabIndex={0}
+                  aria-pressed={selectedUserStoryId === story.id}
+                  className={[
+                    "wpn-epicflow-card",
+                    selectedUserStoryId === story.id ? "wpn-epicflow-card--selected" : "",
+                  ]
+                    .filter(Boolean)
+                    .join(" ")}
+                  onClick={() => onSelect(story.id)}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter" || event.key === " ") {
+                      event.preventDefault();
+                      onSelect(story.id);
+                    }
+                  }}
+                >
+                  <div className="wpn-epicflow-card__row">
+                    <div className="wpn-epicflow-card__title-wrap">
+                      <span
+                        className="wpn-epicflow-card__title"
+                        style={
+                          !isExpanded && isLong
+                            ? ({ "--title-clamp": TITLE_CLAMP_LINES } as CSSProperties)
+                            : undefined
+                        }
                       >
-                        <Icon name="edit" />
-                      </button>
-                    </Tooltip>
-                    {canDeleteBoardItem(story.createdById, currentUser) ? (
-                      <Tooltip label="Delete user story" placement="bottom">
+                        {story.title}
+                      </span>
+                      {isLong && (
                         <button
                           type="button"
-                          className="wpn-epicflow-card__action-btn wpn-epicflow-card__action-btn--danger"
-                          aria-label="Delete user story"
+                          className="wpn-comments-list-table__toggle"
+                          onClick={(e) => toggleTitle(story.id, e)}
+                          aria-expanded={isExpanded}
+                        >
+                          {isExpanded ? "Show less" : "Show more"}
+                        </button>
+                      )}
+                    </div>
+                    <div className="wpn-epicflow-card__actions">
+                      <Tooltip label="Edit user story" placement="bottom">
+                        <button
+                          type="button"
+                          className="wpn-epicflow-card__action-btn"
+                          aria-label="Edit user story"
                           onClick={(event) => {
                             event.stopPropagation();
-                            onDelete(story);
+                            onEdit(story);
                           }}
                         >
-                          <Icon name="trash" />
+                          <Icon name="edit" />
                         </button>
                       </Tooltip>
-                    ) : null}
+                      {canDeleteBoardItem(story.createdById, currentUser) ? (
+                        <Tooltip label="Delete user story" placement="bottom">
+                          <button
+                            type="button"
+                            className="wpn-epicflow-card__action-btn wpn-epicflow-card__action-btn--danger"
+                            aria-label="Delete user story"
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              onDelete(story);
+                            }}
+                          >
+                            <Icon name="trash" />
+                          </button>
+                        </Tooltip>
+                      ) : null}
+                    </div>
                   </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
             <ShowMoreButton remaining={remaining} onClick={showMore} />
           </>
         )}

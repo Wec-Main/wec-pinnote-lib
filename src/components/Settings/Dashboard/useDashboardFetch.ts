@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { useAnnotationContext } from "../../../context/AnnotationContext";
+import { useTokenGetter } from "../../../hooks/useTokenGetter";
 
 export interface DashboardFetchState<T> {
   data: T | null;
@@ -20,7 +21,8 @@ export function useDashboardFetch<T>(
   fallbackMessage: string,
 ): DashboardFetchState<T> {
   const { config, activeAccount } = useAnnotationContext();
-  const authToken = activeAccount?.token;
+  const getToken = useTokenGetter(config.getAuthToken);
+  const identity = activeAccount?.id ?? "";
   const apiBaseUrl = config.apiBaseUrl;
   const loadRef = useRef(load);
   loadRef.current = load;
@@ -36,8 +38,8 @@ export function useDashboardFetch<T>(
     setLoading(true);
     setError(null);
 
-    loadRef
-      .current(apiBaseUrl, authToken, controller.signal)
+    getToken()
+      .then((authToken) => loadRef.current(apiBaseUrl, authToken || undefined, controller.signal))
       .then((result) => {
         setData(result);
         setLoading(false);
@@ -52,7 +54,7 @@ export function useDashboardFetch<T>(
       });
 
     return () => controller.abort();
-  }, [apiBaseUrl, authToken, paramsKey, fallbackMessage]);
+  }, [apiBaseUrl, identity, getToken, paramsKey, fallbackMessage]);
 
   return { data, loading, loaded, error };
 }

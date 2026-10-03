@@ -1,20 +1,46 @@
-import { useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useAnnotationContext } from "../../context/AnnotationContext";
 import { Icon, Tooltip } from "../primitives";
 import { UserManagementPanel } from "../UserManagement/UserManagementPanel";
 import { OrganizationsTab } from "./OrganizationsTab";
 import { ProjectsTab } from "./ProjectsTab";
 import { TagsTab } from "./TagsTab";
+import { IntegrationsTab } from "./IntegrationsTab";
 import { AuditHistoryPanel } from "../AuditHistory";
 import { DashboardTab } from "./Dashboard/DashboardTab";
 import { visibleSettingsTabs, type SettingsTab } from "./settingsTabs";
 import { roleLabel } from "../../data/userManagementOptions";
 import { getInitials } from "../../utils/format";
+import { useAiUi } from "../Ai/AiUiContext";
+import { useOptionalAiRuntime } from "../../context/AiRuntimeContext";
+import { prefetchSettingsTab } from "./settingsCache";
 
 export function SettingsPanel() {
-  const { activeAccount, setUserManagementOpen } = useAnnotationContext();
+  const { activeAccount, setUserManagementOpen, config } = useAnnotationContext();
+  const aiRuntime = useOptionalAiRuntime();
   const [tab, setTab] = useState<SettingsTab>("users");
+  const prefetchTab = useCallback(
+    (target: SettingsTab) =>
+      prefetchSettingsTab(target, {
+        apiBaseUrl: config.apiBaseUrl,
+        token: activeAccount?.token,
+        ai:
+          aiRuntime && aiRuntime.enabled
+            ? {
+                apiBaseUrl: aiRuntime.apiBaseUrl,
+                projectId: aiRuntime.projectId,
+                getToken: aiRuntime.getToken,
+              }
+            : null,
+      }),
+    [activeAccount?.token, aiRuntime, config.apiBaseUrl],
+  );
   const [minimized, setMinimized] = useState(false);
+  const integrationsRequest = useAiUi()?.integrationsRequest ?? null;
+
+  useEffect(() => {
+    if (integrationsRequest) setTab("integrations");
+  }, [integrationsRequest]);
 
   const tabs = useMemo(
     () => visibleSettingsTabs(activeAccount?.roleId ?? "developer"),
@@ -66,6 +92,8 @@ export function SettingsPanel() {
                 .join(" ")}
               aria-current={activeTab === item.id ? "page" : undefined}
               onClick={() => setTab(item.id)}
+              onPointerEnter={() => prefetchTab(item.id)}
+              onFocus={() => prefetchTab(item.id)}
             >
               <Icon name={item.icon} className="wpn-settings-nav__icon" />
               <span className="wpn-settings-nav__label">{item.label}</span>
@@ -117,6 +145,12 @@ export function SettingsPanel() {
         {activeTab === "organizations" ? <OrganizationsTab /> : null}
         {activeTab === "projects" ? <ProjectsTab /> : null}
         {activeTab === "tags" ? <TagsTab /> : null}
+        {activeTab === "integrations" ? (
+          <IntegrationsTab
+            key={integrationsRequest?.nonce ?? 0}
+            section={integrationsRequest?.section}
+          />
+        ) : null}
         {activeTab === "audit" ? <AuditHistoryPanel embedded /> : null}
         {activeTab === "dashboard" ? <DashboardTab /> : null}
       </section>

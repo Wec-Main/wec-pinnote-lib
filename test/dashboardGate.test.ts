@@ -8,20 +8,16 @@ import type {
   DashboardError,
   DashboardStatus,
 } from "../src/components/Settings/Dashboard/dashboardStatus";
-import type { AnalyticsSummary } from "../src/types/analytics.types";
+import type { AnalyticsKpis } from "../src/types/analytics.types";
 
-const summaryFixture: AnalyticsSummary = {
-  range: { from: "2026-09-01", to: "2026-09-07" },
+const kpisFixture: AnalyticsKpis = {
   users: { total: 42 },
-  activeNow: 3,
-  activeUsers: { dau: 5, wau: 9, mau: 17 },
   logins: { total: 20, unique: 11, failed: 2 },
   comments: { total: 8 },
   annotations: {
     total: 6,
     byStatus: { open: 1, "re-open": 1, "dev-inprogress": 2, completed: 1, closed: 1 },
   },
-  visits: { total: 100 },
 };
 
 function occurrences(html: string, needle: string): number {
@@ -90,7 +86,7 @@ describe("KpiCards", () => {
   it("renders values and no skeletons in the ready state", () => {
     const html = renderToString(
       createElement(KpiCards, {
-        state: { kind: "ready", summary: summaryFixture, refreshing: false },
+        state: { kind: "ready", kpis: kpisFixture, refreshing: false },
       }),
     );
 
@@ -99,10 +95,10 @@ describe("KpiCards", () => {
     expect(html).toContain('aria-busy="false"');
   });
 
-  it("marks the cards busy while a ready summary refreshes", () => {
+  it("marks the cards busy while ready KPIs refresh", () => {
     const html = renderToString(
       createElement(KpiCards, {
-        state: { kind: "ready", summary: summaryFixture, refreshing: true },
+        state: { kind: "ready", kpis: kpisFixture, refreshing: true },
       }),
     );
 

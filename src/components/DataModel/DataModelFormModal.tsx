@@ -1,4 +1,4 @@
-import { useId, useRef, useState, type FormEvent } from "react";
+import { useEffect, useId, useRef, useState, type FormEvent } from "react";
 import { Icon, SearchableSelect, Spinner, Tooltip } from "../primitives";
 import { useEscapeKey } from "../../hooks/useEscapeKey";
 import { useScrimDismiss } from "../../hooks/useScrimDismiss";
@@ -6,7 +6,9 @@ import { useFocusTrap } from "../../hooks/useFocusTrap";
 import { Field } from "../Settings/Field";
 import type { DataModel, DataModelDraft, ErdEngineName } from "../../types/dataModel.types";
 
-const NAME_MAX = 200;
+const NAME_MAX = 1000;
+const DESCRIPTION_MAX = 35000;
+const WARN_RATIO = 0.9;
 
 export const DATA_MODEL_ENGINE_OPTIONS: { value: ErdEngineName; label: string }[] = [
   { value: "na", label: "N/A" },
@@ -45,6 +47,14 @@ export function DataModelFormModal({
   const [description, setDescription] = useState(dataModel?.description ?? "");
   const [engine, setEngine] = useState<ErdEngineName>(dataModel?.engine ?? "na");
   const [touched, setTouched] = useState(false);
+  const descriptionRef = useRef<HTMLTextAreaElement>(null);
+
+  useEffect(() => {
+    const el = descriptionRef.current;
+    if (!el) return;
+    el.style.height = "auto";
+    el.style.height = `${el.scrollHeight}px`;
+  }, [description]);
 
   const nameValid = name.trim().length > 0;
 
@@ -92,15 +102,28 @@ export function DataModelFormModal({
               error={touched && !nameValid ? "A data model name is required." : null}
             >
               {(fieldProps) => (
-                <input
-                  {...fieldProps}
-                  ref={nameInputRef}
-                  className="wpn-epicflow-modal__input"
-                  value={name}
-                  maxLength={NAME_MAX}
-                  onChange={(event) => setName(event.target.value)}
-                  placeholder="e.g. Billing schema"
-                />
+                <>
+                  <input
+                    {...fieldProps}
+                    ref={nameInputRef}
+                    className="wpn-epicflow-modal__input"
+                    value={name}
+                    maxLength={NAME_MAX}
+                    onChange={(event) => setName(event.target.value)}
+                    placeholder="e.g. Billing schema"
+                  />
+                  <span
+                    className={
+                      name.length >= NAME_MAX
+                        ? "wpn-epicflow-modal__counter wpn-epicflow-modal__counter--limit"
+                        : name.length >= NAME_MAX * WARN_RATIO
+                          ? "wpn-epicflow-modal__counter wpn-epicflow-modal__counter--warn"
+                          : "wpn-epicflow-modal__counter"
+                    }
+                  >
+                    {name.length}/{NAME_MAX}
+                  </span>
+                </>
               )}
             </Field>
           </div>
@@ -109,12 +132,26 @@ export function DataModelFormModal({
             <label className="wpn-epicflow-modal__field">
               <span className="wpn-epicflow-modal__label">Description</span>
               <textarea
+                ref={descriptionRef}
                 className="wpn-epicflow-modal__input wpn-settings-textarea"
                 value={description}
+                maxLength={DESCRIPTION_MAX}
+                rows={3}
+                style={{ overflowY: "hidden" }}
                 onChange={(event) => setDescription(event.target.value)}
                 placeholder="What this schema models"
-                rows={3}
               />
+              <span
+                className={
+                  description.length >= DESCRIPTION_MAX
+                    ? "wpn-epicflow-modal__counter wpn-epicflow-modal__counter--limit"
+                    : description.length >= DESCRIPTION_MAX * WARN_RATIO
+                      ? "wpn-epicflow-modal__counter wpn-epicflow-modal__counter--warn"
+                      : "wpn-epicflow-modal__counter"
+                }
+              >
+                {description.length}/{DESCRIPTION_MAX}
+              </span>
             </label>
           </div>
 

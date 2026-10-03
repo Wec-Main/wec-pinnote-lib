@@ -20,7 +20,6 @@ export interface ExportBundleInput {
   addToContextOnly: boolean;
 }
 
-/** Keeps only comments/replies flagged `addToContext`; drops threads left empty. */
 export function filterAnnotationsForContext(annotations: Annotation[]): Annotation[] {
   return annotations.flatMap((annotation) => {
     const comments = annotation.comments.filter((comment) => comment.addToContext === true);
@@ -28,9 +27,6 @@ export function filterAnnotationsForContext(annotations: Annotation[]): Annotati
   });
 }
 
-// Ownership/scoping ids and audit fields that mean nothing outside this
-// deployment. Ids that link records together (comment replyToId, epicId, entity
-// ids used by relations) are kept so the exported structure stays intact.
 const EXPORT_OMITTED_KEYS = new Set([
   "organizationId",
   "projectId",
@@ -49,7 +45,6 @@ const EXPORT_OMITTED_KEYS = new Set([
 
 const EXPORT_USER_KEYS = new Set(["createdBy", "updatedBy", "publishedBy"]);
 
-/** Recursively drops keys that are only useful inside the app, e.g. org/project ids. */
 export function stripExportNoise(value: unknown, parentKey?: string): unknown {
   if (Array.isArray(value)) {
     return value.map((item) => stripExportNoise(item, parentKey));
@@ -68,11 +63,6 @@ export function stripExportNoise(value: unknown, parentKey?: string): unknown {
   return result;
 }
 
-/**
- * Context-flagged comments when any exist. `addToContext` defaults to false, so
- * filtering strictly would export an empty file for a project where nothing was
- * flagged; fall back to every comment then.
- */
 function commentsForExport(annotations: Annotation[], contextOnly: boolean): Annotation[] {
   if (!contextOnly) {
     return annotations;
@@ -81,7 +71,6 @@ function commentsForExport(annotations: Annotation[], contextOnly: boolean): Ann
   return flagged.length > 0 ? flagged : annotations;
 }
 
-/** Filesystem-safe version token, e.g. "Version 2" -> "Version_2". */
 export function exportVersionToken(version: ProjectVersion): string {
   const token = projectVersionLabel(version)
     .trim()
@@ -90,11 +79,6 @@ export function exportVersionToken(version: ProjectVersion): string {
   return token || `v${version.versionNumber}`;
 }
 
-/**
- * Builds the four export files. Flows and comments are for the selected version
- * only (the caller fetches them that way); epics/stories and data models are
- * exported whole because they are not version-scoped and carry no context flag.
- */
 export function buildExportFiles(input: ExportBundleInput): ExportFile[] {
   const token = exportVersionToken(input.version);
   const files: ExportFile[] = [

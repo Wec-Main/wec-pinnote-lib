@@ -603,3 +603,18 @@
   background: var(--wpn-flowchart-panel-muted);
   box-shadow: inset 2px 0 0 var(--wpn-accent);
 }
+
+.wpn-erd-field--issue-error {
+  background: color-mix(in srgb, var(--wpn-danger) 14%, transparent);
+  box-shadow: inset 2px 0 0 var(--wpn-danger);
+}
+
+.wpn-erd-field--issue-warning {
+  background: color-mix(in srgb, var(--wpn-flowchart-warning) 14%, transparent);
+  box-shadow: inset 2px 0 0 var(--wpn-flowchart-warning);
+}
+
+.wpn-erd-field--issue-error.wpn-erd-field--active,
+.wpn-erd-field--issue-warning.wpn-erd-field--active {
+  background: var(--wpn-flowchart-panel-muted);
+}

@@ -88,6 +88,7 @@ export interface ErdState extends ErdSnapshot {
   validation: ErdValidationResult | null;
   issueEntityIds: ReadonlyMap<string, ErdIssueSeverity>;
   issueRelationshipIds: ReadonlyMap<string, ErdIssueSeverity>;
+  issueFieldIds: ReadonlyMap<string, ErdIssueSeverity>;
   readOnly: boolean;
   canUndo: boolean;
   canRedo: boolean;
@@ -199,6 +200,7 @@ export class ErdEngine {
       validation: null,
       issueEntityIds: EMPTY_ISSUES,
       issueRelationshipIds: EMPTY_ISSUES,
+      issueFieldIds: EMPTY_ISSUES,
       readOnly: options.readOnly ?? false,
       canUndo: false,
       canRedo: false,
@@ -298,11 +300,45 @@ export class ErdEngine {
       validation: null,
       issueEntityIds: EMPTY_ISSUES,
       issueRelationshipIds: EMPTY_ISSUES,
+      issueFieldIds: EMPTY_ISSUES,
       viewport: document.viewport ?? { x: 0, y: 0, zoom: 1 },
       canUndo: false,
       canRedo: false,
     });
     if (this.pendingFitView) this.fitViewWhenSized();
+  }
+
+  applyDocument(
+    document: Partial<ErdDocumentJSON>,
+    options: { recordHistory?: boolean } = {},
+  ): void {
+    this.interactionDepth = 0;
+    this.interactionStart = null;
+    if (document.meta) this.meta = { ...document.meta };
+    const name = document.meta?.name ?? this.getState().name;
+    const next: ErdSnapshot = {
+      engine: document.engine ?? this.getState().engine,
+      entities: document.entities ?? [],
+      relationships: document.relationships ?? [],
+      enums: document.enums ?? [],
+      notes: document.notes ?? [],
+    };
+    if (options.recordHistory) {
+      this.commit(next);
+    } else {
+      this.history.clear();
+      this.applySnapshot(next);
+    }
+    this.store.setState({
+      name,
+      connection: null,
+      selectionRect: null,
+      activeFieldId: null,
+      validation: null,
+      issueEntityIds: EMPTY_ISSUES,
+      issueRelationshipIds: EMPTY_ISSUES,
+      issueFieldIds: EMPTY_ISSUES,
+    });
   }
 
   setName(name: string): void {
@@ -1007,6 +1043,9 @@ export class ErdEngine {
       issueRelationshipIds: severityMap(
         result.issues.map((issue) => ({ id: issue.relationshipId, severity: issue.severity })),
       ),
+      issueFieldIds: severityMap(
+        result.issues.map((issue) => ({ id: issue.fieldId, severity: issue.severity })),
+      ),
     });
     return result;
   }
@@ -1016,6 +1055,7 @@ export class ErdEngine {
       validation: null,
       issueEntityIds: EMPTY_ISSUES,
       issueRelationshipIds: EMPTY_ISSUES,
+      issueFieldIds: EMPTY_ISSUES,
     });
   }
 }

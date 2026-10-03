@@ -11,6 +11,8 @@ interface Props {
   onModeChange: (mode: ErdCanvasMode) => void;
   grid: ErdBackgroundVariant;
   onGridChange: (grid: ErdBackgroundVariant) => void;
+  miniMapVisible: boolean;
+  onMiniMapToggle: () => void;
 }
 
 const NEXT_GRID: Record<ErdBackgroundVariant, ErdBackgroundVariant> = {
@@ -32,6 +34,8 @@ export const ErdControls = memo(function ErdControls({
   onModeChange,
   grid,
   onGridChange,
+  miniMapVisible,
+  onMiniMapToggle,
 }: Props) {
   const engine = useErdEngine();
   const zoom = useErdState((s) => Math.round(s.viewport.zoom * 100));
@@ -109,6 +113,16 @@ export const ErdControls = memo(function ErdControls({
           onClick={() => onGridChange(NEXT_GRID[grid])}
         >
           <Icon name="grid" />
+        </button>
+        <button
+          type="button"
+          className={cx("wpn-erd-controls__btn", miniMapVisible && "wpn-erd-controls__btn--active")}
+          title={miniMapVisible ? "Hide minimap" : "Show minimap"}
+          aria-label={miniMapVisible ? "Hide minimap" : "Show minimap"}
+          aria-pressed={miniMapVisible}
+          onClick={onMiniMapToggle}
+        >
+          <Icon name="map" />
         </button>
       </div>
     </div>

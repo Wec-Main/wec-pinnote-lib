@@ -926,7 +926,6 @@ select.wpn-flowchart-ui__input {
 }
 
 .wpn-flowchart-node__quick-add-open,
-.wpn-flowchart-node__node:hover .wpn-flowchart-node__quick-add,
 .wpn-flowchart-node__selected .wpn-flowchart-node__quick-add {
   opacity: 1;
   pointer-events: auto;
@@ -1062,6 +1061,55 @@ select.wpn-flowchart-ui__input {
   border-radius: 5px;
   color: var(--node-color);
   background: color-mix(in srgb, var(--node-color) 16%, transparent);
+}
+
+.wpn-flowchart-node__hover-arrow {
+  position: absolute;
+  z-index: 5;
+  transform: translate(-50%, -50%);
+  width: 16px;
+  height: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--wpn-accent) 22%, transparent);
+  color: color-mix(in srgb, var(--wpn-accent) 70%, #fff);
+  cursor: pointer;
+  user-select: none;
+  opacity: 0;
+  pointer-events: none;
+  transition:
+    opacity 120ms,
+    transform 120ms,
+    background 100ms,
+    color 100ms;
+}
+
+.wpn-flowchart-node__hover-arrow svg {
+  width: 8px;
+  height: 8px;
+}
+
+.wpn-flowchart-node__node:hover .wpn-flowchart-node__hover-arrow,
+.wpn-flowchart-node__selected .wpn-flowchart-node__hover-arrow {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.wpn-flowchart-node__layer.wpn-flowchart--connecting .wpn-flowchart-node__hover-arrow {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.wpn-flowchart-node__hover-arrow:hover {
+  background: var(--wpn-accent);
+  color: #fff;
+  transform: translate(-50%, -50%) scale(1.15);
+}
+
+.wpn-flowchart-node__hover-arrow:active {
+  transform: translate(-50%, -50%) scale(0.96);
 }
 
 .wpn-flowchart-edge__layer {
@@ -1592,6 +1640,222 @@ select.wpn-flowchart-ui__input {
 
 .wpn-flowchart-sidebar__item:hover .wpn-flowchart-sidebar__grip {
   opacity: 1;
+}
+
+.wpn-flowchart-sidebar__palette {
+  position: relative;
+}
+
+.wpn-flowchart-sidebar__tip {
+  position: absolute;
+  z-index: 30;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  max-width: 220px;
+  padding: 6px 10px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 7px;
+  background: #1f2430;
+  box-shadow: 0 8px 22px rgba(2, 6, 23, 0.45);
+  color: #f1f5f9;
+  font-size: 11.5px;
+  line-height: 1.35;
+  transform: translateY(-50%);
+  pointer-events: none;
+}
+
+.wpn-flowchart-sidebar__tip-label {
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.wpn-flowchart-sidebar__grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+  margin-bottom: 6px;
+}
+
+.wpn-flowchart-sidebar__tile {
+  justify-content: center;
+  aspect-ratio: 1 / 0.8;
+  min-height: 48px;
+  margin: 0;
+  padding: 6px;
+}
+
+.wpn-flowchart-shape-preview {
+  display: block;
+  flex: none;
+  overflow: visible;
+}
+
+.wpn-flowchart-shape-preview > * {
+  fill: color-mix(in srgb, var(--node-color) 18%, transparent);
+  stroke: var(--node-color);
+  stroke-width: 1.5;
+  stroke-linejoin: round;
+  transition:
+    fill 0.12s,
+    stroke 0.12s;
+}
+
+.wpn-flowchart-shape-preview .wpn-flowchart-shape-preview__line {
+  fill: none;
+}
+
+.wpn-flowchart-shape-preview .wpn-flowchart-shape-preview__band {
+  fill: color-mix(in srgb, var(--node-color) 50%, transparent);
+}
+
+.wpn-flowchart-shape-preview .wpn-flowchart-shape-preview__text {
+  fill: var(--wpn-flowchart-text-muted);
+  stroke: none;
+  font-family: var(--wpn-font);
+  font-size: 13px;
+  font-weight: 650;
+  letter-spacing: 0.01em;
+}
+
+.wpn-flowchart-sidebar__tile:hover .wpn-flowchart-shape-preview > *,
+.wpn-flowchart-sidebar__tile:focus-visible .wpn-flowchart-shape-preview > * {
+  fill: color-mix(in srgb, var(--node-color) 32%, transparent);
+  stroke: color-mix(in srgb, var(--node-color) 75%, #fff);
+}
+
+.wpn-flowchart-sidebar__tile:hover .wpn-flowchart-shape-preview .wpn-flowchart-shape-preview__line,
+.wpn-flowchart-sidebar__tile:focus-visible
+  .wpn-flowchart-shape-preview
+  .wpn-flowchart-shape-preview__line {
+  fill: none;
+}
+
+.wpn-flowchart-sidebar__tile:hover .wpn-flowchart-shape-preview .wpn-flowchart-shape-preview__band,
+.wpn-flowchart-sidebar__tile:focus-visible
+  .wpn-flowchart-shape-preview
+  .wpn-flowchart-shape-preview__band {
+  fill: color-mix(in srgb, var(--node-color) 65%, transparent);
+}
+
+.wpn-flowchart-sidebar__tile:hover .wpn-flowchart-shape-preview .wpn-flowchart-shape-preview__text,
+.wpn-flowchart-sidebar__tile:focus-visible
+  .wpn-flowchart-shape-preview
+  .wpn-flowchart-shape-preview__text {
+  fill: #fff;
+  stroke: none;
+}
+
+.wpn-flowchart-sidebar__tile,
+.wpn-flowchart-sidebar__tile.wpn-flowchart-sidebar__item-disabled:hover {
+  border-color: transparent;
+  background: transparent;
+  box-shadow: none;
+}
+
+.wpn-flowchart-sidebar__tile:hover,
+.wpn-flowchart-sidebar__tile:focus-visible {
+  border-color: var(--wpn-flowchart-border-strong);
+  background: var(--wpn-flowchart-panel-muted);
+  box-shadow: none;
+  transform: none;
+}
+
+.wpn-flowchart-sidebar__tile .wpn-flowchart-sidebar__icon {
+  width: 36px;
+  height: 36px;
+  background: transparent;
+}
+
+.wpn-flowchart-sidebar__tile:focus-visible {
+  outline: 2px solid var(--wpn-accent);
+  outline-offset: 1px;
+}
+
+.wpn-flowchart-node__shape-actor .wpn-flowchart-node__shape > * {
+  fill: color-mix(in srgb, var(--node-color) 22%, var(--wpn-flowchart-node-bg));
+}
+
+.wpn-flowchart-node__shape-actor:not(.wpn-flowchart-node__selected) .wpn-flowchart-node__shape > * {
+  stroke: var(--node-color);
+  stroke-width: 2;
+}
+
+.wpn-flowchart-node__shape-actor .wpn-flowchart-node__content {
+  inset: auto 0 0;
+  height: 26px;
+}
+
+.wpn-flowchart-node__shape-actor .wpn-flowchart-node__body {
+  padding: 0 2px;
+}
+
+.wpn-flowchart-node__shape-actor .wpn-flowchart-node__label {
+  overflow: hidden;
+  font-size: 12px;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.wpn-flowchart-node__shape-swimlane .wpn-flowchart-node__shape > *,
+.wpn-flowchart-node__shape-swimlaneVertical .wpn-flowchart-node__shape > * {
+  fill: color-mix(in srgb, var(--node-color) 5%, transparent);
+}
+
+.wpn-flowchart-node__shape-swimlane:not(.wpn-flowchart-node__selected)
+  .wpn-flowchart-node__shape
+  > *,
+.wpn-flowchart-node__shape-swimlaneVertical:not(.wpn-flowchart-node__selected)
+  .wpn-flowchart-node__shape
+  > * {
+  stroke: color-mix(in srgb, var(--node-color) 45%, var(--wpn-flowchart-node-bg));
+}
+
+.wpn-flowchart-node__shape-swimlane .wpn-flowchart-node__shape,
+.wpn-flowchart-node__shape-swimlaneVertical .wpn-flowchart-node__shape {
+  filter: none;
+}
+
+.wpn-flowchart-node__lane-header {
+  fill: color-mix(in srgb, var(--node-color) 22%, var(--wpn-flowchart-node-bg));
+}
+
+.wpn-flowchart-node__shape-swimlane .wpn-flowchart-node__content {
+  inset: 0 auto 0 0;
+  width: 32px;
+  overflow: visible;
+}
+
+.wpn-flowchart-node__shape-swimlane .wpn-flowchart-node__body {
+  padding: 10px 0;
+  writing-mode: vertical-rl;
+  transform: rotate(180deg);
+}
+
+.wpn-flowchart-node__shape-swimlaneVertical .wpn-flowchart-node__content {
+  inset: 0 0 auto;
+  height: 32px;
+  overflow: visible;
+}
+
+.wpn-flowchart-node__shape-swimlaneVertical .wpn-flowchart-node__body {
+  padding: 0 10px;
+}
+
+.wpn-flowchart-node__shape-swimlane .wpn-flowchart-node__label,
+.wpn-flowchart-node__shape-swimlaneVertical .wpn-flowchart-node__label {
+  overflow: hidden;
+  font-size: 13px;
+  font-weight: 650;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.wpn-flowchart-node__shape-swimlane .wpn-flowchart-node__body:has(.wpn-flowchart-node__label-edit) {
+  writing-mode: horizontal-tb;
+  transform: none;
+  width: 200px;
+  padding: 4px;
 }
 
 .wpn-flowchart-menu__menu {

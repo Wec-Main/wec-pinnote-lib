@@ -130,6 +130,7 @@ export function useAuthSessions(
   apiBaseUrl: string,
   projectId: string,
   client?: AuthApiClient,
+  loginPickerEnabled = true,
 ): AuthSessionsValue {
   const authApi = useMemo(() => client ?? createAuthApi(apiBaseUrl), [client, apiBaseUrl]);
   const [stored, setStored] = useState<StoredAuth>(EMPTY);
@@ -417,7 +418,7 @@ export function useAuthSessions(
     }
   }, [stored.accounts, armRenewal, recentlyRenewed]);
 
-  const loginOptionsKey = `auth-users:${apiBaseUrl}:${projectId}`;
+  const loginOptionsKey = loginPickerEnabled ? `auth-users:${apiBaseUrl}:${projectId}` : null;
   const {
     data: loginOptionsData,
     loading: loginOptionsLoading,

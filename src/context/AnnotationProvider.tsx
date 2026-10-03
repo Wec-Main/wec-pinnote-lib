@@ -3,7 +3,14 @@ import { createPortal } from "react-dom";
 import "../styles/annotation.css";
 import "../styles/flowchart.css";
 import "../styles/datamodel.css";
+import "../styles/ai.css";
+import "../styles/prompts.css";
+import "../styles/ai-dock.css";
+import "../styles/ai-panel.css";
+import "../styles/loading.css";
 import { AnnotationErrorBoundary } from "../components/AnnotationErrorBoundary";
+import { AiUiProvider } from "../components/Ai/AiUiContext";
+import { AiRuntimeProvider } from "./AiRuntimeContext";
 import { DEFAULT_PINNOTE_API_URL } from "../config/env";
 import { AnnotationLayer } from "../components/AnnotationLayer";
 import { useAnnotationApi } from "../hooks/useAnnotationApi";
@@ -28,6 +35,7 @@ import {
   type AnnotationAuthContextValue,
   type AnnotationDataContextValue,
   type AnnotationUiContextValue,
+  type FlowEditorSource,
   type DiscardPrompt,
 } from "./AnnotationContext";
 import { resolveElement } from "../utils/elementResolver";
@@ -46,6 +54,7 @@ import { resolveEffectiveProjectVersionId } from "../utils/resolveEffectiveProje
 import { createClientId } from "../utils/format";
 import { isTrackingEnabled } from "../utils/pageVisitQueue";
 import type { ProjectTag } from "../types/tag.types";
+import type { ReferenceTarget } from "../utils/mentions";
 
 const DEFAULT_Z_INDEX = 2147483000;
 
@@ -87,7 +96,12 @@ export function AnnotationProvider({ config, children }: AnnotationProviderProps
     getAccessToken,
     revokeError,
     clearRevokeError,
-  } = useAuthSessions(resolved.apiBaseUrl, resolved.projectId, resolved.authClient);
+  } = useAuthSessions(
+    resolved.apiBaseUrl,
+    resolved.projectId,
+    resolved.authClient,
+    !resolved.getAuthToken,
+  );
   const hostAuthenticated = Boolean(resolved.getAuthToken);
   const authenticated = hostAuthenticated || activeAccount !== null;
   const sessionKey = hostAuthenticated ? "host" : (activeAccount?.id ?? null);
@@ -173,10 +187,6 @@ export function AnnotationProvider({ config, children }: AnnotationProviderProps
   } = useSharedFetch<Project>(projectVersionKey, async (signal) =>
     fetchProject(activeConfig.apiBaseUrl, await getProjectVersionToken(), projectId, signal),
   );
-  // config.projectVersionId is an explicit host override (pin to one
-  // version); otherwise resolve to the project's live current version so
-  // Settings -> Versioning activating a different version propagates here
-  // without a page reload.
   const projectVersionId = resolveEffectiveProjectVersionId(
     activeConfig.projectVersionId,
     liveProject?.currentProjectVersionId,
@@ -277,11 +287,8 @@ export function AnnotationProvider({ config, children }: AnnotationProviderProps
     [authenticated],
   );
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const revealHidListRef = useRef(false);
   useEffect(() => {
-    // A selected annotation not on this page (opened from a "Not in this
-    // view" row elsewhere in the project) is expected to be absent from the
-    // page-scoped `annotations` — only clear the selection once it's gone
-    // from the project-wide list too, i.e. genuinely deleted.
     if (
       selectedId &&
       !annotations.some((item) => item.id === selectedId) &&
@@ -327,14 +334,7 @@ export function AnnotationProvider({ config, children }: AnnotationProviderProps
     true,
     isBoolean,
   );
-  // Mirrors whether the Comments panel's Full Screen ("Expand panel") mode
-  // is open — not persisted, since it tracks `AnnotationListPanel`'s local
-  // `expanded` state, which itself never survives a reload with a stale
-  // value worth restoring.
   const [commentsFullScreenOpen, setCommentsFullScreenOpen] = useState(false);
-  // Not persisted (resets on reload), but — unlike a useState local to the
-  // Full Screen view itself — survives that view briefly unmounting within
-  // a session.
   const [commentsFullScreenSelectedThreadId, setCommentsFullScreenSelectedThreadId] = useState<
     string | null
   >(null);
@@ -397,7 +397,7 @@ export function AnnotationProvider({ config, children }: AnnotationProviderProps
     pageKey: basePageKey,
     enabled: isTrackingEnabled(resolved.trackPageVisits, authenticated),
     getAuthToken: activeConfig.getAuthToken,
-    sessionKey,
+    sessionKey: hostAuthenticated ? `host:${resolved.currentUser.id}` : sessionKey,
   });
 
   const selectFlowPin = useCallback(
@@ -595,6 +595,94 @@ export function AnnotationProvider({ config, children }: AnnotationProviderProps
     [closeOtherSurfaces, setUserManagementOpen],
   );
 
+  const flowDirtyRef = useRef<Record<FlowEditorSource, boolean>>({ panel: false, pin: false });
+  const [flowLeave, setFlowLeave] = useState<{
+    source: FlowEditorSource;
+    proceed: () => void;
+  } | null>(null);
+  const setFlowDirty = useCallback((source: FlowEditorSource, dirty: boolean) => {
+    flowDirtyRef.current[source] = dirty;
+  }, []);
+  const guardFlowLeave = useCallback((scope: FlowEditorSource | "any", proceed: () => void) => {
+    const dirty = flowDirtyRef.current;
+    const source: FlowEditorSource | null =
+      scope === "any"
+        ? dirty.panel
+          ? "panel"
+          : dirty.pin
+            ? "pin"
+            : null
+        : dirty[scope]
+          ? scope
+          : null;
+    if (source) {
+      setFlowLeave({ source, proceed });
+      return;
+    }
+    proceed();
+  }, []);
+  const resolveFlowLeave = useCallback(
+    (discard: boolean) => {
+      setFlowLeave(null);
+      if (discard && flowLeave) {
+        flowDirtyRef.current[flowLeave.source] = false;
+        flowLeave.proceed();
+      }
+    },
+    [flowLeave],
+  );
+  const guardedSetListOpen = useCallback(
+    (open: boolean) =>
+      open ? guardFlowLeave("any", () => openListExclusive(true)) : openListExclusive(false),
+    [guardFlowLeave, openListExclusive],
+  );
+  const guardedSetEpicFlowOpen = useCallback(
+    (open: boolean) =>
+      open
+        ? guardFlowLeave("any", () => openEpicFlowExclusive(true))
+        : openEpicFlowExclusive(false),
+    [guardFlowLeave, openEpicFlowExclusive],
+  );
+  const guardedSetFlowOpen = useCallback(
+    (open: boolean) => guardFlowLeave(open ? "pin" : "panel", () => openFlowExclusive(open)),
+    [guardFlowLeave, openFlowExclusive],
+  );
+  const guardedSetDataModelOpen = useCallback(
+    (open: boolean) =>
+      open
+        ? guardFlowLeave("any", () => openDataModelExclusive(true))
+        : openDataModelExclusive(false),
+    [guardFlowLeave, openDataModelExclusive],
+  );
+  const guardedSetUserManagementOpen = useCallback(
+    (open: boolean) =>
+      open
+        ? guardFlowLeave("any", () => openUserManagementExclusive(true))
+        : openUserManagementExclusive(false),
+    [guardFlowLeave, openUserManagementExclusive],
+  );
+  const guardedSelectFlowPin = useCallback(
+    (id: string | null) => guardFlowLeave("pin", () => selectFlowPin(id)),
+    [guardFlowLeave, selectFlowPin],
+  );
+
+  const [referenceRequest, setReferenceRequest] = useState<ReferenceTarget | null>(null);
+  const consumeReferenceRequest = useCallback(() => setReferenceRequest(null), []);
+  const openReference = useCallback(
+    (target: ReferenceTarget) => {
+      setReferenceRequest(target);
+      setCommentsFullScreenOpen(false);
+      if (target.kind === "epic") {
+        openEpicFlowExclusive(true);
+      } else if (target.kind === "flow") {
+        openFlowExclusive(true);
+      } else {
+        openDataModelExclusive(true);
+      }
+    },
+    [openDataModelExclusive, openEpicFlowExclusive, openFlowExclusive],
+  );
+
   const [portalReady, setPortalReady] = useState(false);
   useEffect(() => {
     setPortalReady(true);
@@ -607,7 +695,9 @@ export function AnnotationProvider({ config, children }: AnnotationProviderProps
     }
     previousPageKeyRef.current = pageKey;
     clearDraft();
-    setSelectedId(null);
+    if (!revealHidListRef.current) {
+      setSelectedId(null);
+    }
     setDiscardPrompt(null);
   }, [clearDraft, pageKey]);
 
@@ -790,11 +880,6 @@ export function AnnotationProvider({ config, children }: AnnotationProviderProps
     [clearDraft, hasUnsavedDraft, setPinsVisible],
   );
 
-  // Tracks whether the list is currently hidden specifically because of
-  // `revealAnnotationAndHideList` below, so the auto-reopen effect doesn't
-  // fire for unrelated ways the list or selection get closed.
-  const revealHidListRef = useRef(false);
-
   const revealAnnotationAndHideList = useCallback(
     (id: string) => {
       revealHidListRef.current = true;
@@ -805,11 +890,19 @@ export function AnnotationProvider({ config, children }: AnnotationProviderProps
   );
 
   useEffect(() => {
-    if (revealHidListRef.current && !selectedId) {
+    if (!selectedId) {
       revealHidListRef.current = false;
+    }
+  }, [selectedId]);
+
+  const closeThread = useCallback(() => {
+    const backToList = revealHidListRef.current;
+    revealHidListRef.current = false;
+    selectAnnotation(null);
+    if (backToList) {
       setListOpen(true);
     }
-  }, [selectedId, setListOpen]);
+  }, [selectAnnotation, setListOpen]);
 
   const confirmDiscard = useCallback(() => {
     const prompt = discardPrompt;
@@ -914,6 +1007,7 @@ export function AnnotationProvider({ config, children }: AnnotationProviderProps
       selectAnnotation,
       revealAnnotation,
       revealAnnotationAndHideList,
+      closeThread,
       draft,
       startDraft,
       updateDraftLabel,
@@ -943,23 +1037,30 @@ export function AnnotationProvider({ config, children }: AnnotationProviderProps
       submitFlowPinDraft,
       removeFlowPin,
       selectedFlowPinId,
-      selectFlowPin,
+      selectFlowPin: guardedSelectFlowPin,
       listOpen,
-      setListOpen: openListExclusive,
+      setListOpen: guardedSetListOpen,
       epicFlowOpen,
-      setEpicFlowOpen: openEpicFlowExclusive,
+      setEpicFlowOpen: guardedSetEpicFlowOpen,
       flowOpen,
-      setFlowOpen: openFlowExclusive,
+      setFlowOpen: guardedSetFlowOpen,
       dataModelOpen,
-      setDataModelOpen: openDataModelExclusive,
+      setDataModelOpen: guardedSetDataModelOpen,
       userManagementOpen,
-      setUserManagementOpen: openUserManagementExclusive,
+      setUserManagementOpen: guardedSetUserManagementOpen,
+      setFlowDirty,
+      guardFlowLeave,
+      flowLeaveRequest: flowLeave?.source ?? null,
+      resolveFlowLeave,
       auditHistoryOpen,
       setAuditHistoryOpen,
       commentsFullScreenOpen,
       setCommentsFullScreenOpen,
       commentsFullScreenSelectedThreadId,
       setCommentsFullScreenSelectedThreadId,
+      openReference,
+      referenceRequest,
+      consumeReferenceRequest,
     }),
     [
       modeEnabled,
@@ -968,6 +1069,7 @@ export function AnnotationProvider({ config, children }: AnnotationProviderProps
       selectAnnotation,
       revealAnnotation,
       revealAnnotationAndHideList,
+      closeThread,
       draft,
       startDraft,
       updateDraftLabel,
@@ -997,23 +1099,30 @@ export function AnnotationProvider({ config, children }: AnnotationProviderProps
       submitFlowPinDraft,
       removeFlowPin,
       selectedFlowPinId,
-      selectFlowPin,
+      guardedSelectFlowPin,
       listOpen,
-      openListExclusive,
+      guardedSetListOpen,
       epicFlowOpen,
-      openEpicFlowExclusive,
+      guardedSetEpicFlowOpen,
       flowOpen,
-      openFlowExclusive,
+      guardedSetFlowOpen,
       dataModelOpen,
-      openDataModelExclusive,
+      guardedSetDataModelOpen,
       userManagementOpen,
-      openUserManagementExclusive,
+      guardedSetUserManagementOpen,
+      setFlowDirty,
+      guardFlowLeave,
+      flowLeave,
+      resolveFlowLeave,
       auditHistoryOpen,
       setAuditHistoryOpen,
       commentsFullScreenOpen,
       setCommentsFullScreenOpen,
       commentsFullScreenSelectedThreadId,
       setCommentsFullScreenSelectedThreadId,
+      openReference,
+      referenceRequest,
+      consumeReferenceRequest,
     ],
   );
 
@@ -1054,17 +1163,28 @@ export function AnnotationProvider({ config, children }: AnnotationProviderProps
     <AnnotationAuthContext.Provider value={authValue}>
       <AnnotationDataContext.Provider value={dataValue}>
         <AnnotationUiContext.Provider value={uiValue}>
-          <AnnotationViewContext.Provider value={viewContextValue}>
-            {children}
-          </AnnotationViewContext.Provider>
-          {portalReady && activeConfig.enabled
-            ? createPortal(
-                <AnnotationErrorBoundary>
-                  <AnnotationLayer />
-                </AnnotationErrorBoundary>,
-                document.body,
-              )
-            : null}
+          <AiRuntimeProvider
+            apiBaseUrl={activeConfig.apiBaseUrl}
+            projectId={projectId}
+            getAuthToken={activeConfig.getAuthToken}
+            enabled={authenticated && activeConfig.ai?.enabled !== false}
+            sessionKey={sessionKey}
+            currentUserId={activeUser.id}
+          >
+            <AiUiProvider>
+              <AnnotationViewContext.Provider value={viewContextValue}>
+                {children}
+              </AnnotationViewContext.Provider>
+              {portalReady && activeConfig.enabled
+                ? createPortal(
+                    <AnnotationErrorBoundary>
+                      <AnnotationLayer />
+                    </AnnotationErrorBoundary>,
+                    document.body,
+                  )
+                : null}
+            </AiUiProvider>
+          </AiRuntimeProvider>
         </AnnotationUiContext.Provider>
       </AnnotationDataContext.Provider>
     </AnnotationAuthContext.Provider>

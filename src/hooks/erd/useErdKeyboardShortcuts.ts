@@ -16,8 +16,13 @@ const isEditable = (el: EventTarget | null) =>
   el instanceof HTMLElement &&
   (el.isContentEditable || ["INPUT", "TEXTAREA", "SELECT"].includes(el.tagName));
 
-export function useErdKeyboardShortcuts() {
+export interface ErdKeyboardShortcutOptions {
+  onAskAi?: () => void;
+}
+
+export function useErdKeyboardShortcuts(options: ErdKeyboardShortcutOptions = {}) {
   const engine = useErdEngine();
+  const { onAskAi } = options;
 
   return useCallback(
     (e: React.KeyboardEvent) => {
@@ -26,6 +31,10 @@ export function useErdKeyboardShortcuts() {
       const mod = e.ctrlKey || e.metaKey;
       const key = e.key.toLowerCase();
 
+      if (mod && key === "i" && onAskAi) {
+        e.preventDefault();
+        return onAskAi();
+      }
       if (key === "escape") {
         if (state.connection) engine.cancelConnection();
         else engine.clearSelection();
@@ -76,6 +85,6 @@ export function useErdKeyboardShortcuts() {
       }
       engine.setNodePositions(positions);
     },
-    [engine],
+    [engine, onAskAi],
   );
 }

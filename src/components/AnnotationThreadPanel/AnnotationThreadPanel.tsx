@@ -1,4 +1,11 @@
-import { useRef, useState } from "react";
+import {
+  useEffect,
+  useRef,
+  useState,
+  type FocusEvent,
+  type KeyboardEvent,
+  type PointerEvent as ReactPointerEvent,
+} from "react";
 import { useAnnotationData, useAnnotationUi } from "../../context/AnnotationContext";
 import { useFloatingPanel } from "../../hooks/useAnnotationPosition";
 import { useEscapeKey } from "../../hooks/useEscapeKey";
@@ -12,27 +19,14 @@ import { ConfirmDialog } from "../UserManagement/ConfirmDialog";
 import { canDeleteAnnotation } from "../../utils/boardPermissions";
 import { mentionsToPlainText } from "../../utils/mentions";
 import type { AnnotationComment } from "../../types/annotation.types";
+import { fitTitleInputHeight, focusTitleInputAtEnd } from "../../utils/titleInput";
+import { THREAD_STATUS_OPTIONS } from "../../utils/status";
+import { AnnotationAiActions } from "../Ai/AnnotationAiActions";
 
-function fitTitleInputHeight(element: HTMLTextAreaElement | null) {
-  if (!element) {
-    return;
-  }
-  element.style.height = "auto";
-  element.style.height = `${element.scrollHeight}px`;
-}
+const DRAG_EDGE_MARGIN = 8;
 
-function focusTitleInputAtEnd(element: HTMLTextAreaElement | null) {
-  if (!element) {
-    return;
-  }
-  fitTitleInputHeight(element);
-  element.focus();
-  element.setSelectionRange(element.value.length, element.value.length);
-}
+const NON_DRAG_TARGET = "button, a, input, textarea, select, label, [role='tooltip']";
 
-// The displayed title is the last " > " segment of the stored path
-// (see annotationLabel()); renaming it means replacing just that last
-// segment while keeping whatever page-name prefix it had.
 export function buildRenamedPath(currentPath: string | null | undefined, newTitle: string): string {
   if (!currentPath) {
     return newTitle;
@@ -42,15 +36,23 @@ export function buildRenamedPath(currentPath: string | null | undefined, newTitl
   return segments.join(" > ");
 }
 
+function pathPrefix(path: string | null | undefined): string {
+  return path ? path.split(" > ").slice(0, -1).join(" > ") : "";
+}
+
+function buildEditedPath(prefix: string, title: string): string {
+  const segments = prefix
+    .split(">")
+    .map((segment) => segment.trim())
+    .filter(Boolean);
+  return [...segments, title].join(" > ");
+}
+
 interface AnnotationThreadPanelProps {
   annotationId: string;
   x: number;
   y: number;
   orphaned: boolean;
-  // True when opened from a thread that isn't on the current page (e.g. from
-  // the "Not in this view" comments-list row for a different page) — there's
-  // no real on-page position to anchor to, so the panel is centered on the
-  // viewport instead of placed relative to x/y.
   centered?: boolean;
 }
 
@@ -72,7 +74,7 @@ export function AnnotationThreadPanel({
     setStatus,
     renameAnnotation,
   } = useAnnotationData();
-  const { selectAnnotation } = useAnnotationUi();
+  const { closeThread } = useAnnotationUi();
   const annotation =
     annotations.find((item) => item.id === annotationId) ??
     allAnnotations.find((item) => item.id === annotationId);
@@ -82,10 +84,20 @@ export function AnnotationThreadPanel({
   const [hasUnsentReply, setHasUnsentReply] = useState(false);
   const [confirmClose, setConfirmClose] = useState(false);
   const [replyTarget, setReplyTarget] = useState<AnnotationComment | null>(null);
+  const [replySeed, setReplySeed] = useState<{ text: string; key: number } | null>(null);
   const [pendingDelete, setPendingDelete] = useState<AnnotationComment | null>(null);
   const [editingTitle, setEditingTitle] = useState(false);
   const [titleValue, setTitleValue] = useState("");
+  const [pathValue, setPathValue] = useState("");
   const [infoOpen, setInfoOpen] = useState(false);
+  const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
+  const [dragging, setDragging] = useState(false);
+
+  useEffect(() => {
+    if (!centered) {
+      setDragOffset({ x: 0, y: 0 });
+    }
+  }, [centered]);
 
   const closeRequestedRef = useRef<() => void>(() => undefined);
   useEscapeKey(
@@ -101,18 +113,38 @@ export function AnnotationThreadPanel({
 
   const startEditingTitle = () => {
     setTitleValue(title);
+    setPathValue(pathPrefix(annotation.path));
     setEditingTitle(true);
   };
 
   const commitTitle = () => {
     const trimmed = titleValue.trim();
     setEditingTitle(false);
-    if (!trimmed || trimmed === title) {
+    if (!trimmed) {
       return;
     }
-    renameAnnotation(annotation.id, buildRenamedPath(annotation.path, trimmed)).catch(
-      () => undefined,
-    );
+    const nextPath = buildEditedPath(pathValue, trimmed);
+    if (nextPath === (annotation.path ?? title)) {
+      return;
+    }
+    renameAnnotation(annotation.id, nextPath).catch(() => undefined);
+  };
+
+  const commitOnBlurOutside = (event: FocusEvent<HTMLTextAreaElement>) => {
+    const next = event.relatedTarget;
+    if (next instanceof HTMLElement && next.dataset.wpnTitleEdit !== undefined) {
+      return;
+    }
+    commitTitle();
+  };
+
+  const onEditKeyDown = (event: KeyboardEvent<HTMLTextAreaElement>) => {
+    if (event.key === "Enter") {
+      event.preventDefault();
+      commitTitle();
+    } else if (event.key === "Escape") {
+      setEditingTitle(false);
+    }
   };
 
   const requestClose = () => {
@@ -120,13 +152,56 @@ export function AnnotationThreadPanel({
       setConfirmClose(true);
       return;
     }
-    selectAnnotation(null);
+    closeThread();
   };
   closeRequestedRef.current = requestClose;
 
   const confirmDelete = (comment: AnnotationComment) => {
     setPendingDelete(null);
     removeComment(annotation.id, comment.id).catch(() => undefined);
+  };
+
+  const startDrag = (event: ReactPointerEvent<HTMLDivElement>) => {
+    const panel = panelRef.current;
+    if (
+      !centered ||
+      !panel ||
+      event.button !== 0 ||
+      (event.target as HTMLElement).closest(NON_DRAG_TARGET)
+    ) {
+      return;
+    }
+    event.preventDefault();
+    const rect = panel.getBoundingClientRect();
+    const startX = event.clientX;
+    const startY = event.clientY;
+    const startOffset = dragOffset;
+    const clamp = (value: number, min: number, max: number) =>
+      max < min ? min : Math.min(Math.max(value, min), max);
+
+    const onMove = (moveEvent: PointerEvent) => {
+      const dx = clamp(
+        moveEvent.clientX - startX,
+        DRAG_EDGE_MARGIN - rect.left,
+        window.innerWidth - DRAG_EDGE_MARGIN - rect.right,
+      );
+      const dy = clamp(
+        moveEvent.clientY - startY,
+        DRAG_EDGE_MARGIN - rect.top,
+        window.innerHeight - DRAG_EDGE_MARGIN - rect.bottom,
+      );
+      setDragOffset({ x: startOffset.x + dx, y: startOffset.y + dy });
+    };
+    const onUp = () => {
+      setDragging(false);
+      window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("pointerup", onUp);
+      window.removeEventListener("pointercancel", onUp);
+    };
+    setDragging(true);
+    window.addEventListener("pointermove", onMove);
+    window.addEventListener("pointerup", onUp);
+    window.addEventListener("pointercancel", onUp);
   };
 
   const sendReply = async (message: string, addToContext: boolean) => {
@@ -144,12 +219,19 @@ export function AnnotationThreadPanel({
     <>
       <div
         ref={panelRef}
-        className={["wpn-panel", "wpn-thread-panel", centered ? "wpn-thread-panel--centered" : ""]
+        className={[
+          "wpn-panel",
+          "wpn-thread-panel",
+          centered ? "wpn-thread-panel--centered" : "",
+          dragging ? "wpn-thread-panel--dragging" : "",
+        ]
           .filter(Boolean)
           .join(" ")}
         style={
           centered
-            ? undefined
+            ? {
+                transform: `translate(calc(-50% + ${dragOffset.x}px), calc(-50% + ${dragOffset.y}px))`,
+              }
             : {
                 left: placement?.left ?? 0,
                 top: placement?.top ?? 0,
@@ -159,39 +241,40 @@ export function AnnotationThreadPanel({
         role="dialog"
         aria-label={`Comment thread: ${title}`}
       >
-        <div className="wpn-panel__header">
+        <div className="wpn-panel__header" onPointerDown={startDrag}>
           <div className="wpn-panel__header-row">
             <span className="wpn-panel__title-group">
               {editingTitle ? (
                 <textarea
                   ref={focusTitleInputAtEnd}
+                  data-wpn-title-edit=""
                   className="wpn-panel__title-input"
                   rows={1}
+                  aria-label="Title"
                   value={titleValue}
                   onChange={(event) => {
                     setTitleValue(event.target.value);
                     fitTitleInputHeight(event.target);
                   }}
-                  onBlur={commitTitle}
-                  onKeyDown={(event) => {
-                    if (event.key === "Enter") {
-                      event.preventDefault();
-                      commitTitle();
-                    } else if (event.key === "Escape") {
-                      setEditingTitle(false);
-                    }
-                  }}
+                  onBlur={commitOnBlurOutside}
+                  onKeyDown={onEditKeyDown}
                 />
               ) : (
                 <span className="wpn-panel__title" title={title}>
                   {title}
                 </span>
               )}
-              <Tooltip label={editingTitle ? "Save title" : "Edit title"} placement="bottom">
+              {centered && !editingTitle ? (
+                <span className="wpn-thread-panel__chip">Not in this view</span>
+              ) : null}
+              <Tooltip
+                label={editingTitle ? "Save title and path" : "Edit title and path"}
+                placement="bottom"
+              >
                 <button
                   type="button"
                   className="wpn-link wpn-link--icon"
-                  aria-label={editingTitle ? "Save title" : "Edit title"}
+                  aria-label={editingTitle ? "Save title and path" : "Edit title and path"}
                   onMouseDown={(event) => event.preventDefault()}
                   onClick={editingTitle ? commitTitle : startEditingTitle}
                 >
@@ -238,13 +321,30 @@ export function AnnotationThreadPanel({
               </button>
             </Tooltip>
           </div>
-          {annotation.path ? (
+          {editingTitle ? (
+            <label className="wpn-thread-panel__path wpn-thread-panel__path--editing">
+              <span className="wpn-thread-panel__path-label">PATH: </span>
+              <textarea
+                ref={fitTitleInputHeight}
+                data-wpn-title-edit=""
+                className="wpn-thread-panel__path-input"
+                rows={1}
+                value={pathValue}
+                placeholder="Page > Section"
+                onChange={(event) => {
+                  setPathValue(event.target.value);
+                  fitTitleInputHeight(event.target);
+                }}
+                onBlur={commitOnBlurOutside}
+                onKeyDown={onEditKeyDown}
+              />
+            </label>
+          ) : annotation.path ? (
             <div className="wpn-thread-panel__path" title={annotation.path}>
               <span className="wpn-thread-panel__path-label">PATH: </span>
               {annotation.path}
             </div>
           ) : null}
-          {centered ? <span className="wpn-thread-panel__chip">Not in this view</span> : null}
         </div>
         {confirmClose ? (
           <div className="wpn-thread-panel__discard" role="alert">
@@ -262,7 +362,7 @@ export function AnnotationThreadPanel({
                 className="wpn-link wpn-link--chip wpn-link--danger"
                 onClick={() => {
                   setConfirmClose(false);
-                  selectAnnotation(null);
+                  closeThread();
                 }}
               >
                 Discard
@@ -287,11 +387,19 @@ export function AnnotationThreadPanel({
           onEditingChange={setHasUnsavedEdit}
         />
         <div className="wpn-panel__composer">
+          <AnnotationAiActions
+            annotation={annotation}
+            onDraftReply={(text) =>
+              setReplySeed((current) => ({ text, key: (current?.key ?? 0) + 1 }))
+            }
+          />
           <AnnotationReplyComposer
             replyTarget={replyTarget}
             onCancelReply={() => setReplyTarget(null)}
             onDraftChange={setHasUnsentReply}
             onSubmit={sendReply}
+            seed={replySeed}
+            annotationId={annotation.id}
           />
           <div className="wpn-panel__toolbar">
             <div className="wpn-thread-panel__brand">
@@ -302,6 +410,7 @@ export function AnnotationThreadPanel({
             <div className="wpn-panel__toolbar-end">
               <AnnotationStatusSelect
                 value={annotation.status}
+                options={THREAD_STATUS_OPTIONS}
                 disabled={!canDeleteAnnotation(annotation, config.currentUser)}
                 onChange={(status) => setStatus(annotation.id, status).catch(() => undefined)}
               />

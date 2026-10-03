@@ -17,7 +17,13 @@ import { ConfirmDialog } from "./UserManagement/ConfirmDialog";
 import { annotationLabel } from "../utils/annotationLabel";
 import { canDeleteBoardItem } from "../utils/boardPermissions";
 import type { AnnotationTag, UpdateAnnotationTagInput } from "../types/annotationTag.types";
+import { AiFloatingButton } from "./Ai/AiFloatingButton";
+import { useAiUi } from "./Ai/AiUiContext";
 
+const AiWorkspaceHost = lazy(() =>
+  import("./Ai/AiWorkspaceHost").then((module) => ({ default: module.AiWorkspaceHost })),
+);
+const AiPanel = lazy(() => import("./Ai/AiPanel").then((module) => ({ default: module.AiPanel })));
 const EpicFlowPanel = lazy(() =>
   import("./EpicFlow").then((module) => ({ default: module.EpicFlowPanel })),
 );
@@ -160,6 +166,9 @@ export function AnnotationLayer() {
     cancelDiscardPrompt,
   } = useAnnotationUi();
   const { authenticated } = useAnnotationAuth();
+  const aiUi = useAiUi();
+  const aiPanelOpen = aiUi?.panelOpen ?? false;
+  const aiWorkspaceOpen = Boolean(aiUi?.workspaceRequest);
   const [layerError, setLayerError] = useState<string | null>(null);
 
   const [pendingTagRemoval, setPendingTagRemoval] = useState<AnnotationTag | null>(null);
@@ -296,11 +305,6 @@ export function AnnotationLayer() {
   }, [authenticated, flowPins, flowPinsVisible, interactionActive, selectedFlowPinId]);
 
   const selected = authenticated ? annotations.find((item) => item.id === selectedId) : undefined;
-  // Selected via a "Not in this view" row for a thread on a different page —
-  // it won't be in the page-scoped `annotations`/`visible` set (and so never
-  // gets a computed pin position), but its data is still in the project-wide
-  // list. Rendered centered instead of anchored — see AnnotationThreadPanel's
-  // `centered` prop.
   const selectedElsewhere =
     authenticated && selectedId && !selected
       ? allAnnotations.find((item) => item.id === selectedId)
@@ -512,6 +516,17 @@ export function AnnotationLayer() {
           <SettingsPanel />
         </Suspense>
       ) : null}
+      {aiPanelOpen && authenticated ? (
+        <Suspense fallback={null}>
+          <AiPanel />
+        </Suspense>
+      ) : null}
+      {aiWorkspaceOpen && authenticated ? (
+        <Suspense fallback={null}>
+          <AiWorkspaceHost />
+        </Suspense>
+      ) : null}
+      {authenticated ? <AiFloatingButton /> : null}
       {discardPrompt ? (
         <ConfirmDialog
           title="Discard comment?"

@@ -23,6 +23,9 @@ export interface ErdEditorProps {
   description?: string;
   onMetaChange?: (patch: { name?: string; description?: string; engine?: ErdEngineName }) => void;
   saveIndicator?: ReactNode;
+  toolbarActions?: ReactNode;
+  overlay?: ReactNode;
+  onAskAi?: () => void;
 }
 
 interface Notice {
@@ -50,6 +53,9 @@ function EditorLayout({
   description,
   onMetaChange,
   saveIndicator,
+  toolbarActions,
+  overlay,
+  onAskAi,
 }: Omit<ErdEditorProps, "initialDocument">) {
   const engine = useErdEngine();
   const [notices, setNotices] = useState<Notice[]>([]);
@@ -117,6 +123,7 @@ function EditorLayout({
         onPublish={onPublish}
         onNameCommit={(committed) => onMetaChange?.({ name: committed })}
         saveIndicator={saveIndicator}
+        toolbarActions={toolbarActions}
       />
       <div className="wpn-flowchart-editor__body">
         <ErdPalette style={{ width: paletteWidth }} />
@@ -129,7 +136,7 @@ function EditorLayout({
           onResize={setPaletteWidth}
         />
         <main className="wpn-flowchart-editor__main">
-          <ErdCanvas>
+          <ErdCanvas onAskAi={onAskAi}>
             <ErdValidationPanel />
           </ErdCanvas>
           <div className="wpn-flowchart-editor__notices" aria-live="polite">
@@ -166,6 +173,7 @@ function EditorLayout({
               <Icon name="chevron" size={14} />
             </button>
           )}
+          {overlay}
         </main>
         {propertiesOpen && (
           <>

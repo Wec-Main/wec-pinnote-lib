@@ -1,4 +1,4 @@
-import { useId, useRef, useState, type FormEvent } from "react";
+import { useEffect, useId, useRef, useState, type FormEvent } from "react";
 import { Icon, SearchableSelect, Spinner, Tooltip } from "../primitives";
 import { useEscapeKey } from "../../hooks/useEscapeKey";
 import { useScrimDismiss } from "../../hooks/useScrimDismiss";
@@ -40,6 +40,14 @@ export function ProjectFormModal({
   const [description, setDescription] = useState(project?.description ?? "");
   const [status, setStatus] = useState(project?.status ?? "active");
   const [touched, setTouched] = useState(false);
+  const descriptionRef = useRef<HTMLTextAreaElement>(null);
+
+  useEffect(() => {
+    const el = descriptionRef.current;
+    if (!el) return;
+    el.style.height = "auto";
+    el.style.height = `${el.scrollHeight}px`;
+  }, [description]);
 
   const organizationOptions = organizations.map((organization) => ({
     value: organization.id,
@@ -162,11 +170,13 @@ export function ProjectFormModal({
             <label className="wpn-epicflow-modal__field">
               <span className="wpn-epicflow-modal__label">Description</span>
               <textarea
+                ref={descriptionRef}
                 className="wpn-epicflow-modal__input wpn-settings-textarea"
                 value={description}
+                rows={3}
+                style={{ overflowY: "hidden" }}
                 onChange={(event) => setDescription(event.target.value)}
                 placeholder="What this workspace covers"
-                rows={3}
               />
             </label>
           </div>

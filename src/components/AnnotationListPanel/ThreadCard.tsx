@@ -58,7 +58,11 @@ function ThreadComment({
         </span>
         {quoted ? <CommentQuote comment={quoted} /> : null}
         <span className="wpn-thread-card__message">
-          <CommentMessage message={comment.message} currentUserId={currentUserId} />
+          <CommentMessage
+            message={comment.message}
+            currentUserId={currentUserId}
+            interactive={false}
+          />
         </span>
       </span>
     </button>

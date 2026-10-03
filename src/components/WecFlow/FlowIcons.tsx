@@ -69,6 +69,9 @@ const paths = {
     "M4 6c0-1.1 3.6-2 8-2s8 .9 8 2v12c0 1.1-3.6 2-8 2s-8-.9-8-2z M4 6c0 1.1 3.6 2 8 2s8-.9 8-2",
   cloudShape: "M7 18a4 4 0 0 1-1-7.9 5 5 0 0 1 9.6-2A4.5 4.5 0 0 1 17 18z",
   plug: "M9 2v5 M15 2v5 M6 7h12v4a6 6 0 0 1-6 6 6 6 0 0 1-6-6z M12 17v5",
+  actor: "M12 3.5a4 4 0 1 0 0 8 4 4 0 0 0 0-8z M4.5 20.5c0-4 3.4-6.8 7.5-6.8s7.5 2.8 7.5 6.8z",
+  swimlaneH: "M3 5h18v14H3z M3 12h18 M7.5 5v14",
+  swimlaneV: "M4 3h16v18H4z M12 3v18 M4 7.5h16",
 } as const;
 
 export type IconName = keyof typeof paths;
@@ -85,6 +88,7 @@ const filled = new Set<IconName>([
   "hexagonShape",
   "cylinderShape",
   "cloudShape",
+  "actor",
 ]);
 
 export function Icon({

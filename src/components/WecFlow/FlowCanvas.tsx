@@ -31,7 +31,6 @@ export interface FlowCanvasProps {
   children?: ReactNode;
 }
 
-/** "+" badge shown on the connection a dragged node would be inserted into. */
 const EdgeDropIndicator = memo(function EdgeDropIndicator() {
   const target = useDropTargetEdge();
   if (!target) return null;
@@ -53,6 +52,7 @@ const ViewportLayer = memo(function ViewportLayer() {
       className="wpn-flowchart-canvas__viewport"
       style={{ transform: `translate(${x}px, ${y}px) scale(${zoom})` }}
     >
+      <NodeRenderer lanes />
       <EdgeRenderer />
       <EdgeLabelRenderer />
       <NodeRenderer />
@@ -197,7 +197,7 @@ export function FlowCanvas({
         return;
       }
       const unit = e.deltaMode === 1 ? 0.05 : e.deltaMode === 2 ? 1 : 0.0022;
-      const speed = e.ctrlKey ? 4 : 1; // pinch gestures report small deltas with ctrlKey
+      const speed = e.ctrlKey ? 4 : 1;
       engine.zoomAt(
         Math.pow(2, -e.deltaY * unit * speed),
         clientToCanvas({ x: e.clientX, y: e.clientY }),

@@ -10,7 +10,7 @@ import {
 } from "../primitives";
 import { AuthorBadge } from "../EpicFlow/AuthorBadge";
 import { ConfirmDialog } from "../UserManagement/ConfirmDialog";
-import { useSharedFetch, invalidateSharedFetch } from "../../hooks/useSharedFetch";
+import { useSharedFetch } from "../../hooks/useSharedFetch";
 import { useTokenGetter } from "../../hooks/useTokenGetter";
 import { useDataModelStream } from "../../hooks/useDataModelStream";
 import type { StreamEvent } from "../../types/stream.types";
@@ -53,7 +53,6 @@ interface DataModelListPanelProps {
   onOpen: (dataModelId: string) => void;
 }
 
-
 export function DataModelListPanel({ onOpen }: DataModelListPanelProps) {
   const { config } = useAnnotationContext();
   const { hostAuthenticated, activeAccount } = useAnnotationAuth();
@@ -85,12 +84,7 @@ export function DataModelListPanel({ onOpen }: DataModelListPanelProps) {
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
 
-  const refresh = useCallback(() => {
-    if (listKey) {
-      invalidateSharedFetch(listKey);
-    }
-    reload();
-  }, [listKey, reload]);
+  const refresh = reload;
 
   const onStreamEvent = useCallback(
     (event: StreamEvent) => {
@@ -264,7 +258,7 @@ export function DataModelListPanel({ onOpen }: DataModelListPanelProps) {
           <div className="wpn-users-actions">
             <button
               type="button"
-              className="wpn-users-action wpn-users-action--labeled"
+              className="wpn-users-action wpn-users-action--primary wpn-users-action--labeled"
               aria-label={`Open ${dataModel.name}`}
               onClick={() => onOpen(dataModel.id)}
             >
@@ -313,11 +307,7 @@ export function DataModelListPanel({ onOpen }: DataModelListPanelProps) {
         trailing={
           <>
             <RefreshButton label="Refresh data models" loading={loading} onRefresh={refresh} />
-            <button
-              type="button"
-              className="wpn-users-create"
-              onClick={() => setFormOpen(true)}
-            >
+            <button type="button" className="wpn-users-create" onClick={() => setFormOpen(true)}>
               <Icon name="plus" className="wpn-users-create__icon" />
               Create Data Model
             </button>
@@ -341,49 +331,54 @@ export function DataModelListPanel({ onOpen }: DataModelListPanelProps) {
         </div>
       ) : null}
 
-      <div className="wpn-users-table-wrap">
-        <table
-          className={["wpn-users-table", loading && dataModels ? "wpn-users-table--refetching" : ""]
-            .filter(Boolean)
-            .join(" ")}
-        >
-          <colgroup>
-            <col className="wpn-flow-list-tab__col-name" />
-            <col className="wpn-datamodel-list-tab__col-engine" />
-            <col className="wpn-flow-list-tab__col-nodes" />
-            <col />
-            <col />
-            <col className="wpn-datamodel-list-tab__col-actions" />
-          </colgroup>
-          <thead>
-            <tr>
-              <th scope="col">Name</th>
-              <th scope="col">Engine</th>
-              <th scope="col" className="wpn-flow-list-tab__nodes">
-                Entities
-              </th>
-              <th scope="col">Created by</th>
-              <th scope="col">Last updated</th>
-              <th scope="col" className="wpn-users-table__actions-head">
-                Actions
-              </th>
-            </tr>
-          </thead>
-          <tbody>{renderBody()}</tbody>
-        </table>
-      </div>
+      <div className="wpn-table-card">
+        <div className="wpn-users-table-wrap">
+          <table
+            className={[
+              "wpn-users-table",
+              loading && dataModels ? "wpn-users-table--refetching" : "",
+            ]
+              .filter(Boolean)
+              .join(" ")}
+          >
+            <colgroup>
+              <col className="wpn-flow-list-tab__col-name" />
+              <col className="wpn-datamodel-list-tab__col-engine" />
+              <col className="wpn-flow-list-tab__col-nodes" />
+              <col />
+              <col />
+              <col className="wpn-datamodel-list-tab__col-actions" />
+            </colgroup>
+            <thead>
+              <tr>
+                <th scope="col">Name</th>
+                <th scope="col">Engine</th>
+                <th scope="col" className="wpn-flow-list-tab__nodes">
+                  Entities
+                </th>
+                <th scope="col">Created by</th>
+                <th scope="col">Last updated</th>
+                <th scope="col" className="wpn-users-table__actions-head">
+                  Actions
+                </th>
+              </tr>
+            </thead>
+            <tbody>{renderBody()}</tbody>
+          </table>
+        </div>
 
-      <TablePagination
-        page={currentPage}
-        pageSize={pageSize}
-        totalItems={filtered.length}
-        itemLabel="data models"
-        onPageChange={setPage}
-        onPageSizeChange={(next) => {
-          setPageSize(next);
-          setPage(1);
-        }}
-      />
+        <TablePagination
+          page={currentPage}
+          pageSize={pageSize}
+          totalItems={filtered.length}
+          itemLabel="data models"
+          onPageChange={setPage}
+          onPageSizeChange={(next) => {
+            setPageSize(next);
+            setPage(1);
+          }}
+        />
+      </div>
 
       {formOpen ? (
         <DataModelFormModal

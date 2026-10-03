@@ -8,15 +8,9 @@ import type { EdgeDropTarget } from "../../components/WecFlow/EdgeRenderer";
 export const EDGE_DROP_TOLERANCE_PX = 28;
 
 export interface EdgeDropOptions {
-  /** Node being dragged: its own edges and body are never drop targets. */
   excludeNodeIds?: ReadonlySet<string>;
 }
 
-/**
- * Finds the connection nearest a screen point, for inserting a node into it.
- * Works from graph state rather than DOM hit-testing, because during an HTML5
- * drag the pointer sits over the drag image rather than the canvas.
- */
 export function useEdgeDropTarget() {
   const { engine, clientToFlow } = useFlowContext();
 

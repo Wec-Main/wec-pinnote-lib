@@ -179,7 +179,10 @@ export function useFlowPins(options: UseFlowPinsOptions): FlowPinsState {
 
   const applyFlowPinEvent = useCallback((event: StreamEvent) => {
     if (event.eventType === "flow_pin.deleted") {
-      const { flowPinId } = event.payload;
+      if (!event.payload || typeof event.payload !== "object") {
+        return;
+      }
+      const { flowPinId } = event.payload as Record<string, unknown>;
       setFlowPins((current) =>
         current.some((item) => item.id === flowPinId)
           ? current.filter((item) => item.id !== flowPinId)
@@ -191,7 +194,10 @@ export function useFlowPins(options: UseFlowPinsOptions): FlowPinsState {
     if (event.eventType !== "flow_pin.created" && event.eventType !== "flow_pin.updated") {
       return;
     }
-    const incoming: unknown = event.payload.flowPin;
+    if (!event.payload || typeof event.payload !== "object") {
+      return;
+    }
+    const incoming: unknown = (event.payload as Record<string, unknown>).flowPin;
     if (!isFlowPin(incoming)) {
       return;
     }

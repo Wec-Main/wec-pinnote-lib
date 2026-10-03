@@ -10,12 +10,15 @@ import {
 } from "../primitives";
 import { AuthorBadge } from "../EpicFlow/AuthorBadge";
 import { ConfirmDialog } from "../UserManagement/ConfirmDialog";
-import { useSharedFetch, invalidateSharedFetch } from "../../hooks/useSharedFetch";
+import { useSharedFetch } from "../../hooks/useSharedFetch";
 import { useTokenGetter } from "../../hooks/useTokenGetter";
 import { useFlowStream } from "../../hooks/useFlowStream";
 import type { StreamEvent } from "../../types/stream.types";
-import { deleteFlow, listFlows } from "../../services/flowApi";
+import { deleteFlow, fetchFlowDocument, listFlows } from "../../services/flowApi";
 import { canDeleteBoardItem } from "../../utils/boardPermissions";
+import { canExportData } from "../../utils/permissions";
+import { downloadJson } from "../../utils/downloadJson";
+import { stripExportNoise } from "../../utils/exportBundle";
 import { formatRelativeTime } from "../../utils/format";
 import type { Flow } from "../../types/flowPin.types";
 
@@ -52,6 +55,7 @@ export function FlowListPanel({ onOpen }: FlowListPanelProps) {
   const { config, flowsVersionId } = useAnnotationContext();
   const { hostAuthenticated, activeAccount } = useAnnotationAuth();
   const getToken = useTokenGetter(config.getAuthToken);
+  const mayExport = Boolean(activeAccount?.roleId && canExportData(activeAccount.roleId));
   const sessionKey = hostAuthenticated ? "host" : (activeAccount?.id ?? "");
   const flowsKey = sessionKey
     ? `flows-list:${config.apiBaseUrl}:${sessionKey}:${config.projectId}:${flowsVersionId ?? ""}`
@@ -76,12 +80,7 @@ export function FlowListPanel({ onOpen }: FlowListPanelProps) {
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
 
-  const refresh = useCallback(() => {
-    if (flowsKey) {
-      invalidateSharedFetch(flowsKey);
-    }
-    reload();
-  }, [flowsKey, reload]);
+  const refresh = reload;
 
   const onStreamEvent = useCallback(
     (event: StreamEvent) => {
@@ -109,6 +108,18 @@ export function FlowListPanel({ onOpen }: FlowListPanelProps) {
   const lastPage = Math.max(1, Math.ceil(filtered.length / pageSize));
   const currentPage = Math.min(page, lastPage);
   const visible = filtered.slice((currentPage - 1) * pageSize, currentPage * pageSize);
+
+  const handleExport = async (flow: Flow) => {
+    setNotice(null);
+    try {
+      const authToken = await getToken();
+      const document = await fetchFlowDocument(config.apiBaseUrl, authToken, flow.id);
+      const safeName = flow.name.replace(/[^A-Za-z0-9._-]+/g, "_").replace(/^_+|_+$/g, "");
+      downloadJson(`flow_${safeName || flow.id}.json`, stripExportNoise(document));
+    } catch (err) {
+      setNotice(describeApiError(err));
+    }
+  };
 
   const handleConfirmDelete = async () => {
     if (!pendingDelete) {
@@ -209,13 +220,24 @@ export function FlowListPanel({ onOpen }: FlowListPanelProps) {
           <div className="wpn-users-actions">
             <button
               type="button"
-              className="wpn-users-action wpn-users-action--labeled"
-              aria-label={`Edit ${flow.name}`}
+              className="wpn-users-action wpn-users-action--primary wpn-users-action--labeled"
+              aria-label={`Open ${flow.name}`}
               onClick={() => onOpen(flow.id)}
             >
-              <Icon name="edit" />
-              <span>Edit</span>
+              <Icon name="open" />
+              <span>Open</span>
             </button>
+            {mayExport ? (
+              <button
+                type="button"
+                className="wpn-users-action wpn-users-action--labeled"
+                aria-label={`Export ${flow.name}`}
+                onClick={() => void handleExport(flow)}
+              >
+                <Icon name="download" />
+                <span>Export</span>
+              </button>
+            ) : null}
             {canDeleteBoardItem(flow.createdById, config.currentUser) ? (
               <button
                 type="button"
@@ -263,47 +285,49 @@ export function FlowListPanel({ onOpen }: FlowListPanelProps) {
         </div>
       ) : null}
 
-      <div className="wpn-users-table-wrap">
-        <table
-          className={["wpn-users-table", loading && flows ? "wpn-users-table--refetching" : ""]
-            .filter(Boolean)
-            .join(" ")}
-        >
-          <colgroup>
-            <col className="wpn-flow-list-tab__col-name" />
-            <col className="wpn-flow-list-tab__col-nodes" />
-            <col />
-            <col />
-            <col className="wpn-flow-list-tab__col-actions" />
-          </colgroup>
-          <thead>
-            <tr>
-              <th scope="col">Name</th>
-              <th scope="col" className="wpn-flow-list-tab__nodes">
-                Nodes
-              </th>
-              <th scope="col">Created by</th>
-              <th scope="col">Last updated</th>
-              <th scope="col" className="wpn-users-table__actions-head">
-                Actions
-              </th>
-            </tr>
-          </thead>
-          <tbody>{renderBody()}</tbody>
-        </table>
-      </div>
+      <div className="wpn-table-card">
+        <div className="wpn-users-table-wrap">
+          <table
+            className={["wpn-users-table", loading && flows ? "wpn-users-table--refetching" : ""]
+              .filter(Boolean)
+              .join(" ")}
+          >
+            <colgroup>
+              <col className="wpn-flow-list-tab__col-name" />
+              <col className="wpn-flow-list-tab__col-nodes" />
+              <col />
+              <col />
+              <col className="wpn-flow-list-tab__col-actions" />
+            </colgroup>
+            <thead>
+              <tr>
+                <th scope="col">Name</th>
+                <th scope="col" className="wpn-flow-list-tab__nodes">
+                  Nodes
+                </th>
+                <th scope="col">Created by</th>
+                <th scope="col">Last updated</th>
+                <th scope="col" className="wpn-users-table__actions-head">
+                  Actions
+                </th>
+              </tr>
+            </thead>
+            <tbody>{renderBody()}</tbody>
+          </table>
+        </div>
 
-      <TablePagination
-        page={currentPage}
-        pageSize={pageSize}
-        totalItems={filtered.length}
-        itemLabel="flows"
-        onPageChange={setPage}
-        onPageSizeChange={(next) => {
-          setPageSize(next);
-          setPage(1);
-        }}
-      />
+        <TablePagination
+          page={currentPage}
+          pageSize={pageSize}
+          totalItems={filtered.length}
+          itemLabel="flows"
+          onPageChange={setPage}
+          onPageSizeChange={(next) => {
+            setPageSize(next);
+            setPage(1);
+          }}
+        />
+      </div>
 
       {pendingDelete ? (
         <ConfirmDialog

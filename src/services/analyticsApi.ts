@@ -2,13 +2,10 @@ import { AnnotationApiError } from "../types/annotation.types";
 import { buildUrl, request, requestBlob } from "./httpClient";
 import type {
   AnalyticsFilters,
-  AnalyticsSummary,
-  AnalyticsTrends,
+  AnalyticsOverview,
   ExportVisitsQuery,
   PageVisitPage,
   PagesQuery,
-  TopUsersPage,
-  UsersQuery,
   VisitsPage,
   VisitsQuery,
 } from "../types/analytics.types";
@@ -35,20 +32,26 @@ function isAnalyticsStreamTicket(payload: unknown): payload is AnalyticsStreamTi
   );
 }
 
-function isAnalyticsSummary(payload: unknown): payload is AnalyticsSummary {
-  if (!payload || typeof payload !== "object") {
+function isObject(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
+}
+
+function isAnalyticsOverview(payload: unknown): payload is AnalyticsOverview {
+  if (!isObject(payload)) {
     return false;
   }
-  const summary = payload as Record<string, unknown>;
+  const { range, kpis, trends, topPages, topUsers } = payload;
   return (
-    typeof summary.range === "object" &&
-    summary.range !== null &&
-    typeof summary.activeNow === "number" &&
-    typeof summary.activeUsers === "object" &&
-    typeof summary.logins === "object" &&
-    typeof summary.comments === "object" &&
-    typeof summary.annotations === "object" &&
-    typeof summary.visits === "object"
+    isObject(range) &&
+    isObject(kpis) &&
+    isObject(kpis.users) &&
+    isObject(kpis.logins) &&
+    isObject(kpis.comments) &&
+    isObject(kpis.annotations) &&
+    isObject(trends) &&
+    Array.isArray(trends.days) &&
+    Array.isArray(topPages) &&
+    Array.isArray(topUsers)
   );
 }
 
@@ -62,23 +65,6 @@ function isPageVisitPage(payload: unknown): payload is PageVisitPage {
   );
 }
 
-function isAnalyticsTrends(payload: unknown): payload is AnalyticsTrends {
-  if (!payload || typeof payload !== "object") {
-    return false;
-  }
-  return Array.isArray((payload as Record<string, unknown>).days);
-}
-
-function isTopUsersPage(payload: unknown): payload is TopUsersPage {
-  if (!payload || typeof payload !== "object") {
-    return false;
-  }
-  const page = payload as Record<string, unknown>;
-  return (
-    Array.isArray(page.users) && typeof page.limit === "number" && typeof page.offset === "number"
-  );
-}
-
 function isVisitsPage(payload: unknown): payload is VisitsPage {
   if (!payload || typeof payload !== "object") {
     return false;
@@ -89,21 +75,21 @@ function isVisitsPage(payload: unknown): payload is VisitsPage {
   );
 }
 
-export async function fetchAnalyticsSummary(
+export async function fetchAnalyticsOverview(
   apiBaseUrl: string,
   authToken: string | undefined,
   filters: AnalyticsFilters,
   signal?: AbortSignal,
-): Promise<AnalyticsSummary> {
+): Promise<AnalyticsOverview> {
   const payload = await request<unknown>(
-    buildUrl(apiBaseUrl, "/analytics/summary", { ...filters }),
+    buildUrl(apiBaseUrl, "/analytics/overview", { ...filters }),
     authToken,
     { signal },
-    { fallbackMessage: (status) => `Unable to load analytics summary (${status})` },
+    { fallbackMessage: (status) => `Unable to load analytics (${status})` },
   );
-  if (!isAnalyticsSummary(payload)) {
+  if (!isAnalyticsOverview(payload)) {
     throw new AnnotationApiError(
-      "Unexpected analytics summary response",
+      "Unexpected analytics overview response",
       500,
       JSON.stringify(payload),
     );
@@ -128,49 +114,6 @@ export async function fetchAnalyticsPages(
   );
   if (!isPageVisitPage(payload)) {
     throw new AnnotationApiError("Unexpected page visits response", 500, JSON.stringify(payload));
-  }
-  return payload;
-}
-
-export async function fetchAnalyticsTrends(
-  apiBaseUrl: string,
-  authToken: string | undefined,
-  filters: AnalyticsFilters,
-  signal?: AbortSignal,
-): Promise<AnalyticsTrends> {
-  const payload = await request<unknown>(
-    buildUrl(apiBaseUrl, "/analytics/trends", { ...filters }),
-    authToken,
-    { signal },
-    { fallbackMessage: (status) => `Unable to load analytics trends (${status})` },
-  );
-  if (!isAnalyticsTrends(payload)) {
-    throw new AnnotationApiError(
-      "Unexpected analytics trends response",
-      500,
-      JSON.stringify(payload),
-    );
-  }
-  return payload;
-}
-
-export async function fetchAnalyticsUsers(
-  apiBaseUrl: string,
-  authToken: string | undefined,
-  filters: AnalyticsFilters,
-  limit?: number,
-  offset?: number,
-  signal?: AbortSignal,
-): Promise<TopUsersPage> {
-  const query: UsersQuery = { ...filters, limit, offset };
-  const payload = await request<unknown>(
-    buildUrl(apiBaseUrl, "/analytics/users", { ...query }),
-    authToken,
-    { signal },
-    { fallbackMessage: (status) => `Unable to load top users (${status})` },
-  );
-  if (!isTopUsersPage(payload)) {
-    throw new AnnotationApiError("Unexpected top users response", 500, JSON.stringify(payload));
   }
   return payload;
 }

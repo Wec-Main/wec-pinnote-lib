@@ -69,25 +69,21 @@ export { useEpicFlowApi } from "./hooks/useEpicFlowApi";
 export type { Epic, UserStory } from "./types/epicFlow.types";
 export { fetchAuditPage } from "./services/auditApi";
 export {
-  fetchAnalyticsSummary,
+  fetchAnalyticsOverview,
   fetchAnalyticsPages,
-  fetchAnalyticsTrends,
-  fetchAnalyticsUsers,
   fetchAnalyticsVisits,
   downloadAnalyticsVisitsCsv,
 } from "./services/analyticsApi";
 export type {
   AnalyticsFilters,
-  AnalyticsSummary,
+  AnalyticsOverview,
+  AnalyticsKpis,
   AnnotationStatusCounts,
   PageVisitRow as AnalyticsPageVisitRow,
   PageVisitPage,
   PagesQuery as AnalyticsPagesQuery,
   TrendDay,
-  AnalyticsTrends,
   TopUserRecord,
-  TopUsersPage,
-  UsersQuery as AnalyticsUsersQuery,
   VisitRecord,
   VisitsPage,
   VisitsQuery as AnalyticsVisitsQuery,
@@ -177,3 +173,137 @@ export {
 export { createTag, deleteTag, fetchTags, updateTag } from "./services/tagsApi";
 export { useAnnotationView } from "./hooks/useAnnotationView";
 export { ANNOTATION_SCOPE_ATTRIBUTE } from "./utils/annotationScope";
+
+export type * from "./types/ai.types";
+export { AI_PROVIDERS, AI_ACTIVE_TURN_STATUSES } from "./types/ai.types";
+export * from "./ai/ops";
+export * from "./services/aiApi";
+export { parseAiStreamEvent, AI_STREAM_EVENT_TYPES } from "./utils/aiStreamGuards";
+export { canUseAi, canApplyAiModelOps, canManageAiTemplates } from "./utils/permissions";
+export { useAiStream } from "./hooks/useAiStream";
+export type { AiStreamOptions } from "./hooks/useAiStream";
+export { useAiMe } from "./hooks/useAiMe";
+export type { AiMeState } from "./hooks/useAiMe";
+export { useAiSessions } from "./hooks/useAiSessions";
+export type { AiSessionsState, UseAiSessionsOptions } from "./hooks/useAiSessions";
+export { useAiSession } from "./hooks/useAiSession";
+export type { AiSessionState } from "./hooks/useAiSession";
+export {
+  AiRuntimeProvider,
+  AiRuntimeContext,
+  useAiRuntime,
+  useOptionalAiRuntime,
+} from "./context/AiRuntimeContext";
+export type { AiRuntimeContextValue, AiRuntimeProviderProps } from "./context/AiRuntimeContext";
+export { AiStreamHub } from "./ai/AiStreamHub";
+export type { AiStreamListener, AiReconnectListener } from "./ai/AiStreamHub";
+export {
+  EMPTY_AI_SESSION_VIEW,
+  loadSessionDetail,
+  prependMessages,
+  reduceDraft,
+  reduceSessionList,
+  reduceSessionView,
+  sessionMatchesFilter,
+  sortSessions,
+  selectDetail,
+  messageList,
+  upsertMessage,
+  mergeMessages,
+  markDraftStale,
+  isSeqGap,
+} from "./ai/sessionReducer";
+export type {
+  AiSessionFilter,
+  AiSessionViewState,
+  AiStreamingDraft,
+  AiMessageStore,
+  AiSessionMeta,
+} from "./ai/sessionReducer";
+export { aiSelectionStore, useAiCurrentSelection } from "./ai/aiSelectionStore";
+export type { AiCurrentSelection } from "./ai/aiSelectionStore";
+export {
+  aiPreviewStore,
+  createAiPreviewStore,
+  aiPreviewKey,
+  useAiPreview,
+} from "./ai/aiPreviewStore";
+export type {
+  AiPreviewGhosts,
+  AiPreviewOverlay,
+  AiPreviewSnapshot,
+  AiPreviewStore,
+} from "./ai/aiPreviewStore";
+export { useAiOpBatchApplier } from "./ai/useAiOpBatchApplier";
+export type {
+  AiBatchPreviewOutcome,
+  AiOpBatchApplier,
+  UseAiOpBatchApplierOptions,
+} from "./ai/useAiOpBatchApplier";
+export {
+  applyBatchToDocument,
+  buildPreviewOverlay,
+  canTransitionOpBatch,
+  describeOpErrors,
+} from "./ai/opBatchApplier";
+export {
+  IntegrationsButton,
+  AiFloatingButton,
+  AiPanel,
+  AiInlineBar,
+  AiEditorDock,
+  PromptTemplatesPanel,
+  AiUiProvider,
+  useAiUi,
+  AiActivity,
+  AiModelSwitcher,
+  useAiAction,
+  useWarmAi,
+} from "./components/Ai";
+export type {
+  AiInlineBarProps,
+  AiEditorDockProps,
+  AiPanelRequest,
+  AiUiContextValue,
+  AiActivityProps,
+  AiModelSwitcherProps,
+  UseAiActionResult,
+} from "./components/Ai";
+export {
+  runAiAction,
+  warmAi,
+  createSseParser,
+  AiActionRequestError,
+} from "./services/aiActionsStream";
+export { useCachedResource } from "./hooks/useCachedResource";
+export type { CachedResource, UseCachedResourceOptions } from "./hooks/useCachedResource";
+export { useSkeletonGate, SKELETON_DELAY_MS, SKELETON_MIN_MS } from "./hooks/useSkeletonGate";
+export {
+  clearResources,
+  fetchResource,
+  invalidateResource,
+  invalidateResources,
+  mutateResource,
+  notModified,
+  prefetchResource,
+  readResource,
+  withEtag,
+  writeResource,
+} from "./utils/resourceCache";
+export type { FetchContext, ResourceFetcher, ResourceSnapshot } from "./utils/resourceCache";
+export {
+  AI_ME_CACHE_KEY,
+  AI_SESSIONS_CACHE_KEY,
+  AI_TEMPLATES_CACHE_KEY,
+  aiMeCacheKey,
+  aiSessionsCacheKey,
+  aiTemplatesCacheKey,
+} from "./ai/cacheKeys";
+export { prefetchAiActionTemplates, prefetchAiMe, prefetchAiSessions } from "./ai/prefetch";
+export {
+  Skeleton,
+  SkeletonCard,
+  SkeletonLines,
+  SkeletonSlot,
+  RefreshingIndicator,
+} from "./components/primitives/Skeleton";

@@ -10,6 +10,7 @@ import {
 } from "../../../utils/erd/relationshipPath";
 import { getEdgePath } from "../../../utils/flowchart/edgePaths";
 import { cx, shallowEqual } from "../../../utils/flowchart/shallow";
+import { aiMarkClass, useAiPreviewMark } from "../../Ai/AiPreviewScope";
 
 const OPPOSITE_SIDE: Record<ErdSide, ErdSide> = { left: "right", right: "left" };
 const CONNECTION_ENDPOINT_RADIUS = 3.5;
@@ -27,6 +28,7 @@ const RelationshipEdge = memo(function RelationshipEdge({ id }: { id: string }) 
   });
   const selected = useErdState((s) => s.selection.relationshipIds.has(id));
   const issue = useErdState((s) => s.issueRelationshipIds.get(id));
+  const aiMark = useAiPreviewMark("data_model", id);
 
   const geometry = useMemo(() => {
     if (!relationship || !source || !target) return null;
@@ -67,6 +69,7 @@ const RelationshipEdge = memo(function RelationshipEdge({ id }: { id: string }) 
         "wpn-erd-edge",
         selected && "wpn-erd-edge--selected",
         issue && `wpn-erd-edge--issue-${issue}`,
+        aiMarkClass(aiMark),
       )}
       data-relationship-id={id}
     >

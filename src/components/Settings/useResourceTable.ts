@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { readResource, writeResource } from "../../utils/resourceCache";
 import { errorMessage, validationDetailsFrom, type ValidationDetails } from "./validationError";
 
 const NOTICE_DISMISS_MS = 4000;
@@ -12,12 +13,14 @@ export interface ResourceTableOptions<T, Draft> {
   draftLabel: (draft: Draft) => string;
   itemLabel: (item: T) => string;
   deps?: unknown[];
+  cacheKey?: string | null;
 }
 
 export interface ResourceTableState<T, Draft> {
   items: T[];
   visible: T[];
   loading: boolean;
+  refreshing: boolean;
   loaded: boolean;
   error: string | null;
   notice: string | null;
@@ -49,12 +52,16 @@ export function useResourceTable<T, Draft>({
   draftLabel,
   itemLabel,
   deps = [],
+  cacheKey = null,
 }: ResourceTableOptions<T, Draft>): ResourceTableState<T, Draft> {
-  const [items, setItems] = useState<T[]>([]);
+  const fullKey = cacheKey ? `${cacheKey}|` : null;
+  const seeded = fullKey ? readResource<T[]>(fullKey) : null;
+  const [items, setItems] = useState<T[]>(() => seeded?.data ?? []);
   const [search, setSearch] = useState("");
   const [query, setQuery] = useState("");
-  const [loading, setLoading] = useState(true);
-  const [loaded, setLoaded] = useState(false);
+  const [loading, setLoading] = useState(!seeded?.hasData);
+  const [refreshing, setRefreshing] = useState(Boolean(seeded?.hasData));
+  const [loaded, setLoaded] = useState(Boolean(seeded?.hasData));
   const [error, setError] = useState<string | null>(null);
   const [reloadToken, setReloadToken] = useState(0);
   const [formOpen, setFormOpen] = useState(false);
@@ -63,6 +70,7 @@ export function useResourceTable<T, Draft>({
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
   const [submitDetails, setSubmitDetails] = useState<ValidationDetails | null>(null);
+  const seenToken = useRef(0);
   const noticeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const reload = useCallback(() => setReloadToken((value) => value + 1), []);
@@ -93,12 +101,26 @@ export function useResourceTable<T, Draft>({
 
   useEffect(() => {
     const controller = new AbortController();
-    setLoading(true);
+    const cached = fullKey && !query ? readResource<T[]>(fullKey) : null;
+    const manual = seenToken.current !== reloadToken;
+    seenToken.current = reloadToken;
+    const background = Boolean(cached?.hasData) && !manual;
+    if (background && cached?.data) {
+      setItems(cached.data);
+      setLoaded(true);
+      setLoading(false);
+      setRefreshing(true);
+    } else {
+      setLoading(true);
+      setRefreshing(false);
+    }
     setError(null);
     load(query, controller.signal)
       .then((result) => {
+        if (fullKey && !query) writeResource(fullKey, result);
         setItems(result);
         setLoading(false);
+        setRefreshing(false);
         setLoaded(true);
       })
       .catch((err: unknown) => {
@@ -107,10 +129,11 @@ export function useResourceTable<T, Draft>({
         }
         setError(errorMessage(err));
         setLoading(false);
+        setRefreshing(false);
         setLoaded(true);
       });
     return () => controller.abort();
-  }, [query, reloadToken, ...deps]);
+  }, [query, reloadToken, fullKey, ...deps]);
 
   const visible = items;
 
@@ -176,6 +199,7 @@ export function useResourceTable<T, Draft>({
       items,
       visible,
       loading,
+      refreshing,
       loaded,
       error,
       notice,
@@ -201,6 +225,7 @@ export function useResourceTable<T, Draft>({
       items,
       visible,
       loading,
+      refreshing,
       loaded,
       error,
       notice,
