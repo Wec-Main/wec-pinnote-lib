@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import type { AnnotationAnchor } from "../types/annotation.types";
 import type { DraftFlowPin, FlowPin } from "../types/flowPin.types";
 import { createFlowPin, deleteFlowPin, fetchFlowPins } from "../services/flowApi";
@@ -8,6 +8,7 @@ import { isBoolean } from "../utils/valueGuards";
 import { useTokenGetter } from "./useTokenGetter";
 import type { StreamEvent } from "../types/stream.types";
 import { isFlowPin, isNewer } from "../utils/streamPayloadGuards";
+import { usePageScopedResource } from "./usePageScopedResource";
 
 const LOAD_ERROR_MESSAGE = "Could not load flows for this page";
 const SUBMIT_ERROR_MESSAGE = "Could not create the flow pin";
@@ -45,11 +46,6 @@ export function useFlowPins(options: UseFlowPinsOptions): FlowPinsState {
   const { apiBaseUrl, projectId, projectVersionId, pageKey, getAuthToken, sessionKey, enabled } =
     options;
   const getToken = useTokenGetter(getAuthToken);
-  const [flowPins, setFlowPins] = useState<FlowPin[]>([]);
-  const flowPinsRef = useRef(flowPins);
-  flowPinsRef.current = flowPins;
-  const [flowPinsError, setFlowPinsError] = useState<string | null>(null);
-  const [reloadToken, setReloadToken] = useState(0);
   const [flowPinsVisible, setFlowPinsVisible] = usePersistentState(
     `wpn-ui:${projectId}:flowPinsVisible`,
     true,
@@ -61,48 +57,27 @@ export function useFlowPins(options: UseFlowPinsOptions): FlowPinsState {
   const flowPinsVisibleRef = useRef(flowPinsVisible);
   flowPinsVisibleRef.current = flowPinsVisible;
 
-  useEffect(() => {
-    setFlowPins([]);
-    setFlowPinsError(null);
-    setFlowPinDraft(null);
-  }, [projectId, pageKey, sessionKey]);
-
-  useEffect(() => {
-    if (!enabled) {
-      setFlowPins([]);
-      setSelectedFlowPinId(null);
-      return;
-    }
-    const controller = new AbortController();
-    getToken()
-      .then((token) =>
-        fetchFlowPins(apiBaseUrl, token, projectId, pageKey, projectVersionId, controller.signal),
-      )
-      .then((loaded) => {
-        if (controller.signal.aborted) {
-          return;
-        }
-        setFlowPins(loaded);
-        setFlowPinsError(null);
-      })
-      .catch(() => {
-        if (!controller.signal.aborted) {
-          setFlowPinsError(LOAD_ERROR_MESSAGE);
-        }
-      });
-    return () => controller.abort();
-  }, [
+  const {
+    items: flowPins,
+    setItems: setFlowPins,
+    itemsRef: flowPinsRef,
+    error: flowPinsError,
+    setError: setFlowPinsError,
+    reload: reloadFlowPins,
+    isStaleVersion,
+  } = usePageScopedResource<FlowPin>({
     apiBaseUrl,
     getToken,
-    sessionKey,
     projectId,
     projectVersionId,
     pageKey,
+    sessionKey,
     enabled,
-    reloadToken,
-  ]);
-
-  const reloadFlowPins = useCallback(() => setReloadToken((token) => token + 1), []);
+    fetchItems: fetchFlowPins,
+    loadErrorMessage: LOAD_ERROR_MESSAGE,
+    onScopeChange: () => setFlowPinDraft(null),
+    onDisabled: () => setSelectedFlowPinId(null),
+  });
 
   const setFlowPinModeEnabled = useCallback((enabled: boolean) => {
     setFlowPinModeEnabledState(enabled);
@@ -144,7 +119,17 @@ export function useFlowPins(options: UseFlowPinsOptions): FlowPinsState {
         setFlowPinsVisible(true);
       }
     },
-    [apiBaseUrl, getToken, flowPinDraft, pageKey, projectId, projectVersionId, setFlowPinsVisible],
+    [
+      apiBaseUrl,
+      getToken,
+      flowPinDraft,
+      pageKey,
+      projectId,
+      projectVersionId,
+      setFlowPins,
+      setFlowPinsError,
+      setFlowPinsVisible,
+    ],
   );
 
   const removeFlowPin = useCallback(
@@ -163,63 +148,61 @@ export function useFlowPins(options: UseFlowPinsOptions): FlowPinsState {
         throw err;
       }
     },
-    [apiBaseUrl, getToken],
+    [apiBaseUrl, getToken, flowPinsRef, setFlowPins],
   );
 
-  const syncFlowPinName = useCallback((flowPinId: string, name: string) => {
-    setFlowPins((current) =>
-      current.map((item) =>
-        item.id === flowPinId && item.name !== name ? { ...item, name } : item,
-      ),
-    );
-  }, []);
+  const syncFlowPinName = useCallback(
+    (flowPinId: string, name: string) => {
+      setFlowPins((current) =>
+        current.map((item) =>
+          item.id === flowPinId && item.name !== name ? { ...item, name } : item,
+        ),
+      );
+    },
+    [setFlowPins],
+  );
 
-  const projectVersionIdRef = useRef(projectVersionId);
-  projectVersionIdRef.current = projectVersionId;
-
-  const applyFlowPinEvent = useCallback((event: StreamEvent) => {
-    if (event.eventType === "flow_pin.deleted") {
+  const applyFlowPinEvent = useCallback(
+    (event: StreamEvent) => {
+      if (event.eventType === "flow_pin.deleted") {
+        if (!event.payload || typeof event.payload !== "object") {
+          return;
+        }
+        const { flowPinId } = event.payload as Record<string, unknown>;
+        setFlowPins((current) =>
+          current.some((item) => item.id === flowPinId)
+            ? current.filter((item) => item.id !== flowPinId)
+            : current,
+        );
+        setSelectedFlowPinId((current) => (current === flowPinId ? null : current));
+        return;
+      }
+      if (event.eventType !== "flow_pin.created" && event.eventType !== "flow_pin.updated") {
+        return;
+      }
       if (!event.payload || typeof event.payload !== "object") {
         return;
       }
-      const { flowPinId } = event.payload as Record<string, unknown>;
-      setFlowPins((current) =>
-        current.some((item) => item.id === flowPinId)
-          ? current.filter((item) => item.id !== flowPinId)
-          : current,
-      );
-      setSelectedFlowPinId((current) => (current === flowPinId ? null : current));
-      return;
-    }
-    if (event.eventType !== "flow_pin.created" && event.eventType !== "flow_pin.updated") {
-      return;
-    }
-    if (!event.payload || typeof event.payload !== "object") {
-      return;
-    }
-    const incoming: unknown = (event.payload as Record<string, unknown>).flowPin;
-    if (!isFlowPin(incoming)) {
-      return;
-    }
-    const viewedVersionId = projectVersionIdRef.current;
-    if (
-      viewedVersionId &&
-      incoming.projectVersionId &&
-      incoming.projectVersionId !== viewedVersionId
-    ) {
-      return;
-    }
-    setFlowPins((current) => {
-      const existing = current.find((item) => item.id === incoming.id);
-      if (!existing) {
-        return [incoming, ...current];
+      const incoming: unknown = (event.payload as Record<string, unknown>).flowPin;
+      if (!isFlowPin(incoming)) {
+        return;
       }
-      if (!isNewer(incoming.updatedAt, existing.updatedAt)) {
-        return current;
+      if (isStaleVersion(incoming.projectVersionId)) {
+        return;
       }
-      return current.map((item) => (item.id === incoming.id ? incoming : item));
-    });
-  }, []);
+      setFlowPins((current) => {
+        const existing = current.find((item) => item.id === incoming.id);
+        if (!existing) {
+          return [incoming, ...current];
+        }
+        if (!isNewer(incoming.updatedAt, existing.updatedAt)) {
+          return current;
+        }
+        return current.map((item) => (item.id === incoming.id ? incoming : item));
+      });
+    },
+    [isStaleVersion, setFlowPins],
+  );
 
   const selectFlowPin = useCallback((id: string | null) => setSelectedFlowPinId(id), []);
 

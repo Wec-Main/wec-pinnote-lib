@@ -15,6 +15,7 @@ import type {
 import type { AnnotationAnchor } from "../types/annotation.types";
 import { createClientId } from "../utils/format";
 import { useTokenGetter } from "./useTokenGetter";
+import { usePageScopedResource } from "./usePageScopedResource";
 
 const LOAD_ERROR_MESSAGE = "Could not load tags for this page";
 
@@ -52,58 +53,30 @@ export function useAnnotationTags(options: UseAnnotationTagsOptions): Annotation
   const { apiBaseUrl, projectId, projectVersionId, pageKey, getAuthToken, sessionKey, enabled } =
     options;
   const getToken = useTokenGetter(getAuthToken);
-  const [annotationTags, setAnnotationTags] = useState<AnnotationTag[]>([]);
-  const [annotationTagsError, setAnnotationTagsError] = useState<string | null>(null);
   const [tagsVisible, setTagsVisibleState] = useState(true);
   const [tagModeEnabled, setTagModeEnabled] = useState(false);
   const [tagDraft, setTagDraft] = useState<DraftTagPin | null>(null);
-  const [reloadToken, setReloadToken] = useState(0);
   const tagsVisibleRef = useRef(tagsVisible);
   tagsVisibleRef.current = tagsVisible;
 
-  useEffect(() => {
-    setAnnotationTags([]);
-    setAnnotationTagsError(null);
-    setTagDraft(null);
-  }, [projectId, pageKey, sessionKey]);
-
-  useEffect(() => {
-    if (!enabled) {
-      setAnnotationTags([]);
-      return;
-    }
-    const controller = new AbortController();
-    getToken()
-      .then((token) =>
-        fetchAnnotationTags(
-          apiBaseUrl,
-          token,
-          projectId,
-          pageKey,
-          projectVersionId,
-          controller.signal,
-        ),
-      )
-      .then((loaded) => {
-        setAnnotationTags(loaded);
-        setAnnotationTagsError(null);
-      })
-      .catch(() => {
-        if (!controller.signal.aborted) {
-          setAnnotationTagsError(LOAD_ERROR_MESSAGE);
-        }
-      });
-    return () => controller.abort();
-  }, [
+  const {
+    items: annotationTags,
+    setItems: setAnnotationTags,
+    itemsRef: annotationTagsRef,
+    error: annotationTagsError,
+    reload: reloadAnnotationTags,
+  } = usePageScopedResource<AnnotationTag>({
     apiBaseUrl,
     getToken,
-    sessionKey,
     projectId,
     projectVersionId,
     pageKey,
+    sessionKey,
     enabled,
-    reloadToken,
-  ]);
+    fetchItems: fetchAnnotationTags,
+    loadErrorMessage: LOAD_ERROR_MESSAGE,
+    onScopeChange: () => setTagDraft(null),
+  });
 
   useEffect(() => {
     if (!enabled) {
@@ -116,8 +89,6 @@ export function useAnnotationTags(options: UseAnnotationTagsOptions): Annotation
       .catch(() => undefined);
     return () => controller.abort();
   }, [apiBaseUrl, getToken, sessionKey, projectId, enabled]);
-
-  const reloadAnnotationTags = useCallback(() => setReloadToken((token) => token + 1), []);
 
   const setTagsVisible = useCallback(
     (visible: boolean) => {
@@ -155,7 +126,16 @@ export function useAnnotationTags(options: UseAnnotationTagsOptions): Annotation
         setTagsVisible(true);
       }
     },
-    [apiBaseUrl, getToken, projectId, projectVersionId, pageKey, tagDraft, setTagsVisible],
+    [
+      apiBaseUrl,
+      getToken,
+      projectId,
+      projectVersionId,
+      pageKey,
+      tagDraft,
+      setAnnotationTags,
+      setTagsVisible,
+    ],
   );
 
   const removeAnnotationTag = useCallback(
@@ -163,7 +143,7 @@ export function useAnnotationTags(options: UseAnnotationTagsOptions): Annotation
       await deleteAnnotationTag(apiBaseUrl, await getToken(), annotationTagId);
       setAnnotationTags((current) => current.filter((item) => item.id !== annotationTagId));
     },
-    [apiBaseUrl, getToken],
+    [apiBaseUrl, getToken, setAnnotationTags],
   );
 
   const applyAnnotationTagLocal = useCallback(
@@ -172,12 +152,12 @@ export function useAnnotationTags(options: UseAnnotationTagsOptions): Annotation
         current.map((item) => (item.id === annotationTagId ? { ...item, ...patch } : item)),
       );
     },
-    [],
+    [setAnnotationTags],
   );
 
   const commitAnnotationTagUpdate = useCallback(
     async (annotationTagId: string, input: UpdateAnnotationTagInput) => {
-      const previous = annotationTags.find((item) => item.id === annotationTagId);
+      const previous = annotationTagsRef.current.find((item) => item.id === annotationTagId);
       try {
         const updated = await updateAnnotationTag(
           apiBaseUrl,
@@ -197,7 +177,7 @@ export function useAnnotationTags(options: UseAnnotationTagsOptions): Annotation
         throw error;
       }
     },
-    [apiBaseUrl, getToken, annotationTags],
+    [apiBaseUrl, getToken, annotationTagsRef, setAnnotationTags],
   );
 
   return useMemo(
