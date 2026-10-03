@@ -1,5 +1,6 @@
 import { AnnotationApiError } from "../types/annotation.types";
 import { buildUrl, request, requestBlob } from "./httpClient";
+import { isNonEmptyString, isRecord } from "../utils/valueGuards";
 import type {
   AnalyticsFilters,
   AnalyticsOverview,
@@ -21,34 +22,26 @@ export interface AnalyticsStreamScope {
 }
 
 function isAnalyticsStreamTicket(payload: unknown): payload is AnalyticsStreamTicket {
-  if (!payload || typeof payload !== "object") {
-    return false;
-  }
-  const ticket = payload as Record<string, unknown>;
   return (
-    typeof ticket.ticket === "string" &&
-    ticket.ticket.length > 0 &&
-    typeof ticket.expiresInSeconds === "number"
+    isRecord(payload) &&
+    isNonEmptyString(payload.ticket) &&
+    typeof payload.expiresInSeconds === "number"
   );
 }
 
-function isObject(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null;
-}
-
 function isAnalyticsOverview(payload: unknown): payload is AnalyticsOverview {
-  if (!isObject(payload)) {
+  if (!isRecord(payload)) {
     return false;
   }
   const { range, kpis, trends, topPages, topUsers } = payload;
   return (
-    isObject(range) &&
-    isObject(kpis) &&
-    isObject(kpis.users) &&
-    isObject(kpis.logins) &&
-    isObject(kpis.comments) &&
-    isObject(kpis.annotations) &&
-    isObject(trends) &&
+    isRecord(range) &&
+    isRecord(kpis) &&
+    isRecord(kpis.users) &&
+    isRecord(kpis.logins) &&
+    isRecord(kpis.comments) &&
+    isRecord(kpis.annotations) &&
+    isRecord(trends) &&
     Array.isArray(trends.days) &&
     Array.isArray(topPages) &&
     Array.isArray(topUsers)
@@ -56,22 +49,20 @@ function isAnalyticsOverview(payload: unknown): payload is AnalyticsOverview {
 }
 
 function isPageVisitPage(payload: unknown): payload is PageVisitPage {
-  if (!payload || typeof payload !== "object") {
-    return false;
-  }
-  const page = payload as Record<string, unknown>;
   return (
-    Array.isArray(page.pages) && typeof page.limit === "number" && typeof page.offset === "number"
+    isRecord(payload) &&
+    Array.isArray(payload.pages) &&
+    typeof payload.limit === "number" &&
+    typeof payload.offset === "number"
   );
 }
 
 function isVisitsPage(payload: unknown): payload is VisitsPage {
-  if (!payload || typeof payload !== "object") {
-    return false;
-  }
-  const page = payload as Record<string, unknown>;
   return (
-    Array.isArray(page.visits) && typeof page.limit === "number" && typeof page.offset === "number"
+    isRecord(payload) &&
+    Array.isArray(payload.visits) &&
+    typeof payload.limit === "number" &&
+    typeof payload.offset === "number"
   );
 }
 

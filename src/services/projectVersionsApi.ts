@@ -7,20 +7,13 @@ import type {
   UpdateProjectVersionRequest,
 } from "../types/projectVersion.types";
 import { buildUrl, request, withUnauthorizedRetry } from "./httpClient";
+import { isNonEmptyString, isRecord } from "../utils/valueGuards";
 
 const PATHS = {
   versions: (projectId: string) => `/projects/${encodeURIComponent(projectId)}/versions`,
   version: (projectId: string, projectVersionId: string) =>
     `/projects/${encodeURIComponent(projectId)}/versions/${encodeURIComponent(projectVersionId)}`,
 } as const;
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null;
-}
-
-function isNonEmptyString(value: unknown): value is string {
-  return typeof value === "string" && value.length > 0;
-}
 
 function isProjectVersion(value: unknown): value is ProjectVersion {
   return (

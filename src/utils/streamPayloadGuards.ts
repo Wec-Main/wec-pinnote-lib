@@ -7,14 +7,7 @@ import type {
 import type { Epic, UserStory } from "../types/epicFlow.types";
 import type { FlowPin } from "../types/flowPin.types";
 import type { StreamEvent } from "../types/stream.types";
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null;
-}
-
-function isNonEmptyString(value: unknown): value is string {
-  return typeof value === "string" && value.length > 0;
-}
+import { isNonEmptyString, isRecord } from "./valueGuards";
 
 function isAnnotationUser(value: unknown): value is AnnotationUser {
   return isRecord(value) && isNonEmptyString(value.id) && typeof value.name === "string";

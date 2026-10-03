@@ -1,17 +1,17 @@
 import { AnnotationApiError } from "../types/annotation.types";
 import { buildUrl, request } from "./httpClient";
+import { isRecord } from "../utils/valueGuards";
 import type { AuditPage, AuditQuery } from "../types/audit.types";
 
 function isAuditPage(payload: unknown): payload is AuditPage {
-  if (!payload || typeof payload !== "object") {
+  if (!isRecord(payload)) {
     return false;
   }
-  const page = payload as Record<string, unknown>;
   return (
-    Array.isArray(page.entries) &&
-    (typeof page.total === "number" || page.total === null) &&
-    typeof page.limit === "number" &&
-    typeof page.offset === "number"
+    Array.isArray(payload.entries) &&
+    (typeof payload.total === "number" || payload.total === null) &&
+    typeof payload.limit === "number" &&
+    typeof payload.offset === "number"
   );
 }
 
