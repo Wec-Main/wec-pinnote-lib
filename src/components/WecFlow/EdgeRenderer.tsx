@@ -4,14 +4,43 @@ import { useEdgeGeometry } from "../../hooks/flowchart/useEdgeGeometry";
 import { usePointerDrag } from "../../hooks/flowchart/usePointerDrag";
 import type { EdgeEnd } from "../../utils/flowchart/flowEngine";
 import type { XYPosition } from "../../types/flowchart.types";
+import {
+  VIEWPORT_CULL_MARGIN_PX,
+  VIEWPORT_CULL_NODE_THRESHOLD,
+} from "../../utils/flowchart/constants";
 import { getEdgePath, type StepBend } from "../../utils/flowchart/edgePaths";
-import { findHandle, getHandlePosition, oppositeSide } from "../../utils/flowchart/geometry";
+import {
+  findHandle,
+  getHandlePosition,
+  getVisibleRect,
+  oppositeSide,
+  rectsIntersect,
+} from "../../utils/flowchart/geometry";
 import { cx, shallowEqual } from "../../utils/flowchart/shallow";
 import { Icon } from "./FlowIcons";
 import { lineStyleOptions } from "./lineStyles";
 import { aiMarkClass, useAiPreviewMark } from "../Ai/AiPreviewScope";
 
-const useEdgeIds = () => useFlowState((s) => s.edges.map((e) => e.id), shallowEqual);
+function useEdgeIds() {
+  const engine = useFlowEngine();
+  return useFlowState((s) => {
+    if (s.nodes.length <= VIEWPORT_CULL_NODE_THRESHOLD) return s.edges.map((e) => e.id);
+    // Large documents only: keep an edge mounted if either endpoint node is
+    // on screen (plus margin) or the edge is selected, so cost scales with
+    // what's visible rather than total edge count. An edge whose both
+    // endpoints are off-screen but that still crosses the viewport (a very
+    // long edge) is a known, accepted tradeoff — see useEdgeDropTarget.ts
+    // for the same reasoning applied to drop-target hit testing.
+    const visible = getVisibleRect(s.viewport, s.canvasSize, VIEWPORT_CULL_MARGIN_PX);
+    const nodeOnScreen = (id: string) => {
+      const n = s.nodeLookup.get(id);
+      return !!n && rectsIntersect(visible, engine.getNodeRect(n));
+    };
+    return s.edges
+      .filter((e) => s.selectedEdgeIds.has(e.id) || nodeOnScreen(e.source) || nodeOnScreen(e.target))
+      .map((e) => e.id);
+  }, shallowEqual);
+}
 
 const hoverStore = (() => {
   let current: string | null = null;

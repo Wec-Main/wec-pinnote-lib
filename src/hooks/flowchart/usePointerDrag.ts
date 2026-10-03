@@ -69,9 +69,9 @@ export function usePointerDrag() {
         if (cb.onCancel) cb.onCancel(moved);
         else if (last) cb.onEnd?.(last, moved);
       };
-      window.addEventListener("pointermove", move);
-      window.addEventListener("pointerup", up);
-      window.addEventListener("pointercancel", up);
+      window.addEventListener("pointermove", move, { passive: true });
+      window.addEventListener("pointerup", up, { passive: true });
+      window.addEventListener("pointercancel", up, { passive: true });
       cleanup.current = abandon;
     },
     [],

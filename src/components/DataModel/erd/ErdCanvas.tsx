@@ -6,8 +6,11 @@ import {
   ENTITY_DEFAULT_WIDTH,
   ERD_PALETTE_DRAG_MIME,
   NOTE_DEFAULT_SIZE,
+  VIEWPORT_CULL_ENTITY_THRESHOLD,
+  VIEWPORT_CULL_MARGIN_PX,
 } from "../../../utils/erd/erdConstants";
-import { rectFromPoints } from "../../../utils/flowchart/geometry";
+import { getEntityRect, getNoteRect } from "../../../utils/erd/erdGeometry";
+import { getVisibleRect, rectFromPoints, rectsIntersect } from "../../../utils/flowchart/geometry";
 import { cx, shallowEqual } from "../../../utils/flowchart/shallow";
 import { Icon } from "../../WecFlow/FlowIcons";
 import { ErdBackground, type ErdBackgroundVariant } from "./ErdBackground";
@@ -27,8 +30,30 @@ const ENTITY_DROP_HEADER_OFFSET = 18;
 
 const ViewportLayer = memo(function ViewportLayer() {
   const { x, y, zoom } = useErdState((s) => s.viewport);
-  const entityIds = useErdState((s) => s.entities.map((entity) => entity.id), shallowEqual);
-  const noteIds = useErdState((s) => s.notes.map((note) => note.id), shallowEqual);
+  const entityIds = useErdState((s) => {
+    if (s.entities.length <= VIEWPORT_CULL_ENTITY_THRESHOLD) return s.entities.map((e) => e.id);
+    // Large documents only: mount just the entities whose rect intersects
+    // the visible viewport (plus a generous margin), so cost scales with
+    // what's on screen rather than the whole document. Selected entities
+    // are always kept mounted so an in-progress edit/selection never
+    // disappears out from under the user.
+    const visible = getVisibleRect(s.viewport, s.canvasSize, VIEWPORT_CULL_MARGIN_PX);
+    return s.entities
+      .filter(
+        (entity) =>
+          s.selection.entityIds.has(entity.id) || rectsIntersect(visible, getEntityRect(entity)),
+      )
+      .map((entity) => entity.id);
+  }, shallowEqual);
+  const noteIds = useErdState((s) => {
+    if (s.entities.length <= VIEWPORT_CULL_ENTITY_THRESHOLD) return s.notes.map((note) => note.id);
+    const visible = getVisibleRect(s.viewport, s.canvasSize, VIEWPORT_CULL_MARGIN_PX);
+    return s.notes
+      .filter(
+        (note) => s.selection.noteIds.has(note.id) || rectsIntersect(visible, getNoteRect(note)),
+      )
+      .map((note) => note.id);
+  }, shallowEqual);
   return (
     <div
       className="wpn-erd-canvas__viewport"

@@ -9,17 +9,18 @@ export const useViewport = () => useFlowState((s) => s.viewport);
 export const useReadOnly = () => useFlowState((s) => s.readOnly);
 
 export function useSelection() {
-  const [nodeIds, edgeIds] = useFlowState(
-    (s) => [s.selectedNodeIds, s.selectedEdgeIds] as const,
+  // nodeLookup/edgeLookup are mutated in place on position-only updates (see
+  // flowEngine's commitPositions), so their own reference never changes.
+  // Select the resolved node/edge objects directly instead of the lookup Map
+  // itself: each entry gets a new reference whenever its content changes,
+  // which shallowEqual can detect correctly regardless of Map identity.
+  const nodes = useFlowState(
+    (s) => [...s.selectedNodeIds].map((id) => s.nodeLookup.get(id)).filter((n): n is FlowNode => !!n),
     shallowEqual,
   );
-  const nodeLookup = useFlowState((s) => s.nodeLookup);
-  const edgeLookup = useFlowState((s) => s.edgeLookup);
-  return useMemo(
-    () => ({
-      nodes: [...nodeIds].map((id) => nodeLookup.get(id)).filter((n): n is FlowNode => !!n),
-      edges: [...edgeIds].map((id) => edgeLookup.get(id)).filter((e): e is FlowEdge => !!e),
-    }),
-    [nodeIds, edgeIds, nodeLookup, edgeLookup],
+  const edges = useFlowState(
+    (s) => [...s.selectedEdgeIds].map((id) => s.edgeLookup.get(id)).filter((e): e is FlowEdge => !!e),
+    shallowEqual,
   );
+  return useMemo(() => ({ nodes, edges }), [nodes, edges]);
 }

@@ -1,8 +1,35 @@
-import type { FlowNode, HandleSide, Rect, Viewport, XYPosition } from "../../types/flowchart.types";
+import type {
+  Dimensions,
+  FlowNode,
+  HandleSide,
+  Rect,
+  Viewport,
+  XYPosition,
+} from "../../types/flowchart.types";
 import type { HandleDefinition, NodeTypeDefinition, NodeTypeRegistry } from "./nodeTypes";
 
 export const clamp = (value: number, min: number, max: number) =>
   Math.min(max, Math.max(min, value));
+
+/**
+ * The flow-space rect currently visible in the canvas, expanded by a
+ * screen-pixel margin. Used to cheaply cull off-screen elements (viewport
+ * culling) without computing their full geometry.
+ */
+export function getVisibleRect(
+  viewport: Pick<Viewport, "x" | "y" | "zoom">,
+  canvasSize: Dimensions,
+  marginPx = 0,
+): Rect {
+  const zoom = viewport.zoom || 1;
+  const margin = marginPx / zoom;
+  return {
+    x: -viewport.x / zoom - margin,
+    y: -viewport.y / zoom - margin,
+    width: canvasSize.width / zoom + margin * 2,
+    height: canvasSize.height / zoom + margin * 2,
+  };
+}
 
 export function getNodeSize(node: FlowNode, def: NodeTypeDefinition) {
   return {

@@ -1,6 +1,8 @@
 import { memo, useMemo, useRef } from "react";
 import { useErdEngine, useErdState } from "../../../context/ErdContext";
 import { usePointerDrag } from "../../../hooks/flowchart/usePointerDrag";
+import type { ErdEntity, ErdNote } from "../../../types/dataModel.types";
+import type { Rect } from "../../../types/flowchart.types";
 import { getEntityRect, getNoteRect } from "../../../utils/erd/erdGeometry";
 import { getBounds } from "../../../utils/flowchart/geometry";
 
@@ -8,6 +10,13 @@ const WIDTH = 200;
 const HEIGHT = 130;
 const ENTITY_COLOR = "#6366f1";
 const NOTE_COLOR = "#eab308";
+
+interface ErdMiniMapRect {
+  id: string;
+  rect: Rect;
+  color: string;
+  ref: ErdEntity | ErdNote;
+}
 
 export const ErdMiniMap = memo(function ErdMiniMap() {
   const engine = useErdEngine();
@@ -19,23 +28,50 @@ export const ErdMiniMap = memo(function ErdMiniMap() {
   const svgRef = useRef<SVGSVGElement>(null);
   const startDrag = usePointerDrag();
 
-  const rects = useMemo(
-    () => [
-      ...notes.map((note) => ({
-        id: note.id,
-        rect: getNoteRect(note),
-        color: NOTE_COLOR,
-        selected: selection.noteIds.has(note.id),
-      })),
-      ...entities.map((entity) => ({
+  // Dragging a single entity/note always produces a brand-new `entities`/
+  // `notes` array reference (positions update via `.map()`), which would
+  // otherwise force this useMemo to recompute a rect for every entity and
+  // note in the document on every rAF frame. Instead, cache rects per id and
+  // only recompute entries whose entity/note reference actually changed
+  // since the last render. Selection is intentionally not part of the cache
+  // key: it's looked up separately at render time so toggling selection
+  // never has to invalidate (or stale-serve) a position-derived rect.
+  const rectCacheRef = useRef<Map<string, ErdMiniMapRect>>(new Map());
+
+  const rects = useMemo(() => {
+    const cache = rectCacheRef.current;
+    const next: ErdMiniMapRect[] = [];
+    const seen = new Set<string>();
+    for (const note of notes) {
+      seen.add(note.id);
+      const cached = cache.get(note.id);
+      if (cached && cached.ref === note) {
+        next.push(cached);
+        continue;
+      }
+      const entry: ErdMiniMapRect = { id: note.id, rect: getNoteRect(note), color: NOTE_COLOR, ref: note };
+      cache.set(note.id, entry);
+      next.push(entry);
+    }
+    for (const entity of entities) {
+      seen.add(entity.id);
+      const cached = cache.get(entity.id);
+      if (cached && cached.ref === entity) {
+        next.push(cached);
+        continue;
+      }
+      const entry: ErdMiniMapRect = {
         id: entity.id,
         rect: getEntityRect(entity),
         color: ENTITY_COLOR,
-        selected: selection.entityIds.has(entity.id),
-      })),
-    ],
-    [entities, notes, selection],
-  );
+        ref: entity,
+      };
+      cache.set(entity.id, entry);
+      next.push(entry);
+    }
+    for (const id of cache.keys()) if (!seen.has(id)) cache.delete(id);
+    return next;
+  }, [entities, notes]);
 
   const view = {
     x: -viewport.x / viewport.zoom,
@@ -77,18 +113,21 @@ export const ErdMiniMap = memo(function ErdMiniMap() {
       data-erd-overlay
     >
       <svg ref={svgRef} width={WIDTH} height={HEIGHT} viewBox={`${vbX} ${vbY} ${vbW} ${vbH}`}>
-        {rects.map(({ id, rect, color, selected }) => (
-          <rect
-            key={id}
-            x={rect.x}
-            y={rect.y}
-            width={rect.width}
-            height={rect.height}
-            rx={6 * scale}
-            fill={selected ? "var(--wpn-accent)" : color}
-            fillOpacity={selected ? 0.9 : 0.55}
-          />
-        ))}
+        {rects.map(({ id, rect, color }) => {
+          const selected = selection.entityIds.has(id) || selection.noteIds.has(id);
+          return (
+            <rect
+              key={id}
+              x={rect.x}
+              y={rect.y}
+              width={rect.width}
+              height={rect.height}
+              rx={6 * scale}
+              fill={selected ? "var(--wpn-accent)" : color}
+              fillOpacity={selected ? 0.9 : 0.55}
+            />
+          );
+        })}
         <path
           className="wpn-flowchart-canvas__minimap-mask"
           d={`${outer} ${inner}`}
