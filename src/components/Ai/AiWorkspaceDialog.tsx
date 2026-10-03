@@ -5,12 +5,9 @@ import { isWorkspaceOp, type WorkspaceApplyItem } from "../../ai/ops/workspaceOp
 import { useOptionalAiRuntime } from "../../context/AiRuntimeContext";
 import { useAnnotationUi } from "../../context/AnnotationContext";
 import { useAiActionChats } from "../../hooks/useAiActionChats";
-import { useAiActionHistory } from "../../hooks/useAiActionHistory";
 import type { AiActionRunRequest, AiActionRunState, AiMention } from "../../types/ai.types";
 import { Icon, ModalShell } from "../primitives";
-import { AiActionHistory } from "./AiActionHistory";
 import { AiActivity } from "./AiActivity";
-import { AiChatPicker } from "./AiChatPicker";
 import { AiComposer, type AiComposerSeed } from "./AiComposer";
 import { AiModelSwitcher } from "./AiModelSwitcher";
 import { resultNote, resultOpBatch } from "./aiDockLogic";
@@ -118,14 +115,8 @@ export function AiWorkspaceDialog({ request, onClose }: AiWorkspaceDialogProps) 
   const entriesRef = useRef(entries);
   entriesRef.current = entries;
   const seq = useRef(0);
-  const [chatId, setChatId] = useState<string | "new">(request.aiSessionId ?? "new");
+  const [chatId, setChatId] = useState<string | "new">("new");
   const chatsApi = useAiActionChats("workspace", projectId, true);
-  const activeChatId = chatId === "new" ? null : chatId;
-  const history = useAiActionHistory("workspace", projectId, {
-    enabled: chatId !== "new",
-    aiSessionId: activeChatId,
-    refreshKey: 0,
-  });
   const awaitingChats = useRef<readonly unknown[] | null>(null);
   const [seed, setSeed] = useState<AiComposerSeed | null>(
     request.prompt
@@ -171,7 +162,7 @@ export function AiWorkspaceDialog({ request, onClose }: AiWorkspaceDialogProps) 
   useEffect(() => {
     const el = scrollRef.current;
     if (el) el.scrollTop = el.scrollHeight;
-  }, [entries.length, history.messages.length, state.partialOps.length, state.status]);
+  }, [entries.length, state.partialOps.length, state.status]);
 
   const starters = useMemo(() => startersFor(request.mentions ?? []), [request.mentions]);
 
@@ -267,23 +258,6 @@ export function AiWorkspaceDialog({ request, onClose }: AiWorkspaceDialogProps) 
     [annotationUi, onClose],
   );
 
-  const newChat = useCallback(() => {
-    if (running || applying) return;
-    setChatId("new");
-    setEntries([]);
-    setNotice(null);
-  }, [applying, running]);
-
-  const selectChat = useCallback(
-    (aiSessionId: string) => {
-      if (running || applying) return;
-      setChatId(aiSessionId);
-      setEntries([]);
-      setNotice(null);
-    },
-    [applying, running],
-  );
-
   const close = useCallback(() => {
     if (applying) return;
     if (running) stop();
@@ -296,28 +270,7 @@ export function AiWorkspaceDialog({ request, onClose }: AiWorkspaceDialogProps) 
       ? "Your role can't apply AI changes."
       : null;
 
-  const chatPicker = (
-    <AiChatPicker
-      chats={chatsApi.chats}
-      activeId={activeChatId}
-      isNew={chatId === "new"}
-      disabled={running || applying}
-      onSelect={selectChat}
-      onNew={newChat}
-      onRename={chatsApi.rename}
-      onArchive={async (aiSessionId) => {
-        await chatsApi.archive(aiSessionId);
-        if (aiSessionId === chatId) newChat();
-      }}
-    />
-  );
-
-  const showStarters =
-    entries.length === 0 &&
-    history.messages.length === 0 &&
-    !history.loading &&
-    !history.error &&
-    !running;
+  const showStarters = entries.length === 0 && !running;
   const lastIndex = entries.length - 1;
 
   return (
@@ -379,24 +332,7 @@ export function AiWorkspaceDialog({ request, onClose }: AiWorkspaceDialogProps) 
         </div>
       }
     >
-      <div className="wpn-ai-ws__toolbar">{chatPicker}</div>
       <div className="wpn-ai-ws__scroll" ref={scrollRef}>
-        {chatId !== "new" && history.loading && history.messages.length === 0 ? (
-          <p className="wpn-ai-muted" role="status">
-            Loading chat…
-          </p>
-        ) : null}
-        {chatId !== "new" && history.error ? (
-          <p className="wpn-ai-card__warn" role="alert">
-            Couldn't load this chat.{" "}
-            <button type="button" className="wpn-ai-link" onClick={history.retry}>
-              Retry
-            </button>
-          </p>
-        ) : null}
-        {chatId !== "new" && history.messages.length > 0 ? (
-          <AiActionHistory messages={history.messages} className="wpn-ai-ws__history" />
-        ) : null}
         {showStarters ? (
           <div className="wpn-ai-ws__starters">
             <p className="wpn-ai-muted">

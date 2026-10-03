@@ -65,7 +65,6 @@ import { useAiActionChats } from "../../hooks/useAiActionChats";
 import { useAiActionHistory } from "../../hooks/useAiActionHistory";
 import { useAiWorkSlot } from "./AiWorkSlot";
 import { AiWorkStatus } from "./AiWorkStatus";
-import { AiChatPicker } from "./AiChatPicker";
 import { AiActionHistory } from "./AiActionHistory";
 import { AiModelSwitcher } from "./AiModelSwitcher";
 import { countChanges, describeOpBatch, type AiChangeLine } from "./aiOpChanges";
@@ -992,20 +991,6 @@ function AiEditorDockInner({
   const hasThread = runs.length > 0 || actionHistory.messages.length > 0;
   const showPanel = fullMode || (expanded && (hasThread || actionHistory.loading));
 
-  const selectChat = (aiSessionId: string) => {
-    if (running || aiSessionId === activeChatId) return;
-    setChatId(aiSessionId);
-    setRuns([]);
-    setNotice(null);
-    setExpanded(true);
-    stickToBottom.current = true;
-  };
-  const newChat = () => {
-    if (running) return;
-    setChatId("new");
-    setRuns([]);
-    setNotice(null);
-  };
   const dockMax = maxDockHeight();
   const valueNow = Math.round(measured || layout.height || 0);
 
@@ -1093,23 +1078,6 @@ function AiEditorDockInner({
         <div className="wpn-ai-dock__header">
           <Icon name="sparkles" className="wpn-ai-dock__spark" />
           <span className="wpn-ai-dock__panel-title">WeCollab AI</span>
-          {chatsApi.chats.length > 0 ? (
-            <span className="wpn-ai-dock__chats">
-              <AiChatPicker
-                chats={chatsApi.chats}
-                activeId={activeChatId}
-                isNew={chatId === "new"}
-                disabled={running}
-                onSelect={selectChat}
-                onNew={newChat}
-                onRename={chatsApi.rename}
-                onArchive={async (aiSessionId) => {
-                  await chatsApi.archive(aiSessionId);
-                  if (aiSessionId === activeChatId) newChat();
-                }}
-              />
-            </span>
-          ) : null}
           {!fullMode && expanded && hasThread ? (
             <button
               type="button"
