@@ -7,6 +7,7 @@ export const UNAUTHORIZED_EVENT = "wpn:unauthorized";
 const UNAUTHORIZED_STATUS = 401;
 const NO_CONTENT_STATUS = 204;
 const NOT_MODIFIED_STATUS = 304;
+const INVALID_URL_STATUS = 0;
 const ABSOLUTE_URL = /^https?:\/\//i;
 const PLACEHOLDER_ORIGIN = "http://local.invalid";
 const API_PREFIX = "/api/v1/pinnote";
@@ -61,13 +62,27 @@ export function normalizeApiBase(apiBaseUrl: string): string {
   return base.endsWith(API_PREFIX) ? base : `${base}${API_PREFIX}`;
 }
 
+function defaultInvalidUrlMessage(): string {
+  return "Invalid API base URL";
+}
+
 export function buildUrl(
   apiBaseUrl: string,
   path: string,
   query?: Record<string, QueryValue>,
+  policy: Pick<RequestPolicy, "createError" | "fallbackMessage"> = {},
 ): string {
   const base = normalizeApiBase(apiBaseUrl);
-  const url = new URL(`${base}${path}`, PLACEHOLDER_ORIGIN);
+  let url: URL;
+  try {
+    url = new URL(`${base}${path}`, PLACEHOLDER_ORIGIN);
+  } catch (error) {
+    const createError = policy.createError ?? defaultCreateError;
+    const message = policy.fallbackMessage
+      ? policy.fallbackMessage(INVALID_URL_STATUS)
+      : defaultInvalidUrlMessage();
+    throw createError(message, INVALID_URL_STATUS, error instanceof Error ? error.message : null);
+  }
   if (query) {
     for (const [key, value] of Object.entries(query)) {
       if (value !== undefined && value !== "") {

@@ -1,10 +1,12 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   UNAUTHORIZED_EVENT,
+  buildUrl,
   readErrorMessage,
   reportUnauthorized,
   requestBlob,
 } from "../src/services/httpClient";
+import { AnnotationApiError } from "../src/types/annotation.types";
 
 const TOKEN = "signed.jwt.token";
 
@@ -20,6 +22,35 @@ function stubWindow() {
 
 afterEach(() => {
   vi.unstubAllGlobals();
+});
+
+describe("buildUrl", () => {
+  it("builds a normalized API url", () => {
+    expect(buildUrl("https://api.example.com", "/data-models", { projectId: "p1" })).toBe(
+      "https://api.example.com/api/v1/pinnote/data-models?projectId=p1",
+    );
+  });
+
+  it("throws a normalized AnnotationApiError instead of a raw TypeError for a malformed base url", () => {
+    expect(() => buildUrl("http://[::1", "/data-models")).toThrow(AnnotationApiError);
+    try {
+      buildUrl("http://[::1", "/data-models");
+      throw new Error("expected buildUrl to throw");
+    } catch (error) {
+      expect(error).toBeInstanceOf(AnnotationApiError);
+      expect((error as AnnotationApiError).status).toBe(0);
+    }
+  });
+
+  it("lets a module customize the error surfaced for a malformed base url", () => {
+    class CustomApiError extends AnnotationApiError {}
+    expect(() =>
+      buildUrl("http://[::1", "/data-models", undefined, {
+        createError: (message, status, body) => new CustomApiError(message, status, body),
+        fallbackMessage: () => "Custom module could not build its request URL",
+      }),
+    ).toThrow(CustomApiError);
+  });
 });
 
 describe("readErrorMessage", () => {
