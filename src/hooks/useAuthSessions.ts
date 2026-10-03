@@ -5,6 +5,7 @@ import { useSharedFetch } from "./useSharedFetch";
 import { AnnotationApiError } from "../types/annotation.types";
 import type { AuthApiClient, AuthSession, LoginOption } from "../types/auth.types";
 import { isSession, isTokenUnexpired, tokenExpiry, tokenIssuedAt } from "../utils/authSession";
+import { tokenStorage } from "./tokenStorage";
 
 export interface StoredAuth {
   accounts: AuthSession[];
@@ -86,23 +87,12 @@ export function normalizeStoredAuth(parsed: Partial<StoredAuth> | null): StoredA
 }
 
 function readStored(projectId: string): StoredAuth {
-  try {
-    const raw = window.localStorage.getItem(storageKey(projectId));
-    if (!raw) {
-      return EMPTY;
-    }
-    return normalizeStoredAuth(JSON.parse(raw) as Partial<StoredAuth>);
-  } catch {
-    return EMPTY;
-  }
+  const raw = tokenStorage.read(storageKey(projectId));
+  return raw ? normalizeStoredAuth(raw) : EMPTY;
 }
 
 function writeStored(projectId: string, value: StoredAuth): void {
-  try {
-    window.localStorage.setItem(storageKey(projectId), JSON.stringify(value));
-  } catch {
-    return;
-  }
+  tokenStorage.write(storageKey(projectId), value);
 }
 
 function revokeErrorMessage(error: unknown): string {

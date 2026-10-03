@@ -35,7 +35,7 @@ export function usePersistentState<T>(
   const validRef = useRef(isValid);
   validRef.current = isValid;
 
-  const [value, setValue] = useState<T>(fallback);
+  const [value, setValue] = useState<T>(() => read(key, fallback, validRef.current));
 
   useEffect(() => {
     setValue(read(key, fallback, validRef.current));

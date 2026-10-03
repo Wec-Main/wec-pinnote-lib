@@ -17,7 +17,7 @@ import type {
 import { AnnotationApiError } from "../types/annotation.types";
 import { createClientId } from "../utils/format";
 
-function nextNumber(annotations: Annotation[]): number {
+export function nextNumber(annotations: Annotation[]): number {
   return annotations.reduce((max, item) => Math.max(max, item.number), 0) + 1;
 }
 
@@ -150,20 +150,14 @@ export function useAnnotationCollection({
   const [actionError, setActionError] = useState<string | null>(null);
   const [reloadToken, setReloadToken] = useState(0);
   const annotationsRef = useRef(annotations);
+  annotationsRef.current = annotations;
   const currentUserRef = useRef(currentUser);
+  currentUserRef.current = currentUser;
   const eventsRef = useRef(events);
   eventsRef.current = events;
   const pendingAnnotationIdsRef = useRef(new Set<string>());
   const pendingCommentIdsRef = useRef(new Set<string>());
   const loadScopeRef = useRef<LoadScope | null>(null);
-
-  useEffect(() => {
-    annotationsRef.current = annotations;
-  }, [annotations]);
-
-  useEffect(() => {
-    currentUserRef.current = currentUser;
-  }, [currentUser]);
 
   const reportError = useCallback((err: unknown) => {
     eventsRef.current.onError?.(toError(err));
@@ -754,24 +748,46 @@ export function useAnnotationCollection({
 export function useAnnotations() {
   const data = useAnnotationData();
   const { selectedId, selectAnnotation } = useAnnotationUi();
-  return {
-    annotations: data.annotations,
-    loading: data.loading,
-    error: data.error,
-    retry: data.retry,
-    actionError: data.actionError,
-    clearActionError: data.clearActionError,
-    selectedId,
-    selectAnnotation,
-    createAnnotation: data.createAnnotation,
-    addComment: data.addComment,
-    editComment: data.editComment,
-    setCommentAddToContext: data.setCommentAddToContext,
-    removeComment: data.removeComment,
-    setStatus: data.setStatus,
-    renameAnnotation: data.renameAnnotation,
-    removeAnnotation: data.removeAnnotation,
-    pageKey: data.pageKey,
-    connectionState: data.connectionState,
-  };
+  return useMemo(
+    () => ({
+      annotations: data.annotations,
+      loading: data.loading,
+      error: data.error,
+      retry: data.retry,
+      actionError: data.actionError,
+      clearActionError: data.clearActionError,
+      selectedId,
+      selectAnnotation,
+      createAnnotation: data.createAnnotation,
+      addComment: data.addComment,
+      editComment: data.editComment,
+      setCommentAddToContext: data.setCommentAddToContext,
+      removeComment: data.removeComment,
+      setStatus: data.setStatus,
+      renameAnnotation: data.renameAnnotation,
+      removeAnnotation: data.removeAnnotation,
+      pageKey: data.pageKey,
+      connectionState: data.connectionState,
+    }),
+    [
+      data.annotations,
+      data.loading,
+      data.error,
+      data.retry,
+      data.actionError,
+      data.clearActionError,
+      selectedId,
+      selectAnnotation,
+      data.createAnnotation,
+      data.addComment,
+      data.editComment,
+      data.setCommentAddToContext,
+      data.removeComment,
+      data.setStatus,
+      data.renameAnnotation,
+      data.removeAnnotation,
+      data.pageKey,
+      data.connectionState,
+    ],
+  );
 }

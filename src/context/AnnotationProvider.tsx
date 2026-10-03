@@ -15,7 +15,7 @@ import { DEFAULT_PINNOTE_API_URL } from "../config/env";
 import { AnnotationLayer } from "../components/AnnotationLayer";
 import { useAnnotationApi } from "../hooks/useAnnotationApi";
 import { useAuthSessions } from "../hooks/useAuthSessions";
-import { useAnnotationCollection } from "../hooks/useAnnotations";
+import { nextNumber, useAnnotationCollection } from "../hooks/useAnnotations";
 import { useAllProjectAnnotations } from "../hooks/useAllProjectAnnotations";
 import { usePageKey } from "../hooks/usePageKey";
 import { usePageVisitTracker } from "../hooks/usePageVisitTracker";
@@ -31,13 +31,16 @@ import type {
 import {
   AnnotationAuthContext,
   AnnotationDataContext,
+  AnnotationStoreContext,
   AnnotationUiContext,
   type AnnotationAuthContextValue,
+  type AnnotationContextValue,
   type AnnotationDataContextValue,
   type AnnotationUiContextValue,
   type FlowEditorSource,
   type DiscardPrompt,
 } from "./AnnotationContext";
+import { Store } from "../utils/flowchart/store";
 import { resolveElement } from "../utils/elementResolver";
 import { usePersistentState } from "../hooks/usePersistentState";
 import { isBoolean } from "../utils/valueGuards";
@@ -740,8 +743,7 @@ export function AnnotationProvider({ config, children }: AnnotationProviderProps
 
   const startDraft = useCallback(
     (anchor: AnnotationAnchor, label: string) => {
-      const number =
-        annotationsRef.current.reduce((max, item) => Math.max(max, item.number), 0) + 1;
+      const number = nextNumber(annotationsRef.current);
       draftMessageRef.current = "";
       setSelectedId(null);
       setListOpen(false);
@@ -1159,32 +1161,47 @@ export function AnnotationProvider({ config, children }: AnnotationProviderProps
     ],
   );
 
+  const mergedContextValue = useMemo<AnnotationContextValue>(
+    () => ({ ...dataValue, ...uiValue, ...authValue }),
+    [dataValue, uiValue, authValue],
+  );
+  const annotationStoreRef = useRef<Store<AnnotationContextValue> | null>(null);
+  if (!annotationStoreRef.current) {
+    annotationStoreRef.current = new Store(mergedContextValue);
+  }
+  const annotationStore = annotationStoreRef.current;
+  useEffect(() => {
+    annotationStore.setState(mergedContextValue);
+  }, [annotationStore, mergedContextValue]);
+
   return (
     <AnnotationAuthContext.Provider value={authValue}>
       <AnnotationDataContext.Provider value={dataValue}>
         <AnnotationUiContext.Provider value={uiValue}>
-          <AiRuntimeProvider
-            apiBaseUrl={activeConfig.apiBaseUrl}
-            projectId={projectId}
-            getAuthToken={activeConfig.getAuthToken}
-            enabled={authenticated && activeConfig.ai?.enabled !== false}
-            sessionKey={sessionKey}
-            currentUserId={activeUser.id}
-          >
-            <AiUiProvider>
-              <AnnotationViewContext.Provider value={viewContextValue}>
-                {children}
-              </AnnotationViewContext.Provider>
-              {portalReady && activeConfig.enabled
-                ? createPortal(
-                    <AnnotationErrorBoundary>
-                      <AnnotationLayer />
-                    </AnnotationErrorBoundary>,
-                    document.body,
-                  )
-                : null}
-            </AiUiProvider>
-          </AiRuntimeProvider>
+          <AnnotationStoreContext.Provider value={annotationStore}>
+            <AiRuntimeProvider
+              apiBaseUrl={activeConfig.apiBaseUrl}
+              projectId={projectId}
+              getAuthToken={activeConfig.getAuthToken}
+              enabled={authenticated && activeConfig.ai?.enabled !== false}
+              sessionKey={sessionKey}
+              currentUserId={activeUser.id}
+            >
+              <AiUiProvider>
+                <AnnotationViewContext.Provider value={viewContextValue}>
+                  {children}
+                </AnnotationViewContext.Provider>
+                {portalReady && activeConfig.enabled
+                  ? createPortal(
+                      <AnnotationErrorBoundary>
+                        <AnnotationLayer />
+                      </AnnotationErrorBoundary>,
+                      document.body,
+                    )
+                  : null}
+              </AiUiProvider>
+            </AiRuntimeProvider>
+          </AnnotationStoreContext.Provider>
         </AnnotationUiContext.Provider>
       </AnnotationDataContext.Provider>
     </AnnotationAuthContext.Provider>
