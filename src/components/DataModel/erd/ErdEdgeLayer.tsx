@@ -2,6 +2,10 @@ import { memo, useMemo } from "react";
 import { useErdContext, useErdState } from "../../../context/ErdContext";
 import type { ErdEntity } from "../../../types/dataModel.types";
 import type { XYPosition } from "../../../types/flowchart.types";
+import {
+  VIEWPORT_CULL_ENTITY_THRESHOLD,
+  VIEWPORT_CULL_MARGIN_PX,
+} from "../../../utils/erd/erdConstants";
 import { entityAnchor, getEntityRect, type ErdSide } from "../../../utils/erd/erdGeometry";
 import {
   chooseSides,
@@ -9,6 +13,7 @@ import {
   relationshipGeometry,
 } from "../../../utils/erd/relationshipPath";
 import { getEdgePath } from "../../../utils/flowchart/edgePaths";
+import { getVisibleRect, rectsIntersect } from "../../../utils/flowchart/geometry";
 import { cx, shallowEqual } from "../../../utils/flowchart/shallow";
 import { aiMarkClass, useAiPreviewMark } from "../../Ai/AiPreviewScope";
 
@@ -130,7 +135,29 @@ const ConnectionLine = memo(function ConnectionLine() {
 });
 
 export const ErdEdgeLayer = memo(function ErdEdgeLayer() {
-  const ids = useErdState((s) => s.relationships.map((rel) => rel.id), shallowEqual);
+  const ids = useErdState((s) => {
+    if (s.entities.length <= VIEWPORT_CULL_ENTITY_THRESHOLD)
+      return s.relationships.map((rel) => rel.id);
+    // Large documents only: keep a relationship mounted if either endpoint
+    // entity is on screen (plus margin) or it's selected, so cost scales
+    // with what's visible rather than total relationship count. A
+    // relationship whose both endpoints are off-screen but that still
+    // crosses the viewport is a known, accepted tradeoff (see
+    // useEdgeDropTarget.ts for the flow-side equivalent).
+    const visible = getVisibleRect(s.viewport, s.canvasSize, VIEWPORT_CULL_MARGIN_PX);
+    const entityOnScreen = (id: string) => {
+      const entity = s.entityLookup.get(id);
+      return !!entity && rectsIntersect(visible, getEntityRect(entity));
+    };
+    return s.relationships
+      .filter(
+        (rel) =>
+          s.selection.relationshipIds.has(rel.id) ||
+          entityOnScreen(rel.sourceEntityId) ||
+          entityOnScreen(rel.targetEntityId),
+      )
+      .map((rel) => rel.id);
+  }, shallowEqual);
   const connecting = useErdState((s) => s.connection !== null);
   return (
     <svg className={cx("wpn-erd-edge__layer", connecting && "wpn-erd-edge__layer--connecting")}>

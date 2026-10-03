@@ -15,3 +15,13 @@ export const ERD_MAX_ZOOM = 2.5;
 export const ERD_HISTORY_LIMIT = 100;
 export const ERD_PALETTE_DRAG_MIME = "application/x-erd-palette-item";
 export const ERD_DEFAULT_MODEL_NAME = "Untitled data model";
+
+/**
+ * Only cull off-screen entities/notes/relationships once a document has more
+ * than this many entities. Below the threshold, everything renders exactly
+ * as before (zero behavior change).
+ */
+export const VIEWPORT_CULL_ENTITY_THRESHOLD = 150;
+
+/** Screen-pixel margin added around the visible viewport before culling. */
+export const VIEWPORT_CULL_MARGIN_PX = 300;

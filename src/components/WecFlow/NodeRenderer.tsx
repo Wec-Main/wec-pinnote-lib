@@ -1,7 +1,16 @@
 import { memo, useEffect, type CSSProperties } from "react";
 import { useFlowEngine, useFlowState } from "../../context/FlowContext";
 import { useNodeDrag } from "../../hooks/flowchart/useNodeDrag";
-import { getNodeSize, getRenderedHandles } from "../../utils/flowchart/geometry";
+import {
+  VIEWPORT_CULL_MARGIN_PX,
+  VIEWPORT_CULL_NODE_THRESHOLD,
+} from "../../utils/flowchart/constants";
+import {
+  getNodeSize,
+  getRenderedHandles,
+  getVisibleRect,
+  rectsIntersect,
+} from "../../utils/flowchart/geometry";
 import { isLaneShape } from "../../utils/flowchart/nodeTypes";
 import { cx, shallowEqual } from "../../utils/flowchart/shallow";
 import { DefaultNodeContent } from "./DefaultNodeContent";
@@ -90,13 +99,23 @@ export const NodeItem = memo(function NodeItem({ id }: { id: string }) {
 export const NodeRenderer = memo(function NodeRenderer({ lanes = false }: { lanes?: boolean }) {
   const engine = useFlowEngine();
   useFlowState((s) => s.registryVersion);
-  const ids = useFlowState(
-    (s) =>
-      s.nodes
-        .filter((n) => isLaneShape(engine.getDefinition(n.type).shape) === lanes)
-        .map((n) => n.id),
-    shallowEqual,
-  );
+  const ids = useFlowState((s) => {
+    const laneNodes = s.nodes.filter(
+      (n) => isLaneShape(engine.getDefinition(n.type).shape) === lanes,
+    );
+    if (s.nodes.length <= VIEWPORT_CULL_NODE_THRESHOLD) return laneNodes.map((n) => n.id);
+    // Large documents only: mount just the nodes whose rect intersects the
+    // visible viewport (plus a generous margin), so cost scales with what's
+    // on screen rather than the whole document. Selected nodes are always
+    // kept mounted so an in-progress resize/edit/selection never disappears
+    // out from under the user.
+    const visible = getVisibleRect(s.viewport, s.canvasSize, VIEWPORT_CULL_MARGIN_PX);
+    return laneNodes
+      .filter(
+        (n) => s.selectedNodeIds.has(n.id) || rectsIntersect(visible, engine.getNodeRect(n)),
+      )
+      .map((n) => n.id);
+  }, shallowEqual);
   useEffect(() => {
     if (lanes) return;
     return watchNodeCreationForInlineEdit(engine);
