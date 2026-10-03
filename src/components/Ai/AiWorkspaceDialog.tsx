@@ -1,3 +1,5 @@
+import { AiQuestionsCard } from "./AiQuestionsCard";
+import { withAnswers } from "./aiQuestions";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { isWorkspaceOp, type WorkspaceApplyItem } from "../../ai/ops/workspaceOps";
 import { useOptionalAiRuntime } from "../../context/AiRuntimeContext";
@@ -34,6 +36,7 @@ interface Entry {
   items: WorkspaceApplyItem[];
   summary: string;
   error: string | null;
+  mentions?: AiMention[];
 }
 
 interface Starter {
@@ -168,7 +171,7 @@ export function AiWorkspaceDialog({ request, onClose }: AiWorkspaceDialogProps) 
   useEffect(() => {
     const el = scrollRef.current;
     if (el) el.scrollTop = el.scrollHeight;
-  }, [entries.length, state.partialOps.length, state.status]);
+  }, [entries.length, history.messages.length, state.partialOps.length, state.status]);
 
   const starters = useMemo(() => startersFor(request.mentions ?? []), [request.mentions]);
 
@@ -194,6 +197,7 @@ export function AiWorkspaceDialog({ request, onClose }: AiWorkspaceDialogProps) 
             items: [],
             summary: "",
             error: null,
+            mentions,
           },
         ].slice(-8),
       );
@@ -308,7 +312,12 @@ export function AiWorkspaceDialog({ request, onClose }: AiWorkspaceDialogProps) 
     />
   );
 
-  const showStarters = entries.length === 0 && history.messages.length === 0 && !running;
+  const showStarters =
+    entries.length === 0 &&
+    history.messages.length === 0 &&
+    !history.loading &&
+    !history.error &&
+    !running;
   const lastIndex = entries.length - 1;
 
   return (
@@ -372,6 +381,19 @@ export function AiWorkspaceDialog({ request, onClose }: AiWorkspaceDialogProps) 
     >
       <div className="wpn-ai-ws__toolbar">{chatPicker}</div>
       <div className="wpn-ai-ws__scroll" ref={scrollRef}>
+        {chatId !== "new" && history.loading && history.messages.length === 0 ? (
+          <p className="wpn-ai-muted" role="status">
+            Loading chat…
+          </p>
+        ) : null}
+        {chatId !== "new" && history.error ? (
+          <p className="wpn-ai-card__warn" role="alert">
+            Couldn't load this chat.{" "}
+            <button type="button" className="wpn-ai-link" onClick={history.retry}>
+              Retry
+            </button>
+          </p>
+        ) : null}
         {chatId !== "new" && history.messages.length > 0 ? (
           <AiActionHistory messages={history.messages} className="wpn-ai-ws__history" />
         ) : null}
@@ -446,11 +468,19 @@ export function AiWorkspaceDialog({ request, onClose }: AiWorkspaceDialogProps) 
                     {note?.title ? <strong>{note.title}</strong> : null}
                     {note?.rationale ? <p>{note.rationale}</p> : null}
                     {note && note.questions.length > 0 ? (
-                      <ul>
-                        {note.questions.map((question) => (
-                          <li key={question}>{question}</li>
-                        ))}
-                      </ul>
+                      <AiQuestionsCard
+                        questions={note.questions}
+                        disabled={running}
+                        onSubmit={
+                          index === lastIndex && !running
+                            ? (answers) =>
+                                void send({
+                                  text: withAnswers(entry.prompt, answers),
+                                  mentions: entry.mentions ?? [],
+                                })
+                            : undefined
+                        }
+                      />
                     ) : null}
                     {!note ? (
                       <p className="wpn-ai-muted">

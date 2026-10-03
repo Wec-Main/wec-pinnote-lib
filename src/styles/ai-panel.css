@@ -907,3 +907,8 @@
     animation: none;
   }
 }
+
+.wpn-ai-panel .wpn-flow-panel__brand-icon--ai {
+  background: linear-gradient(135deg, rgb(91 77 255), rgb(47 124 246));
+  box-shadow: 0 4px 12px rgb(70 80 255 / 0.4);
+}

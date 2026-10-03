@@ -250,6 +250,74 @@ export function AiSessionList({
     [pins.pinned, scope, search, sessions],
   );
 
+  const chatRows = visible.filter((session) => session.kind !== "actions");
+  const actionRows = visible.filter((session) => session.kind === "actions");
+
+  const renderRow = (session: AiSession) => {
+    const selected = session.aiSessionId === selectedId;
+    return (
+      <li
+        key={session.aiSessionId}
+        className={[
+          "wpn-ai-session-row wpn-reveal",
+          selected ? "wpn-ai-session-row--selected" : "",
+        ].join(" ")}
+      >
+        {renaming === session.aiSessionId ? (
+          <InlineRename
+            value={sessionTitle(session)}
+            onSave={(title) => rename(session.aiSessionId, title)}
+            onCancel={() => setRenaming(null)}
+          />
+        ) : (
+          <>
+            <button
+              type="button"
+              className={["wpn-ai-session", selected ? "wpn-ai-session--selected" : ""].join(" ")}
+              aria-current={selected ? "true" : undefined}
+              onClick={() => onSelect(session.aiSessionId)}
+              onDoubleClick={() => setRenaming(session.aiSessionId)}
+            >
+              <span className="wpn-ai-session__title">
+                {isActiveTurn(session.activeTurn) ? (
+                  <span className="wpn-ai-session__live" aria-label="Running" />
+                ) : null}
+                {session.kind === "actions" ? (
+                  <Icon
+                    name={EDITOR_ICONS[session.scopeKind]}
+                    className="wpn-ai-session__kind"
+                    aria-label="Created in the editor"
+                  />
+                ) : null}
+                <span className="wpn-ai-session__text">{sessionTitle(session)}</span>
+              </span>
+              <span className="wpn-ai-session__meta">
+                {SCOPE_LABELS[session.scopeKind]}
+                {session.kind === "actions" ? " editor" : ""} · {providerLabel(session.provider)} ·{" "}
+                {formatAgo(session.lastMessageAt ?? session.createdAt)}
+              </span>
+            </button>
+            {pins.isPinned(session.aiSessionId) ? (
+              <Icon name="pin" className="wpn-ai-session__pin" />
+            ) : null}
+            <SessionMenu
+              title={sessionTitle(session)}
+              pinned={pins.isPinned(session.aiSessionId)}
+              onRename={() => setRenaming(session.aiSessionId)}
+              onTogglePin={() => pins.toggle(session.aiSessionId)}
+              onArchive={() => {
+                setActionError(null);
+                void archive(session.aiSessionId).catch(() =>
+                  setActionError("Couldn't archive that chat. Try again."),
+                );
+              }}
+            />
+          </>
+        )}
+      </li>
+    );
+  };
+
   return (
     <aside
       className={["wpn-ai-sessions", className].filter(Boolean).join(" ")}
@@ -303,7 +371,7 @@ export function AiSessionList({
         />
       </div>
       <div className="wpn-ai-sessions__label">
-        <span>Recent</span>
+        <span>Chats</span>
         <RefreshingIndicator active={Boolean(refreshing)} label="" />
       </div>
       <ul className="wpn-ai-sessions__list">
@@ -334,73 +402,17 @@ export function AiSessionList({
             {search ? "No chats match." : "No chats yet."}
           </li>
         ) : null}
-        {(showSkeleton ? [] : visible).map((session) => {
-          const selected = session.aiSessionId === selectedId;
-          return (
-            <li
-              key={session.aiSessionId}
-              className={[
-                "wpn-ai-session-row wpn-reveal",
-                selected ? "wpn-ai-session-row--selected" : "",
-              ].join(" ")}
-            >
-              {renaming === session.aiSessionId ? (
-                <InlineRename
-                  value={sessionTitle(session)}
-                  onSave={(title) => rename(session.aiSessionId, title)}
-                  onCancel={() => setRenaming(null)}
-                />
-              ) : (
-                <>
-                  <button
-                    type="button"
-                    className={["wpn-ai-session", selected ? "wpn-ai-session--selected" : ""].join(
-                      " ",
-                    )}
-                    aria-current={selected ? "true" : undefined}
-                    onClick={() => onSelect(session.aiSessionId)}
-                    onDoubleClick={() => setRenaming(session.aiSessionId)}
-                  >
-                    <span className="wpn-ai-session__title">
-                      {isActiveTurn(session.activeTurn) ? (
-                        <span className="wpn-ai-session__live" aria-label="Running" />
-                      ) : null}
-                      {session.kind === "actions" ? (
-                        <Icon
-                          name={EDITOR_ICONS[session.scopeKind]}
-                          className="wpn-ai-session__kind"
-                          aria-label="Created in the editor"
-                        />
-                      ) : null}
-                      <span className="wpn-ai-session__text">{sessionTitle(session)}</span>
-                    </span>
-                    <span className="wpn-ai-session__meta">
-                      {SCOPE_LABELS[session.scopeKind]}
-                      {session.kind === "actions" ? " editor" : ""} ·{" "}
-                      {providerLabel(session.provider)} ·{" "}
-                      {formatAgo(session.lastMessageAt ?? session.createdAt)}
-                    </span>
-                  </button>
-                  {pins.isPinned(session.aiSessionId) ? (
-                    <Icon name="pin" className="wpn-ai-session__pin" />
-                  ) : null}
-                  <SessionMenu
-                    title={sessionTitle(session)}
-                    pinned={pins.isPinned(session.aiSessionId)}
-                    onRename={() => setRenaming(session.aiSessionId)}
-                    onTogglePin={() => pins.toggle(session.aiSessionId)}
-                    onArchive={() => {
-                      setActionError(null);
-                      void archive(session.aiSessionId).catch(() =>
-                        setActionError("Couldn't archive that chat. Try again."),
-                      );
-                    }}
-                  />
-                </>
-              )}
-            </li>
-          );
-        })}
+        {showSkeleton ? null : (
+          <>
+            {chatRows.map(renderRow)}
+            {actionRows.length > 0 ? (
+              <li className="wpn-ai-sessions__label" role="presentation">
+                <span>Action items</span>
+              </li>
+            ) : null}
+            {actionRows.map(renderRow)}
+          </>
+        )}
         {hasMore ? (
           <li className="wpn-ai-sessions__more">
             <button type="button" className="wpn-ai-link" disabled={loading} onClick={loadMore}>

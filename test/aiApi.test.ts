@@ -109,7 +109,7 @@ describe("aiApi routes", () => {
         }),
       "POST",
       "/ai/sessions",
-      { projectId: "p1", mode: "model", scopeKind: "project", provider: "claude", model: "m" },
+      { projectId: "p1", scopeKind: "project", provider: "claude", model: "m" },
     ],
     ["session", () => ai.fetchAiSession(BASE, "t", "s1"), "GET", "/ai/sessions/s1"],
     [

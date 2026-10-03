@@ -391,7 +391,7 @@ export function AiChatDialog({ buttonRef, sessionsState, onClose }: AiChatDialog
   const viewport = useViewport(true);
   const sheet = viewport.width < AI_SHEET_BREAKPOINT;
   const dialogRef = useRef<HTMLDivElement>(null);
-  const [chatChoice, setChatChoice] = useState<{ id: string | null } | null>(null);
+  const [chatChoice, setChatChoice] = useState<{ id: string | null } | null>({ id: null });
   const [dragged, setDragged] = useState<DialogRect | null>(null);
   const dragRef = useRef<{ x: number; y: number; rect: DialogRect } | null>(null);
   const [anchor, setAnchor] = useState<{ x: number; y: number } | null>(null);

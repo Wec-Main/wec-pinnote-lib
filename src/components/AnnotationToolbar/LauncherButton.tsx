@@ -52,3 +52,56 @@ export function LauncherButton({
     </Tooltip>
   );
 }
+
+interface LauncherPillProps {
+  label: string;
+  active?: boolean;
+  blocked?: boolean;
+  accent?: boolean;
+  tone?: string;
+  order: number;
+  hint?: string;
+  onActivate: () => void;
+  onIntent?: () => void;
+  children: ReactNode;
+}
+
+export function LauncherPill({
+  label,
+  active = false,
+  blocked = false,
+  accent = false,
+  tone,
+  order,
+  hint,
+  onActivate,
+  onIntent,
+  children,
+}: LauncherPillProps) {
+  return (
+    <button
+      type="button"
+      role="menuitem"
+      className={[
+        "wpn-launcher__pill",
+        active ? "wpn-launcher__pill--active" : "",
+        blocked ? "wpn-launcher__pill--blocked" : "",
+        accent ? "wpn-launcher__pill--accent" : "",
+      ]
+        .filter(Boolean)
+        .join(" ")}
+      style={{ ["--i" as string]: order, ...(tone ? { ["--tone" as string]: tone } : {}) }}
+      aria-label={label}
+      aria-pressed={active}
+      aria-disabled={blocked}
+      title={blocked ? "Log in first" : hint}
+      onClick={onActivate}
+      onPointerEnter={onIntent}
+      onFocus={onIntent}
+    >
+      <span className="wpn-launcher__pill-icon">{children}</span>
+      <span className="wpn-launcher__pill-label">{label}</span>
+      {active ? <span className="wpn-launcher__pill-dot" aria-hidden="true" /> : null}
+    </button>
+  );
+}

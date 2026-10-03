@@ -146,6 +146,18 @@ export interface AiSelection {
   itemIds: string[];
 }
 
+export interface AiQuestionOption {
+  label: string;
+  description?: string;
+}
+
+export interface AiQuestion {
+  question: string;
+  header?: string;
+  options: AiQuestionOption[];
+  multiSelect?: boolean;
+}
+
 export type AiMessageContent =
   | { type: "text"; text: string; mentions?: AiMention[]; selection?: AiSelection | null }
   | {
@@ -157,6 +169,7 @@ export type AiMessageContent =
     }
   | { type: "op_batch"; aiOpBatchId: string }
   | { type: "comment_draft"; aiCommentDraftId: string }
+  | { type: "questions"; questions: AiQuestion[] }
   | { type: "notice"; level: "info" | "warning" | "error"; text: string; code?: string };
 
 export type AiMessageRole = "user" | "assistant" | "tool" | "system";

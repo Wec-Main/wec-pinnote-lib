@@ -89,7 +89,7 @@ export function DraftCommentCard({
             disabled={busy !== null || !message.trim()}
             onClick={() => void run("post")}
           >
-            {busy === "post" ? <Spinner /> : null}
+            {busy === "post" ? <Spinner /> : <Icon name="send" className="wpn-btn__icon" />}
             Post
           </button>
           <button
@@ -98,6 +98,7 @@ export function DraftCommentCard({
             disabled={busy !== null}
             onClick={() => setEditing((value) => !value)}
           >
+            <Icon name={editing ? "check" : "edit"} className="wpn-btn__icon" />
             {editing ? "Done" : "Edit"}
           </button>
           <button
@@ -106,6 +107,7 @@ export function DraftCommentCard({
             disabled={busy !== null}
             onClick={() => void run("discard")}
           >
+            <Icon name="x" className="wpn-btn__icon" />
             Discard
           </button>
         </div>

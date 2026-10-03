@@ -1,3 +1,5 @@
+import { AiQuestionsCard } from "./AiQuestionsCard";
+import { withAnswers } from "./aiQuestions";
 import {
   useCallback,
   useEffect,
@@ -63,6 +65,7 @@ import { useAiActionChats } from "../../hooks/useAiActionChats";
 import { useAiActionHistory } from "../../hooks/useAiActionHistory";
 import { useAiWorkSlot } from "./AiWorkSlot";
 import { AiWorkStatus } from "./AiWorkStatus";
+import { AiChatPicker } from "./AiChatPicker";
 import { AiActionHistory } from "./AiActionHistory";
 import { AiModelSwitcher } from "./AiModelSwitcher";
 import { countChanges, describeOpBatch, type AiChangeLine } from "./aiOpChanges";
@@ -808,6 +811,14 @@ function AiEditorDockInner({
     });
   };
 
+  const answer = (entry: DockRun, answers: string) => {
+    if (running) return;
+    startRun(entry.actionKey, withAnswers(entry.prompt, answers), {
+      ...entry.body,
+      ...(route ? { provider: route.provider, model: route.model, effort: route.effort } : {}),
+    });
+  };
+
   const openInChat = (entry: DockRun) => {
     ui?.openPanel({
       newSession: true,
@@ -978,7 +989,23 @@ function AiEditorDockInner({
   }, [prompt]);
 
   const fullMode = layout.mode !== "compact";
-  const showPanel = fullMode || (expanded && runs.length > 0);
+  const hasThread = runs.length > 0 || actionHistory.messages.length > 0;
+  const showPanel = fullMode || (expanded && (hasThread || actionHistory.loading));
+
+  const selectChat = (aiSessionId: string) => {
+    if (running || aiSessionId === activeChatId) return;
+    setChatId(aiSessionId);
+    setRuns([]);
+    setNotice(null);
+    setExpanded(true);
+    stickToBottom.current = true;
+  };
+  const newChat = () => {
+    if (running) return;
+    setChatId("new");
+    setRuns([]);
+    setNotice(null);
+  };
   const dockMax = maxDockHeight();
   const valueNow = Math.round(measured || layout.height || 0);
 
@@ -1066,7 +1093,24 @@ function AiEditorDockInner({
         <div className="wpn-ai-dock__header">
           <Icon name="sparkles" className="wpn-ai-dock__spark" />
           <span className="wpn-ai-dock__panel-title">WeCollab AI</span>
-          {!fullMode && expanded && runs.length > 0 ? (
+          {chatsApi.chats.length > 0 ? (
+            <span className="wpn-ai-dock__chats">
+              <AiChatPicker
+                chats={chatsApi.chats}
+                activeId={activeChatId}
+                isNew={chatId === "new"}
+                disabled={running}
+                onSelect={selectChat}
+                onNew={newChat}
+                onRename={chatsApi.rename}
+                onArchive={async (aiSessionId) => {
+                  await chatsApi.archive(aiSessionId);
+                  if (aiSessionId === activeChatId) newChat();
+                }}
+              />
+            </span>
+          ) : null}
+          {!fullMode && expanded && hasThread ? (
             <button
               type="button"
               className="wpn-ai-dock__icon-btn"
@@ -1084,14 +1128,18 @@ function AiEditorDockInner({
               <AiWorkStatus control={control} compact />
             </div>
           )}
-          {!fullMode && !expanded && runs.length > 0 ? (
+          {!fullMode && !expanded && hasThread ? (
             <button
               type="button"
               className="wpn-ai-dock__result-toggle"
               onClick={() => setExpanded(true)}
             >
               <Icon name="chevronUp" />
-              {runs.length === 1 ? "Show result" : `Show ${runs.length} results`}
+              {runs.length === 0
+                ? "Show chat"
+                : runs.length === 1
+                  ? "Show result"
+                  : `Show ${runs.length} results`}
             </button>
           ) : null}
           {ui ? (
@@ -1156,13 +1204,26 @@ function AiEditorDockInner({
                 stickToBottom.current = el.scrollHeight - el.scrollTop - el.clientHeight < 48;
               }}
             >
+              {actionHistory.loading && actionHistory.messages.length === 0 ? (
+                <li className="wpn-ai-dock__empty" role="status">
+                  <span className="wpn-ai-muted">Loading chat…</span>
+                </li>
+              ) : null}
+              {actionHistory.error ? (
+                <li className="wpn-ai-dock__empty" role="alert">
+                  <span className="wpn-ai-muted">Couldn't load this chat.</span>
+                  <button type="button" className="wpn-ai-link" onClick={actionHistory.retry}>
+                    Retry
+                  </button>
+                </li>
+              ) : null}
               {actionHistory.messages.length > 0 ? (
                 <li className="wpn-ai-dock__history">
                   <p className="wpn-ai-history__label">Earlier</p>
                   <AiActionHistory messages={actionHistory.messages} />
                 </li>
               ) : null}
-              {runs.map((entry) => (
+              {runs.map((entry, index) => (
                 <DockRunItem
                   key={entry.id}
                   entry={entry}
@@ -1177,9 +1238,14 @@ function AiEditorDockInner({
                   onDiscard={(batch) => void discard(batch)}
                   onRetry={retry}
                   onOpenInChat={openInChat}
+                  canAnswer={index === runs.length - 1 && !running}
+                  onAnswer={answer}
                 />
               ))}
-              {runs.length === 0 && actionHistory.messages.length === 0 ? (
+              {runs.length === 0 &&
+              actionHistory.messages.length === 0 &&
+              !actionHistory.loading &&
+              !actionHistory.error ? (
                 <li className="wpn-ai-dock__empty">
                   <Icon name="sparkles" className="wpn-ai-dock__empty-icon" />
                   <strong>
@@ -1231,6 +1297,7 @@ function AiEditorDockInner({
               className="wpn-btn wpn-btn--primary"
               onClick={() => void confirmReplace()}
             >
+              <Icon name="refresh" className="wpn-btn__icon" />
               Replace preview
             </button>
             <button
@@ -1238,6 +1305,7 @@ function AiEditorDockInner({
               className="wpn-btn wpn-btn--ghost"
               onClick={() => setPendingReplace(null)}
             >
+              <Icon name="x" className="wpn-btn__icon" />
               Keep current
             </button>
           </div>
@@ -1257,6 +1325,7 @@ function AiEditorDockInner({
               Apply
             </button>
             <button type="button" className="wpn-btn wpn-btn--ghost" onClick={rejectCurrent}>
+              <Icon name="x" className="wpn-btn__icon" />
               Discard
             </button>
           </div>
@@ -1271,6 +1340,7 @@ function AiEditorDockInner({
               className="wpn-ai-dock__toast-btn"
               onClick={() => void undo(toast.batchId)}
             >
+              <Icon name="undo" className="wpn-btn__icon" />
               Undo AI change
             </button>
             <span className="wpn-ai-dock__toast-timer" aria-hidden="true" />
@@ -1439,6 +1509,8 @@ interface DockRunItemProps {
   onDiscard: (batch: AiOpBatch) => void;
   onRetry: (entry: DockRun) => void;
   onOpenInChat: (entry: DockRun) => void;
+  canAnswer: boolean;
+  onAnswer: (entry: DockRun, answers: string) => void;
 }
 
 const CONNECTING_STATE: AiActionRunState = {
@@ -1468,6 +1540,8 @@ function DockRunItem({
   onDiscard,
   onRetry,
   onOpenInChat,
+  canAnswer,
+  onAnswer,
 }: DockRunItemProps) {
   const state = entry.state ?? live;
   const opAction = OP_ACTIONS.has(entry.actionKey);
@@ -1534,14 +1608,14 @@ function DockRunItem({
         <div className="wpn-ai-dock__note">
           {note.title ? <strong>{note.title}</strong> : null}
           {note.rationale ? <span>{note.rationale}</span> : null}
-          {note.questions.length > 0 ? (
-            <ul>
-              {note.questions.map((question) => (
-                <li key={question}>{question}</li>
-              ))}
-            </ul>
-          ) : null}
         </div>
+      ) : null}
+      {note && note.questions.length > 0 ? (
+        <AiQuestionsCard
+          questions={note.questions}
+          disabled={running}
+          onSubmit={canAnswer ? (answers) => onAnswer(entry, answers) : undefined}
+        />
       ) : null}
       {jsonOnly !== undefined ? (
         <pre className="wpn-ai-dock__json">{JSON.stringify(jsonOnly, null, 2)}</pre>
@@ -1613,6 +1687,7 @@ function BatchResult({
               className="wpn-btn wpn-btn--ghost"
               onClick={() => onDiscard(batch)}
             >
+              <Icon name="x" className="wpn-btn__icon" />
               Discard
             </button>
             {disposition === "proposed" ? (

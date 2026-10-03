@@ -142,7 +142,7 @@ export function AiUnsavedChanges({
       <Icon name="sparkles" className="wpn-ai-unsaved__icon" />
       Unsaved AI changes
       <button type="button" className="wpn-ai-unsaved__btn" disabled={saving} onClick={onSave}>
-        {saving ? <Spinner /> : null}
+        {saving ? <Spinner /> : <Icon name="save" className="wpn-btn__icon" />}
         Save
       </button>
       <button
@@ -151,6 +151,7 @@ export function AiUnsavedChanges({
         disabled={saving || discarding}
         onClick={() => setConfirming(true)}
       >
+        <Icon name="x" className="wpn-btn__icon" />
         Discard
       </button>
       {confirming ? (

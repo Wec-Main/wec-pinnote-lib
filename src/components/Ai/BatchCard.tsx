@@ -136,7 +136,7 @@ export function BatchCard({
             disabled={busy}
             onClick={() => void reject()}
           >
-            {busy ? <Spinner /> : null}
+            {busy ? <Spinner /> : <Icon name="x" className="wpn-btn__icon" />}
             Reject
           </button>
         ) : null}

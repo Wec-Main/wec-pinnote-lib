@@ -122,7 +122,7 @@ export function AiSessionSwitcher({
                       >
                         <span className="wpn-ai-switch__option-title">
                           {pins.isPinned(session.aiSessionId) ? (
-                            <Icon name="mapPin" className="wpn-ai-session__pin" />
+                            <Icon name="pin" className="wpn-ai-session__pin" />
                           ) : null}
                           {isActiveTurn(session.activeTurn) ? (
                             <span className="wpn-ai-session__live" aria-label="Running" />
@@ -140,7 +140,7 @@ export function AiSessionSwitcher({
                         aria-pressed={pins.isPinned(session.aiSessionId)}
                         onClick={() => pins.toggle(session.aiSessionId)}
                       >
-                        <Icon name="mapPin" />
+                        <Icon name="pin" />
                       </button>
                       <button
                         type="button"

@@ -30,6 +30,8 @@ import { isWorkspaceBatch } from "./useAiWorkspaceApplier";
 import { DraftCommentCard } from "./DraftCommentCard";
 import { aiErrorActions, aiErrorText, isActiveTurn, type AiErrorAction } from "./aiHelpers";
 import { useAiCardActions } from "./useAiCardActions";
+import { AiQuestionsCard } from "./AiQuestionsCard";
+import { AiTurnWorking, workTitle } from "./AiTurnWorking";
 
 export type AiFeedback = "up" | "down";
 
@@ -45,6 +47,8 @@ export interface AiTranscriptProps {
   onEditLast?: (message: AiMessage) => void;
   onOpenIntegrations?: () => void;
   onFeedback?: (aiMessageId: string, value: AiFeedback | null) => void;
+  onAnswerQuestions?: (answers: string) => void;
+  pendingUser?: { text: string; mentions: AiMention[]; at: number } | null;
 }
 
 export const NEAR_BOTTOM_PX = 80;
@@ -206,10 +210,42 @@ interface UserRowProps {
 const LONG_MESSAGE_CHARS = 480;
 const LONG_MESSAGE_LINES = 8;
 
+export function parseAnswers(text: string): { question: string; answer: string }[] | null {
+  if (!/^here are my answers:/i.test(text.trim())) return null;
+  const rows: { question: string; answer: string }[] = [];
+  for (const line of text.split("\n").slice(1)) {
+    const match = /^\d+\.\s+(.*?)\s+→\s+(.*)$/.exec(line.trim());
+    if (match) rows.push({ question: match[1] ?? "", answer: match[2] ?? "" });
+  }
+  return rows.length > 0 ? rows : null;
+}
+
 const UserRow = memo(function UserRow({ message, canEdit, onEdit, onOpenMention }: UserRowProps) {
   const { content } = message;
   const [expanded, setExpanded] = useState(false);
   if (content.type !== "text") return null;
+  const answers = parseAnswers(content.text);
+  if (answers) {
+    return (
+      <div className="wpn-ai-transcript__item wpn-ai-row wpn-ai-row--user">
+        <div className="wpn-ai-msg wpn-ai-msg--user">
+          <div className="wpn-ai-msg__bubble wpn-ai-answers">
+            <p className="wpn-ai-answers__title">
+              <Icon name="check" /> My answers
+            </p>
+            <dl className="wpn-ai-answers__list">
+              {answers.map((row, index) => (
+                <div key={`${index}-${row.question}`} className="wpn-ai-answers__item">
+                  <dt>{row.question}</dt>
+                  <dd>{row.answer}</dd>
+                </div>
+              ))}
+            </dl>
+          </div>
+        </div>
+      </div>
+    );
+  }
   const long =
     content.text.length > LONG_MESSAGE_CHARS ||
     content.text.split("\n").length > LONG_MESSAGE_LINES;
@@ -334,6 +370,7 @@ interface TurnRowProps {
   onRetry?: () => void;
   onRetryWithProvider?: () => void;
   onOpenIntegrations?: () => void;
+  onAnswerQuestions?: (answers: string) => void;
 }
 
 function sameMessages(a: AiMessage[], b: AiMessage[]): boolean {
@@ -356,7 +393,8 @@ function turnRowEqual(prev: TurnRowProps, next: TurnRowProps): boolean {
     prev.onFeedback === next.onFeedback &&
     prev.onRetry === next.onRetry &&
     prev.onRetryWithProvider === next.onRetryWithProvider &&
-    prev.onOpenIntegrations === next.onOpenIntegrations
+    prev.onOpenIntegrations === next.onOpenIntegrations &&
+    prev.onAnswerQuestions === next.onAnswerQuestions
   );
 }
 
@@ -427,6 +465,7 @@ const TurnRow = memo(function TurnRow({
   onRetry,
   onRetryWithProvider,
   onOpenIntegrations,
+  onAnswerQuestions,
 }: TurnRowProps) {
   const actions = useAiCardActions();
   const [expanded, setExpanded] = useState(false);
@@ -518,6 +557,14 @@ const TurnRow = memo(function TurnRow({
               />
             ) : null;
           }
+          case "questions":
+            return (
+              <AiQuestionsCard
+                key={message.aiMessageId}
+                questions={content.questions}
+                onSubmit={isLast && !failure ? onAnswerQuestions : undefined}
+              />
+            );
           default:
             return null;
         }
@@ -583,9 +630,12 @@ const TurnRow = memo(function TurnRow({
 interface LiveDraftProps {
   draft: AiStreamingDraft | null;
   turn: AiTurn;
+  detail: string | null;
+  title: string;
+  onStop?: () => void;
 }
 
-const LiveDraft = memo(function LiveDraft({ draft, turn }: LiveDraftProps) {
+const LiveDraft = memo(function LiveDraft({ draft, turn, detail, title, onStop }: LiveDraftProps) {
   const own = draft && draft.aiTurnId === turn.aiTurnId ? draft : null;
   if (turn.status === "queued") {
     return (
@@ -607,9 +657,13 @@ const LiveDraft = memo(function LiveDraft({ draft, turn }: LiveDraftProps) {
           <AiMarkdown text={own.text} streaming />
         </div>
       ) : null}
-      <p className="wpn-ai-livestatus">
-        <Spinner /> <span className="wpn-ai-shimmer">{own?.status || "Thinking…"}</span>
-      </p>
+      <AiTurnWorking
+        title={title}
+        detail={own?.status || detail}
+        silent
+        startedAt={Date.parse(turn.startedAt ?? turn.createdAt) || null}
+        onStop={onStop}
+      />
     </div>
   );
 });
@@ -626,6 +680,8 @@ export function AiTranscript({
   onEditLast,
   onOpenIntegrations,
   onFeedback,
+  onAnswerQuestions,
+  pendingUser = null,
 }: AiTranscriptProps) {
   const { detail, messages, draft, turns, loading, error, loadingOlder, loadOlder } = session;
   const { openMention } = useAiCardActions();
@@ -641,6 +697,21 @@ export function AiTranscript({
   const rows = useMemo(() => buildRows(messages.order, messages.byId), [messages]);
   const activeTurn = detail?.session.activeTurn ?? null;
   const live = activeTurn && isActiveTurn(activeTurn) ? activeTurn : null;
+  const liveWork = useMemo(() => {
+    const names: string[] = [];
+    let detail: string | null = null;
+    if (live) {
+      for (const id of messages.order) {
+        const message = messages.byId[id];
+        if (message?.aiTurnId !== live.aiTurnId || message.content.type !== "tool") continue;
+        names.push(message.content.name);
+        if (message.content.status === "running") {
+          detail = message.content.summary || message.content.name;
+        }
+      }
+    }
+    return { title: workTitle(names), detail };
+  }, [live, messages]);
   const firstId = messages.order[0];
   const lastId = messages.order[messages.order.length - 1];
   const lastMessage = lastId ? messages.byId[lastId] : undefined;
@@ -658,7 +729,7 @@ export function AiTranscript({
     [onFeedback],
   );
 
-  const contentKey = `${messages.order.length}:${lastId ?? ""}:${lastMessage?.updatedAt ?? ""}:${
+  const contentKey = `${pendingUser ? 1 : 0}:${messages.order.length}:${lastId ?? ""}:${lastMessage?.updatedAt ?? ""}:${
     draft?.text.length ?? 0
   }:${draft?.status ?? ""}:${live?.status ?? ""}`;
 
@@ -785,7 +856,7 @@ export function AiTranscript({
             {loadingOlder ? "Loading…" : "Load earlier messages"}
           </button>
         ) : null}
-        {rows.length === 0 && !live ? emptyHint : null}
+        {rows.length === 0 && !live && !pendingUser ? emptyHint : null}
         {rows.map((row, index) => {
           if (row.kind === "user") {
             return (
@@ -820,10 +891,50 @@ export function AiTranscript({
               onRetry={isLast ? onRetry : undefined}
               onRetryWithProvider={isLast ? onRetryWithProvider : undefined}
               onOpenIntegrations={isLast ? onOpenIntegrations : undefined}
+              onAnswerQuestions={isLast ? onAnswerQuestions : undefined}
             />
           );
         })}
-        {live ? <LiveDraft draft={draft} turn={live} /> : null}
+        {pendingUser ? (
+          <>
+            <UserRow
+              key="pending-user"
+              message={{
+                aiMessageId: "pending-user",
+                aiSessionId: "",
+                aiTurnId: null,
+                authorId: currentUserId,
+                authorName: null,
+                role: "user",
+                content: { type: "text", text: pendingUser.text, mentions: pendingUser.mentions },
+                createdAt: new Date(pendingUser.at).toISOString(),
+                updatedAt: new Date(pendingUser.at).toISOString(),
+              }}
+              canEdit={false}
+              onEdit={onEditLast}
+              onOpenMention={openMention}
+            />
+            {live ? null : (
+              <div className="wpn-ai-transcript__item wpn-ai-transcript__live">
+                <AiTurnWorking
+                  title="AI is working on your request"
+                  detail="Sending your message…"
+                  startedAt={pendingUser.at}
+                  silent
+                />
+              </div>
+            )}
+          </>
+        ) : null}
+        {live ? (
+          <LiveDraft
+            draft={draft}
+            turn={live}
+            detail={liveWork.detail}
+            title={liveWork.title}
+            onStop={() => session.interrupt()}
+          />
+        ) : null}
         {presence ? <p className="wpn-ai-presence">{presence}</p> : null}
       </div>
       {showJump ? (

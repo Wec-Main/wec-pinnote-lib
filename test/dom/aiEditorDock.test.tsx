@@ -796,4 +796,66 @@ describe("AiEditorDock", () => {
       expect(dock().classList.contains("wpn-ai-dock")).toBe(true);
     });
   });
+
+  it("switches to an older chat, shows its messages and continues in it", async () => {
+    const now = new Date().toISOString();
+    const chat = (id: string, title: string) => ({
+      aiSessionId: id,
+      projectId: "p1",
+      title,
+      mode: "model",
+      scopeKind: "data_model",
+      scopeId: "dm1",
+      provider: "claude",
+      model: "default",
+      effort: null,
+      createdById: "u1",
+      createdByName: "Kavi",
+      nativeSessionOwnerId: null,
+      lastMessageAt: now,
+      createdAt: now,
+      updatedAt: now,
+      archivedAt: null,
+      activeTurn: null,
+      kind: "actions",
+    });
+    const base = fetchMock.getMockImplementation()!;
+    fetchMock.mockImplementation(async (url: string, init?: RequestInit) => {
+      const route = path(url);
+      if (route === "/ai/actions/chats") {
+        return jsonResponse([chat("c1", "Add orders"), chat("c2", "Review keys")]);
+      }
+      if (route === "/ai/actions/history") {
+        const id = new URL(url).searchParams.get("aiSessionId");
+        return jsonResponse({
+          aiSessionId: id,
+          hasMore: false,
+          messages: [
+            {
+              aiMessageId: "m1",
+              aiSessionId: id,
+              aiTurnId: null,
+              authorId: "u1",
+              authorName: "Kavi",
+              role: "user",
+              content: { type: "text", text: `Earlier request in ${id}` },
+              createdAt: now,
+              updatedAt: now,
+            },
+          ],
+        });
+      }
+      return base(url, init);
+    });
+    await mount();
+    click(container.querySelector<HTMLElement>(".wpn-ai-chats__trigger"));
+    await flush(5);
+    click(buttonByText(document.body, /Review keys/));
+    await flush(20);
+    expect(container.querySelector(".wpn-ai-history")?.textContent).toContain(
+      "Earlier request in c2",
+    );
+    await ask("Add a tags table");
+    expect(runs[0]?.body).toMatchObject({ sessionId: "c2" });
+  });
 });

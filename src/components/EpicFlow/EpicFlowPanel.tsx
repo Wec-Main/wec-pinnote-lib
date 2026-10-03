@@ -417,7 +417,9 @@ export function EpicFlowPanel() {
     >
       <div className="wpn-epicflow-panel__header">
         <span className="wpn-epicflow-panel__brand">
-          <img src={Icons.epic} alt="" className="wpn-epicflow-panel__brand-icon" />
+          <span className="wpn-flow-panel__brand-icon wpn-flow-panel__brand-icon--draft">
+            <img src={Icons.epic} alt="" className="wpn-epicflow-panel__brand-icon" />
+          </span>
           <span className="wpn-panel__title">Draft Board</span>
         </span>
         <div className="wpn-epicflow-panel__header-actions">

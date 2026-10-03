@@ -17,6 +17,15 @@ function MessageBody({ message }: { message: AiMessage }) {
   if (content.type === "comment_draft") {
     return <p className="wpn-ai-muted">Drafted a reply.</p>;
   }
+  if (content.type === "questions") {
+    return (
+      <ul className="wpn-ai-muted">
+        {content.questions.map((item) => (
+          <li key={item.question}>{item.question}</li>
+        ))}
+      </ul>
+    );
+  }
   if (content.type === "notice") {
     return <p className="wpn-ai-card__warn">{content.text}</p>;
   }

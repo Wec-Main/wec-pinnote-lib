@@ -39,7 +39,9 @@ import { useAiDefaults } from "./useAiPreferences";
 export interface AiSuggestion {
   title: string;
   prompt: string;
+  hint?: string;
   icon?: IconName;
+  tone?: string;
 }
 
 export interface AiChatViewProps {
@@ -144,6 +146,11 @@ export function AiChatView({
   );
   const [failure, setFailure] = useState<ChatFailure | null>(null);
   const [seed, setSeed] = useState<AiComposerSeed | null>(null);
+  const [optimistic, setOptimistic] = useState<{
+    text: string;
+    mentions: AiMention[];
+    at: number;
+  } | null>(null);
   const createdRef = useRef<string | null>(null);
   const sessionIdRef = useRef(aiSessionId);
   sessionIdRef.current = aiSessionId;
@@ -193,7 +200,6 @@ export function AiChatView({
           });
           id = created.aiSessionId;
           createdRef.current = id;
-          writeComposerDraft(id, { text: input.text, mentions: input.mentions });
           writeComposerDraft(newKey, null);
           onSessionCreated(id);
         }
@@ -224,6 +230,26 @@ export function AiChatView({
       void submit(input, routeOverride).catch(() => undefined);
     },
     [setRoute, submit],
+  );
+
+  const sendNow = useCallback(
+    (input: AiComposerSendInput) => {
+      setOptimistic({ text: input.text, mentions: input.mentions, at: Date.now() });
+      submit(input).catch(() => {
+        setOptimistic(null);
+        setSeed((value) => ({
+          text: input.text,
+          mentions: input.mentions,
+          nonce: (value?.nonce ?? 0) + 1,
+        }));
+      });
+    },
+    [submit],
+  );
+
+  const answerQuestions = useCallback(
+    (answers: string) => sendNow({ text: answers, mentions: [] }),
+    [sendNow],
   );
 
   const retry = useCallback(() => resend(), [resend]);
@@ -258,6 +284,23 @@ export function AiChatView({
       );
   };
 
+  const optimisticMatched = Boolean(
+    optimistic &&
+    session.messages.order.some((id) => {
+      const message = session.messages.byId[id];
+      return (
+        message?.role === "user" &&
+        message.content.type === "text" &&
+        message.content.text === optimistic.text &&
+        Date.parse(message.createdAt) >= optimistic.at - 60_000
+      );
+    }),
+  );
+  useEffect(() => {
+    if (optimisticMatched) setOptimistic(null);
+  }, [optimisticMatched]);
+  const pendingUser = optimistic && !optimisticMatched ? optimistic : null;
+
   const disabledReason = !ready ? connectAgentHint(me) : null;
   const pickSuggestion = (prompt: string) =>
     setSeed((value) => ({ text: prompt, nonce: (value?.nonce ?? 0) + 1 }));
@@ -269,7 +312,8 @@ export function AiChatView({
       </span>
       <p className="wpn-ai-empty__title">How can I help?</p>
       <p className="wpn-ai-muted">
-        Mention a data model, flow or comment with <kbd>#</kbd>.
+        Pick a starting point, or type your own request. Mention a data model, flow or comment with{" "}
+        <kbd>#</kbd>.
       </p>
       {suggestions && suggestions.length > 0 ? (
         <div className="wpn-ai-suggestions" role="list">
@@ -282,8 +326,20 @@ export function AiChatView({
               disabled={!ready}
               onClick={() => pickSuggestion(suggestion.prompt)}
             >
-              <Icon name={suggestion.icon ?? "sparkles"} className="wpn-ai-suggestion__icon" />
-              <span className="wpn-ai-suggestion__title">{suggestion.title}</span>
+              <span
+                className="wpn-ai-suggestion__tile"
+                data-tone={suggestion.tone ?? suggestion.icon ?? "sparkles"}
+                aria-hidden="true"
+              >
+                <Icon name={suggestion.icon ?? "sparkles"} className="wpn-ai-suggestion__icon" />
+              </span>
+              <span className="wpn-ai-suggestion__text">
+                <span className="wpn-ai-suggestion__title">{suggestion.title}</span>
+                {suggestion.hint ? (
+                  <span className="wpn-ai-suggestion__hint">{suggestion.hint}</span>
+                ) : null}
+              </span>
+              <Icon name="chevronRight" className="wpn-ai-suggestion__go" />
             </button>
           ))}
         </div>
@@ -307,6 +363,8 @@ export function AiChatView({
         onRetryWithProvider={alternate ? retryWithOther : undefined}
         onEditLast={editLast}
         onOpenIntegrations={ai ? openIntegrations : undefined}
+        pendingUser={pendingUser}
+        onAnswerQuestions={ready ? answerQuestions : undefined}
       />
       {failure ? (
         <div className="wpn-ai-failure wpn-ai-failure--error wpn-ai-chat__failure" role="alert">
@@ -334,7 +392,7 @@ export function AiChatView({
       <AiComposer
         candidates={mentions.candidates}
         onMentionTrigger={mentions.request}
-        onSend={(input) => submit(input)}
+        onSend={sendNow}
         disabled={!ready || !route}
         disabledReason={disabledReason}
         active={active && current?.activeTurn?.userId === currentUserId}

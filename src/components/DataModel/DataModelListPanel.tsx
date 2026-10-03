@@ -230,7 +230,10 @@ export function DataModelListPanel({ onOpen }: DataModelListPanelProps) {
               <span className="wpn-users-identity__name wpn-flow-list-tab__name">
                 {dataModel.name}
               </span>
-              <span className="wpn-users-identity__email">
+              <span
+                className="wpn-users-identity__email"
+                title={dataModel.description || undefined}
+              >
                 {dataModel.description || "No description"}
               </span>
             </span>

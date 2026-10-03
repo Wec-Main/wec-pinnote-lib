@@ -1,4 +1,10 @@
-import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
+import {
+  Fragment,
+  useEffect,
+  useRef,
+  useState,
+  type PointerEvent as ReactPointerEvent,
+} from "react";
 import {
   useAnnotationAuth,
   useAnnotationData,
@@ -8,12 +14,13 @@ import { AnnotationModeButton, AnnotationVisibilityToggle } from "../AnnotationT
 import { ToolbarAuthControl } from "../Auth";
 import { Icons } from "../../assets/icons";
 import { Icon, LiveStatus, Tooltip } from "../primitives";
-import { LauncherButton, type LauncherDragHandlers } from "./LauncherButton";
+import { LauncherPill } from "./LauncherButton";
 import { PublishVersionButton } from "./PublishVersionButton";
 import { useOptionalAiRuntime } from "../../context/AiRuntimeContext";
 import { prefetchAiMe } from "../../ai/prefetch";
 import { ExportDialogButton } from "./ExportDialogButton";
 import { useAiUi } from "../Ai/AiUiContext";
+import { useAiAvailable } from "../Ai/IntegrationsButton";
 import { isBoolean, usePersistentState } from "../../hooks/usePersistentState";
 
 const EDGE = 8;
@@ -83,7 +90,9 @@ export function AnnotationToolbar() {
       getToken: aiRuntime.getToken,
     });
   };
-  const aiPanelOpen = useAiUi()?.panelOpen ?? false;
+  const aiUi = useAiUi();
+  const aiPanelOpen = aiUi?.panelOpen ?? false;
+  const aiAvailable = useAiAvailable();
   const [spinning, setSpinning] = useState(false);
   const spinTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   useEffect(
@@ -136,11 +145,32 @@ export function AnnotationToolbar() {
     true,
     isBoolean,
   );
-  const [launcherExpanded, setLauncherExpanded] = usePersistentState(
-    `wpn-ui:${config.projectId}:launcherExpanded`,
-    true,
-    isBoolean,
+  const [launcherOpen, setLauncherOpen] = useState(false);
+  const launcherSuppressed = useRef(false);
+  const hoverTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(
+    () => () => {
+      if (hoverTimer.current) clearTimeout(hoverTimer.current);
+    },
+    [],
   );
+  const hoverIn = () => {
+    if (launcherSuppressed.current) return;
+    if (hoverTimer.current) clearTimeout(hoverTimer.current);
+    setLauncherOpen(true);
+  };
+  const hoverOut = () => {
+    launcherSuppressed.current = false;
+    if (hoverTimer.current) clearTimeout(hoverTimer.current);
+    hoverTimer.current = setTimeout(() => setLauncherOpen(false), 160);
+  };
+  const closeLauncher = () => {
+    launcherSuppressed.current = true;
+    if (hoverTimer.current) clearTimeout(hoverTimer.current);
+    setLauncherOpen(false);
+    if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
+  };
+  const launcherExpanded = launcherOpen;
   const [barExpanded, setBarExpanded] = usePersistentState(
     `wpn-ui:${config.projectId}:toolbarExpanded`,
     true,
@@ -250,69 +280,145 @@ export function AnnotationToolbar() {
 
   const loggedOut = !activeAccount;
 
-  const launcherDragHandlers: LauncherDragHandlers = {
-    onPointerDown: onLauncherDragStart,
-    onPointerMove: onDragMove,
-    onPointerUp: onDragEnd,
-    onPointerCancel: onDragEnd,
+  const menuUp =
+    !launcherPosition ||
+    typeof window === "undefined" ||
+    launcherPosition.y > window.innerHeight / 2;
+
+  const closeBarForLauncher = () => {
+    setPosition(null);
+    setModeEnabled(false);
+    setFlowPinModeEnabled(false);
+    setTagModeEnabled(false);
+    setListOpen(false);
+    setUserManagementOpen(false);
+    setAuditHistoryOpen(false);
+    selectAnnotation(null);
+    requestCancelDraft();
+    setBarOpen(false);
   };
 
+  const pillActions: {
+    key: string;
+    label: string;
+    active: boolean;
+    blocked: boolean;
+    accent?: boolean;
+    tone?: string;
+    icon: JSX.Element;
+    run: () => void;
+    intent?: () => void;
+  }[] = [
+    {
+      key: "toolbar",
+      tone: "139 92 246",
+      label: barOpen ? "Close toolbar" : "Open toolbar",
+      active: barOpen,
+      blocked: false,
+      icon: <img src={Icons.pen} alt="" className="wpn-launcher-item__icon" />,
+      run: () => {
+        if (barOpen) closeBarForLauncher();
+        else {
+          setPosition(null);
+          setBarOpen(true);
+        }
+      },
+    },
+    {
+      key: "draft",
+      tone: "244 114 182",
+      label: epicFlowOpen ? "Close Draft Board" : "Draft Board",
+      active: epicFlowOpen,
+      blocked: loggedOut,
+      icon: <img src={Icons.epic} alt="" className="wpn-launcher-item__icon" />,
+      run: () => setEpicFlowOpen(!epicFlowOpen),
+    },
+    {
+      key: "flows",
+      tone: "52 211 153",
+      label: flowOpen ? "Close All Flows" : "All Flows",
+      active: flowOpen,
+      blocked: loggedOut,
+      icon: <Icon name="flow" className="wpn-launcher-item__glyph" />,
+      run: () => setFlowOpen(!flowOpen),
+    },
+    {
+      key: "models",
+      tone: "251 191 36",
+      label: dataModelOpen ? "Close Data Models" : "Data Models",
+      active: dataModelOpen,
+      blocked: loggedOut,
+      icon: <Icon name="dataModel" className="wpn-launcher-item__glyph" />,
+      run: () => setDataModelOpen(!dataModelOpen),
+    },
+    {
+      key: "settings",
+      tone: "148 163 184",
+      label: userManagementOpen ? "Close settings" : "Settings",
+      active: userManagementOpen,
+      blocked: loggedOut,
+      icon: <img src={Icons.settings} alt="" className="wpn-launcher-item__icon" />,
+      run: () => setUserManagementOpen(!userManagementOpen),
+      intent: warmSettings,
+    },
+    ...(aiUi && aiAvailable
+      ? [
+          {
+            key: "ai",
+            label: aiPanelOpen ? "Close AI" : "Ask AI",
+            active: aiPanelOpen,
+            blocked: loggedOut,
+            accent: true,
+            icon: <Icon name="sparkles" className="wpn-launcher-item__glyph" />,
+            run: () => (aiPanelOpen ? aiUi.closePanel() : aiUi.openPanel({ newSession: true })),
+          },
+        ]
+      : []),
+  ];
+
+  const mainPills = pillActions.filter((item) => !item.accent);
+  const aiPills = pillActions.filter((item) => item.accent);
+  const renderPill = (item: (typeof pillActions)[number], order: number) => (
+    <LauncherPill
+      key={item.key}
+      label={item.label}
+      active={item.active}
+      blocked={item.blocked}
+      accent={item.accent}
+      tone={item.tone}
+      order={order}
+      onIntent={item.intent}
+      onActivate={guardedClick(() => {
+        if (!item.blocked) {
+          item.run();
+          closeLauncher();
+        }
+      })}
+    >
+      {item.icon}
+    </LauncherPill>
+  );
+  const ordered = menuUp ? [...mainPills, ...aiPills] : [...aiPills, ...mainPills];
+  const dividerAt = menuUp ? mainPills.length : aiPills.length;
+
   const launcherShortcuts = (
-    <>
-      <LauncherButton
-        label={epicFlowOpen ? "Close Draft Board" : "Draft Board"}
-        active={epicFlowOpen}
-        blocked={loggedOut}
-        dragHandlers={launcherDragHandlers}
-        onActivate={guardedClick(() => {
-          if (!loggedOut) {
-            setEpicFlowOpen(!epicFlowOpen);
-          }
-        })}
-      >
-        <img src={Icons.epic} alt="" className="wpn-launcher-item__icon" />
-      </LauncherButton>
-      <LauncherButton
-        label={flowOpen ? "Close All Flows" : "All Flows"}
-        active={flowOpen}
-        blocked={loggedOut}
-        dragHandlers={launcherDragHandlers}
-        onActivate={guardedClick(() => {
-          if (!loggedOut) {
-            setFlowOpen(!flowOpen);
-          }
-        })}
-      >
-        <Icon name="flow" className="wpn-launcher-item__glyph" />
-      </LauncherButton>
-      <LauncherButton
-        label={dataModelOpen ? "Close Data Models" : "Data Models"}
-        active={dataModelOpen}
-        blocked={loggedOut}
-        dragHandlers={launcherDragHandlers}
-        onActivate={guardedClick(() => {
-          if (!loggedOut) {
-            setDataModelOpen(!dataModelOpen);
-          }
-        })}
-      >
-        <Icon name="dataModel" className="wpn-launcher-item__glyph" />
-      </LauncherButton>
-      <LauncherButton
-        label={userManagementOpen ? "Close settings" : "Settings"}
-        active={userManagementOpen}
-        blocked={loggedOut}
-        dragHandlers={launcherDragHandlers}
-        onIntent={warmSettings}
-        onActivate={guardedClick(() => {
-          if (!loggedOut) {
-            setUserManagementOpen(!userManagementOpen);
-          }
-        })}
-      >
-        <img src={Icons.settings} alt="" className="wpn-launcher-item__icon" />
-      </LauncherButton>
-    </>
+    <div
+      className="wpn-launcher__menu"
+      role="menu"
+      aria-label="Pinnote launcher"
+      aria-hidden={!launcherExpanded}
+    >
+      <div className="wpn-launcher__panel">
+        {ordered.map((item, index) => (
+          <Fragment key={item.key}>
+            {aiPills.length > 0 && index === dividerAt ? (
+              <div className="wpn-launcher__divider" role="separator" />
+            ) : null}
+            {renderPill(item, menuUp ? ordered.length - 1 - index : index)}
+          </Fragment>
+        ))}
+      </div>
+    </div>
   );
 
   const closeBar = () => {
@@ -332,81 +438,52 @@ export function AnnotationToolbar() {
     setBarOpen(false);
   };
 
-  const openToolbar = () => {
-    if (didDrag.current) {
-      didDrag.current = false;
-      return;
-    }
-    setPosition(null);
-    setBarOpen(true);
-  };
-
   const toggleLauncher = () => {
     if (didDrag.current) {
       didDrag.current = false;
       return;
     }
-    setLauncherExpanded(!launcherExpanded);
+    if (launcherOpen) closeLauncher();
+    else {
+      launcherSuppressed.current = false;
+      setLauncherOpen(true);
+    }
   };
-
-  const openToolbarButton = (
-    <LauncherButton
-      label={barOpen ? "Close toolbar" : "Open toolbar"}
-      active={barOpen}
-      dragHandlers={launcherDragHandlers}
-      onActivate={barOpen ? closeBar : openToolbar}
-    >
-      <img src={Icons.pen} alt="" className="wpn-launcher-item__icon" />
-    </LauncherButton>
-  );
 
   const launcher = (
     <div
       ref={setLauncherRef}
       className={[
-        "wpn-toolbar",
-        "wpn-toolbar--launcher",
-        launcherExpanded ? "" : "wpn-toolbar--launcher-collapsed",
-        launcherPosition ? "wpn-toolbar--placed" : "wpn-toolbar--launcher-docked",
+        "wpn-launcher",
+        launcherExpanded ? "wpn-launcher--open" : "",
+        menuUp ? "wpn-launcher--up" : "wpn-launcher--down",
+        launcherPosition ? "wpn-launcher--placed" : "wpn-launcher--docked",
       ]
         .filter(Boolean)
         .join(" ")}
       style={launcherPosition ? { left: launcherPosition.x, top: launcherPosition.y } : undefined}
+      onPointerEnter={hoverIn}
+      onPointerLeave={hoverOut}
+      onFocus={hoverIn}
+      onBlur={hoverOut}
     >
-      <Tooltip label={launcherExpanded ? "Collapse launcher" : "Expand launcher"} placement="right">
-        <button
-          type="button"
-          className="wpn-launcher-item__logo-wrap"
-          aria-label={launcherExpanded ? "Collapse launcher" : "Expand launcher"}
-          aria-expanded={launcherExpanded}
-          onPointerDown={onLauncherDragStart}
-          onPointerMove={onDragMove}
-          onPointerUp={onDragEnd}
-          onPointerCancel={onDragEnd}
-          onClick={toggleLauncher}
-        >
-          <img src={Icons.wecLogo} alt="" className="wpn-launcher-item__logo" />
-        </button>
-      </Tooltip>
-      {launcherExpanded ? (
-        <>
-          <Tooltip label="Drag to move" placement="right">
-            <button
-              type="button"
-              className="wpn-toolbar__drag"
-              aria-label="Drag annotation launcher"
-              onPointerDown={onLauncherDragStart}
-              onPointerMove={onDragMove}
-              onPointerUp={onDragEnd}
-              onPointerCancel={onDragEnd}
-            >
-              <Icon name="drag" className="wpn-toolbar__drag-icon" />
-            </button>
-          </Tooltip>
-          {openToolbarButton}
-          {launcherShortcuts}
-        </>
-      ) : null}
+      <button
+        type="button"
+        className="wpn-launcher__fab"
+        aria-label={launcherOpen ? "Close launcher" : "Open launcher"}
+        aria-expanded={launcherExpanded}
+        aria-haspopup="menu"
+        title="Drag to move"
+        onPointerDown={onLauncherDragStart}
+        onPointerMove={onDragMove}
+        onPointerUp={onDragEnd}
+        onPointerCancel={onDragEnd}
+        onClick={toggleLauncher}
+      >
+        <span className="wpn-launcher__ring" aria-hidden="true" />
+        <img src={Icons.wecLogo} alt="" className="wpn-launcher__logo" />
+      </button>
+      {launcherShortcuts}
     </div>
   );
 

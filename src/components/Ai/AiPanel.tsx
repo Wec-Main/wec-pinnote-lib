@@ -6,10 +6,9 @@ import { useEscapeKey } from "../../hooks/useEscapeKey";
 import { usePersistentState } from "../../hooks/usePersistentState";
 import type { AiMention, AiScopeKind } from "../../types/ai.types";
 import { Icon, Tooltip } from "../primitives";
-import { AiChatView, useChatRoute } from "./AiChatView";
+import { AiChatView, useChatRoute, type AiSuggestion } from "./AiChatView";
 import { AiSessionList, InlineRename, sessionTitle } from "./AiSessionList";
 import { useAiUi } from "./AiUiContext";
-import { AiWorkspaceButton } from "./AiWorkspaceButton";
 
 interface NewSessionSeed {
   key: number;
@@ -20,6 +19,33 @@ interface NewSessionSeed {
 }
 
 type Drawer = "sessions" | null;
+
+const CREATE_SUGGESTIONS: AiSuggestion[] = [
+  {
+    title: "Create an epic",
+    hint: "Outline a goal with scope and outcomes",
+    prompt: "Create an epic for ",
+    icon: "epic",
+  },
+  {
+    title: "Write user stories",
+    hint: "Break a feature into stories with acceptance criteria",
+    prompt: "Write user stories for ",
+    icon: "list",
+  },
+  {
+    title: "Design a flow",
+    hint: "Map steps, branches and edge cases",
+    prompt: "Create a flow for ",
+    icon: "flow",
+  },
+  {
+    title: "Design a data model",
+    hint: "Draft entities, fields and relations",
+    prompt: "Create a data model for ",
+    icon: "dataModel",
+  },
+];
 
 export const AI_PANEL_DRAWER_BREAKPOINT = 900;
 
@@ -127,7 +153,7 @@ export function AiPanel() {
               <Icon name="sidebar" />
             </button>
           ) : null}
-          <span className="wpn-flow-panel__brand-icon">
+          <span className="wpn-flow-panel__brand-icon wpn-flow-panel__brand-icon--ai">
             <Icon name="sparkles" />
           </span>
           <span className="wpn-panel__title">WeCollab AI</span>
@@ -152,10 +178,6 @@ export function AiPanel() {
           ) : null}
         </span>
         <div className="wpn-flow-panel__header-actions">
-          <AiWorkspaceButton
-            label="Create"
-            tooltip="Create or update epics, user stories, flows and data models with AI"
-          />
           {narrow ? (
             <Tooltip label="New chat" placement="bottom">
               <button
@@ -220,6 +242,7 @@ export function AiPanel() {
             route={route}
             onRouteChange={setRoute}
             showRoutePicker
+            suggestions={CREATE_SUGGESTIONS}
           />
         </main>
       </div>

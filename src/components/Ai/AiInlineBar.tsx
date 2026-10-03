@@ -294,6 +294,7 @@ function AiInlineBarInner({
             className="wpn-btn wpn-btn--ghost"
             onClick={() => void applier.reject()}
           >
+            <Icon name="x" className="wpn-btn__icon" />
             Reject
           </button>
         </div>
@@ -356,6 +357,7 @@ function AiInlineBarInner({
             className="wpn-btn wpn-btn--ghost"
             onClick={() => void session.interrupt().catch(() => undefined)}
           >
+            <Icon name="stop" className="wpn-btn__icon" />
             Stop
           </button>
         ) : null}
@@ -365,6 +367,7 @@ function AiInlineBarInner({
             className="wpn-ai-link"
             onClick={() => ai.openPanel({ aiSessionId })}
           >
+            <Icon name="open" className="wpn-btn__icon" />
             Open in chat
           </button>
         ) : null}

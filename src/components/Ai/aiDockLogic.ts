@@ -1,3 +1,5 @@
+import type { AiQuestion } from "../../types/ai.types";
+import { toQuestions } from "./aiQuestions";
 import { useCallback, useEffect, useRef, type RefObject } from "react";
 import type {
   AiActionResult,
@@ -202,7 +204,7 @@ export function resultFindings(result: AiActionResult | null | undefined): AiRev
 export interface DockResultNote {
   title: string | null;
   rationale: string | null;
-  questions: string[];
+  questions: AiQuestion[];
 }
 
 export function resultNote(result: AiActionResult | null | undefined): DockResultNote | null {
@@ -211,9 +213,7 @@ export function resultNote(result: AiActionResult | null | undefined): DockResul
   if (!value) return null;
   const title = findingText(value.title) ?? null;
   const rationale = findingText(value.rationale) ?? null;
-  const questions = Array.isArray(value.questions)
-    ? value.questions.filter((item): item is string => typeof item === "string" && !!item.trim())
-    : [];
+  const questions = toQuestions(value.questions);
   if (!title && !rationale && questions.length === 0) return null;
   return { title, rationale, questions };
 }

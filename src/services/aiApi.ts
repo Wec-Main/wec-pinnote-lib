@@ -59,6 +59,19 @@ function json(method: string, body: unknown): RequestInit {
   return { method, body: JSON.stringify(body) };
 }
 
+function sendBody(input: SendAiMessageRequest): SendAiMessageRequest {
+  const { mode: _mode, mentions, selection, ...rest } = input;
+  const body: SendAiMessageRequest = { ...rest };
+  if (mentions && mentions.length > 0) body.mentions = mentions;
+  if (selection) body.selection = selection;
+  return body;
+}
+
+function createBody(input: CreateAiSessionRequest): Omit<CreateAiSessionRequest, "mode"> {
+  const { mode: _mode, ...rest } = input;
+  return rest;
+}
+
 export function fetchAiMe(
   apiBaseUrl: string,
   authToken: string | undefined,
@@ -224,11 +237,9 @@ export function getAiActionHistory(
   },
   signal?: AbortSignal,
 ): Promise<AiActionHistory> {
-  return request<AiActionHistory>(
-    buildUrl(apiBaseUrl, "/ai/actions/history", query),
-    authToken,
-    { signal },
-  );
+  return request<AiActionHistory>(buildUrl(apiBaseUrl, "/ai/actions/history", query), authToken, {
+    signal,
+  });
 }
 
 export function listAiActionChats(
@@ -247,7 +258,11 @@ export function createAiSession(
   authToken: string | undefined,
   input: CreateAiSessionRequest,
 ): Promise<AiSession> {
-  return request<AiSession>(buildUrl(apiBaseUrl, "/ai/sessions"), authToken, json("POST", input));
+  return request<AiSession>(
+    buildUrl(apiBaseUrl, "/ai/sessions"),
+    authToken,
+    json("POST", createBody(input)),
+  );
 }
 
 export function fetchAiSession(
@@ -299,7 +314,7 @@ export function sendAiMessage(
   return request<SendAiMessageResponse>(
     buildUrl(apiBaseUrl, `/ai/sessions/${seg(aiSessionId)}/messages`),
     authToken,
-    json("POST", input),
+    json("POST", sendBody(input)),
   );
 }
 

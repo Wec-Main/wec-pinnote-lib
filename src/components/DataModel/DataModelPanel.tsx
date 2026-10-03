@@ -26,7 +26,7 @@ export function DataModelPanel() {
     <div className="wpn-flow-panel wpn-datamodel-panel">
       <div className="wpn-flow-panel__header">
         <span className="wpn-flow-panel__brand">
-          <span className="wpn-flow-panel__brand-icon">
+          <span className="wpn-flow-panel__brand-icon wpn-flow-panel__brand-icon--model">
             <Icon name="dataModel" />
           </span>
           <span className="wpn-panel__title">Data Models</span>

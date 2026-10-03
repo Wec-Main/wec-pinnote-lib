@@ -25,7 +25,8 @@ const discard = vi.fn();
 const openReference = vi.fn();
 
 vi.mock("../../src/components/Ai/useAiWorkspaceApplier", async (importOriginal) => {
-  const original = await importOriginal<typeof import("../../src/components/Ai/useAiWorkspaceApplier")>();
+  const original =
+    await importOriginal<typeof import("../../src/components/Ai/useAiWorkspaceApplier")>();
   return { ...original, useAiWorkspaceApplier: () => ({ apply, discard }) };
 });
 
@@ -68,7 +69,11 @@ const workspaceBatch = (status: AiOpBatch["status"] = "proposed"): AiOpBatch =>
     ops: [
       { op: "createEpic", tempId: "$e", title: "Checkout", description: "Goal" },
       { op: "createUserStory", epic: "$e", title: "Add to cart", description: "As a buyer" },
-      { op: "createFlow", name: "Checkout flow", ops: [{ op: "addNode", type: "start", label: "S" }] },
+      {
+        op: "createFlow",
+        name: "Checkout flow",
+        ops: [{ op: "addNode", type: "start", label: "S" }],
+      },
     ],
   }) as AiOpBatch;
 
@@ -114,9 +119,33 @@ async function ask(text: string) {
 
 const doneResult: WorkspaceApplyResult = {
   items: [
-    { index: 0, op: "createEpic", kind: "epic", action: "created", label: "Checkout", status: "done", id: "e1" },
-    { index: 1, op: "createUserStory", kind: "user_story", action: "created", label: "Add to cart", status: "done", id: "s1" },
-    { index: 2, op: "createFlow", kind: "flow", action: "created", label: "Checkout flow", status: "done", id: "f1" },
+    {
+      index: 0,
+      op: "createEpic",
+      kind: "epic",
+      action: "created",
+      label: "Checkout",
+      status: "done",
+      id: "e1",
+    },
+    {
+      index: 1,
+      op: "createUserStory",
+      kind: "user_story",
+      action: "created",
+      label: "Add to cart",
+      status: "done",
+      id: "s1",
+    },
+    {
+      index: 2,
+      op: "createFlow",
+      kind: "flow",
+      action: "created",
+      label: "Checkout flow",
+      status: "done",
+      id: "f1",
+    },
   ],
   done: 3,
   failed: 0,
@@ -137,7 +166,8 @@ beforeEach(() => {
     const route = path(url);
     if (route === "/ai/warm") return jsonResponse({}, 202);
     if (route === "/ai/actions/chats") return jsonResponse([]);
-    if (route === "/ai/actions/history") return jsonResponse({ aiSessionId: null, messages: [], hasMore: false });
+    if (route === "/ai/actions/history")
+      return jsonResponse({ aiSessionId: null, messages: [], hasMore: false });
     const match = /^\/ai\/actions\/([^/]+)\/run$/.exec(route);
     if (match) {
       runs.push({ actionKey: decodeURIComponent(match[1]!), body: JSON.parse(String(init?.body)) });
@@ -182,14 +212,27 @@ describe("AiWorkspaceDialog", () => {
     await mount();
     await ask("Create a checkout epic");
     const card = document.querySelector(".wpn-ai-ws__proposal")!;
+    const tab = (name: string) =>
+      Array.from(card.querySelectorAll<HTMLButtonElement>('[role="tab"]')).find((el) =>
+        el.textContent?.startsWith(name),
+      )!;
+    expect(tab("Epics").textContent).toContain("1");
+    expect(tab("User stories").textContent).toContain("1");
+    expect(tab("Flows").textContent).toContain("1");
+    expect(tab("Epics").getAttribute("aria-selected")).toBe("true");
     expect(card.textContent).toContain("Checkout epic");
-    expect(card.textContent).toContain("1 epic");
-    expect(card.textContent).toContain("1 user story");
-    expect(card.textContent).toContain("Checkout flow");
-    expect(card.textContent).not.toContain("As a buyer");
-    click(buttonByText(card as HTMLElement, "Expand all"));
+    expect(card.textContent).not.toContain("Add to cart");
+    click(tab("User stories"));
     expect(card.textContent).toContain("Add to cart");
+    expect(card.textContent).not.toContain("Checkout flow");
+    click(tab("Flows"));
+    expect(card.textContent).toContain("Checkout flow");
+    click(tab("Epics"));
+    expect(card.textContent).not.toContain("As a buyer");
+    click(card.querySelector('[aria-label="Expand Checkout"]'));
     expect(card.textContent).toContain("Goal");
+    click(tab("User stories"));
+    click(card.querySelector('[aria-label^="Expand Add to cart"]'));
     expect(card.textContent).toContain("As a buyer");
     expect(apply).not.toHaveBeenCalled();
   });
@@ -213,8 +256,24 @@ describe("AiWorkspaceDialog", () => {
     apply.mockResolvedValue({
       items: [
         doneResult.items[0],
-        { index: 1, op: "createUserStory", kind: "user_story", action: "created", label: "Add to cart", status: "failed", error: "Title is too long" },
-        { index: 2, op: "createFlow", kind: "flow", action: "created", label: "Checkout flow", status: "done", id: "f1" },
+        {
+          index: 1,
+          op: "createUserStory",
+          kind: "user_story",
+          action: "created",
+          label: "Add to cart",
+          status: "failed",
+          error: "Title is too long",
+        },
+        {
+          index: 2,
+          op: "createFlow",
+          kind: "flow",
+          action: "created",
+          label: "Checkout flow",
+          status: "done",
+          id: "f1",
+        },
       ],
       done: 2,
       failed: 1,
@@ -257,5 +316,62 @@ describe("AiWorkspaceDialog", () => {
     click(buttonByText(document.body, "Add user stories"));
     await flush(5);
     expect(field().value).toContain("user stories");
+  });
+
+  it("loads an older chat's messages when it is picked and continues in that chat", async () => {
+    const chat = (id: string, title: string) => ({
+      aiSessionId: id,
+      projectId: "p1",
+      title,
+      mode: "model",
+      scopeKind: "workspace",
+      scopeId: "p1",
+      provider: "claude",
+      model: "default",
+      effort: null,
+      createdById: "u1",
+      createdByName: "Kavi",
+      nativeSessionOwnerId: null,
+      lastMessageAt: new Date().toISOString(),
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      archivedAt: null,
+      activeTurn: null,
+      kind: "actions",
+    });
+    const base = fetchMock.getMockImplementation()!;
+    fetchMock.mockImplementation(async (url: string, init?: RequestInit) => {
+      const route = path(url);
+      if (route === "/ai/actions/chats") {
+        return jsonResponse([chat("c1", "Split the story"), chat("c2", "Break the epic")]);
+      }
+      if (route === "/ai/actions/history") {
+        const id = new URL(url).searchParams.get("aiSessionId");
+        const message = {
+          aiMessageId: "m1",
+          aiSessionId: id,
+          aiTurnId: null,
+          authorId: "u1",
+          authorName: "Kavi",
+          role: "user",
+          content: { type: "text", text: `Earlier request in ${id}` },
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        };
+        return jsonResponse({ aiSessionId: id, messages: id ? [message] : [], hasMore: false });
+      }
+      return base(url, init);
+    });
+    await mount();
+    click(document.querySelector<HTMLElement>(".wpn-ai-chats__trigger"));
+    await flush(5);
+    click(buttonByText(document.body, /Break the epic/));
+    await flush(20);
+    expect(document.querySelector(".wpn-ai-ws__history")?.textContent).toContain(
+      "Earlier request in c2",
+    );
+    await ask("Add one more story");
+    expect(runs[0]?.body).toMatchObject({ sessionId: "c2" });
+    expect(runs[0]?.body.newChat).toBeUndefined();
   });
 });

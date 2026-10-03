@@ -17,7 +17,6 @@ import { ConfirmDialog } from "./UserManagement/ConfirmDialog";
 import { annotationLabel } from "../utils/annotationLabel";
 import { canDeleteBoardItem } from "../utils/boardPermissions";
 import type { AnnotationTag, UpdateAnnotationTagInput } from "../types/annotationTag.types";
-import { AiFloatingButton } from "./Ai/AiFloatingButton";
 import { useAiUi } from "./Ai/AiUiContext";
 
 const AiWorkspaceHost = lazy(() =>
@@ -526,7 +525,6 @@ export function AnnotationLayer() {
           <AiWorkspaceHost />
         </Suspense>
       ) : null}
-      {authenticated ? <AiFloatingButton /> : null}
       {discardPrompt ? (
         <ConfirmDialog
           title="Discard comment?"

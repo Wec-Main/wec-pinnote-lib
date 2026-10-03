@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useId, useMemo, useState } from "react";
 import type { WorkspaceApplyItem } from "../../ai/ops/workspaceOps";
 import { useAnnotationAuth, useAnnotationData } from "../../context/AnnotationContext";
 import { useEpicFlowApi } from "../../hooks/useEpicFlowApi";
@@ -56,8 +56,42 @@ function countNodes(nodes: readonly WorkspaceTreeNode[], out: Map<string, number
   return out;
 }
 
-function allIds(nodes: readonly WorkspaceTreeNode[]): number[] {
-  return nodes.flatMap((node) => [node.index, ...allIds(node.children)]);
+const TAB_ORDER: WorkspaceTreeNode["kind"][] = ["epic", "user_story", "flow", "data_model"];
+
+const TAB_LABEL: Record<WorkspaceTreeNode["kind"], string> = {
+  epic: "Epics",
+  user_story: "User stories",
+  flow: "Flows",
+  data_model: "Data models",
+};
+
+function groupByKind(
+  tree: readonly WorkspaceTreeNode[],
+): Map<WorkspaceTreeNode["kind"], WorkspaceTreeNode[]> {
+  const groups = new Map<WorkspaceTreeNode["kind"], WorkspaceTreeNode[]>();
+  const add = (kind: WorkspaceTreeNode["kind"], node: WorkspaceTreeNode) =>
+    groups.set(kind, [...(groups.get(kind) ?? []), node]);
+  const visit = (node: WorkspaceTreeNode, parent: WorkspaceTreeNode | null) => {
+    if (node.kind === "epic") {
+      const stories = node.children.length;
+      add("epic", {
+        ...node,
+        children: [],
+        hint:
+          node.hint ??
+          (stories > 0 ? `${stories} ${stories === 1 ? "story" : "stories"}` : undefined),
+      });
+    } else {
+      add(node.kind, {
+        ...node,
+        children: [],
+        hint: node.kind === "user_story" && parent ? parent.title : node.hint,
+      });
+    }
+    node.children.forEach((child) => visit(child, node));
+  };
+  tree.forEach((node) => visit(node, null));
+  return groups;
 }
 
 function useExistingEpicTitle(batch: AiWorkspaceBatch): (id: string) => string | undefined {
@@ -213,6 +247,7 @@ export function WorkspaceProposal({
   onDiscard,
   onOpen,
 }: WorkspaceProposalProps) {
+  const tabsId = useId();
   const epicTitleOf = useExistingEpicTitle(batch);
   const tree = useMemo(
     () => describeWorkspaceTree(batch.ops, epicTitleOf),
@@ -222,8 +257,19 @@ export function WorkspaceProposal({
   const busy = entry.phase === "applying";
   const actionable = entry.phase === "idle" || entry.phase === "failed";
   const counts = useMemo(() => countNodes(tree), [tree]);
-  const everything = useMemo(() => allIds(tree), [tree]);
-  const allOpen = open.size >= everything.length && everything.length > 0;
+  const groups = useMemo(() => groupByKind(tree), [tree]);
+  const tabs = useMemo(() => TAB_ORDER.filter((kind) => groups.has(kind)), [groups]);
+  const [picked, setPicked] = useState<WorkspaceTreeNode["kind"] | null>(null);
+  const problemKinds = useMemo(() => {
+    const bad = new Set(entry.items.filter((item) => item.status !== "done").map((i) => i.index));
+    const kinds = new Set<WorkspaceTreeNode["kind"]>();
+    for (const [kind, nodes] of groups)
+      if (nodes.some((node) => bad.has(node.index))) kinds.add(kind);
+    return kinds;
+  }, [entry.items, groups]);
+  const firstProblem = tabs.find((kind) => problemKinds.has(kind));
+  const tab = picked && tabs.includes(picked) ? picked : (firstProblem ?? tabs[0] ?? "epic");
+  const shown = tabs.length > 1 ? (groups.get(tab) ?? []) : tree;
   const toggle = (index: number) =>
     setOpen((current) => {
       const next = new Set(current);
@@ -241,25 +287,61 @@ export function WorkspaceProposal({
         </span>
       </header>
       {batch.rationale ? <p className="wpn-ai-card__body">{batch.rationale}</p> : null}
-      <div className="wpn-ai-ws__bar">
-        <ul className="wpn-ai-ws__counts" aria-label="Summary">
-          {([...counts.entries()] as [WorkspaceTreeNode["kind"], number][]).map(([kind, n]) => (
-            <li key={kind} className={`wpn-ai-ws__count wpn-ai-ws__kind--${kind}`}>
-              <Icon name={KIND_ICON[kind]} />
-              {n} {KIND_LABEL[kind][n === 1 ? 0 : 1]}
-            </li>
+      {tabs.length > 1 ? null : (
+        <div className="wpn-ai-ws__bar">
+          <ul className="wpn-ai-ws__counts" aria-label="Summary">
+            {([...counts.entries()] as [WorkspaceTreeNode["kind"], number][]).map(([kind, n]) => (
+              <li key={kind} className={`wpn-ai-ws__count wpn-ai-ws__kind--${kind}`}>
+                <Icon name={KIND_ICON[kind]} />
+                {n} {KIND_LABEL[kind][n === 1 ? 0 : 1]}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+      {tabs.length > 1 ? (
+        <div className="wpn-ai-ws__tabs" role="tablist" aria-label="Proposed items">
+          {tabs.map((kind) => (
+            <button
+              key={kind}
+              type="button"
+              role="tab"
+              id={`${tabsId}-${kind}`}
+              aria-selected={tab === kind}
+              aria-controls={`${tabsId}-panel`}
+              tabIndex={tab === kind ? 0 : -1}
+              className={["wpn-ai-ws__tab", tab === kind ? "wpn-ai-ws__tab--on" : ""].join(" ")}
+              onClick={() => setPicked(kind)}
+              onKeyDown={(event) => {
+                if (event.key !== "ArrowRight" && event.key !== "ArrowLeft") return;
+                event.preventDefault();
+                const at = tabs.indexOf(kind);
+                const next =
+                  tabs[(at + (event.key === "ArrowRight" ? 1 : tabs.length - 1)) % tabs.length];
+                if (next) {
+                  setPicked(next);
+                  document.getElementById(`${tabsId}-${next}`)?.focus();
+                }
+              }}
+            >
+              <Icon name={KIND_ICON[kind]} className="wpn-ai-ws__tab-icon" />
+              {TAB_LABEL[kind]}
+              <span className="wpn-ai-ws__tab-count">{counts.get(kind) ?? 0}</span>
+              {problemKinds.has(kind) ? (
+                <span className="wpn-ai-ws__tab-alert" role="img" aria-label="Needs attention" />
+              ) : null}
+            </button>
           ))}
-        </ul>
-        <button
-          type="button"
-          className="wpn-ai-link"
-          onClick={() => setOpen(allOpen ? new Set() : new Set(everything))}
-        >
-          {allOpen ? "Collapse all" : "Expand all"}
-        </button>
-      </div>
-      <ul className="wpn-ai-ws__tree">
-        {tree.map((node) => (
+        </div>
+      ) : null}
+      <ul
+        className="wpn-ai-ws__tree"
+        key={tab}
+        id={`${tabsId}-panel`}
+        role={tabs.length > 1 ? "tabpanel" : undefined}
+        aria-labelledby={tabs.length > 1 ? `${tabsId}-${tab}` : undefined}
+      >
+        {shown.map((node) => (
           <Row
             key={node.index}
             node={node}
@@ -300,6 +382,7 @@ export function WorkspaceProposal({
             disabled={busy}
             onClick={onDiscard}
           >
+            <Icon name="x" className="wpn-btn__icon" />
             Discard
           </button>
         </div>

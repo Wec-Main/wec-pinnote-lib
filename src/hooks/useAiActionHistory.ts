@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useOptionalAiRuntime } from "../context/AiRuntimeContext";
 import { getAiActionHistory } from "../services/aiApi";
 import type { AiActionTarget, AiMessage } from "../types/ai.types";
@@ -9,11 +9,14 @@ export function useAiActionHistory(
   targetKind: AiActionTarget["kind"],
   targetId: string | null | undefined,
   options: { enabled?: boolean; refreshKey?: number; aiSessionId?: string | null } = {},
-): { messages: AiMessage[]; loading: boolean } {
+): { messages: AiMessage[]; loading: boolean; error: boolean; retry: () => void } {
   const runtime = useOptionalAiRuntime();
   const { enabled = true, refreshKey = 0, aiSessionId = null } = options;
   const [messages, setMessages] = useState<AiMessage[]>(NO_MESSAGES);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(false);
+  const [tick, setTick] = useState(0);
+  const scopeRef = useRef("");
   const active = Boolean(runtime?.enabled && runtime.projectId && targetId && enabled);
 
   useEffect(() => {
@@ -21,8 +24,14 @@ export function useAiActionHistory(
       setMessages(NO_MESSAGES);
       return undefined;
     }
+    const scope = `${targetKind}:${targetId}:${aiSessionId ?? ""}`;
+    if (scopeRef.current !== scope) {
+      scopeRef.current = scope;
+      setMessages(NO_MESSAGES);
+    }
     const controller = new AbortController();
     setLoading(true);
+    setError(false);
     runtime
       .getToken()
       .then((token) =>
@@ -42,13 +51,17 @@ export function useAiActionHistory(
         if (!controller.signal.aborted) setMessages(history.messages);
       })
       .catch(() => {
-        if (!controller.signal.aborted) setMessages(NO_MESSAGES);
+        if (controller.signal.aborted) return;
+        setMessages(NO_MESSAGES);
+        setError(true);
       })
       .finally(() => {
         if (!controller.signal.aborted) setLoading(false);
       });
     return () => controller.abort();
-  }, [active, aiSessionId, runtime, targetKind, targetId, refreshKey]);
+  }, [active, aiSessionId, runtime, targetKind, targetId, refreshKey, tick]);
 
-  return { messages: active ? messages : NO_MESSAGES, loading };
+  const retry = useCallback(() => setTick((value) => value + 1), []);
+
+  return { messages: active ? messages : NO_MESSAGES, loading: active && loading, error, retry };
 }

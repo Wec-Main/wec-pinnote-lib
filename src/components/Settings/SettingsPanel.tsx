@@ -75,7 +75,9 @@ export function SettingsPanel() {
     >
       <aside className="wpn-settings-sidebar">
         <div className="wpn-settings-sidebar__brand">
-          <Icon name="settings" className="wpn-settings-sidebar__brand-icon" />
+          <span className="wpn-flow-panel__brand-icon wpn-flow-panel__brand-icon--settings">
+            <Icon name="settings" className="wpn-settings-sidebar__brand-icon" />
+          </span>
           <span className="wpn-settings-sidebar__brand-text">Settings</span>
         </div>
 

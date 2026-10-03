@@ -93,7 +93,7 @@ export function FlowPinPanel({ flowPin, originX, originY, onDelete }: FlowPinPan
       >
         <div className="wpn-flow-panel__header">
           <span className="wpn-flow-panel__brand">
-            <span className="wpn-flow-panel__brand-icon">
+            <span className="wpn-flow-panel__brand-icon wpn-flow-panel__brand-icon--flow">
               <Icon name="flow" />
             </span>
             <span className="wpn-panel__title">{flowPin.name}</span>

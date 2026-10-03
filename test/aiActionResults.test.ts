@@ -55,7 +55,7 @@ describe("action results", () => {
     expect(resultNote(plain)).toEqual({
       title: "No change",
       rationale: "Fine as is",
-      questions: ["Which DB?"],
+      questions: [{ question: "Which DB?", options: [] }],
     });
     expect(resultFindings({ kind: "markdown", text: "x" })).toEqual([]);
   });

@@ -218,7 +218,6 @@ describe("AiInlineBar", () => {
     expect(JSON.parse(String((create?.[1] as RequestInit).body))).toMatchObject({
       scopeKind: "data_model",
       scopeId: "dm1",
-      mode: "model",
       provider: "claude",
       model: "claude-model",
     });

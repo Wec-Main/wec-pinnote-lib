@@ -136,7 +136,7 @@ export function WecFlowPanel() {
     <div className="wpn-flow-panel">
       <div className="wpn-flow-panel__header">
         <span className="wpn-flow-panel__brand">
-          <span className="wpn-flow-panel__brand-icon">
+          <span className="wpn-flow-panel__brand-icon wpn-flow-panel__brand-icon--flow">
             <Icon name="flow" />
           </span>
           <span className="wpn-panel__title">Flow</span>
