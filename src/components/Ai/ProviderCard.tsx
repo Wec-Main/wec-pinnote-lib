@@ -5,7 +5,7 @@ import type {
   AiProviderId,
 } from "../../types/ai.types";
 import { Icon, Spinner } from "../primitives";
-import { PROVIDER_DESCRIPTIONS, isConnected, providerLabel } from "./aiHelpers";
+import { isConnected, providerDescription, providerLabel } from "./aiHelpers";
 import { ProviderLogo } from "./ProviderLogo";
 
 const STATUS_LABELS: Record<AiConnectorStatus, string> = {
@@ -99,7 +99,7 @@ export function ProviderCard({
           <ProviderLogo provider={provider} size={40} />
           <div className="wpn-ai-provider__title">
             <span className="wpn-ai-provider__name">{label}</span>
-            <span className="wpn-ai-provider__tagline">{PROVIDER_DESCRIPTIONS[provider]}</span>
+            <span className="wpn-ai-provider__tagline">{providerDescription(provider)}</span>
           </div>
         </div>
         <div className="wpn-ai-provider__body">
@@ -171,7 +171,7 @@ export function ProviderCard({
         <ProviderLogo provider={provider} size={40} />
         <div className="wpn-ai-provider__title">
           <span className="wpn-ai-provider__name">{label}</span>
-          <span className="wpn-ai-provider__tagline">{PROVIDER_DESCRIPTIONS[provider]}</span>
+          <span className="wpn-ai-provider__tagline">{providerDescription(provider)}</span>
         </div>
         <ConnectorStatusBadge status={status} />
       </div>

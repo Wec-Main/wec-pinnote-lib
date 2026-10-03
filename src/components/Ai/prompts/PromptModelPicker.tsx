@@ -3,7 +3,7 @@ import { AI_EFFORTS } from "../../../ai/modelValidation";
 import { useOptionalAiRuntime } from "../../../context/AiRuntimeContext";
 import type { AiProviderId } from "../../../types/ai.types";
 import { Icon, SearchableSelect, Tooltip, type SelectOption } from "../../primitives";
-import { PROVIDER_LABELS } from "../aiHelpers";
+import { providerLabel } from "../aiHelpers";
 import { TIER_LABELS, buildProviderCatalogs, pickRecommended } from "./modelCatalog";
 import { EFFORT_DETAILS, recommendationFor, type PromptEffort } from "./promptRecommendations";
 
@@ -39,7 +39,7 @@ export function PromptModelPicker({
     { value: SENDERS_CHOICE, label: "Sender's choice" },
     ...catalogs.map((item) => ({
       value: item.provider,
-      label: PROVIDER_LABELS[item.provider],
+      label: providerLabel(item.provider),
       description: item.connected ? "Connected" : "Not connected",
     })),
   ];
@@ -132,7 +132,7 @@ export function PromptModelPicker({
       </div>
       {active && !active.connected ? (
         <p className="wpn-pw-alert wpn-pw-alert--warn">
-          {PROVIDER_LABELS[active.provider]} isn't connected on your account. Anyone using this
+          {providerLabel(active.provider)} isn't connected on your account. Anyone using this
           prompt needs it connected.
         </p>
       ) : null}
