@@ -479,7 +479,7 @@ describe("AiEditorDock", () => {
           }),
       ),
     );
-    await flush(40);
+    await settleDraft();
     expect(names()).toContain("coupons");
     expect(names()).toContain("stickers");
     stream.close();

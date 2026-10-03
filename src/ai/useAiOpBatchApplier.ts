@@ -426,8 +426,8 @@ export function useAiOpBatchApplier(options: UseAiOpBatchApplierOptions): AiOpBa
           draft.ids,
         ).catch(() => null);
         if (epoch !== draftEpochRef.current || revRef.current !== rev) return false;
-        draft.applied = submitted;
         if (!result) return false;
+        draft.applied = submitted;
         const { added, changed, removed } = result.diff;
         if (added.length === 0 && changed.length === 0 && removed.length === 0) return false;
         if (loadDocument(result.document)) draft.pushes += 1;
@@ -449,11 +449,11 @@ export function useAiOpBatchApplier(options: UseAiOpBatchApplierOptions): AiOpBa
       const ids: DraftIds = { next: 0 };
       const result = await applyPartialOps(current.kind, before, submitted, ids).catch(() => null);
       if (epoch !== draftEpochRef.current || revRef.current !== rev) return false;
+      if (!result) return false;
       draft.applied = submitted;
       draft.ids = ids;
       draft.steps = 0;
       draft.before = before;
-      if (!result) return false;
       const { added, changed, removed } = result.diff;
       if (added.length === 0 && changed.length === 0 && removed.length === 0) return false;
       if (loadDocument(result.document)) draft.pushes += 1;
