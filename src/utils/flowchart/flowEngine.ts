@@ -35,7 +35,7 @@ import {
   type AlignmentGuide,
   type DistributeAxis,
 } from "./alignment";
-import { FIT_VIEW_TOP_OFFSET } from "./constants";
+import { FIT_VIEW_TOP_OFFSET, NODE_SPATIAL_PREFILTER_MARGIN } from "./constants";
 import { createId } from "./id";
 import {
   checkConnection,
@@ -327,6 +327,39 @@ export class FlowEngine {
     this.events.emit("operation", op);
   }
 
+  // Fast path for `setNodePositions`: the node/edge id set never changes (no
+  // add/remove), only a handful of node/edge objects get new references each
+  // call. Rebuilding nodeLookup/edgeLookup as brand-new Maps over the full
+  // list on every rAF frame of a drag is O(N) allocation regardless of how
+  // many nodes actually moved. Since we already know exactly which entries
+  // changed, mutate the existing Maps in place instead (O(changed) rather
+  // than O(N)). The Map *instance* is intentionally kept stable here; any
+  // reader must re-derive values via `.get(id)` (as every consumer in this
+  // codebase does) rather than relying on lookup reference identity.
+  private commitPositions(
+    nodes: FlowNode[],
+    edges: FlowEdge[],
+    changedNodes: readonly FlowNode[],
+    changedEdges: readonly FlowEdge[],
+    op: FlowOperation,
+  ): void {
+    const s = this.getState();
+    if (this.interactionDepth === 0) this.history.push({ nodes: s.nodes, edges: s.edges });
+    const nodeLookup = s.nodeLookup as Map<string, FlowNode>;
+    for (const node of changedNodes) nodeLookup.set(node.id, node);
+    const edgeLookup = s.edgeLookup as Map<string, FlowEdge>;
+    for (const edge of changedEdges) edgeLookup.set(edge.id, edge);
+    this.store.setState({
+      nodes,
+      edges,
+      nodeLookup,
+      edgeLookup,
+      canUndo: this.history.canUndo,
+      canRedo: this.history.canRedo,
+    });
+    this.events.emit("operation", op);
+  }
+
   beginInteraction(): void {
     if (this.interactionDepth++ === 0) this.interactionStart = this.getSnapshot();
   }
@@ -399,17 +432,27 @@ export class FlowEngine {
   setNodePositions(positions: Record<string, XYPosition>): void {
     const s = this.getState();
     const moves = new Map<string, XYPosition>();
+    const changedNodes: FlowNode[] = [];
     const nodes = s.nodes.map((n) => {
       const p = positions[n.id];
       if (!p || (p.x === n.position.x && p.y === n.position.y)) return n;
       moves.set(n.id, { x: p.x - n.position.x, y: p.y - n.position.y });
-      return { ...n, position: p };
+      const next = { ...n, position: p };
+      changedNodes.push(next);
+      return next;
     });
     if (moves.size === 0) return;
-    const edges = s.edges.map((e) =>
-      this.carryBend(e, s.nodeLookup.get(e.source), moves.get(e.source), moves.get(e.target)),
-    );
-    this.commit(nodes, edges.some((e, i) => e !== s.edges[i]) ? edges : s.edges, {
+    const changedEdges: FlowEdge[] = [];
+    let edgesChanged = false;
+    const edges = s.edges.map((e) => {
+      const next = this.carryBend(e, s.nodeLookup.get(e.source), moves.get(e.source), moves.get(e.target));
+      if (next !== e) {
+        changedEdges.push(next);
+        edgesChanged = true;
+      }
+      return next;
+    });
+    this.commitPositions(nodes, edgesChanged ? edges : s.edges, changedNodes, changedEdges, {
       type: "moveNodes",
       positions,
     });
@@ -985,11 +1028,23 @@ export class FlowEngine {
     if (!conn) return null;
     const wanted: HandleKind = conn.from.kind === "source" ? "target" : "source";
     const radius = CONNECT_RADIUS / s.viewport.zoom;
+    // Cheap prefilter against the pointer before the registry lookup and
+    // allocation cost of getNodeRect: a node whose stored position (plus a
+    // generous margin covering default sizes and explicit resizes) is
+    // farther than `radius` from the pointer can't contain it or have a
+    // handle within `radius` of it, so skip the geometry work for it.
+    const reach = radius + NODE_SPATIAL_PREFILTER_MARGIN;
     let best: HandleRef | null = null;
     let bestDist = Infinity;
     let hovered: FlowNode | null = null;
     for (const node of s.nodes) {
       if (node.id === conn.from.nodeId) continue;
+      const margin = Math.max(node.width ?? 0, node.height ?? 0);
+      if (
+        Math.abs(pointer.x - node.position.x) > reach + margin ||
+        Math.abs(pointer.y - node.position.y) > reach + margin
+      )
+        continue;
       const rect = this.getNodeRect(node);
       const inside = pointInRect(pointer, rect);
       if (inside) hovered = node;

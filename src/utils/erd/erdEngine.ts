@@ -429,6 +429,37 @@ export class ErdEngine {
     this.applySnapshot(next);
   }
 
+  // Fast path for `setNodePositions`: entity/note ids never change here (no
+  // add/remove), only a handful of entity/note objects get new references
+  // per call. Rebuilding entityLookup/noteLookup as brand-new Maps over the
+  // full list on every rAF frame of a drag is O(N) allocation regardless of
+  // how many entities actually moved. Since we already know exactly which
+  // entries changed, mutate the existing Maps in place instead (O(changed)
+  // rather than O(N)). The Map *instance* is intentionally kept stable; any
+  // reader must re-derive values via `.get(id)` (as every consumer in this
+  // codebase does) rather than relying on lookup reference identity.
+  private commitPositions(
+    entities: ErdEntity[],
+    notes: ErdNote[],
+    changedEntities: readonly ErdEntity[],
+    changedNotes: readonly ErdNote[],
+  ): void {
+    const s = this.getState();
+    if (this.interactionDepth === 0) this.history.push(this.getSnapshot());
+    const entityLookup = s.entityLookup as Map<string, ErdEntity>;
+    for (const entity of changedEntities) entityLookup.set(entity.id, entity);
+    const noteLookup = s.noteLookup as Map<string, ErdNote>;
+    for (const note of changedNotes) noteLookup.set(note.id, note);
+    this.store.setState({
+      entities,
+      notes,
+      entityLookup,
+      noteLookup,
+      canUndo: this.history.canUndo,
+      canRedo: this.history.canRedo,
+    });
+  }
+
   private static differs(a: ErdSnapshot, b: ErdSnapshot): boolean {
     return (
       a.engine !== b.engine ||
@@ -564,28 +595,38 @@ export class ErdEngine {
 
   setNodePositions(positions: Record<string, XYPosition>): void {
     const s = this.getState();
+    if (s.readOnly) return;
     const moved = (id: string, current: XYPosition): XYPosition | null => {
       const target = positions[id];
       return target && (target.x !== current.x || target.y !== current.y) ? target : null;
     };
     let entitiesMoved = false;
     let notesMoved = false;
+    const changedEntities: ErdEntity[] = [];
+    const changedNotes: ErdNote[] = [];
     const entities = s.entities.map((entity) => {
       const position = moved(entity.id, entity.position);
       if (!position) return entity;
       entitiesMoved = true;
-      return { ...entity, position: { ...position } };
+      const next = { ...entity, position: { ...position } };
+      changedEntities.push(next);
+      return next;
     });
     const notes = s.notes.map((note) => {
       const position = moved(note.id, note.position);
       if (!position) return note;
       notesMoved = true;
-      return { ...note, position: { ...position } };
+      const next = { ...note, position: { ...position } };
+      changedNotes.push(next);
+      return next;
     });
-    this.commit({
-      entities: entitiesMoved ? entities : s.entities,
-      notes: notesMoved ? notes : s.notes,
-    });
+    if (!entitiesMoved && !notesMoved) return;
+    this.commitPositions(
+      entitiesMoved ? entities : s.entities,
+      notesMoved ? notes : s.notes,
+      changedEntities,
+      changedNotes,
+    );
   }
 
   addField(entityId: string, input: ErdFieldInput = {}): ErdField | null {
