@@ -1,5 +1,5 @@
 import { useId, useRef, useState, type FormEvent } from "react";
-import { Icon, MultiSelect, SearchableSelect, Spinner, Tooltip } from "../primitives";
+import { ColorPicker, Icon, MultiSelect, SearchableSelect, Spinner, Tooltip } from "../primitives";
 import { useEscapeKey } from "../../hooks/useEscapeKey";
 import { useScrimDismiss } from "../../hooks/useScrimDismiss";
 import { useFocusTrap } from "../../hooks/useFocusTrap";
@@ -164,27 +164,13 @@ export function TagFormModal({
           <div className="wpn-epicflow-modal__row">
             <div className="wpn-epicflow-modal__field">
               <span className="wpn-epicflow-modal__label">Colour</span>
-              <div className="wpn-tag-swatches" role="radiogroup" aria-label="Tag colour">
-                {TAG_COLORS.map((option) => (
-                  <button
-                    key={option}
-                    type="button"
-                    role="radio"
-                    aria-checked={color === option}
-                    aria-label={option}
-                    className={[
-                      "wpn-tag-swatch",
-                      color === option ? "wpn-tag-swatch--selected" : "",
-                    ]
-                      .filter(Boolean)
-                      .join(" ")}
-                    style={{ backgroundColor: option }}
-                    onClick={() => setColor(option)}
-                  >
-                    {color === option ? <Icon name="check" /> : null}
-                  </button>
-                ))}
-              </div>
+              <ColorPicker
+                value={color}
+                onChange={(next) => next && setColor(next)}
+                palette={[...TAG_COLORS]}
+                ariaLabel="Tag colour"
+                showValue
+              />
               <span className="wpn-tag-preview">
                 <span className="wpn-tag-chip" style={{ backgroundColor: color }}>
                   {name.trim() || "Preview"}
