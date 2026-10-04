@@ -1,13 +1,14 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { useAnnotationContext } from "../../context/AnnotationContext";
 import { formatRelativeTime, getInitials } from "../../utils/format";
 import {
+  DataTable,
   Icon,
   ListSearchBar,
+  resolveDataTableState,
   RefreshButton,
   SearchableSelect,
   TablePagination,
-  TableSkeleton,
   Tooltip,
   type SelectOption,
 } from "../primitives";
@@ -32,10 +33,7 @@ import { UserFormModal } from "./UserFormModal";
 import { ResetPasswordModal } from "./ResetPasswordModal";
 import { ConfirmDialog } from "./ConfirmDialog";
 import { GeneratedPasswordModal } from "./GeneratedPasswordModal";
-import { validationDetailsFrom } from "../Settings/validationError";
-
-type PendingAction =
-  { kind: "delete"; user: ManagedUser } | { kind: "create"; draft: ManagedUserDraft };
+import { useResourceTable } from "../Settings/useResourceTable";
 
 interface GeneratedPassword {
   title: string;
@@ -54,82 +52,78 @@ export function UserManagementPanel() {
   const actorRole = activeAccount?.roleId ?? "developer";
   const selfOnly = userScopeFor(actorRole) === "self";
   const mayCreate = canCreateUsers(actorRole);
-  const [users, setUsers] = useState<ManagedUser[]>([]);
-  const [total, setTotal] = useState(0);
-  const [searchInput, setSearchInput] = useState("");
-  const [searchQuery, setSearchQuery] = useState("");
   const [roleFilter, setRoleFilter] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("");
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
-  const [loading, setLoading] = useState(true);
-  const [loaded, setLoaded] = useState(false);
-  const [loadError, setLoadError] = useState<string | null>(null);
-  const [formOpen, setFormOpen] = useState(false);
-  const [editTarget, setEditTarget] = useState<ManagedUser | null>(null);
-  const [pending, setPending] = useState<PendingAction | null>(null);
   const [resetTarget, setResetTarget] = useState<ManagedUser | null>(null);
-  const [busy, setBusy] = useState(false);
-  const [notice, setNotice] = useState<string | null>(null);
-  const [fieldErrors, setFieldErrors] = useState<Record<string, string[]> | null>(null);
+  const [resetBusy, setResetBusy] = useState(false);
+  const [resetNotice, setResetNotice] = useState<string | null>(null);
+  const [pendingCreateDraft, setPendingCreateDraft] = useState<ManagedUserDraft | null>(null);
   const [generatedPassword, setGeneratedPassword] = useState<GeneratedPassword | null>(null);
-  const [reloadToken, setReloadToken] = useState(0);
 
-  const reload = useCallback(() => setReloadToken((value) => value + 1), []);
-
-  const reloadAll = useCallback(() => {
-    reload();
-    reloadLoginOptions();
-  }, [reload, reloadLoginOptions]);
-
-  useEffect(() => {
-    const controller = new AbortController();
-    setLoading(true);
-    setLoadError(null);
-
-    fetchUsers(
-      config.apiBaseUrl,
-      getAuthToken,
-      {
-        projectId: config.projectId,
-        search: searchQuery || undefined,
-        roleId: roleFilter || undefined,
-        status: statusFilter || undefined,
-        category: categoryFilter || undefined,
-        limit: pageSize,
-        offset: (page - 1) * pageSize,
-      },
-      controller.signal,
-    )
-      .then((result) => {
-        setUsers(result.users);
-        setTotal(result.total);
-        setLoading(false);
-        setLoaded(true);
-      })
-      .catch((err: unknown) => {
-        if (controller.signal.aborted) {
-          return;
-        }
-        setLoadError(errorMessage(err));
-        setLoading(false);
-      });
-
-    return () => controller.abort();
-  }, [
-    config.apiBaseUrl,
-    config.projectId,
-    getAuthToken,
-    actorId,
-    searchQuery,
-    roleFilter,
-    statusFilter,
-    categoryFilter,
-    page,
-    pageSize,
-    reloadToken,
-  ]);
+  const {
+    items: users,
+    total,
+    loading,
+    loaded,
+    error: loadError,
+    notice,
+    busy,
+    formOpen,
+    editTarget,
+    pendingDelete,
+    submitDetails,
+    search,
+    setSearch,
+    query,
+    setQuery,
+    open,
+    closeForm,
+    askDelete,
+    cancelDelete,
+    submit,
+    confirmDelete,
+    dismissNotice,
+    reload,
+  } = useResourceTable<ManagedUser, ManagedUserDraft>({
+    load: async (searchQuery, signal) => {
+      const result = await fetchUsers(
+        config.apiBaseUrl,
+        getAuthToken,
+        {
+          projectId: config.projectId,
+          search: searchQuery || undefined,
+          roleId: roleFilter || undefined,
+          status: statusFilter || undefined,
+          category: categoryFilter || undefined,
+          limit: pageSize,
+          offset: (page - 1) * pageSize,
+        },
+        signal,
+      );
+      return { items: result.users, total: result.total };
+    },
+    create: async (draft) => {
+      const result = await createUser(config.apiBaseUrl, getAuthToken, config.projectId, draft);
+      reloadLoginOptions();
+      return result;
+    },
+    update: async (id, draft) => {
+      const result = await updateUser(config.apiBaseUrl, getAuthToken, config.projectId, id, draft);
+      reloadLoginOptions();
+      return result;
+    },
+    remove: async (id) => {
+      await deleteUser(config.apiBaseUrl, getAuthToken, config.projectId, id);
+      reloadLoginOptions();
+    },
+    getId: (user) => user.id,
+    draftLabel: (draft) => `${draft.firstName} ${draft.lastName}`,
+    itemLabel: (user) => `${user.firstName} ${user.lastName}`,
+    deps: [config.apiBaseUrl, config.projectId, actorId, roleFilter, statusFilter, categoryFilter, page, pageSize],
+  });
 
   const roleOptions = useMemo<SelectOption[]>(
     () => USER_ROLE_OPTIONS.map((option) => ({ value: option.value, label: option.label })),
@@ -144,57 +138,44 @@ export function UserManagementPanel() {
     [],
   );
 
-  const filtersActive = Boolean(searchQuery || roleFilter || statusFilter || categoryFilter);
+  const filtersActive = Boolean(query || roleFilter || statusFilter || categoryFilter);
 
   const resetFilters = () => {
-    setSearchInput("");
-    setSearchQuery("");
+    setSearch("");
+    setQuery("");
     setRoleFilter("");
     setStatusFilter("");
     setCategoryFilter("");
     setPage(1);
   };
 
-  const openCreate = () => {
-    setEditTarget(null);
-    setFieldErrors(null);
-    setFormOpen(true);
-  };
+  const openCreate = useCallback(() => open(), [open]);
+  const openEdit = useCallback((user: ManagedUser) => open(user), [open]);
 
-  const openEdit = (user: ManagedUser) => {
-    setEditTarget(user);
-    setFieldErrors(null);
-    setFormOpen(true);
-  };
-
-  const handleFormSubmit = async (draft: ManagedUserDraft) => {
-    if (!editTarget) {
-      setPending({ kind: "create", draft });
+  const handleFormSubmit = (draft: ManagedUserDraft) => {
+    if (editTarget) {
+      void submit(draft);
       return;
     }
-    setBusy(true);
-    setNotice(null);
-    setFieldErrors(null);
-    try {
-      await updateUser(config.apiBaseUrl, getAuthToken, config.projectId, editTarget.id, draft);
-      setNotice(`${draft.firstName} ${draft.lastName} updated.`);
-      setFormOpen(false);
-      setEditTarget(null);
-      reloadAll();
-    } catch (err) {
-      setNotice(errorMessage(err));
-      setFieldErrors(validationDetailsFrom(err)?.fieldErrors ?? null);
-    } finally {
-      setBusy(false);
+    setPendingCreateDraft(draft);
+  };
+
+  const confirmCreate = async () => {
+    if (!pendingCreateDraft) {
+      return;
     }
+    const draft = pendingCreateDraft;
+    setPendingCreateDraft(null);
+    setPage(1);
+    await submit(draft);
   };
 
   const handleResetSubmit = async (password: string | undefined) => {
     if (!resetTarget) {
       return;
     }
-    setBusy(true);
-    setNotice(null);
+    setResetBusy(true);
+    setResetNotice(null);
     try {
       const result = await resetUserPassword(
         config.apiBaseUrl,
@@ -203,8 +184,6 @@ export function UserManagementPanel() {
         resetTarget.id,
         password,
       );
-      setNotice(`Password reset for ${resetTarget.email} successfully.`);
-      setResetTarget(null);
       setGeneratedPassword({
         title: "Password reset",
         description: password
@@ -212,80 +191,28 @@ export function UserManagementPanel() {
           : `A new password was generated for ${resetTarget.firstName} ${resetTarget.lastName} (${resetTarget.email}).`,
         password: result.password,
       });
-      reloadAll();
+      setResetTarget(null);
+      reload();
+      reloadLoginOptions();
     } catch (err) {
-      setNotice(errorMessage(err));
+      setResetNotice(errorMessage(err));
     } finally {
-      setBusy(false);
+      setResetBusy(false);
     }
-  };
-
-  const confirmPending = async () => {
-    if (!pending) {
-      return;
-    }
-    setBusy(true);
-    setNotice(null);
-    try {
-      if (pending.kind === "delete") {
-        const { user } = pending;
-        await deleteUser(config.apiBaseUrl, getAuthToken, config.projectId, user.id);
-        setNotice(`${user.firstName} ${user.lastName} deleted.`);
-      } else {
-        const { draft } = pending;
-        setFieldErrors(null);
-        await createUser(config.apiBaseUrl, getAuthToken, config.projectId, draft);
-        setNotice(`${draft.firstName} ${draft.lastName} created.`);
-        setPage(1);
-        setFormOpen(false);
-        setEditTarget(null);
-      }
-      setPending(null);
-      reloadAll();
-    } catch (err) {
-      setNotice(errorMessage(err));
-      if (pending.kind === "create") {
-        setFieldErrors(validationDetailsFrom(err)?.fieldErrors ?? null);
-      }
-      setPending(null);
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  const pendingCopy = (action: PendingAction) => {
-    if (action.kind === "delete") {
-      const name = `${action.user.firstName} ${action.user.lastName}`;
-      return {
-        title: "Delete user",
-        description: `${name} (${action.user.email}) will lose access immediately. This cannot be undone.`,
-        confirmLabel: "Delete user",
-        confirmIcon: "trash" as const,
-        destructive: true,
-      };
-    }
-    const name = `${action.draft.firstName} ${action.draft.lastName}`;
-    return {
-      title: "Create user",
-      description: `${name} (${action.draft.email}) will be added as ${roleLabel(action.draft.roleId)} and can sign in straight away.`,
-      confirmLabel: "Create user",
-      confirmIcon: "plus" as const,
-      destructive: false,
-    };
   };
 
   return (
     <div className="wpn-settings-tab">
       <ListSearchBar
-        value={searchInput}
-        onValueChange={setSearchInput}
+        value={search}
+        onValueChange={setSearch}
         onSubmit={() => {
-          setSearchQuery(searchInput);
+          setQuery(search);
           setPage(1);
         }}
         onClear={() => {
-          setSearchInput("");
-          setSearchQuery("");
+          setSearch("");
+          setQuery("");
           setPage(1);
         }}
         placeholder="Search name, email or organization"
@@ -344,15 +271,18 @@ export function UserManagementPanel() {
         }
       />
 
-      {notice ? (
+      {notice || resetNotice ? (
         <div className="wpn-users-notice" role="status">
-          <span>{notice}</span>
+          <span>{notice ?? resetNotice}</span>
           <Tooltip label="Dismiss" placement="left">
             <button
               type="button"
               className="wpn-icon-btn"
               aria-label="Dismiss notification"
-              onClick={() => setNotice(null)}
+              onClick={() => {
+                dismissNotice();
+                setResetNotice(null);
+              }}
             >
               <Icon name="close" />
             </button>
@@ -360,213 +290,220 @@ export function UserManagementPanel() {
         </div>
       ) : null}
 
-      <div className="wpn-table-card">
-        <div className="wpn-users-table-wrap">
-          <table
-            className={["wpn-users-table", loading && loaded ? "wpn-users-table--refetching" : ""]
-              .filter(Boolean)
-              .join(" ")}
-          >
-            <colgroup>
-              <col className="wpn-users-table__col-name" />
-              <col />
-              <col />
-              <col />
-              <col />
-              <col />
-              <col className="wpn-users-table__col-actions" />
-            </colgroup>
-            <thead>
-              <tr>
-                <th scope="col">Name</th>
-                <th scope="col">Role</th>
-                <th scope="col">Project</th>
-                <th scope="col">Category</th>
-                <th scope="col">Last active</th>
-                <th scope="col">Status</th>
-                <th scope="col" className="wpn-users-table__actions-head">
-                  Actions
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {loading && !loaded ? (
-                <TableSkeleton
-                  rows={Math.min(pageSize, 5)}
-                  columns={["identity", "pill", "text", "text", "text", "pill", "actions"]}
-                  label="Loading users..."
-                />
-              ) : loadError && users.length === 0 ? (
-                <tr>
-                  <td colSpan={7} className="wpn-users-table__empty">
-                    <span>{loadError}</span>
-                    <button type="button" className="wpn-btn wpn-btn--ghost" onClick={reload}>
-                      <Icon name="refresh" className="wpn-btn__icon" />
-                      Retry
-                    </button>
-                  </td>
-                </tr>
-              ) : users.length === 0 ? (
-                <tr>
-                  <td colSpan={7} className="wpn-users-table__empty">
-                    <Icon name="users" className="wpn-users-table__empty-icon" />
-                    <span>No users match your search.</span>
-                    {filtersActive ? (
+      <DataTable<ManagedUser>
+        state={resolveDataTableState({
+          loading,
+          loaded,
+          error: loadError,
+          isEmpty: users.length === 0,
+        })}
+        items={users}
+        getRowKey={(user) => user.id}
+        refetching={loading && loaded}
+        colgroup={
+          <colgroup>
+            <col className="wpn-users-table__col-name" />
+            <col />
+            <col />
+            <col />
+            <col />
+            <col />
+            <col className="wpn-users-table__col-actions" />
+          </colgroup>
+        }
+        skeleton={{
+          rows: Math.min(pageSize, 5),
+          columns: ["identity", "pill", "text", "text", "text", "pill", "actions"],
+          label: "Loading users...",
+        }}
+        head={
+          <>
+            <th scope="col">Name</th>
+            <th scope="col">Role</th>
+            <th scope="col">Project</th>
+            <th scope="col">Category</th>
+            <th scope="col">Last active</th>
+            <th scope="col">Status</th>
+            <th scope="col" className="wpn-users-table__actions-head">
+              Actions
+            </th>
+          </>
+        }
+        errorRow={
+          <tr>
+            <td colSpan={7} className="wpn-users-table__empty">
+              <span>{loadError}</span>
+              <button type="button" className="wpn-btn wpn-btn--ghost" onClick={reload}>
+                <Icon name="refresh" className="wpn-btn__icon" />
+                Retry
+              </button>
+            </td>
+          </tr>
+        }
+        emptyRow={
+          <tr>
+            <td colSpan={7} className="wpn-users-table__empty">
+              <Icon name="users" className="wpn-users-table__empty-icon" />
+              <span>No users match your search.</span>
+              {filtersActive ? (
+                <button type="button" className="wpn-btn wpn-btn--ghost" onClick={resetFilters}>
+                  <Icon name="refresh" className="wpn-btn__icon" />
+                  Clear filters
+                </button>
+              ) : null}
+            </td>
+          </tr>
+        }
+        renderRow={(user) => (
+          <tr>
+            <td>
+              <div className="wpn-users-identity">
+                <span className="wpn-avatar wpn-avatar--fallback">
+                  {getInitials(`${user.firstName} ${user.lastName}`)}
+                </span>
+                <span className="wpn-users-identity__copy">
+                  <span className="wpn-users-identity__name">
+                    {user.firstName} {user.lastName}
+                  </span>
+                  <span className="wpn-users-identity__email">{user.email}</span>
+                </span>
+              </div>
+            </td>
+            <td>
+              <span className={`wpn-users-pill wpn-users-pill--role-${user.roleId}`}>
+                {roleLabel(user.roleId)}
+              </span>
+            </td>
+            <td>
+              {user.projects.length === 0 ? (
+                <span className="wpn-users-projects__empty">N/A</span>
+              ) : (
+                <span className="wpn-users-projects">
+                  {user.projects.map((project) => (
+                    <span key={project.id} className="wpn-users-projects__item">
+                      {project.name}
+                    </span>
+                  ))}
+                </span>
+              )}
+            </td>
+            <td>
+              {user.category ? (
+                <span className="wpn-users-org__country">{categoryLabel(user.category)}</span>
+              ) : (
+                <span className="wpn-users-projects__empty">N/A</span>
+              )}
+            </td>
+            <td className="wpn-users-table__muted">
+              {user.lastActiveAt ? formatRelativeTime(user.lastActiveAt) : "Never"}
+            </td>
+            <td>
+              <span className={`wpn-users-pill wpn-users-pill--status-${user.status}`}>
+                {userStatusLabel(user.status)}
+              </span>
+            </td>
+            <td>
+              <div className="wpn-users-actions">
+                {canEditUser(actorRole, actorId ?? "", user) ? (
+                  <>
+                    <Tooltip label="Edit user" placement="left">
                       <button
                         type="button"
-                        className="wpn-btn wpn-btn--ghost"
-                        onClick={resetFilters}
+                        className="wpn-users-action wpn-users-action--primary"
+                        aria-label={`Edit ${user.firstName} ${user.lastName}`}
+                        onClick={() => openEdit(user)}
                       >
-                        <Icon name="refresh" className="wpn-btn__icon" />
-                        Clear filters
+                        <Icon name="edit" />
                       </button>
-                    ) : null}
-                  </td>
-                </tr>
-              ) : (
-                users.map((user) => (
-                  <tr key={user.id}>
-                    <td>
-                      <div className="wpn-users-identity">
-                        <span className="wpn-avatar wpn-avatar--fallback">
-                          {getInitials(`${user.firstName} ${user.lastName}`)}
-                        </span>
-                        <span className="wpn-users-identity__copy">
-                          <span className="wpn-users-identity__name">
-                            {user.firstName} {user.lastName}
-                          </span>
-                          <span className="wpn-users-identity__email">{user.email}</span>
-                        </span>
-                      </div>
-                    </td>
-                    <td>
-                      <span className={`wpn-users-pill wpn-users-pill--role-${user.roleId}`}>
-                        {roleLabel(user.roleId)}
-                      </span>
-                    </td>
-                    <td>
-                      {user.projects.length === 0 ? (
-                        <span className="wpn-users-projects__empty">N/A</span>
-                      ) : (
-                        <span className="wpn-users-projects">
-                          {user.projects.map((project) => (
-                            <span key={project.id} className="wpn-users-projects__item">
-                              {project.name}
-                            </span>
-                          ))}
-                        </span>
-                      )}
-                    </td>
-                    <td>
-                      {user.category ? (
-                        <span className="wpn-users-org__country">
-                          {categoryLabel(user.category)}
-                        </span>
-                      ) : (
-                        <span className="wpn-users-projects__empty">N/A</span>
-                      )}
-                    </td>
-                    <td className="wpn-users-table__muted">
-                      {user.lastActiveAt ? formatRelativeTime(user.lastActiveAt) : "Never"}
-                    </td>
-                    <td>
-                      <span className={`wpn-users-pill wpn-users-pill--status-${user.status}`}>
-                        {userStatusLabel(user.status)}
-                      </span>
-                    </td>
-                    <td>
-                      <div className="wpn-users-actions">
-                        {canEditUser(actorRole, actorId ?? "", user) ? (
-                          <>
-                            <Tooltip label="Edit user" placement="left">
-                              <button
-                                type="button"
-                                className="wpn-users-action wpn-users-action--primary"
-                                aria-label={`Edit ${user.firstName} ${user.lastName}`}
-                                onClick={() => openEdit(user)}
-                              >
-                                <Icon name="edit" />
-                              </button>
-                            </Tooltip>
-                            <Tooltip label="Reset password" placement="left">
-                              <button
-                                type="button"
-                                className="wpn-users-action"
-                                aria-label={`Reset password for ${user.firstName} ${user.lastName}`}
-                                onClick={() => setResetTarget(user)}
-                              >
-                                <Icon name="key" />
-                              </button>
-                            </Tooltip>
-                          </>
-                        ) : null}
-                        {canDeleteUser(actorRole, actorId ?? "", user) ? (
-                          <Tooltip label="Delete user" placement="left">
-                            <button
-                              type="button"
-                              className="wpn-users-action wpn-users-action--danger"
-                              aria-label={`Delete ${user.firstName} ${user.lastName}`}
-                              onClick={() => setPending({ kind: "delete", user })}
-                            >
-                              <Icon name="trash" />
-                            </button>
-                          </Tooltip>
-                        ) : null}
-                        {canEditUser(actorRole, actorId ?? "", user) ||
-                        canDeleteUser(actorRole, actorId ?? "", user) ? null : (
-                          <span className="wpn-users-actions__none">View only</span>
-                        )}
-                      </div>
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
-
-        <TablePagination
-          page={page}
-          pageSize={pageSize}
-          totalItems={total}
-          itemLabel="users"
-          onPageChange={setPage}
-          onPageSizeChange={(next) => {
-            setPageSize(next);
-            setPage(1);
-          }}
-        />
-      </div>
+                    </Tooltip>
+                    <Tooltip label="Reset password" placement="left">
+                      <button
+                        type="button"
+                        className="wpn-users-action"
+                        aria-label={`Reset password for ${user.firstName} ${user.lastName}`}
+                        onClick={() => setResetTarget(user)}
+                      >
+                        <Icon name="key" />
+                      </button>
+                    </Tooltip>
+                  </>
+                ) : null}
+                {canDeleteUser(actorRole, actorId ?? "", user) ? (
+                  <Tooltip label="Delete user" placement="left">
+                    <button
+                      type="button"
+                      className="wpn-users-action wpn-users-action--danger"
+                      aria-label={`Delete ${user.firstName} ${user.lastName}`}
+                      onClick={() => askDelete(user)}
+                    >
+                      <Icon name="trash" />
+                    </button>
+                  </Tooltip>
+                ) : null}
+                {canEditUser(actorRole, actorId ?? "", user) ||
+                canDeleteUser(actorRole, actorId ?? "", user) ? null : (
+                  <span className="wpn-users-actions__none">View only</span>
+                )}
+              </div>
+            </td>
+          </tr>
+        )}
+        pagination={
+          <TablePagination
+            page={page}
+            pageSize={pageSize}
+            totalItems={total}
+            itemLabel="users"
+            onPageChange={setPage}
+            onPageSizeChange={(next) => {
+              setPageSize(next);
+              setPage(1);
+            }}
+          />
+        }
+      />
 
       {formOpen ? (
         <UserFormModal
           user={editTarget}
           busy={busy}
-          fieldErrors={fieldErrors}
-          onClose={() => {
-            setFormOpen(false);
-            setEditTarget(null);
-            setFieldErrors(null);
-          }}
-          onSubmit={(draft) => void handleFormSubmit(draft)}
+          fieldErrors={submitDetails?.fieldErrors ?? null}
+          onClose={closeForm}
+          onSubmit={handleFormSubmit}
         />
       ) : null}
 
       {resetTarget ? (
         <ResetPasswordModal
           user={resetTarget}
-          busy={busy}
+          busy={resetBusy}
           onClose={() => setResetTarget(null)}
           onSubmit={(password) => void handleResetSubmit(password)}
         />
       ) : null}
 
-      {pending ? (
+      {pendingCreateDraft ? (
         <ConfirmDialog
-          {...pendingCopy(pending)}
+          title="Create user"
+          description={`${pendingCreateDraft.firstName} ${pendingCreateDraft.lastName} (${pendingCreateDraft.email}) will be added as ${roleLabel(pendingCreateDraft.roleId)} and can sign in straight away.`}
+          confirmLabel="Create user"
+          confirmIcon="plus"
           busy={busy}
-          onCancel={() => setPending(null)}
-          onConfirm={() => void confirmPending()}
+          onCancel={() => setPendingCreateDraft(null)}
+          onConfirm={() => void confirmCreate()}
+        />
+      ) : null}
+
+      {pendingDelete ? (
+        <ConfirmDialog
+          title="Delete user"
+          description={`${pendingDelete.firstName} ${pendingDelete.lastName} (${pendingDelete.email}) will lose access immediately. This cannot be undone.`}
+          confirmLabel="Delete user"
+          confirmIcon="trash"
+          destructive
+          busy={busy}
+          onCancel={cancelDelete}
+          onConfirm={() => void confirmDelete()}
         />
       ) : null}
 

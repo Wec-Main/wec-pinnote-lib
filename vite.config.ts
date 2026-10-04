@@ -9,6 +9,7 @@ const sharedPanelModules = [
   "/src/components/UserManagement/ConfirmDialog.",
   "/src/components/Settings/Field.",
   "/src/components/Settings/validationError.",
+  "/src/components/Settings/useResourceTable.",
 ];
 
 const lazyPanelDirectories = [

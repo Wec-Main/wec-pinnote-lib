@@ -4,8 +4,14 @@ import { errorMessage, validationDetailsFrom, type ValidationDetails } from "./v
 
 const NOTICE_DISMISS_MS = 4000;
 
+export type ResourceTableLoadResult<T> = T[] | { items: T[]; total: number };
+
+function normalizeLoadResult<T>(result: ResourceTableLoadResult<T>): { items: T[]; total: number } {
+  return Array.isArray(result) ? { items: result, total: result.length } : result;
+}
+
 export interface ResourceTableOptions<T, Draft> {
-  load: (query: string, signal: AbortSignal) => Promise<T[]>;
+  load: (query: string, signal: AbortSignal) => Promise<ResourceTableLoadResult<T>>;
   create: (draft: Draft) => Promise<unknown>;
   update: (id: string, draft: Draft) => Promise<unknown>;
   remove: (id: string) => Promise<void>;
@@ -19,6 +25,7 @@ export interface ResourceTableOptions<T, Draft> {
 export interface ResourceTableState<T, Draft> {
   items: T[];
   visible: T[];
+  total: number;
   loading: boolean;
   refreshing: boolean;
   loaded: boolean;
@@ -57,6 +64,7 @@ export function useResourceTable<T, Draft>({
   const fullKey = cacheKey ? `${cacheKey}|` : null;
   const seeded = fullKey ? readResource<T[]>(fullKey) : null;
   const [items, setItems] = useState<T[]>(() => seeded?.data ?? []);
+  const [total, setTotal] = useState<number>(() => seeded?.data?.length ?? 0);
   const [search, setSearch] = useState("");
   const [query, setQuery] = useState("");
   const [loading, setLoading] = useState(!seeded?.hasData);
@@ -117,8 +125,10 @@ export function useResourceTable<T, Draft>({
     setError(null);
     load(query, controller.signal)
       .then((result) => {
-        if (fullKey && !query) writeResource(fullKey, result);
-        setItems(result);
+        const { items: nextItems, total: nextTotal } = normalizeLoadResult(result);
+        if (fullKey && !query) writeResource(fullKey, nextItems);
+        setItems(nextItems);
+        setTotal(nextTotal);
         setLoading(false);
         setRefreshing(false);
         setLoaded(true);
@@ -198,6 +208,7 @@ export function useResourceTable<T, Draft>({
     () => ({
       items,
       visible,
+      total,
       loading,
       refreshing,
       loaded,
@@ -224,6 +235,7 @@ export function useResourceTable<T, Draft>({
     [
       items,
       visible,
+      total,
       loading,
       refreshing,
       loaded,
