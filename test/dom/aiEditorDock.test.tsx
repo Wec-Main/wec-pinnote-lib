@@ -168,6 +168,11 @@ async function mount(doc: ErdDocumentJSON = blogDocument()) {
 }
 
 async function settleDraft() {
+  // Flush microtasks first so the dock's draft-throttle effect actually runs
+  // and registers its setTimeout before we start the real-time wait below —
+  // otherwise the two can race and the wait can elapse (and flush(40) can
+  // finish, which only drains microtasks) before that timer ever fires.
+  await flush(10);
   await act(async () => {
     await new Promise((resolve) => setTimeout(resolve, 260));
   });
@@ -479,7 +484,7 @@ describe("AiEditorDock", () => {
           }),
       ),
     );
-    await flush(40);
+    await settleDraft();
     expect(names()).toContain("coupons");
     expect(names()).toContain("stickers");
     stream.close();

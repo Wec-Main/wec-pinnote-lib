@@ -11,6 +11,7 @@ import {
 } from "react";
 import { createPortal } from "react-dom";
 import { isAiEffort } from "../../ai/modelValidation";
+import { getProvider } from "../../ai/providerRegistry";
 import { useOptionalAiRuntime } from "../../context/AiRuntimeContext";
 import { useEscapeKey } from "../../hooks/useEscapeKey";
 import type { AiConnector, AiMe, AiModelInfo, AiProviderId } from "../../types/ai.types";
@@ -95,28 +96,10 @@ function fallbackModel(): AiModelInfo {
   };
 }
 
-const isFamily = (option: ModelOption, family: string) =>
-  `${option.model.id} ${option.model.label}`.toLowerCase().includes(family);
-
 function arrangeModels(provider: AiProviderId, options: ModelOption[]) {
-  if (provider !== "claude") return { options, primaryCount: PRIMARY_MODELS };
-  const haikuIndex = options.findIndex((option) => isFamily(option, "haiku"));
-  const sonnetIndex = options.findIndex((option) => isFamily(option, "sonnet"));
-  if (haikuIndex === -1 || sonnetIndex === -1) {
-    return { options, primaryCount: PRIMARY_MODELS };
-  }
-  const arranged = options.slice();
-  const [haiku] = arranged.splice(haikuIndex, 1);
-  arranged.splice(
-    arranged.findIndex((option) => isFamily(option, "sonnet")),
-    0,
-    haiku!,
-  );
-  const lastPinned = Math.max(
-    arranged.findIndex((option) => isFamily(option, "sonnet")),
-    arranged.indexOf(haiku!),
-  );
-  return { options: arranged, primaryCount: Math.max(PRIMARY_MODELS, lastPinned + 1) };
+  const arrange = getProvider(provider)?.capabilities.arrangeModels;
+  if (!arrange) return { options, primaryCount: PRIMARY_MODELS };
+  return arrange(options);
 }
 
 export function buildModelSections(me: AiMe | null | undefined): ProviderSection[] {

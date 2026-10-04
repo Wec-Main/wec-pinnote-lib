@@ -1,3 +1,4 @@
+import { getOpKind } from "./ops/registry";
 import type { ApplyOpsResult, DocDiff, ErdOp, FlowOp, OpError } from "./ops/types";
 import type { AiPreviewOverlay } from "./aiPreviewStore";
 import type { AiOpBatch, AiOpBatchStatus, AiOpBatchTargetKind } from "../types/ai.types";
@@ -86,22 +87,20 @@ export async function applyBatchToDocument(
   batch: AiOpBatch,
   current: ErdDocumentJSON | FlowJSON,
 ): Promise<BatchApplication<ErdDocumentJSON | FlowJSON>> {
-  const erd = batch.targetKind === "data_model" ? await loadErdOpsRunner() : null;
-  const flow = batch.targetKind === "data_model" ? null : await loadFlowOpsRunner();
-  const run = (list: unknown[]) =>
-    erd
-      ? erd(current as ErdDocumentJSON, list as ErdOp[])
-      : flow!(current as FlowJSON, list as FlowOp[]);
+  const plugin = getOpKind(batch.targetKind);
+  if (!plugin) {
+    return { ok: false, errors: [], detail: `Unsupported target kind "${batch.targetKind}"` };
+  }
   let ops: unknown[] = [...batch.ops];
   let origin = ops.map((_, index) => index);
   const skipped: string[] = [];
   let firstErrors: OpError[] | null = null;
   for (let round = 0; round <= MAX_SKIP_ROUNDS; round++) {
-    const result = run(ops);
+    const result = await plugin.apply(current, ops);
     if (result.ok) {
       return {
         ok: true,
-        document: result.document,
+        document: result.document as ErdDocumentJSON | FlowJSON,
         diff: result.diff,
         idMap: result.idMap,
         warnings: result.warnings,
@@ -143,16 +142,16 @@ export async function applyPartialOps(
   ops: readonly unknown[],
   ids: DraftIds = { next: 0 },
 ): Promise<{ document: ErdDocumentJSON | FlowJSON; diff: DocDiff } | null> {
-  const erd = kind === "data_model" ? await loadErdOpsRunner() : null;
-  const flow = kind === "data_model" ? null : await loadFlowOpsRunner();
+  const plugin = getOpKind(kind);
+  if (!plugin) return null;
   let pending = ops.filter((op) => typeof op === "object" && op !== null);
   for (let attempt = 0; attempt < DRAFT_ATTEMPTS && pending.length > 0; attempt++) {
     const start = ids.next;
     const createId = draftIds(ids);
-    const result = erd
-      ? erd(current as ErdDocumentJSON, pending as ErdOp[], { createId })
-      : flow!(current as FlowJSON, pending as FlowOp[], { createId });
-    if (result.ok) return { document: result.document, diff: result.diff };
+    const result = await plugin.apply(current, pending, { createId });
+    if (result.ok) {
+      return { document: result.document as ErdDocumentJSON | FlowJSON, diff: result.diff };
+    }
     ids.next = start;
     const bad = new Set(result.errors.map((error) => error.index).filter((index) => index >= 0));
     if (bad.size === 0) return null;

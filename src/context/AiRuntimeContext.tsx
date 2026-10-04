@@ -43,6 +43,7 @@ export interface AiRuntimeContextValue {
   mergeConnectors: (connectors: AiConnector[]) => void;
   subscribe: (listener: AiStreamListener, onReconnect?: AiReconnectListener) => () => void;
   connection: StreamConnectionState;
+  reconnect: () => void;
 }
 
 export type AiRuntimeActions = Pick<
@@ -305,7 +306,10 @@ export function AiRuntimeProvider({
 
 function useLegacyActions(): AiRuntimeActions | null {
   const legacy = useContext(AiRuntimeContext);
-  return useMemo(() => (legacy ? { ...legacy, reconnect: noopReconnect } : null), [legacy]);
+  return useMemo(
+    () => (legacy ? { ...legacy, reconnect: legacy.reconnect ?? noopReconnect } : null),
+    [legacy],
+  );
 }
 
 export function useAiRuntimeActions(): AiRuntimeActions {

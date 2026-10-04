@@ -1,3 +1,4 @@
+import { isKnownProviderId } from "../ai/providerRegistry";
 import { buildUrl, request, requestNoContent } from "./httpClient";
 import type {
   AiActionKey,
@@ -390,8 +391,6 @@ const TARGET_KINDS: readonly NonNullable<AiActionTemplate["target"]>[] = [
   "data_model",
   "flow",
 ];
-const KNOWN_PROVIDERS: readonly AiProviderId[] = ["claude", "codex", "gemini"];
-
 type Loose = Record<string, unknown>;
 
 const isRecord = (value: unknown): value is Loose =>
@@ -435,9 +434,7 @@ function toTemplateFields(raw: Loose): AiActionTemplateFields {
     inputSpec: toInputSpec(raw.inputSpec),
     outputFormat: toOutputFormat(raw.outputFormat),
     outputSchema: isRecord(raw.outputSchema) ? raw.outputSchema : null,
-    provider: KNOWN_PROVIDERS.includes(provider as AiProviderId)
-      ? (provider as AiProviderId)
-      : null,
+    provider: provider && isKnownProviderId(provider) ? provider : null,
     model: strOrNull(raw.model),
     effort: strOrNull(raw.effort),
     maxTokens: numOrNull(raw.maxTokens),

@@ -2,6 +2,7 @@ import { act, createElement } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createAiPreviewStore, type AiPreviewStore } from "../../src/ai/aiPreviewStore";
+import * as opBatchApplier from "../../src/ai/opBatchApplier";
 import { useAiOpBatchApplier, type AiOpBatchApplier } from "../../src/ai/useAiOpBatchApplier";
 import type { RevisionedDocumentState } from "../../src/hooks/useRevisionedDocument";
 import type { AiOpBatch } from "../../src/types/ai.types";
@@ -192,5 +193,47 @@ describe("useAiOpBatchApplier", () => {
       ["ob3", "discarded"],
     ]);
     expect(applier.hasUnsavedAiChanges).toBe(false);
+  });
+
+  it("does not desync the draft when a partial apply fails after a successful step", async () => {
+    const alpha = { op: "addEntity", name: "alpha" };
+    const beta = { op: "addEntity", name: "beta" };
+    const gamma = { op: "addEntity", name: "gamma" };
+
+    await act(async () => {
+      expect(await applier.draft([alpha])).toBe(true);
+    });
+    expect(engine.getState().entities.map((e) => e.name)).toContain("alpha");
+
+    const spy = vi.spyOn(opBatchApplier, "applyPartialOps").mockResolvedValueOnce(null);
+    await act(async () => {
+      expect(await applier.draft([alpha, beta])).toBe(false);
+    });
+    spy.mockRestore();
+    expect(engine.getState().entities.map((e) => e.name)).not.toContain("beta");
+
+    await act(async () => {
+      expect(await applier.draft([alpha, beta, gamma])).toBe(true);
+    });
+    const names = engine.getState().entities.map((e) => e.name);
+    expect(names).toEqual(expect.arrayContaining(["alpha", "beta", "gamma"]));
+  });
+
+  it("does not desync the draft when the first (full) step fails", async () => {
+    const alpha = { op: "addEntity", name: "alpha" };
+    const beta = { op: "addEntity", name: "beta" };
+
+    const spy = vi.spyOn(opBatchApplier, "applyPartialOps").mockResolvedValueOnce(null);
+    await act(async () => {
+      expect(await applier.draft([alpha])).toBe(false);
+    });
+    spy.mockRestore();
+    expect(engine.getState().entities.map((e) => e.name)).not.toContain("alpha");
+
+    await act(async () => {
+      expect(await applier.draft([alpha, beta])).toBe(true);
+    });
+    const names = engine.getState().entities.map((e) => e.name);
+    expect(names).toEqual(expect.arrayContaining(["alpha", "beta"]));
   });
 });

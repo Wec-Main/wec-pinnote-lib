@@ -24,6 +24,7 @@ import {
   type AppliedBatches,
   type DraftIds,
 } from "./opBatchApplier";
+import { getOpKind } from "./ops/registry";
 import type { DocDiff } from "./ops/types";
 import { isOpBatchStatusConflict, reconcileStatusConflict } from "./opBatchConflict";
 import { PatchQueue, type PatchQueueState, type PatchSendResult } from "./patchQueue";
@@ -426,8 +427,8 @@ export function useAiOpBatchApplier(options: UseAiOpBatchApplierOptions): AiOpBa
           draft.ids,
         ).catch(() => null);
         if (epoch !== draftEpochRef.current || revRef.current !== rev) return false;
-        draft.applied = submitted;
         if (!result) return false;
+        draft.applied = submitted;
         const { added, changed, removed } = result.diff;
         if (added.length === 0 && changed.length === 0 && removed.length === 0) return false;
         if (loadDocument(result.document)) draft.pushes += 1;
@@ -449,11 +450,11 @@ export function useAiOpBatchApplier(options: UseAiOpBatchApplierOptions): AiOpBa
       const ids: DraftIds = { next: 0 };
       const result = await applyPartialOps(current.kind, before, submitted, ids).catch(() => null);
       if (epoch !== draftEpochRef.current || revRef.current !== rev) return false;
+      if (!result) return false;
       draft.applied = submitted;
       draft.ids = ids;
       draft.steps = 0;
       draft.before = before;
-      if (!result) return false;
       const { added, changed, removed } = result.diff;
       if (added.length === 0 && changed.length === 0 && removed.length === 0) return false;
       if (loadDocument(result.document)) draft.pushes += 1;
@@ -481,17 +482,9 @@ export function useAiOpBatchApplier(options: UseAiOpBatchApplierOptions): AiOpBa
   const clearForFresh = useCallback((): boolean => {
     const current = optionsRef.current;
     const document = currentDocument();
-    if (!current.engine || !document || batchesRef.current.previewing) return false;
-    const empty =
-      current.kind === "data_model"
-        ? {
-            ...(document as ErdDocumentJSON),
-            entities: [],
-            relationships: [],
-            enums: [],
-            notes: [],
-          }
-        : { ...(document as FlowJSON), nodes: [], edges: [] };
+    const plugin = getOpKind(current.kind);
+    if (!current.engine || !document || !plugin || batchesRef.current.previewing) return false;
+    const empty = plugin.clearContent(document) as ErdDocumentJSON | FlowJSON;
     current.onUnsavedAiChangesChange?.(true);
     loadDocument(empty);
     markersRef.current.set(FRESH_KEY, revRef.current);

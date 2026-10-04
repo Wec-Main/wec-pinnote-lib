@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
+import { isKnownProviderId } from "../../ai/providerRegistry";
 import { usePersistentState } from "../../hooks/usePersistentState";
-import { AI_KNOWN_PROVIDERS, type AiProviderId } from "../../types/ai.types";
 import type { AiRoutePreference } from "./aiHelpers";
 
 const NO_PREFERENCE: AiRoutePreference = { provider: null, model: null, effort: null };
@@ -14,7 +14,7 @@ function isRoutePreference(value: unknown): value is AiRoutePreference {
   const candidate = value as Record<string, unknown>;
   return (
     (candidate.provider === null ||
-      AI_KNOWN_PROVIDERS.includes(candidate.provider as AiProviderId)) &&
+      (typeof candidate.provider === "string" && isKnownProviderId(candidate.provider))) &&
     isNullableString(candidate.model) &&
     isNullableString(candidate.effort)
   );

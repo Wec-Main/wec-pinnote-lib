@@ -1,8 +1,7 @@
 import { isValidModelId } from "../../ai/modelValidation";
+import { getProvider, listProviderIds } from "../../ai/providerRegistry";
 import {
   AI_ACTIVE_TURN_STATUSES,
-  AI_KNOWN_PROVIDERS,
-  AI_PROVIDERS,
   type AiConnector,
   type AiMe,
   type AiModelInfo,
@@ -11,33 +10,24 @@ import {
 } from "../../types/ai.types";
 import { AnnotationApiError } from "../../types/annotation.types";
 
-export const PROVIDER_LABELS: Record<AiProviderId, string> = {
-  claude: "Claude",
-  codex: "Codex",
-  gemini: "Gemini",
-};
-
-export const PROVIDER_DESCRIPTIONS: Record<AiProviderId, string> = {
-  claude: "Anthropic's coding agent",
-  codex: "OpenAI's coding agent",
-  gemini: "Google's coding agent",
-};
-
-export const PROVIDER_SIGNIN_NAMES: Record<AiProviderId, string> = {
-  claude: "Claude",
-  codex: "ChatGPT",
-  gemini: "Google",
-};
-
 export function providerLabel(provider: string): string {
-  const known = PROVIDER_LABELS[provider as AiProviderId];
+  const known = getProvider(provider)?.label;
   if (known) return known;
   return provider ? provider.charAt(0).toUpperCase() + provider.slice(1) : "Agent";
 }
 
+export function providerDescription(provider: string): string {
+  return getProvider(provider)?.description ?? "";
+}
+
+export function providerSignInLabel(provider: string): string {
+  return getProvider(provider)?.signInLabel ?? providerLabel(provider);
+}
+
 function providerRank(provider: string): number {
-  const index = AI_KNOWN_PROVIDERS.indexOf(provider as AiProviderId);
-  return index < 0 ? AI_KNOWN_PROVIDERS.length : index;
+  const known = listProviderIds();
+  const index = known.indexOf(provider as AiProviderId);
+  return index < 0 ? known.length : index;
 }
 
 export function sortProviders(providers: Iterable<AiProviderId>): AiProviderId[] {
@@ -48,7 +38,7 @@ export function sortProviders(providers: Iterable<AiProviderId>): AiProviderId[]
 
 export function listedProviders(me: AiMe | null | undefined): AiProviderId[] {
   return sortProviders([
-    ...AI_PROVIDERS,
+    ...listProviderIds(),
     ...(me?.providers ?? []),
     ...(me?.connectors ?? []).map((row) => row.provider),
   ]);
@@ -64,7 +54,7 @@ const time = (value: string | null | undefined) => (value ? Date.parse(value) ||
 
 export function enabledProviders(me: AiMe | null | undefined): AiProviderId[] {
   const enabled = me?.providers;
-  if (!enabled || enabled.length === 0) return [...AI_PROVIDERS];
+  if (!enabled || enabled.length === 0) return listProviderIds();
   return sortProviders(enabled);
 }
 

@@ -7,9 +7,10 @@ import {
   type FormEvent,
   type ReactNode,
 } from "react";
+import { getProvider } from "../../ai/providerRegistry";
 import type { AiConnector, AiConnectorAuth, AiProviderId } from "../../types/ai.types";
-import { Icon, ModalShell, Spinner, Tooltip, type IconName } from "../primitives";
-import { formatCountdown, providerLabel } from "./aiHelpers";
+import { Icon, ModalShell, Spinner, Tooltip } from "../primitives";
+import { formatCountdown, providerLabel, providerSignInLabel } from "./aiHelpers";
 import { ProviderLogo } from "./ProviderLogo";
 import { useConnectorLogin } from "./useConnectorLogin";
 import { useAiDefaults, useCopy, useCountdown } from "./useAiPreferences";
@@ -22,65 +23,6 @@ export interface ConnectDialogProps {
   onClose: () => void;
   onConnected?: (connector: AiConnector) => void;
 }
-
-interface MethodCopy {
-  title: string;
-  description: string;
-  icon: IconName;
-}
-
-const METHODS: Record<AiProviderId, Record<ConnectMethod, MethodCopy>> = {
-  claude: {
-    subscription: {
-      title: "Claude subscription",
-      description: "Use your Pro or Max plan",
-      icon: "sparkles",
-    },
-    api_key: {
-      title: "API key",
-      description: "Pay as you go with an Anthropic Console key",
-      icon: "key",
-    },
-  },
-  codex: {
-    subscription: {
-      title: "ChatGPT subscription",
-      description: "Plus, Pro or Team",
-      icon: "sparkles",
-    },
-    api_key: { title: "API key", description: "OpenAI platform key", icon: "key" },
-  },
-  gemini: {
-    subscription: {
-      title: "Google account",
-      description: "Use your Gemini plan",
-      icon: "sparkles",
-    },
-    api_key: { title: "API key", description: "Google AI Studio key", icon: "key" },
-  },
-};
-
-const KEYS: Record<AiProviderId, { name: string; placeholder: string; host: string; url: string }> =
-  {
-    claude: {
-      name: "Anthropic API key",
-      placeholder: "sk-ant-…",
-      host: "console.anthropic.com",
-      url: "https://console.anthropic.com/settings/keys",
-    },
-    codex: {
-      name: "OpenAI API key",
-      placeholder: "sk-…",
-      host: "platform.openai.com",
-      url: "https://platform.openai.com/api-keys",
-    },
-    gemini: {
-      name: "Gemini API key",
-      placeholder: "AIza…",
-      host: "aistudio.google.com",
-      url: "https://aistudio.google.com/apikey",
-    },
-  };
 
 const EXPIRY_WARN_MS = 2 * 60 * 1000;
 
@@ -212,6 +154,8 @@ export function ConnectDialog({
   onConnected,
 }: ConnectDialogProps) {
   const label = providerLabel(provider);
+  const signInLabel = providerSignInLabel(provider);
+  const descriptor = getProvider(provider);
   const [method, setMethod] = useState<ConnectMethod>(initialMethod ?? "subscription");
   const flow = useConnectorLogin(provider);
   const { phase, login, connector, error, start, cancel } = flow;
@@ -233,7 +177,9 @@ export function ConnectDialog({
   const verifying = phase === "verifying";
   const starting = phase === "starting";
   const busy = starting || verifying;
-  const deviceFlow = login ? login.method !== "link_paste" : provider === "codex";
+  const deviceFlow = login
+    ? login.method !== "link_paste"
+    : (descriptor?.auth.subscription?.method ?? "link_paste") !== "link_paste";
   const linkExpired = useExpired(login?.needsCode ? login.expiresAt : null);
 
   const onConnectedRef = useRef(onConnected);
@@ -334,7 +280,8 @@ export function ConnectDialog({
   if (connected) liveText = `${label} is connected.`;
   else if (verifying) liveText = method === "api_key" ? "Checking your key…" : "Connecting…";
   else if (starting) liveText = "Getting a sign-in link…";
-  else if (phase === "waiting" && deviceFlow) liveText = "Waiting for you to approve in ChatGPT.";
+  else if (phase === "waiting" && deviceFlow)
+    liveText = `Waiting for you to approve in ${signInLabel}.`;
   else if (phase === "waiting" && opened) liveText = "Waiting for you to authorize.";
 
   const showError = error && !(method === "subscription" && login?.needsCode && linkExpired);
@@ -382,7 +329,12 @@ export function ConnectDialog({
       </button>
     );
   } else if (method === "api_key") {
-    const key = KEYS[provider];
+    const key = descriptor?.auth.apiKey ?? {
+      name: "API key",
+      placeholder: "",
+      host: "",
+      url: "",
+    };
     const empty = !apiKey.trim();
     body = (
       <form id={ids.form} className="wpn-ai-connect__form" onSubmit={submit} noValidate>
@@ -578,8 +530,8 @@ export function ConnectDialog({
         <Step
           index={1}
           state={!ready ? "active" : opened ? "done" : "active"}
-          title="Sign in with ChatGPT"
-          description="Sign in with the ChatGPT account you want Pinnote to use."
+          title={`Sign in with ${signInLabel}`}
+          description={`Sign in with the ${signInLabel} account you want Pinnote to use.`}
         >
           <button
             type="button"
@@ -592,10 +544,10 @@ export function ConnectDialog({
           >
             {starting ? <Spinner /> : null}
             {opened
-              ? "Open ChatGPT again"
+              ? `Open ${signInLabel} again`
               : starting
                 ? "Getting your sign-in link…"
-                : "Open ChatGPT"}
+                : `Open ${signInLabel}`}
             <Icon name="arrowUpRight" className="wpn-btn__icon" />
           </button>
         </Step>
@@ -609,10 +561,12 @@ export function ConnectDialog({
               </span>
               <div>
                 <p>
-                  {verifying ? "Approved. Finishing up…" : "Waiting for you to approve in ChatGPT…"}
+                  {verifying
+                    ? "Approved. Finishing up…"
+                    : `Waiting for you to approve in ${signInLabel}…`}
                 </p>
                 <p className="wpn-ai-muted">
-                  This finishes by itself once ChatGPT sends you back. Keep this window open.
+                  This finishes by itself once {signInLabel} sends you back. Keep this window open.
                 </p>
               </div>
             </div>
@@ -659,8 +613,8 @@ export function ConnectDialog({
           <Step
             index={2}
             state={!ready ? "todo" : opened ? "done" : "active"}
-            title="Paste it in ChatGPT"
-            description="Sign in with the ChatGPT account you want Pinnote to use."
+            title={`Paste it in ${signInLabel}`}
+            description={`Sign in with the ${signInLabel} account you want Pinnote to use.`}
           >
             <button
               type="button"
@@ -671,7 +625,7 @@ export function ConnectDialog({
               disabled={!ready}
               onClick={openSignIn}
             >
-              {opened ? "Open ChatGPT again" : "Open ChatGPT"}
+              {opened ? `Open ${signInLabel} again` : `Open ${signInLabel}`}
               <Icon name="arrowUpRight" className="wpn-btn__icon" />
             </button>
           </Step>
@@ -687,7 +641,7 @@ export function ConnectDialog({
                   <p>
                     {verifying
                       ? "Approved. Finishing up…"
-                      : "Waiting for you to approve in ChatGPT…"}
+                      : `Waiting for you to approve in ${signInLabel}…`}
                   </p>
                   <p className="wpn-ai-muted">This finishes by itself. Keep this window open.</p>
                 </div>
@@ -695,24 +649,24 @@ export function ConnectDialog({
             ) : null}
           </Step>
         </ol>
-        {opened ? (
+        {opened && descriptor?.auth.subscription?.deviceHelp ? (
           <div className="wpn-ai-connect__help" role="note">
-            <strong>ChatGPT says "Enable device code sign-in"?</strong>
+            <strong>{descriptor.auth.subscription.deviceHelp.heading}</strong>
             <p>
-              Turn on device code authorization for Codex in{" "}
+              Turn on device code authorization for {label} in{" "}
               <a
-                href="https://chatgpt.com/#settings/Security"
+                href={descriptor.auth.subscription.deviceHelp.settingsUrl}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="wpn-ai-link"
               >
-                ChatGPT Security Settings
+                {descriptor.auth.subscription.deviceHelp.settingsLabel}
               </a>
-              , then click "Open ChatGPT again". On a Team or Enterprise plan, a workspace admin has
-              to switch it on.
+              , then click &quot;Open {signInLabel} again&quot;. On a Team or Enterprise plan, a
+              workspace admin has to switch it on.
             </p>
             <button type="button" className="wpn-ai-link" onClick={() => switchMethod("api_key")}>
-              Connect with an API key instead
+              {descriptor.auth.subscription.deviceHelp.toggleLabel}
             </button>
           </div>
         ) : null}
@@ -749,7 +703,13 @@ export function ConnectDialog({
       {connected ? null : (
         <div className="wpn-ai-connect__methods" role="radiogroup" aria-label="How to connect">
           {(["subscription", "api_key"] as const).map((value) => {
-            const copyText = METHODS[provider][value];
+            const copyText = (value === "subscription"
+              ? descriptor?.auth.subscription
+              : descriptor?.auth.apiKey) ?? {
+              title: "API key",
+              description: "",
+              icon: "key" as const,
+            };
             const on = method === value;
             return (
               <button

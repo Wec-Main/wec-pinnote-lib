@@ -23,6 +23,7 @@ import { AiRoutePicker } from "./AiRoutePicker";
 import { AiTranscript, FailureActions } from "./AiTranscript";
 import { aiEditorRequests } from "./aiEditorRequests";
 import {
+  aiErrorActions,
   aiErrorCode,
   aiErrorText,
   aiReady,
@@ -59,6 +60,17 @@ export interface AiChatViewProps {
   showRoutePicker?: boolean;
   suggestions?: readonly AiSuggestion[];
   autoFocus?: boolean;
+  /**
+   * When true, a send that fails with a retryable, provider-related error
+   * (anything whose action list includes "switch_provider" — see
+   * aiErrorActions in aiHelpers.ts) is automatically retried once with
+   * another connected provider before showing the failure to the user, the
+   * same provider the manual "Retry with other provider" button would use.
+   * Off by default: switching providers changes which agent sees the
+   * conversation, so callers opt in deliberately. If the fallback attempt
+   * also fails, the normal failure UI (including a manual retry) is shown.
+   */
+  autoFallbackProvider?: boolean;
 }
 
 interface ChatFailure {
@@ -74,6 +86,22 @@ export function otherProviderRoute(me: AiMe | null, route: AiRoute | null): AiRo
   if (!route) return null;
   const other = connectedProviders(me).find((provider) => provider !== route.provider);
   return other ? resolveRoute(me, { provider: other, model: null, effort: null }) : null;
+}
+
+/**
+ * Pure decision for the opt-in auto-fallback mechanism: should this failed
+ * send be retried once with another connected provider? `alreadyTried`
+ * guards against ping-ponging forever if the fallback provider also fails
+ * (the caller is expected to track that per logical send attempt, e.g. by
+ * clientMessageId).
+ */
+export function shouldAutoFallbackProvider(options: {
+  enabled: boolean;
+  code: string | null;
+  alreadyTried: boolean;
+}): boolean {
+  if (!options.enabled || options.alreadyTried) return false;
+  return aiErrorActions(options.code).includes("switch_provider");
 }
 
 export function useChatRoute(
@@ -127,6 +155,7 @@ export function AiChatView({
   showRoutePicker,
   suggestions,
   autoFocus = true,
+  autoFallbackProvider = false,
 }: AiChatViewProps) {
   const { apiBaseUrl, getToken, projectId, currentUserId } = useAiRuntimeActions();
   const { me } = useAiRuntimeState();
@@ -159,6 +188,7 @@ export function AiChatView({
   sessionRef.current = session;
   const lastAttemptRef = useRef<AiComposerSendInput | null>(null);
   const lastClientIdRef = useRef<string | null>(null);
+  const autoFallbackTriedRef = useRef<Set<string>>(new Set());
   const editingRef = useRef<string | null>(null);
   const [supersededId, setSupersededId] = useState<string | null>(null);
   const current = session.detail?.session ?? null;
@@ -225,11 +255,34 @@ export function AiChatView({
         aiEditorRequests.rememberTurn(response.turn.aiTurnId);
       } catch (err) {
         const code = aiErrorCode(err);
+        const canAutoFallback = shouldAutoFallbackProvider({
+          enabled: autoFallbackProvider,
+          code,
+          alreadyTried: autoFallbackTriedRef.current.has(clientMessageId),
+        });
+        const fallback = canAutoFallback ? otherProviderRoute(me, target) : null;
+        if (fallback) {
+          autoFallbackTriedRef.current.add(clientMessageId);
+          setRoute(fallback);
+          return submit(input, fallback, clientMessageId);
+        }
         setFailure({ code, message: describeAiError(err, "Could not send to AI") });
         throw err;
       }
     },
-    [apiBaseUrl, getToken, newKey, onSessionCreated, projectId, route, scopeId, scopeKind],
+    [
+      apiBaseUrl,
+      autoFallbackProvider,
+      getToken,
+      me,
+      newKey,
+      onSessionCreated,
+      projectId,
+      route,
+      scopeId,
+      scopeKind,
+      setRoute,
+    ],
   );
 
   const resend = useCallback(

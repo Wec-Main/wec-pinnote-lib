@@ -1,8 +1,12 @@
 import type { ErdOp, FlowOp, WorkspaceOp } from "../ai/ops/types";
 
 export type AiProviderId = "claude" | "codex" | "gemini";
+// The canonical list of built-in provider ids. The full descriptor for each
+// (label, logo, auth copy, model catalog, …) lives in src/ai/providerRegistry.ts;
+// this array only exists so ai.types.ts (a dependency-free leaf module, and part
+// of this package's public API via src/index.ts) can keep exporting it unchanged.
 export const AI_PROVIDERS: readonly AiProviderId[] = ["claude", "codex", "gemini"];
-export const AI_KNOWN_PROVIDERS: readonly AiProviderId[] = ["claude", "codex", "gemini"];
+export const AI_KNOWN_PROVIDERS: readonly AiProviderId[] = AI_PROVIDERS;
 
 export type AiMode = "model";
 
