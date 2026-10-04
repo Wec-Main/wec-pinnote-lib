@@ -1,13 +1,13 @@
-import { useEffect, useRef, useState, type FormEvent } from "react";
+import { useRef, useState, type FormEvent } from "react";
 import { Icon, SearchableSelect, Spinner, Tooltip } from "../primitives";
 import { useEscapeKey } from "../../hooks/useEscapeKey";
 import { useFocusTrap } from "../../hooks/useFocusTrap";
 import { useScrimDismiss } from "../../hooks/useScrimDismiss";
+import { CharCounterField } from "./CharCounterField";
 import type { Epic, UserStory } from "../../types/epicFlow.types";
 
 const TITLE_MAX = 1000;
 const DESCRIPTION_MAX = 35000;
-const WARN_RATIO = 0.9;
 
 interface UserStoryFormModalProps {
   mode: "create" | "edit";
@@ -34,14 +34,6 @@ export function UserStoryFormModal({
   const [touched, setTouched] = useState(false);
   const dialogRef = useRef<HTMLFormElement>(null);
   const titleInputRef = useRef<HTMLInputElement>(null);
-  const descriptionRef = useRef<HTMLTextAreaElement>(null);
-
-  useEffect(() => {
-    const el = descriptionRef.current;
-    if (!el) return;
-    el.style.height = "auto";
-    el.style.height = `${el.scrollHeight}px`;
-  }, [description]);
 
   const dismiss = () => {
     if (!busy) {
@@ -116,63 +108,28 @@ export function UserStoryFormModal({
               />
             </div>
 
-            <label className="wpn-epicflow-modal__field">
-              <span className="wpn-epicflow-modal__label">
-                Title <span className="wpn-epicflow-modal__required">*</span>
-              </span>
-              <input
-                ref={titleInputRef}
-                className="wpn-epicflow-modal__input"
-                value={title}
-                maxLength={TITLE_MAX}
-                onChange={(event) => setTitle(event.target.value)}
-                placeholder="As a customer, I want..."
-              />
-              <span
-                className={
-                  title.length >= TITLE_MAX
-                    ? "wpn-epicflow-modal__counter wpn-epicflow-modal__counter--limit"
-                    : title.length >= TITLE_MAX * WARN_RATIO
-                      ? "wpn-epicflow-modal__counter wpn-epicflow-modal__counter--warn"
-                      : "wpn-epicflow-modal__counter"
-                }
-              >
-                {title.length}/{TITLE_MAX}
-              </span>
-              {touched && !titleValid ? (
-                <span className="wpn-users-modal__error">A title is required.</span>
-              ) : null}
-            </label>
+            <CharCounterField
+              ref={titleInputRef}
+              label="Title"
+              required
+              value={title}
+              maxLength={TITLE_MAX}
+              onChange={setTitle}
+              placeholder="As a customer, I want..."
+              error={touched && !titleValid ? "A title is required." : null}
+            />
 
-            <label className="wpn-epicflow-modal__field">
-              <span className="wpn-epicflow-modal__label">
-                Notes <span className="wpn-epicflow-modal__required">*</span>
-              </span>
-              <textarea
-                ref={descriptionRef}
-                className="wpn-epicflow-modal__input wpn-epicflow-modal__textarea"
-                value={description}
-                maxLength={DESCRIPTION_MAX}
-                rows={4}
-                style={{ overflowY: "hidden" }}
-                onChange={(event) => setDescription(event.target.value)}
-                placeholder="Describe the acceptance criteria or context for this user story..."
-              />
-              <span
-                className={
-                  description.length >= DESCRIPTION_MAX
-                    ? "wpn-epicflow-modal__counter wpn-epicflow-modal__counter--limit"
-                    : description.length >= DESCRIPTION_MAX * WARN_RATIO
-                      ? "wpn-epicflow-modal__counter wpn-epicflow-modal__counter--warn"
-                      : "wpn-epicflow-modal__counter"
-                }
-              >
-                {description.length}/{DESCRIPTION_MAX}
-              </span>
-              {touched && !descriptionValid ? (
-                <span className="wpn-users-modal__error">Notes are required.</span>
-              ) : null}
-            </label>
+            <CharCounterField
+              label="Notes"
+              required
+              multiline
+              rows={4}
+              value={description}
+              maxLength={DESCRIPTION_MAX}
+              onChange={setDescription}
+              placeholder="Describe the acceptance criteria or context for this user story..."
+              error={touched && !descriptionValid ? "Notes are required." : null}
+            />
           </div>
         </div>
 
