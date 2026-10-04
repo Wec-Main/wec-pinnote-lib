@@ -252,7 +252,6 @@ export {
   AiPanel,
   AiInlineBar,
   AiEditorDock,
-  PromptTemplatesPanel,
   AiUiProvider,
   useAiUi,
   AiActivity,

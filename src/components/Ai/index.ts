@@ -13,7 +13,6 @@ export { AiInlineBar } from "./AiInlineBar";
 export type { AiInlineBarProps } from "./AiInlineBar";
 export { AiEditorDock } from "./AiEditorDock";
 export type { AiEditorDockProps } from "./AiEditorDock";
-export { PromptTemplatesPanel } from "./PromptTemplatesPanel";
 export { PromptsWorkbench } from "./prompts/PromptsWorkbench";
 export { AiMarkdown } from "./AiMarkdown";
 export { AiActivity } from "./AiActivity";
