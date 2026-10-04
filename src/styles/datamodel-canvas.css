@@ -99,16 +99,6 @@
   pointer-events: none;
 }
 
-.wpn-erd-canvas__overlay {
-  position: absolute;
-  right: 16px;
-  bottom: 16px;
-  z-index: 5;
-  max-width: calc(100% - 32px);
-  cursor: default;
-  user-select: text;
-}
-
 .wpn-erd-selection {
   position: absolute;
   border: 1px solid var(--wpn-accent);
@@ -180,7 +170,7 @@
   box-sizing: border-box;
   border-radius: 8px;
   color: var(--wpn-flowchart-text);
-  background: var(--wpn-flowchart-node-bg);
+  background: var(--erd-entity-fill-color, var(--wpn-flowchart-node-bg));
   box-shadow:
     0 0 0 1px var(--wpn-flowchart-node-border),
     var(--wpn-flowchart-shadow);
@@ -220,8 +210,12 @@
   height: var(--erd-header-height);
   padding: 0 10px 0 6px;
   border-radius: 8px 8px 0 0;
-  background: color-mix(in srgb, var(--wpn-accent) 22%, var(--wpn-flowchart-node-bg));
-  box-shadow: inset 0 3px 0 var(--wpn-accent);
+  background: color-mix(
+    in srgb,
+    var(--erd-entity-color, var(--wpn-accent)) 22%,
+    var(--erd-entity-fill-color, var(--wpn-flowchart-node-bg))
+  );
+  box-shadow: inset 0 3px 0 var(--erd-entity-color, var(--wpn-accent));
   cursor: grab;
 }
 
@@ -268,6 +262,12 @@
   flex: none;
   font-size: 11px;
   font-variant-numeric: tabular-nums;
+  color: var(--wpn-flowchart-text-subtle);
+}
+
+.wpn-erd-entity__lock {
+  display: inline-flex;
+  flex: none;
   color: var(--wpn-flowchart-text-subtle);
 }
 
@@ -452,7 +452,11 @@
 .wpn-erd-note__grip {
   flex: none;
   height: 14px;
-  background: color-mix(in srgb, var(--erd-note-color) 45%, transparent);
+  background: color-mix(
+    in srgb,
+    var(--erd-note-title-color, var(--erd-note-color)) 45%,
+    transparent
+  );
   cursor: grab;
 }
 

@@ -6,7 +6,7 @@ import {
   fetchPreferences,
   saveTagsVisible,
   updateAnnotationTag,
-} from "../services/annotationTagsApi";
+} from "../services/annotationTagsService";
 import type {
   AnnotationTag,
   DraftTagPin,

@@ -5,11 +5,11 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
 import { FlowEngine } from "../../src/utils/flowchart/flowEngine";
-import { FlowProvider } from "../../src/components/WecFlow/FlowProvider";
-import { NodeRenderer } from "../../src/components/WecFlow/NodeRenderer";
+import { FlowProvider } from "../../src/features/flowchart/components/FlowProvider";
+import { NodeRenderer } from "../../src/features/flowchart/components/NodeRenderer";
 import { ErdEngine } from "../../src/utils/erd/erdEngine";
-import { ErdProvider } from "../../src/components/DataModel/erd/ErdProvider";
-import { ErdCanvas } from "../../src/components/DataModel/erd/ErdCanvas";
+import { ErdProvider } from "../../src/features/erd/components/erd/ErdProvider";
+import { ErdCanvas } from "../../src/features/erd/components/erd/ErdCanvas";
 
 let container: HTMLDivElement;
 let root: Root;
@@ -28,16 +28,16 @@ afterEach(() => {
 });
 
 function renderedNodeIds(): string[] {
-  return [...container.querySelectorAll("[data-node-id]")].map(
-    (el) => el.getAttribute("data-node-id")!,
+  return [...container.querySelectorAll("[data-node-id]")].map((el) =>
+    el.getAttribute("data-node-id")!,
   );
 }
 
 function renderedEntityIds(): string[] {
   // EntityHandle (left/right connection handles) also carries
   // data-entity-id, so scope to the entity's own container div.
-  return [...container.querySelectorAll("div[data-entity-id]")].map(
-    (el) => el.getAttribute("data-entity-id")!,
+  return [...container.querySelectorAll("div[data-entity-id]")].map((el) =>
+    el.getAttribute("data-entity-id")!,
   );
 }
 
@@ -52,9 +52,7 @@ describe("viewport culling: flowchart NodeRenderer", () => {
     const farNode = engine.addNode({ type: "process", position: { x: 100_000, y: 100_000 } });
 
     act(() => {
-      root.render(
-        createElement(FlowProvider, { engine }, createElement(NodeRenderer)),
-      );
+      root.render(createElement(FlowProvider, { engine }, createElement(NodeRenderer)));
     });
 
     const ids = renderedNodeIds();
@@ -69,16 +67,17 @@ describe("viewport culling: flowchart NodeRenderer", () => {
 
     const nearNode = engine.addNode({ type: "process", position: { x: 100, y: 100 } });
     for (let i = 1; i < 199; i++) {
-      engine.addNode({ type: "process", position: { x: (i % 4) * 150, y: Math.floor(i / 4) * 100 } });
+      engine.addNode({
+        type: "process",
+        position: { x: (i % 4) * 150, y: Math.floor(i / 4) * 100 },
+      });
     }
     const farNode = engine.addNode({ type: "process", position: { x: 500_000, y: 500_000 } });
 
     expect(engine.getNodes().length).toBeGreaterThan(150);
 
     act(() => {
-      root.render(
-        createElement(FlowProvider, { engine }, createElement(NodeRenderer)),
-      );
+      root.render(createElement(FlowProvider, { engine }, createElement(NodeRenderer)));
     });
 
     const ids = renderedNodeIds();
@@ -93,15 +92,16 @@ describe("viewport culling: flowchart NodeRenderer", () => {
     engine.setViewport({ x: 0, y: 0, zoom: 1 });
 
     for (let i = 0; i < 199; i++) {
-      engine.addNode({ type: "process", position: { x: (i % 4) * 150, y: Math.floor(i / 4) * 100 } });
+      engine.addNode({
+        type: "process",
+        position: { x: (i % 4) * 150, y: Math.floor(i / 4) * 100 },
+      });
     }
     const farNode = engine.addNode({ type: "process", position: { x: 500_000, y: 500_000 } });
     engine.setSelection([farNode.id]);
 
     act(() => {
-      root.render(
-        createElement(FlowProvider, { engine }, createElement(NodeRenderer)),
-      );
+      root.render(createElement(FlowProvider, { engine }, createElement(NodeRenderer)));
     });
 
     expect(renderedNodeIds()).toContain(farNode.id);
@@ -118,9 +118,7 @@ describe("viewport culling: ERD ViewportLayer", () => {
     const farEntity = engine.addEntity({ position: { x: 100_000, y: 100_000 } });
 
     act(() => {
-      root.render(
-        createElement(ErdProvider, { engine }, createElement(ErdCanvas)),
-      );
+      root.render(createElement(ErdProvider, { engine }, createElement(ErdCanvas)));
     });
 
     const ids = renderedEntityIds();
@@ -141,9 +139,7 @@ describe("viewport culling: ERD ViewportLayer", () => {
     expect(engine.getState().entities.length).toBeGreaterThan(150);
 
     act(() => {
-      root.render(
-        createElement(ErdProvider, { engine }, createElement(ErdCanvas)),
-      );
+      root.render(createElement(ErdProvider, { engine }, createElement(ErdCanvas)));
     });
 
     const ids = renderedEntityIds();

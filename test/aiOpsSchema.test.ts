@@ -6,9 +6,9 @@ import {
   ERD_OPS_JSON_SCHEMA,
   FLOW_OP_SPECS,
   FLOW_OPS_JSON_SCHEMA,
-} from "../src/ai/ops";
+} from "../src/features/ai/ops";
 
-const OPS_DIR = resolve(__dirname, "../src/ai/ops");
+const OPS_DIR = resolve(__dirname, "../src/features/ai/ops");
 
 function opNamesInTypes(typeName: "ErdOp" | "FlowOp"): string[] {
   const source = readFileSync(resolve(OPS_DIR, "types.ts"), "utf8");
@@ -69,7 +69,7 @@ describe("op JSON schemas", () => {
   });
 });
 
-describe("src/ai/ops import graph", () => {
+describe("src/features/ai/ops import graph", () => {
   const FORBIDDEN_MODULES = /^(react|react-dom)(\/|$)/;
   const BROWSER_GLOBALS = [
     /\bwindow\b/,

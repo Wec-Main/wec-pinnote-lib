@@ -316,6 +316,81 @@ describe("validateErd: extended rules", () => {
     expect(found).toContain("orphan-entity");
   });
 
+  it("flags an enum that no field uses", () => {
+    const found = codes(
+      snapshot({
+        entities: [entity("a", [pk("a1")], { name: "a" })],
+        enums: [{ id: "e1", name: "unused", values: ["x"] }],
+      }),
+    );
+    expect(found).toContain("unused-enum");
+  });
+
+  it("does not flag an enum that a field uses", () => {
+    const found = codes(
+      snapshot({
+        entities: [
+          entity("a", [pk("a1"), field("a2", { name: "kind", type: "text", enumId: "e1" })], {
+            name: "a",
+          }),
+        ],
+        enums: [{ id: "e1", name: "used", values: ["x"] }],
+      }),
+    );
+    expect(found).not.toContain("unused-enum");
+  });
+
+  it("flags a field with both a generated expression and a default value", () => {
+    const found = validateErd(
+      snapshot({
+        entities: [
+          entity(
+            "a",
+            [
+              pk("a1"),
+              field("a2", {
+                name: "total",
+                defaultValue: "0",
+                generated: { expression: "price * qty" },
+              }),
+            ],
+            { name: "a" },
+          ),
+        ],
+      }),
+    ).issues.find((issue) => issue.code === "generated-default-conflict");
+    expect(found?.severity).toBe("error");
+    expect(found?.fieldId).toBe("a2");
+  });
+
+  it("flags a composite key whose source and target column counts differ", () => {
+    const found = validateErd(
+      snapshot({
+        entities: [parent, child()],
+        relationships: [link({ sourceFieldIds: ["p_id"], targetFieldIds: ["c_pid", "c_id"] })],
+      }),
+    ).issues.find((issue) => issue.code === "composite-key-length-mismatch");
+    expect(found?.severity).toBe("error");
+  });
+
+  it("flags a circular chain of relationships once, excluding self-relationships", () => {
+    const a = entity("a", [pk("a_id"), field("a_b", { name: "b_id" })], { name: "a" });
+    const b = entity("b", [pk("b_id"), field("b_c", { name: "c_id" })], { name: "b" });
+    const c = entity("c", [pk("c_id"), field("c_a", { name: "a_id" })], { name: "c" });
+    const found = validateErd(
+      snapshot({
+        entities: [a, b, c],
+        relationships: [
+          relationship("r1", "a", "b", { sourceFieldId: "a_id", targetFieldId: "a_b" }),
+          relationship("r2", "b", "c", { sourceFieldId: "b_id", targetFieldId: "b_c" }),
+          relationship("r3", "c", "a", { sourceFieldId: "c_id", targetFieldId: "c_a" }),
+          relationship("r4", "a", "a"),
+        ],
+      }),
+    ).issues.filter((issue) => issue.code === "circular-relationship");
+    expect(found).toHaveLength(1);
+  });
+
   it("lists errors before warnings", () => {
     const severities = validateErd(
       snapshot({

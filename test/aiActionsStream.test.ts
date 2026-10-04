@@ -9,7 +9,7 @@ import {
   toWarmBody,
   warmAi,
   type SseFrame,
-} from "../src/services/aiActionsStream";
+} from "../src/services/aiActionsStreamService";
 import type { AiActionEvent } from "../src/types/ai.types";
 
 function collect(chunks: string[]): SseFrame[] {
@@ -256,20 +256,49 @@ describe("warmAi", () => {
     vi.unstubAllGlobals();
   });
 
-  it("posts once a minute per provider with a body the API accepts", () => {
+  it("throttles per provider, model, effort and action keys with a body the API accepts", () => {
     warmAi("https://api.example.com", "tok", "p1", { provider: "claude", model: "m" }, 1_000);
+    warmAi("https://api.example.com", "tok", "p1", { provider: "claude", model: "m" }, 30_000);
     warmAi("https://api.example.com", "tok", "p1", { provider: "claude" }, 30_000);
     warmAi("https://api.example.com", "tok", "p1", { provider: "codex" }, 30_000);
     warmAi("https://api.example.com", "tok", "p1", null, 30_000);
-    warmAi("https://api.example.com", "tok", "p1", { provider: "claude" }, 61_001);
-    expect(fetchMock).toHaveBeenCalledTimes(4);
+    warmAi("https://api.example.com", "tok", "p1", { provider: "claude", model: "m" }, 46_001);
+    expect(fetchMock).toHaveBeenCalledTimes(5);
     const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
     expect(url).toBe("https://api.example.com/api/v1/pinnote/ai/warm?projectId=p1");
     expect(init.method).toBe("POST");
     expect(JSON.parse(init.body as string)).toEqual({ provider: "claude", model: "m" });
     expect(
-      JSON.parse((fetchMock.mock.calls[2] as [string, RequestInit])[1].body as string),
+      JSON.parse((fetchMock.mock.calls[3] as [string, RequestInit])[1].body as string),
     ).toEqual({});
+  });
+
+  it("sends the action keys to prewarm, deduped and sorted, keyed separately", () => {
+    const route = { provider: "claude" as const, model: "m", effort: "low" };
+    warmAi(
+      "https://api.example.com",
+      "tok",
+      "p1",
+      { ...route, actionKeys: ["erd.edit", "erd.ask", "erd.edit"] },
+      1_000,
+    );
+    warmAi(
+      "https://api.example.com",
+      "tok",
+      "p1",
+      { ...route, actionKeys: ["erd.ask", "erd.edit"] },
+      2_000,
+    );
+    warmAi("https://api.example.com", "tok", "p1", { ...route, actionKeys: ["flow.ask"] }, 2_000);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(
+      JSON.parse((fetchMock.mock.calls[0] as [string, RequestInit])[1].body as string),
+    ).toEqual({
+      provider: "claude",
+      model: "m",
+      effort: "low",
+      actionKeys: ["erd.ask", "erd.edit"],
+    });
   });
 });
 

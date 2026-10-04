@@ -1,6 +1,6 @@
 import { useLayoutEffect, useState, type RefObject } from "react";
 
-export type FloatingPlacement = "bottom-start" | "right-start";
+export type FloatingPlacement = "bottom-start" | "top-start" | "right-start";
 
 interface FloatingPositionResult {
   top: number;
@@ -46,7 +46,10 @@ function measure(
 
   const spaceBelow = viewportHeight - VIEWPORT_MARGIN - anchorRect.bottom;
   const spaceAbove = anchorRect.top - VIEWPORT_MARGIN;
-  const openBelow = panelRect.height <= spaceBelow || spaceBelow >= spaceAbove;
+  const openBelow =
+    placement === "top-start"
+      ? panelRect.height > spaceAbove && spaceBelow > spaceAbove
+      : panelRect.height <= spaceBelow || spaceBelow >= spaceAbove;
   const top = openBelow
     ? Math.min(anchorRect.bottom, viewportHeight - VIEWPORT_MARGIN - panelRect.height)
     : Math.max(VIEWPORT_MARGIN, anchorRect.top - panelRect.height);

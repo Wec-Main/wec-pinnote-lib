@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { niceTopTick, thinXLabels, trendChartGeometry, yAxisTicks } from "../src/utils/trendChart";
+import {
+  niceTopTick,
+  thinXLabels,
+  trendChartGeometry,
+  yAxisTicks,
+} from "../src/utils/analytics/trendChart";
 
 interface TrendDay {
   date: string;

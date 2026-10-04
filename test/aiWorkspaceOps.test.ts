@@ -4,8 +4,8 @@ import {
   isWorkspaceOp,
   type WorkspaceApplyDeps,
   type WorkspaceOp,
-} from "../src/ai/ops";
-import { describeWorkspaceOps } from "../src/components/Ai/aiOpChanges";
+} from "../src/features/ai/ops";
+import { describeWorkspaceOps } from "../src/features/ai/components/aiOpChanges";
 import type { ErdDocumentJSON } from "../src/types/dataModel.types";
 import type { FlowJSON } from "../src/types/flowchart.types";
 import { createEmptyErdDocument } from "../src/utils/erd/erdSerialization";

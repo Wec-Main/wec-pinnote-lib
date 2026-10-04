@@ -54,7 +54,7 @@ describe("parseErdDocument", () => {
     expect(parsed.meta).toEqual({});
   });
 
-  it("strips legacy field and entity keys", () => {
+  it("strips legacy field and entity keys but keeps known optional ones", () => {
     const parsed = parseErdDocument({
       version: 1,
       engine: "na",
@@ -63,14 +63,16 @@ describe("parseErdDocument", () => {
           id: "e",
           name: "t",
           color: "#fff",
+          legacyUnknownKey: true,
           fields: [{ id: "f", name: "c", autoIncrement: true, comment: "old" }],
         },
       ],
     });
     expect(parsed.engine).toBe("na");
-    expect(parsed.entities[0]).not.toHaveProperty("color");
+    expect(parsed.entities[0]).not.toHaveProperty("legacyUnknownKey");
+    expect(parsed.entities[0]?.color).toBe("#fff");
     expect(parsed.entities[0]?.fields[0]).not.toHaveProperty("autoIncrement");
-    expect(parsed.entities[0]?.fields[0]).not.toHaveProperty("comment");
+    expect(parsed.entities[0]?.fields[0]?.comment).toBe("old");
   });
 
   it("keeps relationships that point at missing entities for the validator", () => {

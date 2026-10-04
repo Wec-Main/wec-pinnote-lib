@@ -6,20 +6,20 @@ import { fileURLToPath } from "node:url";
 const rootDir = dirname(fileURLToPath(import.meta.url));
 
 const sharedPanelModules = [
-  "/src/components/UserManagement/ConfirmDialog.",
-  "/src/components/Settings/Field.",
-  "/src/components/Settings/validationError.",
-  "/src/components/Settings/useResourceTable.",
+  "/src/features/userManagement/components/ConfirmDialog.",
+  "/src/features/settings/components/Field.",
+  "/src/features/settings/components/validationError.",
+  "/src/features/settings/components/useResourceTable.",
 ];
 
 const lazyPanelDirectories = [
-  "/src/components/Settings/",
-  "/src/components/UserManagement/",
-  "/src/components/AuditHistory/",
-  "/src/components/EpicFlow/",
-  "/src/components/WecFlow/",
-  "/src/components/Ai/",
-  "/src/ai/ops/apply",
+  "/src/features/settings/components/",
+  "/src/features/userManagement/components/",
+  "/src/features/auditHistory/components/",
+  "/src/features/epicFlow/components/",
+  "/src/features/flowchart/components/",
+  "/src/features/ai/components/",
+  "/src/features/ai/ops/apply",
 ];
 
 const isSharedModule = (id: string) =>
@@ -57,16 +57,16 @@ export default defineConfig({
           if (isSharedModule(id)) {
             return "shared";
           }
-          if (id.includes("/src/components/Settings/")) {
+          if (id.includes("/src/features/settings/components/")) {
             return "settings-panel";
           }
-          if (id.includes("/src/components/UserManagement/")) {
+          if (id.includes("/src/features/userManagement/components/")) {
             return "user-management-panel";
           }
-          if (id.includes("/src/components/AuditHistory/")) {
+          if (id.includes("/src/features/auditHistory/components/")) {
             return "audit-history-panel";
           }
-          if (id.includes("/src/components/EpicFlow/")) {
+          if (id.includes("/src/features/epicFlow/components/")) {
             return "epic-flow-panel";
           }
           return undefined;

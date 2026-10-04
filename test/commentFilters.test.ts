@@ -8,7 +8,7 @@ import {
   statusOptions,
   toThreads,
   type CommentFilters,
-} from "../src/components/AnnotationListPanel/commentFilters";
+} from "../src/features/annotation/components/AnnotationListPanel/commentFilters";
 import type { Annotation, AnnotationStatus } from "../src/types/annotation.types";
 
 function annotation(

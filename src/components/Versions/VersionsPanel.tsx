@@ -1,4 +1,4 @@
-import { Icon } from "../WecFlow/FlowIcons";
+import { Icon } from "../../features/flowchart/components/FlowIcons";
 import type { VersionRecordBase } from "../../hooks/useVersionHistory";
 import { formatRelativeTime, formatTimestamp } from "../../utils/format";
 

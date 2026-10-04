@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { pinnedFirst, togglePinned } from "../src/components/Ai/useAiPinnedSessions";
-import { hasUsage, usageText } from "../src/components/Ai/AiTranscript";
-import { listedProviders } from "../src/components/Ai/aiHelpers";
+import { pinnedFirst, togglePinned } from "../src/features/ai/components/useAiPinnedSessions";
+import { hasUsage, usageText } from "../src/features/ai/components/AiTranscript";
+import { listedProviders } from "../src/features/ai/components/aiHelpers";
 import { AI_PROVIDERS } from "../src/types/ai.types";
 import type { AiSession } from "../src/types/ai.types";
 

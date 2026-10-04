@@ -1,7 +1,7 @@
 import { useCallback, useMemo, useState } from "react";
 import { useAnnotationAuth, useAnnotationData } from "../context/AnnotationContext";
-import { listDataModels } from "../services/dataModelApi";
-import { listFlows } from "../services/flowApi";
+import { listDataModels } from "../services/erdService";
+import { listAllFlows } from "../services/flowchartService";
 import type { ReferenceCandidate } from "../utils/mentions";
 import { useEpicFlowApi } from "./useEpicFlowApi";
 import { useSharedFetch } from "./useSharedFetch";
@@ -34,7 +34,7 @@ export function useReferenceCandidates(): ReferenceCandidatesResult {
 
   const flows = useSharedFetch(scope && `flows-list:${scope}:${flowsVersionId ?? ""}`, (signal) =>
     getToken().then((authToken) =>
-      listFlows(config.apiBaseUrl, authToken, config.projectId, flowsVersionId, signal),
+      listAllFlows(config.apiBaseUrl, authToken, config.projectId, flowsVersionId, signal),
     ),
   );
   const dataModels = useSharedFetch(scope && `data-models-list:${scope}`, (signal) =>

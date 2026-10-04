@@ -1,6 +1,13 @@
 import { describe, expect, it, vi } from "vitest";
-import { isOpBatchStatusConflict, reconcileStatusConflict } from "../src/ai/opBatchConflict";
-import { AI_ERROR_TEXT, aiErrorCode, describeAiError } from "../src/components/Ai/aiHelpers";
+import {
+  isOpBatchStatusConflict,
+  reconcileStatusConflict,
+} from "../src/features/ai/opBatchConflict";
+import {
+  AI_ERROR_TEXT,
+  aiErrorCode,
+  describeAiError,
+} from "../src/features/ai/components/aiHelpers";
 import { AnnotationApiError } from "../src/types/annotation.types";
 import type { AiOpBatch } from "../src/types/ai.types";
 

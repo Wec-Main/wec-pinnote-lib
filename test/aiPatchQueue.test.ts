@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
-import { AsyncMutex } from "../src/ai/asyncMutex";
-import { PatchQueue, nextBackoffMs, type PatchSendResult } from "../src/ai/patchQueue";
+import { AsyncMutex } from "../src/features/ai/asyncMutex";
+import { PatchQueue, nextBackoffMs, type PatchSendResult } from "../src/features/ai/patchQueue";
 
 function harness(results: PatchSendResult[]) {
   const scheduled: { run: () => void; delay: number }[] = [];

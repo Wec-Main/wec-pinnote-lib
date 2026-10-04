@@ -1,7 +1,13 @@
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
-import { AiMarkdown, parseMarkdownBlocks, safeHref } from "../src/components/Ai/AiMarkdown";
+import {
+  AiMarkdown,
+  parseMarkdownBlocks,
+  parseMarkdownSegments,
+  safeHref,
+  type MarkdownSegment,
+} from "../src/features/ai/components/AiMarkdown";
 
 const render = (text: string) => renderToStaticMarkup(createElement(AiMarkdown, { text }));
 
@@ -156,5 +162,180 @@ describe("AiMarkdown", () => {
     expect(
       renderToStaticMarkup(createElement(AiMarkdown, { text: "hi", streaming: true })),
     ).toContain('class="wpn-ai-md wpn-ai-md--streaming"');
+  });
+});
+
+const DOCUMENT = [
+  "# Release plan",
+  "",
+  "Intro with `inline code`, **bold**, *italic* and a [link](https://example.com).",
+  "Second line of the same paragraph.",
+  "",
+  "## Steps",
+  "",
+  "- first item",
+  "  - nested one",
+  "  - nested two",
+  "",
+  "  continued after a blank line",
+  "- second item",
+  "",
+  "- loose item after blank",
+  "",
+  "1. ordered",
+  "2. ordered again",
+  "   1. deep ordered",
+  "",
+  "```ts",
+  "const a = 1;",
+  "",
+  "",
+  "function b() {",
+  "  return a;",
+  "}",
+  "```",
+  "",
+  "| Name | Type | Note |",
+  "| :--- | ---: | :---: |",
+  "| `id` | uuid | **pk** |",
+  "| title | text | a\\|b |",
+  "",
+  "> quoted text",
+  "> - quoted item",
+  "",
+  "---",
+  "",
+  "a | b",
+  "",
+  "Paragraph right before a fence",
+  "```",
+  "unterminated",
+  "",
+  "still code",
+].join("\n");
+
+const flatten = (segments: MarkdownSegment[]) => segments.flatMap((segment) => segment.blocks);
+
+function streamPrefixes(
+  text: string,
+  step: number,
+  check: (prefix: string, segments: MarkdownSegment[], previous: MarkdownSegment[]) => void,
+) {
+  let previous: MarkdownSegment[] = [];
+  for (let length = 0; length <= text.length; length += step) {
+    const prefix = text.slice(0, length);
+    const segments = parseMarkdownSegments(prefix, previous);
+    check(prefix, segments, previous);
+    previous = segments;
+  }
+  const segments = parseMarkdownSegments(text, previous);
+  check(text, segments, previous);
+}
+
+describe("AiMarkdown incremental parsing", () => {
+  it("matches a full parse for every streamed prefix", () => {
+    for (const step of [1, 3, 7, 16]) {
+      streamPrefixes(DOCUMENT, step, (prefix, segments) => {
+        expect(flatten(segments)).toEqual(parseMarkdownBlocks(prefix));
+        expect(segments.map((segment) => segment.source).join("")).toBe(prefix);
+      });
+    }
+  });
+
+  it("splits the document into several segments", () => {
+    const segments = parseMarkdownSegments(DOCUMENT);
+    expect(segments.length).toBeGreaterThan(8);
+    const code = segments.find((segment) => segment.source.startsWith("```ts"));
+    expect(code?.blocks).toEqual([
+      { kind: "code", lang: "ts", text: "const a = 1;\n\n\nfunction b() {\n  return a;\n}" },
+    ]);
+  });
+
+  it("keeps completed segments and blocks by reference while streaming", () => {
+    let reused = 0;
+    streamPrefixes(DOCUMENT, 5, (_prefix, segments, previous) => {
+      for (const segment of previous.slice(0, -1)) {
+        const match = segments.find((next) => next.start === segment.start);
+        if (match?.source === segment.source) {
+          expect(match).toBe(segment);
+          expect(match.blocks).toBe(segment.blocks);
+          reused++;
+        }
+      }
+      const kept = previous.slice(0, -1).filter((segment) => segments.includes(segment));
+      expect(kept.length).toBeGreaterThanOrEqual(Math.max(0, previous.length - 2));
+    });
+    expect(reused).toBeGreaterThan(100);
+  });
+
+  it("returns the same segments when the text is unchanged", () => {
+    const first = parseMarkdownSegments(DOCUMENT);
+    const second = parseMarkdownSegments(DOCUMENT, first);
+    second.forEach((segment, index) => expect(segment).toBe(first[index]));
+  });
+
+  it("re-parses correctly when earlier text is edited", () => {
+    const first = parseMarkdownSegments(DOCUMENT);
+    const edited = DOCUMENT.replace("## Steps", "Steps\n- injected");
+    expect(flatten(parseMarkdownSegments(edited, first))).toEqual(parseMarkdownBlocks(edited));
+    const shorter = DOCUMENT.slice(0, 120);
+    expect(flatten(parseMarkdownSegments(shorter, first))).toEqual(parseMarkdownBlocks(shorter));
+    const crlf = DOCUMENT.replace(/\n/g, "\r\n");
+    expect(flatten(parseMarkdownSegments(crlf, first))).toEqual(parseMarkdownBlocks(crlf));
+  });
+
+  it("matches a full parse for random documents built from tricky lines", () => {
+    const vocabulary = [
+      "",
+      "",
+      "para text",
+      "- item",
+      "* star item",
+      "1. one",
+      "3) three",
+      "  - nested",
+      "    deep continuation",
+      "\t- tab item",
+      "  indented text",
+      "```",
+      "```js",
+      "| a | b |",
+      "|---|---|",
+      "a | b",
+      "> quote",
+      "# heading",
+      "---",
+      "   ",
+    ];
+    let seed = 7;
+    const random = () => {
+      seed = (seed * 1103515245 + 12345) % 2147483648;
+      return seed / 2147483648;
+    };
+    for (let run = 0; run < 150; run++) {
+      const lines = Array.from(
+        { length: 4 + Math.floor(random() * 18) },
+        () => vocabulary[Math.floor(random() * vocabulary.length)] as string,
+      );
+      const text = lines.join("\n");
+      streamPrefixes(text, 1 + Math.floor(random() * 4), (prefix, segments) => {
+        expect(flatten(segments)).toEqual(parseMarkdownBlocks(prefix));
+      });
+    }
+  });
+
+  it("renders blocks that span blank lines", () => {
+    const html = render(DOCUMENT);
+    expect(html).toContain(
+      '<pre class="wpn-ai-md__pre" data-lang="ts"><code>const a = 1;\n\n\nfunction b()',
+    );
+    expect(html).toContain(
+      "<ul><li>first item<ul><li>nested one</li><li>nested two continued after a blank line</li></ul></li><li>second item</li><li>loose item after blank</li></ul>",
+    );
+    expect(html).toContain('<th style="text-align:right">Type</th>');
+    expect(html).toContain("<p>a | b</p>");
+    expect(html).toContain(
+      '<pre class="wpn-ai-md__pre"><code>unterminated\n\nstill code</code></pre>',
+    );
   });
 });

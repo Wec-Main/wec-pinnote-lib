@@ -7,7 +7,7 @@ import {
   parseScopedSelector,
   scopeRootOf,
   scopedSelector,
-} from "../../src/utils/annotationScope";
+} from "../../src/utils/annotation/annotationScope";
 
 afterEach(() => {
   document.body.innerHTML = "";

@@ -1,9 +1,9 @@
 import { act, createElement } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { ErdEditor } from "../../src/components/DataModel/erd/ErdEditor";
+import { ErdEditor } from "../../src/features/erd/components/erd/ErdEditor";
 import { blogDocument } from "../erdFixtures";
-import { buttonByText, click } from "./aiTestUtils";
+import { buttonByText, click, typeInto } from "./aiTestUtils";
 
 let container: HTMLDivElement;
 let root: Root;
@@ -27,6 +27,13 @@ const outlineItems = () => [
 ];
 const labels = () =>
   [...container.querySelectorAll(".wpn-flowchart-ui__field-label")].map((n) => n.textContent);
+const tabButtons = () => [...container.querySelectorAll<HTMLButtonElement>('[role="tab"]')];
+const fieldInput = (label: string) => {
+  const match = [...container.querySelectorAll(".wpn-flowchart-ui__field")].find(
+    (el) => el.querySelector(".wpn-flowchart-ui__field-label")?.textContent === label,
+  );
+  return match?.querySelector<HTMLInputElement | HTMLTextAreaElement>("input, textarea") ?? null;
+};
 
 describe("data model sidebar and properties", () => {
   it("lists entities in the sidebar and opens the entity with General and Fields tabs", () => {
@@ -57,5 +64,54 @@ describe("data model sidebar and properties", () => {
     const order = labels();
     expect(order).toContain("Engine");
     expect(order.indexOf("Engine")).toBeLessThan(order.indexOf("Description"));
+  });
+
+  it("entity General tab edits group and lock, and locking disables editing", () => {
+    const items = outlineItems();
+    act(() => click(items[0] ?? null));
+    expect(tabButtons().map((tab) => tab.textContent)).toEqual([
+      "General",
+      expect.stringMatching(/^Fields/),
+    ]);
+    expect(labels()).toEqual(expect.arrayContaining(["Group / subject area"]));
+
+    typeInto(fieldInput("Group / subject area") as HTMLInputElement, "Billing");
+    expect(outlineItems()[0]?.closest(".wpn-erd__outline-subgroup")?.textContent).toContain(
+      "Billing",
+    );
+
+    const lockSwitch = container.querySelector<HTMLButtonElement>(
+      '[aria-label="Locked — prevents edits"]',
+    );
+    expect(lockSwitch).not.toBeNull();
+    act(() => click(lockSwitch));
+    expect(fieldInput("Name")?.hasAttribute("disabled")).toBe(true);
+  });
+
+  it("converts an enum to a lookup table and selects the new entity", () => {
+    act(() => click(buttonByText(container, "Enum")));
+    act(() => click(buttonByText(container, "Add value")));
+    act(() => click(buttonByText(container, "Convert to table")));
+    expect(container.querySelector(".wpn-flowchart-properties__header-title")?.textContent).toBe(
+      "Entity",
+    );
+  });
+
+  it("materializes a join table for a many-to-many relationship", () => {
+    const postsItem = outlineItems().find((item) => item.textContent?.includes("posts"));
+    act(() => click(postsItem ?? null));
+    act(() => click(tabButtons()[1] ?? null));
+    const relButtons = [
+      ...container.querySelectorAll<HTMLButtonElement>(".wpn-flowchart-properties__endpoint"),
+    ];
+    const manyToMany = relButtons.find((button) => button.textContent?.includes("tags"));
+    act(() => click(manyToMany ?? null));
+    expect(container.querySelector(".wpn-flowchart-properties__header-title")?.textContent).toBe(
+      "Relationship",
+    );
+    act(() => click(buttonByText(container, "Materialize join table")));
+    expect(container.querySelector(".wpn-flowchart-properties__header-title")?.textContent).toBe(
+      "Entity",
+    );
   });
 });

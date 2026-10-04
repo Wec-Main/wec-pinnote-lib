@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { createAnnotationApi } from "../src/services/annotationApi";
+import { createAnnotationApi } from "../src/services/annotationService";
 
 const STALE_TOKEN = "stale.jwt.token";
 const FRESH_TOKEN = "fresh.jwt.token";

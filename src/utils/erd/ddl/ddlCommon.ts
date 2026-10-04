@@ -5,8 +5,16 @@ import type {
   ErdReferentialAction,
 } from "../../../types/dataModel.types";
 import { normalizeType } from "../erdTypes";
+import {
+  findReferenceColumn,
+  holdsReference,
+  primaryKeyFields,
+  referenceKey,
+} from "../erdReferences";
 
-export type DdlDialect = "postgres" | "mysql";
+export { primaryKeyFields } from "../erdReferences";
+
+export type DdlDialect = "postgres" | "mysql" | "sqlite";
 
 export interface DdlForeignKey {
   table: ErdEntity;
@@ -22,6 +30,7 @@ export interface DdlForeignKey {
 export interface DdlModel {
   tables: ErdEntity[];
   foreignKeys: DdlForeignKey[];
+  skipped: string[];
 }
 
 const ACTION_SQL: Record<ErdReferentialAction, string> = {
@@ -85,10 +94,6 @@ export function fkName(tableName: string, columnNames: string, explicitName?: st
     : `fk_${tableName}_${columnNames}`;
 }
 
-export function primaryKeyFields(entity: ErdEntity): ErdField[] {
-  return entity.fields.filter((field) => field.primaryKey);
-}
-
 function uniqueName(base: string, taken: Set<string>): string {
   let candidate = base;
   for (let n = 2; taken.has(candidate); n++) candidate = `${base}_${n}`;
@@ -122,9 +127,32 @@ function explicitField(entity: ErdEntity, fieldId: string | undefined): ErdField
   return fieldId === undefined ? undefined : entity.fields.find((field) => field.id === fieldId);
 }
 
-function referencedColumnsOf(parent: ErdEntity, fieldId: string | undefined): ErdField[] {
+function explicitFields(entity: ErdEntity, fieldIds: string[] | undefined): ErdField[] | undefined {
+  if (!fieldIds || fieldIds.length === 0) return undefined;
+  const fields = fieldIds
+    .map((fieldId) => entity.fields.find((field) => field.id === fieldId))
+    .filter((field): field is ErdField => field !== undefined);
+  return fields.length === fieldIds.length ? fields : undefined;
+}
+
+function referencedColumnsOf(
+  parent: ErdEntity,
+  fieldId: string | undefined,
+  fieldIds?: string[],
+): ErdField[] {
+  const explicitMany = explicitFields(parent, fieldIds);
+  if (explicitMany) return explicitMany;
   const explicit = explicitField(parent, fieldId);
-  return explicit ? [explicit] : primaryKeyFields(parent);
+  return explicit ? [explicit] : referenceKey(parent);
+}
+
+function hasExplicitFields(relationship: ErdDocumentJSON["relationships"][number]): boolean {
+  return Boolean(
+    relationship.sourceFieldId ||
+    relationship.targetFieldId ||
+    relationship.sourceFieldIds?.length ||
+    relationship.targetFieldIds?.length,
+  );
 }
 
 function coversPrimaryKey(entity: ErdEntity, columns: readonly ErdField[]): boolean {
@@ -137,11 +165,30 @@ export function buildDdlModel(document: ErdDocumentJSON): DdlModel {
   const tableById = new Map<string, ErdEntity>();
   for (const entity of document.entities) {
     if (entity.fields.length > 0)
-      tableById.set(entity.id, { ...entity, fields: [...entity.fields] });
+      tableById.set(entity.id, {
+        ...entity,
+        fields: [...entity.fields],
+        indexes: [...entity.indexes],
+      });
   }
   const junctions: ErdEntity[] = [];
   const foreignKeys: DdlForeignKey[] = [];
+  const skipped: string[] = [];
   const names = new Set<string>();
+  const ensureReferenceable = (parent: ErdEntity, columns: ErdField[]) => {
+    const table = tableById.get(parent.id);
+    if (!table || coversPrimaryKey(parent, columns)) return;
+    if (columns.length === 1 && columns[0]?.unique) return;
+    const ids = columns.map((column) => column.id).join(",");
+    const covered = table.indexes.some((index) => index.unique && index.fieldIds.join(",") === ids);
+    if (covered) return;
+    table.indexes.push({
+      id: `ref:${parent.id}:${ids}`,
+      name: `uq_${parent.name}_${columns.map((column) => column.name).join("_")}`,
+      fieldIds: columns.map((column) => column.id),
+      unique: true,
+    });
+  };
   const addForeignKey = (
     table: ErdEntity,
     columns: ErdField[],
@@ -150,6 +197,7 @@ export function buildDdlModel(document: ErdDocumentJSON): DdlModel {
     relationship: ErdDocumentJSON["relationships"][number],
     uniqueConstraint: string | null,
   ) => {
+    ensureReferenceable(referencedTable, referencedColumns);
     const columnNames = columns.map((column) => column.name).join("_");
     foreignKeys.push({
       table,
@@ -163,13 +211,35 @@ export function buildDdlModel(document: ErdDocumentJSON): DdlModel {
     });
   };
   for (const relationship of document.relationships) {
-    const source = lookup.get(relationship.sourceEntityId);
-    const target = lookup.get(relationship.targetEntityId);
+    let source = lookup.get(relationship.sourceEntityId);
+    let target = lookup.get(relationship.targetEntityId);
     if (!source || !target) continue;
-    const parentColumns = referencedColumnsOf(source, relationship.sourceFieldId);
+    if (
+      relationship.cardinality !== "many-to-many" &&
+      source.id !== target.id &&
+      !hasExplicitFields(relationship) &&
+      !holdsReference(target, source) &&
+      holdsReference(source, target)
+    ) {
+      [source, target] = [target, source];
+    }
+    const label = `${source.name} → ${target.name}`;
+    const parentColumns = referencedColumnsOf(
+      source,
+      relationship.sourceFieldId,
+      relationship.sourceFieldIds,
+    );
     if (relationship.cardinality === "many-to-many") {
-      const targetColumns = referencedColumnsOf(target, relationship.targetFieldId);
-      if (parentColumns.length === 0 || targetColumns.length === 0) continue;
+      const targetColumns = referencedColumnsOf(
+        target,
+        relationship.targetFieldId,
+        relationship.targetFieldIds,
+      );
+      if (parentColumns.length === 0 || targetColumns.length === 0) {
+        const keyless = parentColumns.length === 0 ? source : target;
+        skipped.push(`${label}: ${keyless.name} has no primary key, "id" or unique column`);
+        continue;
+      }
       const taken = new Set<string>();
       const options = { nullable: false, primaryKey: true };
       const sourceJunctionColumns = parentColumns.map((field) =>
@@ -191,22 +261,33 @@ export function buildDdlModel(document: ErdDocumentJSON): DdlModel {
       continue;
     }
     const child = tableById.get(target.id);
-    if (!child || parentColumns.length === 0) continue;
+    if (!child) {
+      skipped.push(`${label}: ${target.name} has no columns`);
+      continue;
+    }
+    if (parentColumns.length === 0) {
+      skipped.push(`${label}: ${source.name} has no primary key, "id" or unique column`);
+      continue;
+    }
+    const explicitChildColumns = explicitFields(target, relationship.targetFieldIds);
     const explicitChild =
-      parentColumns.length === 1 ? explicitField(target, relationship.targetFieldId) : undefined;
-    const childColumns = explicitChild
-      ? [explicitChild]
-      : parentColumns.map((field) => {
-          const name = `${source.name}_${field.name}`;
-          const existing = child.fields.find((candidate) => candidate.name === name);
-          if (existing) return existing;
-          const column = referencingColumn(source, field, new Set(), {
-            nullable: relationship.targetOptional,
-            primaryKey: false,
-          });
-          child.fields.push(column);
-          return column;
-        });
+      !explicitChildColumns && parentColumns.length === 1
+        ? explicitField(target, relationship.targetFieldId)
+        : undefined;
+    const childColumns =
+      explicitChildColumns ??
+      (explicitChild
+        ? [explicitChild]
+        : parentColumns.map((field) => {
+            const existing = findReferenceColumn(child, source, field);
+            if (existing) return existing;
+            const column = referencingColumn(source, field, new Set(), {
+              nullable: relationship.targetOptional,
+              primaryKey: false,
+            });
+            child.fields.push(column);
+            return column;
+          }));
     const single = childColumns.length === 1 ? childColumns[0] : undefined;
     const needsUnique =
       relationship.cardinality === "one-to-one" &&
@@ -217,7 +298,7 @@ export function buildDdlModel(document: ErdDocumentJSON): DdlModel {
       : null;
     addForeignKey(child, childColumns, source, parentColumns, relationship, uniqueConstraint);
   }
-  return { tables: [...tableById.values(), ...junctions], foreignKeys };
+  return { tables: [...tableById.values(), ...junctions], foreignKeys, skipped };
 }
 
 export function renderIndexes(model: DdlModel, dialect: DdlDialect): string[] {
@@ -233,8 +314,10 @@ export function renderIndexes(model: DdlModel, dialect: DdlDialect): string[] {
           : index.name;
       const list = columns.map((column) => quoteIdentifier(column.name, dialect)).join(", ");
       const keyword = index.unique ? "CREATE UNIQUE INDEX" : "CREATE INDEX";
+      const using = dialect === "postgres" && index.method ? ` USING ${index.method}` : "";
+      const where = dialect === "postgres" && index.where ? ` WHERE ${index.where}` : "";
       return [
-        `${keyword} ${quoteIdentifier(name, dialect)} ON ${qualifiedTableName(table, dialect)} (${list});`,
+        `${keyword} ${quoteIdentifier(name, dialect)} ON ${qualifiedTableName(table, dialect)}${using} (${list})${where};`,
       ];
     }),
   );
@@ -256,6 +339,10 @@ export function renderForeignKeys(model: DdlModel, dialect: DdlDialect): string[
       `ALTER TABLE ${table} ADD CONSTRAINT ${quoteIdentifier(key.name, dialect)} FOREIGN KEY (${list(key.columns)}) REFERENCES ${reference} ON DELETE ${referentialAction(key.onDelete)} ON UPDATE ${referentialAction(key.onUpdate)};`,
     ];
   });
+}
+
+export function skippedComments(model: DdlModel): string[] {
+  return model.skipped.map((reason) => `-- Skipped relationship ${reason.replace(/\s+/g, " ")}`);
 }
 
 export function joinStatements(statements: readonly string[]): string {

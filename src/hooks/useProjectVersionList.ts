@@ -1,5 +1,5 @@
 import { useAnnotationContext } from "../context/AnnotationContext";
-import { createProjectVersionsApi } from "../services/projectVersionsApi";
+import { createProjectVersionsApi } from "../services/versioningService";
 import type { ProjectVersion } from "../types/projectVersion.types";
 import { useSharedFetch } from "./useSharedFetch";
 

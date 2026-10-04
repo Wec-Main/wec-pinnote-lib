@@ -6,7 +6,7 @@ import {
   isRetryableAiMeError,
   useOptionalAiRuntime,
   type AiRuntimeContextValue,
-} from "../../src/context/AiRuntimeContext";
+} from "../../src/features/ai/AiRuntimeContext";
 import { AnnotationApiError } from "../../src/types/annotation.types";
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;

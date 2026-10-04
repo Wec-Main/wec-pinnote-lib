@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { applyStreamEvent } from "../src/utils/applyStreamEvent";
+import { applyStreamEvent } from "../src/utils/annotation/applyStreamEvent";
 import type { Annotation, AnnotationComment } from "../src/types/annotation.types";
 import type { StreamEvent, StreamEventType } from "../src/types/stream.types";
 

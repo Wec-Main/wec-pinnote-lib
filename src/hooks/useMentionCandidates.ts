@@ -1,6 +1,6 @@
 import { useMemo } from "react";
 import { useAnnotationAuth, useAnnotationData } from "../context/AnnotationContext";
-import { fetchMentionCandidates } from "../services/usersApi";
+import { fetchMentionCandidates } from "../services/userManagementService";
 import type { MentionCandidate } from "../utils/mentions";
 import { useSharedFetch } from "./useSharedFetch";
 

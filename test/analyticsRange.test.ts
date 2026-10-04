@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { rangeForPreset, validateCustomRange } from "../src/utils/analyticsRange";
+import { rangeForPreset, validateCustomRange } from "../src/utils/analytics/analyticsRange";
 
 describe("rangeForPreset", () => {
   it("resolves a 7-day preset relative to now", () => {

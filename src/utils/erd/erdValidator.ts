@@ -42,7 +42,11 @@ export type ErdIssueCode =
   | "many-to-many-without-join-table"
   | "foreign-key-without-index"
   | "self-relationship"
-  | "orphan-entity";
+  | "orphan-entity"
+  | "unused-enum"
+  | "circular-relationship"
+  | "generated-default-conflict"
+  | "composite-key-length-mismatch";
 
 export interface ErdValidationIssue {
   id: string;
@@ -226,6 +230,112 @@ function fieldEnumIssues(entity: ErdEntity, enumIds: ReadonlySet<string>): Issue
       entityId: entity.id,
       fieldId: field.id,
     }));
+}
+
+function generatedDefaultIssues(entity: ErdEntity): IssueDraft[] {
+  return entity.fields
+    .filter((field) => field.generated !== undefined && field.defaultValue !== undefined)
+    .map((field) => ({
+      code: "generated-default-conflict" as const,
+      severity: "error" as const,
+      message: `Field ${quoted(field.name)} in ${quoted(entity.name)} cannot have both a generated expression and a default value`,
+      hint: "Remove one of them.",
+      entityId: entity.id,
+      fieldId: field.id,
+    }));
+}
+
+function unusedEnumIssues(enums: readonly ErdEnum[], entities: readonly ErdEntity[]): IssueDraft[] {
+  const used = new Set(
+    entities.flatMap((entity) => entity.fields.flatMap((field) => field.enumId ?? [])),
+  );
+  return enums
+    .filter((entry) => !used.has(entry.id))
+    .map((entry) => ({
+      code: "unused-enum" as const,
+      severity: "warning" as const,
+      message: `Enum ${quoted(entry.name)} is not used by any field`,
+      hint: "Remove it, or use it on a field.",
+      enumId: entry.id,
+    }));
+}
+
+function compositeKeyIssues(relationship: ErdRelationship): IssueDraft[] {
+  const { sourceFieldIds, targetFieldIds } = relationship;
+  if (!sourceFieldIds || !targetFieldIds) return [];
+  if (sourceFieldIds.length === targetFieldIds.length) return [];
+  return [
+    {
+      code: "composite-key-length-mismatch",
+      severity: "error",
+      message: `Relationship ${relationship.id} has ${sourceFieldIds.length} source columns but ${targetFieldIds.length} target columns`,
+      hint: "Composite foreign keys must pair up one-to-one.",
+      relationshipId: relationship.id,
+    },
+  ];
+}
+
+function circularRelationshipIssues(
+  snapshot: ErdSnapshot,
+  entityLookup: ReadonlyMap<string, ErdEntity>,
+): IssueDraft[] {
+  type Edge = { to: string; relationship: ErdRelationship };
+  const edges = new Map<string, Edge[]>();
+  for (const relationship of snapshot.relationships) {
+    if (relationship.sourceEntityId === relationship.targetEntityId) continue;
+    if (
+      !entityLookup.has(relationship.sourceEntityId) ||
+      !entityLookup.has(relationship.targetEntityId)
+    ) {
+      continue;
+    }
+    const list = edges.get(relationship.sourceEntityId) ?? [];
+    list.push({ to: relationship.targetEntityId, relationship });
+    edges.set(relationship.sourceEntityId, list);
+  }
+  const issues: IssueDraft[] = [];
+  const seenCycles = new Set<string>();
+  const visited = new Set<string>();
+  const path: string[] = [];
+  const pathEdges: ErdRelationship[] = [];
+  const onPath = new Set<string>();
+
+  const visit = (entityId: string): void => {
+    path.push(entityId);
+    onPath.add(entityId);
+    for (const edge of edges.get(entityId) ?? []) {
+      if (onPath.has(edge.to)) {
+        const startIndex = path.indexOf(edge.to);
+        const cycleIds = path.slice(startIndex);
+        const key = [...cycleIds].sort().join("|");
+        if (!seenCycles.has(key)) {
+          seenCycles.add(key);
+          const names = cycleIds.map((id) => quoted(entityLookup.get(id)?.name ?? id)).join(", ");
+          issues.push({
+            code: "circular-relationship",
+            severity: "warning",
+            message: `Entities ${names} form a circular relationship chain`,
+            hint: "Circular foreign keys can make inserts and deletes order-dependent — confirm this is intentional.",
+            relationshipId: (pathEdges[startIndex] ?? edge.relationship).id,
+          });
+        }
+        continue;
+      }
+      if (!visited.has(edge.to)) {
+        pathEdges.push(edge.relationship);
+        visit(edge.to);
+        pathEdges.pop();
+      }
+    }
+    path.pop();
+    onPath.delete(entityId);
+    visited.add(entityId);
+  };
+
+  for (const entity of snapshot.entities) {
+    if (!visited.has(entity.id)) visit(entity.id);
+  }
+  return issues;
 }
 
 function enumIssues(enums: readonly ErdEnum[]): IssueDraft[] {
@@ -680,14 +790,18 @@ export function validateErd(snapshot: ErdSnapshot): ErdValidationResult {
       ...fieldIssues(entity),
       ...indexIssues(entity),
       ...fieldEnumIssues(entity, enumIds),
+      ...generatedDefaultIssues(entity),
     ]),
     ...nameRuleIssues(snapshot),
     ...typeRuleIssues(snapshot),
-    ...snapshot.relationships.flatMap((relationship) =>
-      relationshipIssues(relationship, entityLookup),
-    ),
+    ...snapshot.relationships.flatMap((relationship) => [
+      ...relationshipIssues(relationship, entityLookup),
+      ...compositeKeyIssues(relationship),
+    ]),
     ...relationshipRuleIssues(snapshot, entityLookup),
+    ...circularRelationshipIssues(snapshot, entityLookup),
     ...enumIssues(snapshot.enums),
+    ...unusedEnumIssues(snapshot.enums, snapshot.entities),
     ...orphanIssues(snapshot),
   ].sort((a, b) => (a.severity === b.severity ? 0 : a.severity === "error" ? -1 : 1));
   const issues = drafts.map((draft, index) => ({ ...draft, id: `${draft.code}:${index}` }));

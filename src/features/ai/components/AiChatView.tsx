@@ -1,0 +1,534 @@
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useAiCurrentSelection } from "../aiSelectionStore";
+import { useAiRuntimeActions, useAiRuntimeState } from "../AiRuntimeContext";
+import { createClientMessageId } from "../../../utils/ai/aiStreamGuards";
+import { useAiSession, type AiSessionState } from "../../../hooks/useAiSession";
+import { createAiSessionWithMessage, sendAiMessage } from "../../../services/aiService";
+import { writeResource } from "../../../utils/resourceCache";
+import { aiSessionCacheKey } from "../cacheKeys";
+import type {
+  AiMe,
+  AiMention,
+  AiMessage,
+  AiScopeKind,
+  SendAiMessageRequest,
+  SendAiMessageResponse,
+} from "../../../types/ai.types";
+import { Icon, type IconName } from "../../../components/primitives/Icon";
+import {
+  AiComposer,
+  writeComposerDraft,
+  type AiComposerSeed,
+  type AiComposerSendInput,
+} from "./AiComposer";
+import { AiRoutePicker } from "./AiRoutePicker";
+import { AiTranscript, FailureActions } from "./AiTranscript";
+import { aiEditorRequests } from "./aiEditorRequests";
+import {
+  aiErrorActions,
+  aiErrorCode,
+  aiErrorText,
+  aiReady,
+  connectAgentHint,
+  connectedProviders,
+  describeAiError,
+  isActiveTurn,
+  resolveRoute,
+  type AiRoute,
+} from "./aiHelpers";
+import { useAiUi } from "./AiUiContext";
+import { useAiMentionCandidates } from "./useAiMentionCandidates";
+import { useAiDefaults } from "./useAiPreferences";
+import { useWarmAi } from "./useAiAction";
+
+export interface AiSuggestion {
+  title: string;
+  prompt: string;
+  hint?: string;
+  icon?: IconName;
+  tone?: string;
+}
+
+export interface AiChatViewProps {
+  aiSessionId: string | null;
+  onSessionCreated: (aiSessionId: string) => void;
+  compact?: boolean;
+  initialMentions?: readonly AiMention[];
+  initialText?: string;
+  scopeKind?: AiScopeKind;
+  scopeId?: string | null;
+  session?: AiSessionState;
+  route?: AiRoute | null;
+  onRouteChange?: (route: AiRoute) => void;
+  showRoutePicker?: boolean;
+  suggestions?: readonly AiSuggestion[];
+  autoFocus?: boolean;
+  /**
+   * When true, a send that fails with a retryable, provider-related error
+   * (anything whose action list includes "switch_provider" — see
+   * aiErrorActions in aiHelpers.ts) is automatically retried once with
+   * another connected provider before showing the failure to the user, the
+   * same provider the manual "Retry with other provider" button would use.
+   * Off by default: switching providers changes which agent sees the
+   * conversation, so callers opt in deliberately. If the fallback attempt
+   * also fails, the normal failure UI (including a manual retry) is shown.
+   */
+  autoFallbackProvider?: boolean;
+}
+
+interface ChatFailure {
+  message: string;
+  code: string | null;
+}
+
+export function newChatDraftKey(scopeKind: AiScopeKind, scopeId: string | null): string {
+  return `new:${scopeKind}:${scopeId ?? ""}`;
+}
+
+export function otherProviderRoute(me: AiMe | null, route: AiRoute | null): AiRoute | null {
+  if (!route) return null;
+  const other = connectedProviders(me).find((provider) => provider !== route.provider);
+  return other ? resolveRoute(me, { provider: other, model: null, effort: null }) : null;
+}
+
+/**
+ * Pure decision for the opt-in auto-fallback mechanism: should this failed
+ * send be retried once with another connected provider? `alreadyTried`
+ * guards against ping-ponging forever if the fallback provider also fails
+ * (the caller is expected to track that per logical send attempt, e.g. by
+ * clientMessageId).
+ */
+export function shouldAutoFallbackProvider(options: {
+  enabled: boolean;
+  code: string | null;
+  alreadyTried: boolean;
+}): boolean {
+  if (!options.enabled || options.alreadyTried) return false;
+  return aiErrorActions(options.code).includes("switch_provider");
+}
+
+export function useChatRoute(
+  me: AiMe | null,
+  session: AiSessionState,
+  aiSessionId: string | null,
+): [AiRoute | null, (route: AiRoute) => void] {
+  const [defaults] = useAiDefaults();
+  const [override, setOverride] = useState<AiRoute | null>(null);
+  const current = session.detail?.session ?? null;
+  const previousId = useRef(aiSessionId);
+  useEffect(() => {
+    if (previousId.current !== null && previousId.current !== aiSessionId) setOverride(null);
+    previousId.current = aiSessionId;
+  }, [aiSessionId]);
+  const preference = current
+    ? { provider: current.provider, model: current.model, effort: current.effort }
+    : defaults;
+  return [override ?? resolveRoute(me, preference), setOverride];
+}
+
+function lastUserMessage(session: AiSessionState): AiMessage | null {
+  const { order, byId } = session.messages;
+  for (let index = order.length - 1; index >= 0; index -= 1) {
+    const message = byId[order[index] as string];
+    if (message?.role === "user" && message.content.type === "text") return message;
+  }
+  return null;
+}
+
+function inputOf(message: AiMessage): AiComposerSendInput | null {
+  if (message.content.type !== "text") return null;
+  return {
+    text: message.content.text,
+    mentions: message.content.mentions ?? [],
+    selection: message.content.selection ?? null,
+  };
+}
+
+export function AiChatView({
+  aiSessionId,
+  onSessionCreated,
+  compact = false,
+  initialMentions,
+  initialText,
+  scopeKind = "project",
+  scopeId = null,
+  session: sessionFromParent,
+  route: routeProp,
+  onRouteChange,
+  showRoutePicker,
+  suggestions,
+  autoFocus = true,
+  autoFallbackProvider = false,
+}: AiChatViewProps) {
+  const { apiBaseUrl, getToken, projectId, currentUserId } = useAiRuntimeActions();
+  const { me } = useAiRuntimeState();
+  const ai = useAiUi();
+  const ownSession = useAiSession(sessionFromParent ? null : aiSessionId);
+  const session = sessionFromParent ?? ownSession;
+  const mentions = useAiMentionCandidates();
+  const selection = useAiCurrentSelection();
+  const [ownRoute, setOwnRoute] = useChatRoute(me, session, aiSessionId);
+  const controlled = routeProp !== undefined;
+  const route = controlled ? routeProp : ownRoute;
+  const setRoute = useCallback(
+    (next: AiRoute) => {
+      if (!controlled) setOwnRoute(next);
+      onRouteChange?.(next);
+    },
+    [controlled, onRouteChange, setOwnRoute],
+  );
+  const [failure, setFailure] = useState<ChatFailure | null>(null);
+  const [seed, setSeed] = useState<AiComposerSeed | null>(null);
+  const [optimistic, setOptimistic] = useState<{
+    text: string;
+    mentions: AiMention[];
+    at: number;
+  } | null>(null);
+  const createdRef = useRef<string | null>(null);
+  const sessionIdRef = useRef(aiSessionId);
+  sessionIdRef.current = aiSessionId;
+  const sessionRef = useRef(session);
+  sessionRef.current = session;
+  const lastAttemptRef = useRef<AiComposerSendInput | null>(null);
+  const lastClientIdRef = useRef<string | null>(null);
+  const autoFallbackTriedRef = useRef<Set<string>>(new Set());
+  const editingRef = useRef<string | null>(null);
+  const [supersededId, setSupersededId] = useState<string | null>(null);
+  const current = session.detail?.session ?? null;
+
+  useEffect(() => {
+    if (aiSessionId && aiSessionId === createdRef.current) return;
+    createdRef.current = null;
+    setFailure(null);
+  }, [aiSessionId]);
+
+  const ready = aiReady(me);
+  const active = isActiveTurn(current?.activeTurn);
+  const alternate = useMemo(() => otherProviderRoute(me, route), [me, route]);
+  const newKey = newChatDraftKey(scopeKind, scopeId);
+
+  const warm = useWarmAi();
+  const warmProvider = route?.provider ?? null;
+  const warmModel = route?.model ?? null;
+  const warmEffort = route?.effort ?? null;
+  const warmNow = useCallback(() => {
+    warm(
+      projectId,
+      warmProvider
+        ? {
+            provider: warmProvider,
+            ...(warmModel ? { model: warmModel } : {}),
+            ...(warmEffort ? { effort: warmEffort } : {}),
+          }
+        : null,
+    );
+  }, [projectId, warm, warmEffort, warmModel, warmProvider]);
+  useEffect(() => {
+    warmNow();
+  }, [warmNow]);
+
+  const submit = useCallback(
+    async (
+      input: AiComposerSendInput,
+      routeOverride?: AiRoute | null,
+      reuseClientMessageId?: string | null,
+    ) => {
+      const target = routeOverride ?? route;
+      if (!target) return;
+      setFailure(null);
+      lastAttemptRef.current = input;
+      const clientMessageId = reuseClientMessageId ?? createClientMessageId();
+      lastClientIdRef.current = clientMessageId;
+      const request: SendAiMessageRequest = {
+        clientMessageId,
+        text: input.text,
+        mentions: input.mentions,
+        mode: "model",
+        provider: target.provider,
+        model: target.model,
+        effort: target.effort,
+      };
+      if (input.selection) request.selection = input.selection;
+      try {
+        let id = sessionIdRef.current ?? createdRef.current;
+        let response: SendAiMessageResponse | null = null;
+        if (!id) {
+          const authToken = await getToken();
+          const created = await createAiSessionWithMessage(apiBaseUrl, authToken, {
+            projectId,
+            mode: "model",
+            scopeKind,
+            scopeId,
+            provider: target.provider,
+            model: target.model,
+            effort: target.effort,
+            message: request,
+          });
+          id = created.session.aiSessionId;
+          createdRef.current = id;
+          if (created.detail && created.sent) {
+            writeResource(aiSessionCacheKey(apiBaseUrl, id), created.detail);
+            response = created.sent;
+          }
+          writeComposerDraft(newKey, null);
+          onSessionCreated(id);
+        }
+        if (!response) {
+          const live = sessionRef.current;
+          if (live.detail?.session.aiSessionId === id) {
+            response = await live.send(request);
+          } else {
+            const authToken = await getToken();
+            response = await sendAiMessage(apiBaseUrl, authToken, id, request);
+          }
+        }
+        aiEditorRequests.rememberTurn(response.turn.aiTurnId);
+      } catch (err) {
+        const code = aiErrorCode(err);
+        const canAutoFallback = shouldAutoFallbackProvider({
+          enabled: autoFallbackProvider,
+          code,
+          alreadyTried: autoFallbackTriedRef.current.has(clientMessageId),
+        });
+        const fallback = canAutoFallback ? otherProviderRoute(me, target) : null;
+        if (fallback) {
+          autoFallbackTriedRef.current.add(clientMessageId);
+          setRoute(fallback);
+          return submit(input, fallback, clientMessageId);
+        }
+        setFailure({ code, message: describeAiError(err, "Could not send to AI") });
+        throw err;
+      }
+    },
+    [
+      apiBaseUrl,
+      autoFallbackProvider,
+      getToken,
+      me,
+      newKey,
+      onSessionCreated,
+      projectId,
+      route,
+      scopeId,
+      scopeKind,
+      setRoute,
+    ],
+  );
+
+  const resend = useCallback(
+    (routeOverride?: AiRoute | null) => {
+      const last = lastUserMessage(sessionRef.current);
+      const input = (last && inputOf(last)) ?? lastAttemptRef.current;
+      if (!input) return;
+      if (routeOverride) setRoute(routeOverride);
+      void submit(input, routeOverride).catch(() => undefined);
+    },
+    [setRoute, submit],
+  );
+
+  const sendNow = useCallback(
+    (input: AiComposerSendInput) => {
+      setOptimistic({ text: input.text, mentions: input.mentions, at: Date.now() });
+      const editing = editingRef.current;
+      editingRef.current = null;
+      submit(input)
+        .then(() => {
+          if (editing) setSupersededId(editing);
+        })
+        .catch(() => {
+          setOptimistic(null);
+          if (editing) editingRef.current = editing;
+          setSeed((value) => ({
+            text: input.text,
+            mentions: input.mentions,
+            nonce: (value?.nonce ?? 0) + 1,
+          }));
+        });
+    },
+    [submit],
+  );
+
+  const answerQuestions = useCallback(
+    (answers: string) => sendNow({ text: answers, mentions: [] }),
+    [sendNow],
+  );
+
+  const retry = useCallback(() => resend(), [resend]);
+  const retryWithOther = useCallback(() => resend(alternate), [alternate, resend]);
+  const openIntegrations = useCallback(() => ai?.openIntegrations("connectors"), [ai]);
+  const editLast = useCallback((message: AiMessage) => {
+    const input = inputOf(message);
+    if (!input) return;
+    editingRef.current = message.aiMessageId;
+    setSeed((value) => ({
+      text: input.text,
+      mentions: input.mentions,
+      nonce: (value?.nonce ?? 0) + 1,
+    }));
+  }, []);
+
+  const editLastFromComposer = useCallback(() => {
+    const last = lastUserMessage(sessionRef.current);
+    if (last && last.authorId === currentUserId) editLast(last);
+  }, [currentUserId, editLast]);
+
+  const retryAttempt = () => {
+    const input = lastAttemptRef.current;
+    if (input) void submit(input, undefined, lastClientIdRef.current).catch(() => undefined);
+  };
+  const retryAttemptWithOther = () => {
+    const input = lastAttemptRef.current;
+    if (!input || !alternate) return;
+    setRoute(alternate);
+    void submit(input, alternate, null).catch(() => undefined);
+  };
+
+  const stop = () => {
+    session
+      .interrupt()
+      .catch((err: unknown) =>
+        setFailure({ code: aiErrorCode(err), message: describeAiError(err, "Could not stop") }),
+      );
+  };
+
+  const { messages: messageStore } = session;
+  const optimisticMatched = useMemo(() => {
+    if (!optimistic) return false;
+    const floor = optimistic.at - 60_000;
+    for (let index = messageStore.order.length - 1; index >= 0; index -= 1) {
+      const message = messageStore.byId[messageStore.order[index] as string];
+      if (!message) continue;
+      const created = Date.parse(message.createdAt);
+      if (created < floor) break;
+      if (
+        message.role === "user" &&
+        message.content.type === "text" &&
+        message.content.text === optimistic.text
+      ) {
+        return true;
+      }
+    }
+    return false;
+  }, [optimistic, messageStore]);
+  useEffect(() => {
+    if (optimisticMatched) setOptimistic(null);
+  }, [optimisticMatched]);
+  const pendingUser = optimistic && !optimisticMatched ? optimistic : null;
+
+  const disabledReason = !ready ? connectAgentHint(me) : null;
+  const pickSuggestion = (prompt: string) =>
+    setSeed((value) => ({ text: prompt, nonce: (value?.nonce ?? 0) + 1 }));
+
+  const emptyHint = (
+    <div className="wpn-ai-empty">
+      <span className="wpn-ai-empty__icon" aria-hidden="true">
+        <Icon name="sparkles" />
+      </span>
+      <p className="wpn-ai-empty__title">How can I help?</p>
+      <p className="wpn-ai-muted">
+        Pick a starting point, or type your own request. Mention a data model, flow or comment with{" "}
+        <kbd>#</kbd>.
+      </p>
+      {suggestions && suggestions.length > 0 ? (
+        <ul className="wpn-ai-suggestions">
+          {suggestions.map((suggestion) => (
+            <li key={suggestion.title}>
+              <button
+                type="button"
+                className="wpn-ai-suggestion"
+                disabled={!ready}
+                onClick={() => pickSuggestion(suggestion.prompt)}
+              >
+                <span
+                  className="wpn-ai-suggestion__tile"
+                  data-tone={suggestion.tone ?? suggestion.icon ?? "sparkles"}
+                  aria-hidden="true"
+                >
+                  <Icon name={suggestion.icon ?? "sparkles"} className="wpn-ai-suggestion__icon" />
+                </span>
+                <span className="wpn-ai-suggestion__text">
+                  <span className="wpn-ai-suggestion__title">{suggestion.title}</span>
+                  {suggestion.hint ? (
+                    <span className="wpn-ai-suggestion__hint">{suggestion.hint}</span>
+                  ) : null}
+                </span>
+                <Icon name="chevronRight" className="wpn-ai-suggestion__go" />
+              </button>
+            </li>
+          ))}
+        </ul>
+      ) : null}
+    </div>
+  );
+
+  const pickerVisible = showRoutePicker ?? !controlled;
+
+  return (
+    <div className={["wpn-ai-chat", compact ? "wpn-ai-chat--compact" : ""].join(" ")}>
+      <AiTranscript
+        key={aiSessionId ?? "new"}
+        session={session}
+        currentUserId={currentUserId}
+        canApplyModelOps={Boolean(me?.canApplyModelOps)}
+        compact={compact}
+        emptyHint={emptyHint}
+        canSwitchProvider={Boolean(alternate)}
+        onRetry={route ? retry : undefined}
+        onRetryWithProvider={alternate ? retryWithOther : undefined}
+        onEditLast={editLast}
+        onOpenIntegrations={ai ? openIntegrations : undefined}
+        pendingUser={pendingUser}
+        supersededUserMessageId={supersededId}
+        onAnswerQuestions={ready ? answerQuestions : undefined}
+      />
+      {failure ? (
+        <div className="wpn-ai-failure wpn-ai-failure--error wpn-ai-chat__failure" role="alert">
+          <p className="wpn-ai-notice wpn-ai-notice--error">
+            <Icon name="alert" /> {aiErrorText(failure.code, failure.message)}
+          </p>
+          <FailureActions
+            code={failure.code}
+            canSwitchProvider={Boolean(alternate)}
+            onRetry={lastAttemptRef.current ? retryAttempt : undefined}
+            onRetryWithProvider={alternate ? retryAttemptWithOther : undefined}
+            onOpenIntegrations={ai ? openIntegrations : undefined}
+          />
+        </div>
+      ) : null}
+      {disabledReason ? (
+        <div className="wpn-ai-chat__disabled">
+          <span>{disabledReason}</span>
+          <button type="button" className="wpn-btn wpn-btn--ghost" onClick={openIntegrations}>
+            <Icon name="plug" className="wpn-btn__icon" />
+            Connect
+          </button>
+        </div>
+      ) : null}
+      <AiComposer
+        candidates={mentions.candidates}
+        onMentionTrigger={mentions.request}
+        onSend={sendNow}
+        onWarm={warmNow}
+        disabled={!ready || !route}
+        disabledReason={disabledReason}
+        active={active && current?.activeTurn?.userId === currentUserId}
+        onStop={stop}
+        onEditLast={editLastFromComposer}
+        activeSince={
+          current?.activeTurn
+            ? Date.parse(current.activeTurn.startedAt ?? current.activeTurn.createdAt) || null
+            : null
+        }
+        activeLabel={session.draft?.status || null}
+        initialMentions={initialMentions}
+        initialText={initialText}
+        autoFocus={autoFocus}
+        compact={compact}
+        draftKey={aiSessionId ?? newKey}
+        seed={seed}
+        selection={selection}
+        toolbar={pickerVisible ? <AiRoutePicker me={me} value={route} onChange={setRoute} /> : null}
+      />
+    </div>
+  );
+}

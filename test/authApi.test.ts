@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { createAuthApi } from "../src/services/authApi";
+import { createAuthApi } from "../src/services/authService";
 import { AnnotationApiError } from "../src/types/annotation.types";
 
 const API_BASE = "http://localhost:4000/api/v1/pinnote";

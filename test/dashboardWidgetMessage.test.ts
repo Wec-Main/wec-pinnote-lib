@@ -4,7 +4,7 @@ import { describe, expect, it } from "vitest";
 import {
   WidgetMessage,
   WidgetMessageRow,
-} from "../src/components/Settings/Dashboard/DashboardWidgetMessage";
+} from "../src/features/settings/components/Dashboard/DashboardWidgetMessage";
 
 describe("WidgetMessage", () => {
   it("renders the empty tone with its title and detail and no users notice", () => {

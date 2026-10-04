@@ -6,7 +6,7 @@ import {
   filterMentionCandidates,
   findMentionQuery,
   type AiMentionCandidate,
-} from "../../src/components/Ai/AiComposer";
+} from "../../src/features/ai/components/AiComposer";
 import { click, flush, press, typeInto } from "./aiTestUtils";
 
 const candidates: AiMentionCandidate[] = [

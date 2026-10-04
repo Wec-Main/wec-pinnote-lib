@@ -1,8 +1,8 @@
 import { describe, expect, it, vi } from "vitest";
-import { EMPTY_AI_SESSION_VIEW } from "../src/ai/sessionReducer";
-import { AiSessionViewStore } from "../src/ai/sessionViewStore";
-import { buildTranscriptRows } from "../src/components/Ai/AiTranscript";
-import { createClientMessageId, parseAiStreamEvent } from "../src/utils/aiStreamGuards";
+import { EMPTY_AI_SESSION_VIEW } from "../src/features/ai/sessionReducer";
+import { AiSessionViewStore } from "../src/features/ai/sessionViewStore";
+import { buildTranscriptRows } from "../src/features/ai/components/AiTranscript";
+import { createClientMessageId, parseAiStreamEvent } from "../src/utils/ai/aiStreamGuards";
 import type { AiMessage, AiStreamEvent } from "../src/types/ai.types";
 
 function manualScheduler() {
@@ -80,6 +80,48 @@ describe("AiSessionViewStore", () => {
     store.dispatch(delta(1, "a"));
     runFrame();
     expect(store.getDraft()).toBeNull();
+  });
+});
+
+describe("resume snapshots", () => {
+  const snapshot = (seq: number, text: string): AiStreamEvent => ({
+    type: "ai_snapshot",
+    aiSessionId: "s1",
+    aiTurnId: "t1",
+    kind: "text",
+    seq,
+    offset: 0,
+    length: text.length,
+    text,
+  });
+
+  it("replaces the draft text and applies only newer deltas", () => {
+    const { scheduler, runFrame } = manualScheduler();
+    const store = new AiSessionViewStore(EMPTY_AI_SESSION_VIEW, "s1", scheduler);
+    store.dispatch(delta(1, "He"));
+    store.dispatch({ ...delta(4, "lo"), fromSeq: 4 } as AiStreamEvent);
+    runFrame();
+    expect(store.getDraft()?.maybeMissed).toBe(true);
+    store.dispatch(snapshot(5, "Hello"));
+    expect(store.getDraft()).toMatchObject({ text: "Hello", seq: 5 });
+    expect(store.getDraft()?.maybeMissed).toBeUndefined();
+    store.dispatch(delta(3, "x"));
+    store.dispatch(delta(5, "y"));
+    store.dispatch({ ...delta(6, " world"), fromSeq: 6 } as AiStreamEvent);
+    runFrame();
+    expect(store.getDraft()).toMatchObject({ text: "Hello world", seq: 6 });
+    store.dispatch(snapshot(4, "stale"));
+    expect(store.getDraft()?.text).toBe("Hello world");
+  });
+
+  it("starts a draft from an empty snapshot when none is held", () => {
+    const { scheduler, runFrame } = manualScheduler();
+    const store = new AiSessionViewStore(EMPTY_AI_SESSION_VIEW, "s1", scheduler);
+    store.dispatch(snapshot(2, ""));
+    store.dispatch({ ...delta(3, "Hi"), fromSeq: 3 } as AiStreamEvent);
+    runFrame();
+    expect(store.getDraft()).toMatchObject({ aiTurnId: "t1", text: "Hi", seq: 3 });
+    expect(store.getDraft()?.maybeMissed).toBeUndefined();
   });
 });
 

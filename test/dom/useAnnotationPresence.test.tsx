@@ -4,8 +4,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 import { useAnnotationPresence } from "../../src/hooks/useAnnotationPresence";
-import { ANNOTATION_SCOPE_ATTRIBUTE } from "../../src/utils/annotationScope";
-import { generateSelector } from "../../src/utils/selectorGenerator";
+import { ANNOTATION_SCOPE_ATTRIBUTE } from "../../src/utils/annotation/annotationScope";
+import { generateSelector } from "../../src/utils/dom/selectorGenerator";
 import type { Annotation } from "../../src/types/annotation.types";
 
 function annotation(id: string, selector: string, elementIdentifier: string): Annotation {

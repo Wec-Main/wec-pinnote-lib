@@ -8,29 +8,30 @@ import {
   type AiMessageStore,
   type AiSessionViewState,
   type AiStreamingDraft,
-} from "../ai/sessionReducer";
-import { aiSessionCacheKey } from "../ai/cacheKeys";
-import { AI_SESSION_DETAIL_TTL_MS } from "../ai/prefetch";
-import { AiSessionViewStore, type AiDraftStore } from "../ai/sessionViewStore";
-import { useAiRuntimeActions } from "../context/AiRuntimeContext";
+} from "../features/ai/sessionReducer";
+import { aiSessionCacheKey } from "../features/ai/cacheKeys";
+import { AI_SESSION_DETAIL_TTL_MS } from "../features/ai/prefetch";
+import { AiSessionViewStore, type AiDraftStore } from "../features/ai/sessionViewStore";
+import { useAiRuntimeActions } from "../features/ai/AiRuntimeContext";
 import { fetchResource, readResource, writeResource } from "../utils/resourceCache";
-import { createClientMessageId } from "../utils/aiStreamGuards";
+import { createClientMessageId } from "../utils/ai/aiStreamGuards";
 import {
   fetchAiSession,
   fetchAiSessionMessages,
   interruptAiSession,
   sendAiMessage,
   updateAiSession,
-} from "../services/aiApi";
+} from "../services/aiService";
 import { AnnotationApiError } from "../types/annotation.types";
-import type {
-  AiSession,
-  AiSessionDetail,
-  AiStreamEvent,
-  AiTurn,
-  SendAiMessageRequest,
-  SendAiMessageResponse,
-  UpdateAiSessionRequest,
+import {
+  AI_ACTIVE_TURN_STATUSES,
+  type AiSession,
+  type AiSessionDetail,
+  type AiStreamEvent,
+  type AiTurn,
+  type SendAiMessageRequest,
+  type SendAiMessageResponse,
+  type UpdateAiSessionRequest,
 } from "../types/ai.types";
 
 const OLDER_PAGE_SIZE = 100;
@@ -53,8 +54,18 @@ export interface AiSessionState {
   reload: () => void;
 }
 
+function isActiveTurn(turn: AiTurn): boolean {
+  return AI_ACTIVE_TURN_STATUSES.includes(turn.status);
+}
+
 function describe(err: unknown): string {
   return err instanceof Error && err.message ? err.message : "Could not load the AI session";
+}
+
+export function needsResync(view: AiSessionViewState): boolean {
+  if (view.draft) return true;
+  if (view.meta?.session.activeTurn && isActiveTurn(view.meta.session.activeTurn)) return true;
+  return Object.values(view.turns).some(isActiveTurn);
 }
 
 export function isMissingSessionStatus(status: number | null): boolean {
@@ -147,12 +158,13 @@ export function useAiSession(aiSessionId: string | null): AiSessionState {
       (event) => {
         if (event.type === "ai_resync") {
           store.flush();
-          reload();
+          if (needsResync(store.getView())) reload();
           return;
         }
         store.dispatch(event);
       },
-      () => {
+      (reconnect) => {
+        if (reconnect.resumed) return;
         store.update(markDraftStale);
         reload();
       },

@@ -73,7 +73,7 @@ export interface MenuDefinition {
 
 export interface MenuPanelProps {
   items: MenuItemDefinition[];
-  placement: "bottom-start" | "right-start";
+  placement: "bottom-start" | "top-start" | "right-start";
   anchorRef: RefObject<HTMLElement | null>;
   onRequestClose: () => void;
   className?: string;

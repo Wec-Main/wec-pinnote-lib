@@ -1,8 +1,11 @@
 import { act, createElement } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { ConnectDialog, type ConnectDialogProps } from "../../src/components/Ai/ConnectDialog";
-import { AiRuntimeContext } from "../../src/context/AiRuntimeContext";
+import {
+  ConnectDialog,
+  type ConnectDialogProps,
+} from "../../src/features/ai/components/ConnectDialog";
+import { AiRuntimeContext } from "../../src/features/ai/AiRuntimeContext";
 import type { AiConnector, AiLoginStart, AiMe, AiProviderId } from "../../src/types/ai.types";
 import {
   aiMe,

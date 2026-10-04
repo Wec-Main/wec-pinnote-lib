@@ -1,16 +1,19 @@
 import { act, createElement } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { mergeMessages, EMPTY_MESSAGE_STORE } from "../../src/ai/sessionReducer";
-import { AiTranscript, type AiTranscriptProps } from "../../src/components/Ai/AiTranscript";
+import { mergeMessages, EMPTY_MESSAGE_STORE } from "../../src/features/ai/sessionReducer";
+import {
+  AiTranscript,
+  type AiTranscriptProps,
+} from "../../src/features/ai/components/AiTranscript";
 import type { AiSessionState } from "../../src/hooks/useAiSession";
 import type { AiMessage, AiSession, AiTurn } from "../../src/types/ai.types";
-import { AI_ERROR_TEXT } from "../../src/components/Ai/aiHelpers";
+import { AI_ERROR_TEXT } from "../../src/features/ai/components/aiHelpers";
 import { T0, buttonByText, click } from "./aiTestUtils";
 
 const openMention = vi.hoisted(() => vi.fn());
 
-vi.mock("../../src/components/Ai/useAiCardActions", () => ({
+vi.mock("../../src/features/ai/components/useAiCardActions", () => ({
   useAiCardActions: () => ({
     openMention,
     previewBatch: vi.fn(),

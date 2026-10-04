@@ -5,7 +5,7 @@ import {
   diffFields,
   entityLabel,
   summarize,
-} from "../src/components/AuditHistory/auditFormat";
+} from "../src/features/auditHistory/components/auditFormat";
 import type { AuditRecord } from "../src/types/audit.types";
 
 function record(overrides: Partial<AuditRecord> = {}): AuditRecord {

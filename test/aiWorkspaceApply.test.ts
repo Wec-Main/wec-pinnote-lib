@@ -1,21 +1,25 @@
 import { describe, expect, it } from "vitest";
-import { applyWorkspaceOps, type WorkspaceApplyDeps, type WorkspaceOp } from "../src/ai/ops";
-import type { WorkspaceResumeEntry } from "../src/ai/ops/workspaceOps";
+import {
+  applyWorkspaceOps,
+  type WorkspaceApplyDeps,
+  type WorkspaceOp,
+} from "../src/features/ai/ops";
+import type { WorkspaceResumeEntry } from "../src/features/ai/ops/workspaceOps";
 import {
   clearWorkspaceResume,
   loadWorkspaceResume,
   saveWorkspaceResume,
-} from "../src/ai/workspaceResumeStore";
+} from "../src/features/ai/workspaceResumeStore";
 import {
   WorkspaceBatchBusyError,
   claimWorkspaceBatch,
   retryAsync,
-} from "../src/components/Ai/useAiWorkspaceApplier";
+} from "../src/features/ai/components/useAiWorkspaceApplier";
 import {
   postDraftOnce,
   postedDraftCount,
   resetPostedDrafts,
-} from "../src/components/Ai/useAiCardActions";
+} from "../src/features/ai/components/useAiCardActions";
 
 function memoryStorage() {
   const data = new Map<string, string>();

@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useAnnotationData, useAnnotationUi } from "../context/AnnotationContext";
 import { useAnnotationStream } from "./useAnnotationStream";
 import type { StreamTokenGetter } from "./useSseStream";
-import { applyStreamEvent } from "../utils/applyStreamEvent";
+import { applyStreamEvent } from "../utils/annotation/applyStreamEvent";
 import type { StreamEvent } from "../types/stream.types";
 import type {
   Annotation,

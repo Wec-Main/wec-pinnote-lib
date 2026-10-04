@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import { createAnnotationApi } from "../services/annotationApi";
+import { createAnnotationApi } from "../services/annotationService";
 import type { AnnotationApiClient, AnnotationConfig } from "../types/annotation.types";
 import { useTokenGetter } from "./useTokenGetter";
 

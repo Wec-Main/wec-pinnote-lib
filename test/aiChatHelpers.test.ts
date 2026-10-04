@@ -5,14 +5,14 @@ import {
   anchorDialog,
   clampDialog,
   suggestionsFor,
-} from "../src/components/Ai/AiFloatingButton";
+} from "../src/features/ai/components/AiFloatingButton";
 import {
   isNearBottom,
   resolveToolStatus,
   restoredScrollTop,
   shouldAutoScroll,
   turnFailureText,
-} from "../src/components/Ai/AiTranscript";
+} from "../src/features/ai/components/AiTranscript";
 import {
   AI_ERROR_TEXT,
   aiErrorActions,
@@ -21,7 +21,7 @@ import {
   enabledProviders,
   listedProviders,
   providerLabel,
-} from "../src/components/Ai/aiHelpers";
+} from "../src/features/ai/components/aiHelpers";
 import { AnnotationApiError } from "../src/types/annotation.types";
 import type { AiMe, AiTurn } from "../src/types/ai.types";
 

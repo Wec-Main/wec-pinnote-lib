@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { ErdEngine } from "../src/utils/erd/erdEngine";
+import { getEntityRect } from "../src/utils/erd/erdGeometry";
 import { blogDocument, entity, field, relationship } from "./erdFixtures";
 
 function blogEngine() {
@@ -62,7 +63,7 @@ describe("entities", () => {
     expect(first.schema).toBe("public");
     expect(first.fields).toHaveLength(1);
     expect(first.fields[0]).toMatchObject({
-      name: "id",
+      name: `${first.name}_id`,
       type: "integer",
       primaryKey: true,
       nullable: false,
@@ -166,6 +167,87 @@ describe("enums and notes", () => {
     expect(engine.getNote(note.id)?.text).toBe("bye");
     engine.removeNotes([note.id]);
     expect(engine.getState().notes).toEqual([]);
+  });
+});
+
+describe("audit columns, enum-to-table and join-table materialization", () => {
+  it("adds audit columns with engine defaults and skips names that already exist", () => {
+    const engine = blogEngine();
+    engine.addAuditColumns("tags");
+    const names = engine.getEntity("tags")?.fields.map((f) => f.name) ?? [];
+    expect(names).toEqual(expect.arrayContaining(["created_at", "updated_at", "deleted_at"]));
+    expect(names).not.toContain("created_by");
+    const createdAt = engine.getEntity("tags")?.fields.find((f) => f.name === "created_at");
+    expect(createdAt).toMatchObject({ type: "timestamp", nullable: false, defaultValue: "now()" });
+    const deletedAt = engine.getEntity("tags")?.fields.find((f) => f.name === "deleted_at");
+    expect(deletedAt).toMatchObject({ type: "timestamp", nullable: true });
+    expect(engine.getState().canUndo).toBe(true);
+    engine.undo();
+    expect(engine.getEntity("tags")?.fields.map((f) => f.name)).toEqual(["id", "label"]);
+  });
+
+  it("does not re-add audit columns whose names already exist", () => {
+    const engine = blogEngine();
+    engine.addField("tags", { name: "created_at", type: "text" });
+    engine.addAuditColumns("tags", { timestamps: true, softDelete: false });
+    const createdAtFields = engine.getEntity("tags")?.fields.filter((f) => f.name === "created_at");
+    expect(createdAtFields).toHaveLength(1);
+    expect(createdAtFields?.[0]?.type).toBe("text");
+  });
+
+  it("adds requested audit column groups only", () => {
+    const engine = blogEngine();
+    engine.addAuditColumns("tags", { timestamps: false, softDelete: false, actorTracking: true });
+    const names = engine.getEntity("tags")?.fields.map((f) => f.name) ?? [];
+    expect(names).toEqual(expect.arrayContaining(["created_by", "updated_by"]));
+    expect(names).not.toContain("created_at");
+    expect(names).not.toContain("deleted_at");
+  });
+
+  it("converts an enum into a lookup table and rewires referencing fields", () => {
+    const engine = blogEngine();
+    const lookup = engine.convertEnumToTable("role_enum");
+    expect(lookup?.name).toBe("user_role");
+    expect(lookup?.fields.map((f) => f.name)).toEqual(["user_role_id", "value"]);
+    const valueField = lookup?.fields.find((f) => f.name === "value");
+    expect(valueField).toMatchObject({ type: "text", unique: true, nullable: false });
+    expect(valueField?.comment).toBe("Seed values: admin, member");
+    const roleField = engine.getEntity("users")?.fields.find((f) => f.id === "users_role");
+    expect(roleField?.enumId).toBeUndefined();
+    expect(roleField?.type).toBe(lookup?.fields[0]?.type);
+    expect(engine.getState().enums).toEqual([]);
+    const newRel = engine
+      .getState()
+      .relationships.find((r) => r.sourceEntityId === lookup?.id && r.targetEntityId === "users");
+    expect(newRel).toMatchObject({ cardinality: "one-to-many", targetFieldId: "users_role" });
+    engine.undo();
+    expect(engine.getEnum("role_enum")).toBeDefined();
+    expect(engine.getEntity(lookup?.id ?? "")).toBeUndefined();
+  });
+
+  it("returns null when converting a missing enum", () => {
+    expect(blogEngine().convertEnumToTable("nope")).toBeNull();
+  });
+
+  it("materializes a many-to-many relationship into a join table", () => {
+    const engine = blogEngine();
+    const join = engine.materializeJoinTable("r2");
+    expect(join?.name).toBe("posts_tags");
+    expect(join?.fields.map((f) => f.name)).toEqual(["posts_id", "tags_id"]);
+    expect(join?.fields.every((f) => f.primaryKey && !f.nullable)).toBe(true);
+    expect(engine.getState().relationships.some((r) => r.id === "r2")).toBe(false);
+    const toJoin = engine.getState().relationships.filter((r) => r.targetEntityId === join?.id);
+    expect(toJoin).toHaveLength(2);
+    expect(toJoin.map((r) => r.sourceEntityId).sort()).toEqual(["posts", "tags"]);
+    engine.undo();
+    expect(engine.getEntity(join?.id ?? "")).toBeUndefined();
+    expect(engine.getState().relationships.some((r) => r.id === "r2")).toBe(true);
+  });
+
+  it("returns null for a relationship that is missing or not many-to-many", () => {
+    const engine = blogEngine();
+    expect(engine.materializeJoinTable("nope")).toBeNull();
+    expect(engine.materializeJoinTable("r1")).toBeNull();
   });
 });
 
@@ -409,6 +491,19 @@ describe("layout and validation", () => {
     expect(new Set(positions).size).toBe(3);
     engine.undo();
     expect(engine.getEntity("users")?.position).toEqual({ x: 0, y: 0 });
+  });
+
+  it("lines notes up in a row below the entities on auto-layout", () => {
+    const engine = blogEngine();
+    const second = engine.addNote({ position: { x: 900, y: 10 } });
+    const first = engine.addNote({ position: { x: -400, y: 10 } });
+    engine.applyLayout("layered");
+    const { entities, notes } = engine.getState();
+    const bottom = Math.max(...entities.map((e) => getEntityRect(e).y + getEntityRect(e).height));
+    const placed = (id: string) => notes.find((note) => note.id === id)!.position;
+    expect(placed(first.id).y).toBe(placed(second.id).y);
+    expect(placed(first.id).y).toBeGreaterThan(bottom);
+    expect(placed(first.id).x).toBeLessThan(placed(second.id).x);
   });
 
   it("records validation results and issue severities", () => {

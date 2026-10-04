@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { Annotation } from "../types/annotation.types";
-import { isLibraryElement, resolveElement } from "../utils/elementResolver";
+import { isLibraryElement, resolveElement } from "../utils/dom/elementResolver";
 
 const MUTATION_DEBOUNCE_MS = 120;
 const MUTATION_MAX_WAIT_MS = 400;

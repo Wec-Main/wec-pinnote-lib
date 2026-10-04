@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { visibleSettingsTabs } from "../src/components/Settings/settingsTabs";
+import { visibleSettingsTabs } from "../src/features/settings/components/settingsTabs";
 
 const tabIds = (role: Parameters<typeof visibleSettingsTabs>[0]) =>
   visibleSettingsTabs(role).map((tab) => tab.id);

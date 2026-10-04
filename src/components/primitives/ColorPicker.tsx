@@ -2,26 +2,10 @@ import { useRef, useState } from "react";
 import { useEscapeKey } from "../../hooks/useEscapeKey";
 import { useFloatingPosition } from "../../hooks/useFloatingPosition";
 import { useOutsidePointerDown } from "../../hooks/useOutsidePointerDown";
+import { DEFAULT_PALETTE } from "../../utils/colorPalette";
 import { Icon } from "./Icon";
 
-const DEFAULT_PALETTE = [
-  "#ef4444",
-  "#f97316",
-  "#f59e0b",
-  "#eab308",
-  "#84cc16",
-  "#10b981",
-  "#14b8a6",
-  "#0ea5e9",
-  "#6366f1",
-  "#8b5cf6",
-  "#a855f7",
-  "#ec4899",
-  "#f43f5e",
-  "#64748b",
-  "#1e293b",
-  "#ffffff",
-];
+export { DEFAULT_PALETTE };
 
 const HEX_PATTERN = /^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/;
 

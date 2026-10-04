@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it } from "vitest";
-import { generateSelector, isStableId } from "../../src/utils/selectorGenerator";
-import { ANNOTATION_SCOPE_ATTRIBUTE } from "../../src/utils/annotationScope";
+import { generateSelector, isStableId } from "../../src/utils/dom/selectorGenerator";
+import { ANNOTATION_SCOPE_ATTRIBUTE } from "../../src/utils/annotation/annotationScope";
 
 afterEach(() => {
   document.body.innerHTML = "";

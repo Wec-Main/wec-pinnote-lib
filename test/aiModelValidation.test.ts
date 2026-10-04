@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { AI_EFFORTS, isAiEffort, isValidModelId } from "../src/ai/modelValidation";
-import { buildProviderCatalogs } from "../src/components/Ai/prompts/modelCatalog";
-import { TEMPLATE_EFFORTS } from "../src/components/Ai/promptTemplateLogic";
+import { AI_EFFORTS, isAiEffort, isValidModelId } from "../src/features/ai/modelValidation";
+import { buildProviderCatalogs } from "../src/features/ai/components/prompts/modelCatalog";
+import { TEMPLATE_EFFORTS } from "../src/features/ai/components/promptTemplateLogic";
 
 describe("model and effort validation", () => {
   it("matches the server effort enum", () => {

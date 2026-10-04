@@ -7,7 +7,7 @@ import {
   isBusyOpBatchStatus,
   mergeDocDiffs,
   planDraftStep,
-} from "../src/ai/opBatchApplier";
+} from "../src/features/ai/opBatchApplier";
 import type { AiOpBatch, AiOpBatchStatus } from "../src/types/ai.types";
 import { createEmptyErdDocument } from "../src/utils/erd/erdSerialization";
 

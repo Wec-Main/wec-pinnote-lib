@@ -6,7 +6,7 @@ import {
   aiActionReducer,
   useAiAction,
   type UseAiActionResult,
-} from "../../src/components/Ai/useAiAction";
+} from "../../src/features/ai/components/useAiAction";
 import type { AiActionRunState } from "../../src/types/ai.types";
 import { flush } from "./aiTestUtils";
 
@@ -18,6 +18,37 @@ describe("aiActionReducer", () => {
   });
   const ev = (state: AiActionRunState, event: Parameters<typeof aiActionReducer>[1]) =>
     aiActionReducer(state, event);
+
+  it("keeps a result that arrives before a persistence error and surfaces the error", () => {
+    let state = ev(started, {
+      type: "batch",
+      events: [{ type: "step", id: "read", label: "Reading", status: "running", detail: "3s" }],
+      text: "",
+      reasoning: "",
+      at: 101,
+    });
+    expect(state.steps).toEqual([
+      { id: "read", label: "Reading", status: "running", detail: "3s" },
+    ]);
+    state = ev(state, {
+      type: "event",
+      event: { type: "result", kind: "markdown", text: "Answer" },
+      at: 102,
+    });
+    state = ev(state, {
+      type: "event",
+      event: { type: "error", code: "persist_failed", message: "Could not save", retryable: true },
+      at: 103,
+    });
+    state = ev(state, {
+      type: "event",
+      event: { type: "done", runId: "r1", status: "failed", aiSessionId: null },
+      at: 104,
+    });
+    expect(state.status).toBe("error");
+    expect(state.result).toMatchObject({ kind: "markdown", text: "Answer" });
+    expect(state.error).toMatchObject({ code: "persist_failed", message: "Could not save" });
+  });
 
   it("folds a full run into state", () => {
     let state = started;
@@ -88,7 +119,7 @@ describe("aiActionReducer", () => {
     state = ev(state, {
       type: "event",
       at: 109,
-      event: { type: "done", runId: "r1", status: "completed" },
+      event: { type: "done", runId: "r1", status: "completed", aiSessionId: "chat-1" },
     });
     expect(state).toEqual({
       status: "done",
@@ -107,6 +138,7 @@ describe("aiActionReducer", () => {
       result: { kind: "markdown", text: "Hello" },
       usage: { inputTokens: 10, outputTokens: 5, ttftMs: 300, durationMs: 900 },
       error: null,
+      aiSessionId: "chat-1",
       startedAt: 100,
       finishedAt: 109,
     });
@@ -184,6 +216,7 @@ let streams: ControlledStream[];
 let signals: AbortSignal[];
 let frames: FrameRequestCallback[];
 let renders: number;
+let liveText = false;
 
 function Probe() {
   renders++;
@@ -191,6 +224,7 @@ function Probe() {
     apiBaseUrl: "https://api.example.com",
     projectId: "p1",
     getToken: async () => "tok",
+    liveText,
   });
   return null;
 }
@@ -232,10 +266,47 @@ afterEach(() => {
   act(() => root.unmount());
   container.remove();
   vi.unstubAllGlobals();
+  liveText = false;
 });
 
 describe("useAiAction", () => {
-  it("streams a run, batching text deltas into one render per frame", async () => {
+  it("in live text mode streams text through the store and commits it when the run ends", async () => {
+    liveText = true;
+    act(() => root.render(createElement(Probe)));
+    let done!: Promise<void>;
+    act(() => {
+      done = hook.run("erd.ask", { prompt: "why" });
+    });
+    await flush();
+    const stream = streams[0]!;
+    const notified = vi.fn();
+    const off = hook.live.subscribe(notified);
+    stream.push(frame("delta", { text: "Hel" }));
+    await flush();
+    runFrames();
+    expect(hook.state.text).toBe("Hel");
+    const before = renders;
+    stream.push(frame("delta", { text: "lo " }) + frame("reasoning", { text: "r" }));
+    await flush();
+    runFrames();
+    stream.push(frame("delta", { text: "world" }));
+    await flush();
+    runFrames();
+    expect(hook.live.get()).toEqual({ text: "Hello world", reasoning: "r" });
+    expect(hook.state.text).toBe("Hel");
+    expect(hook.state.reasoning).toBe("r");
+    expect(renders - before).toBeLessThanOrEqual(1);
+    expect(notified).toHaveBeenCalledTimes(3);
+    stream.push(frame("done", { runId: "r1", status: "completed" }));
+    stream.close();
+    await act(async () => {
+      await done;
+    });
+    off();
+    expect(hook.state).toMatchObject({ status: "done", text: "Hello world", reasoning: "r" });
+  });
+
+  it("streams a run, batching text deltas, steps and progress into one render per frame", async () => {
     let done!: Promise<void>;
     act(() => {
       done = hook.run("erd.explain", { target: { kind: "data_model", id: "dm1" } });
@@ -246,6 +317,8 @@ describe("useAiAction", () => {
 
     stream.push(frame("step", { id: "s1", label: "Reading", status: "running" }));
     await flush();
+    expect(hook.state.steps).toEqual([]);
+    runFrames();
     expect(hook.state.steps).toEqual([{ id: "s1", label: "Reading", status: "running" }]);
 
     const before = renders;
@@ -261,9 +334,13 @@ describe("useAiAction", () => {
     expect(hook.state.reasoning).toBe("r");
     expect(renders).toBe(before + 1);
 
+    const beforeProgress = renders;
     stream.push(frame("delta", { text: "d" }) + frame("progress", { ops: 2 }));
     await flush();
+    expect(hook.state).toMatchObject({ text: "abc", progress: 0 });
+    runFrames();
     expect(hook.state).toMatchObject({ text: "abcd", progress: 2 });
+    expect(renders).toBe(beforeProgress + 1);
 
     stream.push(frame("done", { runId: "r1", status: "completed" }));
     stream.close();

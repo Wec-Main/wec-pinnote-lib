@@ -10,8 +10,8 @@ import {
   outputFormatOptions,
   templatePlaceholders,
   validateDraft,
-} from "../src/components/Ai/promptTemplateLogic";
-import { normalizeAiActionTemplate } from "../src/services/aiApi";
+} from "../src/features/ai/components/promptTemplateLogic";
+import { normalizeAiActionTemplate } from "../src/services/aiService";
 import type { AiActionTemplate, AiActionTemplateDto } from "../src/types/ai.types";
 
 const template: AiActionTemplate = {

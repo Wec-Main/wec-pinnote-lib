@@ -6,6 +6,7 @@ import { flush, jsonResponse } from "./aiTestUtils";
 
 let container: HTMLDivElement;
 let root: Root;
+let eventSourceUrls: string[] = [];
 const fetchMock = vi.fn();
 
 beforeEach(() => {
@@ -16,9 +17,13 @@ beforeEach(() => {
     return jsonResponse([]);
   });
   vi.stubGlobal("fetch", fetchMock);
+  eventSourceUrls = [];
   vi.stubGlobal(
     "EventSource",
     class {
+      constructor(url: string) {
+        eventSourceUrls.push(String(url));
+      }
       addEventListener() {}
       close() {}
     },
@@ -36,7 +41,7 @@ afterEach(() => {
 });
 
 describe("AI UI without /ai routes", () => {
-  it("renders no AI controls and never asks for an AI stream ticket", async () => {
+  it("renders no AI controls and never opens the AI stream", async () => {
     const errors = vi.spyOn(console, "error").mockImplementation(() => undefined);
     act(() =>
       root.render(
@@ -57,7 +62,10 @@ describe("AI UI without /ai routes", () => {
     await flush(30);
     expect(container.textContent).toContain("host app");
     expect(fetchMock.mock.calls.some(([url]) => String(url).includes("/ai/me"))).toBe(true);
-    expect(fetchMock.mock.calls.some(([url]) => String(url).includes("/ai/stream"))).toBe(false);
+    expect(
+      fetchMock.mock.calls.filter(([url]) => String(url).includes("/ai/stream")).length,
+    ).toBeLessThanOrEqual(1);
+    expect(eventSourceUrls.filter((url) => url.includes("/ai/stream"))).toEqual([]);
     expect(document.body.querySelector('[aria-label="AI integrations"]')).toBeNull();
     expect(document.body.querySelector(".wpn-ai-fab")).toBeNull();
     const aiErrors = errors.mock.calls.filter((call) =>

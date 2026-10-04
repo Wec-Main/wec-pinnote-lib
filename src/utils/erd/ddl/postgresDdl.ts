@@ -10,6 +10,7 @@ import {
   renderDefault,
   renderForeignKeys,
   renderIndexes,
+  skippedComments,
 } from "./ddlCommon";
 
 const TYPE_MAP: Record<string, string> = {
@@ -41,10 +42,13 @@ function columnType(field: ErdField, enums: ReadonlyMap<string, ErdEnum>): strin
 function columnDefinition(field: ErdField, enums: ReadonlyMap<string, ErdEnum>): string {
   const parts = [quote(field.name), columnType(field, enums)];
   if (!field.nullable || field.primaryKey) parts.push("NOT NULL");
-  if (field.defaultValue !== undefined && field.defaultValue !== "") {
+  if (field.generated) {
+    parts.push(`GENERATED ALWAYS AS (${field.generated.expression}) STORED`);
+  } else if (field.defaultValue !== undefined && field.defaultValue !== "") {
     parts.push(`DEFAULT ${renderDefault(field.defaultValue, "postgres")}`);
   }
   if (field.unique && !field.primaryKey) parts.push("UNIQUE");
+  if (field.check) parts.push(`CHECK (${field.check})`);
   return parts.join(" ");
 }
 
@@ -59,10 +63,19 @@ function createTable(table: ErdEntity, enums: ReadonlyMap<string, ErdEnum>): str
 }
 
 function comments(table: ErdEntity): string[] {
-  if (!table.comment) return [];
-  return [
-    `COMMENT ON TABLE ${qualifiedTableName(table, "postgres")} IS ${literal(table.comment)};`,
-  ];
+  const statements: string[] = [];
+  if (table.comment) {
+    statements.push(
+      `COMMENT ON TABLE ${qualifiedTableName(table, "postgres")} IS ${literal(table.comment)};`,
+    );
+  }
+  for (const field of table.fields) {
+    if (!field.comment) continue;
+    statements.push(
+      `COMMENT ON COLUMN ${qualifiedTableName(table, "postgres")}.${quote(field.name)} IS ${literal(field.comment)};`,
+    );
+  }
+  return statements;
 }
 
 export function renderPostgresDdl(document: ErdDocumentJSON): string {
@@ -73,6 +86,7 @@ export function renderPostgresDdl(document: ErdDocumentJSON): string {
       `CREATE TYPE ${quote(entry.name)} AS ENUM (${entry.values.map(literal).join(", ")});`,
   );
   return joinStatements([
+    ...skippedComments(model),
     ...types,
     ...model.tables.map((table) => createTable(table, enums)),
     ...renderIndexes(model, "postgres"),

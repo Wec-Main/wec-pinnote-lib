@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { emailError, passwordError } from "../src/utils/credentialValidation";
+import { emailError, passwordError } from "../src/utils/auth/credentialValidation";
 
 describe("emailError", () => {
   it.each(["priya@company.com", "a+b@sub.x.com", "o'n@x.co", "kavi@gmail.ai"])(

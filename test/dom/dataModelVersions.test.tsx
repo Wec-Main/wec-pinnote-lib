@@ -1,9 +1,9 @@
 import { act, createElement } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { DataModelDocumentEditor } from "../../src/components/DataModel/DataModelDocumentEditor";
+import { DataModelDocumentEditor } from "../../src/features/erd/components/DataModelDocumentEditor";
 import type { DataModelDocumentState } from "../../src/hooks/useDataModelDocument";
-import type { ErdEditorProps } from "../../src/components/DataModel/erd/ErdEditor";
+import type { ErdEditorProps } from "../../src/features/erd/components/erd/ErdEditor";
 import type { DataModelVersionRecord, ErdDocumentJSON } from "../../src/types/dataModel.types";
 import { blogDocument } from "../erdFixtures";
 import { API, T0, buttonByText, click, flush } from "./aiTestUtils";
@@ -20,20 +20,20 @@ vi.mock("../../src/context/AnnotationContext", () => ({
   }),
 }));
 
-vi.mock("../../src/services/dataModelApi", () => ({
+vi.mock("../../src/services/erdService", () => ({
   listDataModelVersions: mocks.listDataModelVersions,
   fetchDataModelVersion: mocks.fetchDataModelVersion,
 }));
 
-vi.mock("../../src/ai/aiDockState", () => ({
+vi.mock("../../src/features/ai/aiDockState", () => ({
   useAiDockControl: () => ({ show: vi.fn() }),
 }));
 
-vi.mock("../../src/ai/useAiOpBatchApplier", () => ({
+vi.mock("../../src/features/ai/useAiOpBatchApplier", () => ({
   useAiOpBatchApplier: () => ({ hasUnsavedAiChanges: false, discard: vi.fn() }),
 }));
 
-vi.mock("../../src/components/Ai/ErdAiIntegration", async () => {
+vi.mock("../../src/features/ai/components/ErdAiIntegration", async () => {
   const { useEffect, createElement: h } = await import("react");
   return {
     AiUnsavedChanges: () => null,
@@ -52,7 +52,7 @@ vi.mock("../../src/components/Ai/ErdAiIntegration", async () => {
   };
 });
 
-vi.mock("../../src/components/DataModel/erd/ErdEditor", async () => {
+vi.mock("../../src/features/erd/components/erd/ErdEditor", async () => {
   const { createElement: h } = await import("react");
   return {
     ErdEditor: (props: ErdEditorProps) =>

@@ -20,9 +20,9 @@ class FakeEventSource {
   close() {
     this.closed = true;
   }
-  fire(type: string, data = "") {
+  fire(type: string, data = "", lastEventId = "") {
     for (const listener of this.listeners.get(type) ?? []) {
-      listener({ type, data } as MessageEvent<string>);
+      listener({ type, data, lastEventId } as MessageEvent<string>);
     }
   }
 }
@@ -96,21 +96,90 @@ describe("useAiStream", () => {
     expect(onReconnect).not.toHaveBeenCalled();
   });
 
-  it("reconnects with backoff and calls onReconnect after the second open", async () => {
-    act(() => root.render(createElement(Probe)));
-    await flush();
-    const first = FakeEventSource.instances[0]!;
-    act(() => first.fire("open"));
-    act(() => first.fire("error"));
-    expect(first.closed).toBe(true);
+  async function dropAndReconnect(source: FakeEventSource): Promise<FakeEventSource> {
+    const count = FakeEventSource.instances.length;
+    act(() => source.fire("error"));
+    expect(source.closed).toBe(true);
     expect(state).toBe("reconnecting");
     await act(async () => {
       await vi.advanceTimersByTimeAsync(2000);
     });
     await flush();
-    const second = FakeEventSource.instances[1]!;
+    expect(FakeEventSource.instances).toHaveLength(count + 1);
+    return FakeEventSource.instances[count]!;
+  }
+
+  it("reconnects with backoff and calls onReconnect once the second stream is ready", async () => {
+    act(() => root.render(createElement(Probe)));
+    await flush();
+    const first = FakeEventSource.instances[0]!;
+    act(() => first.fire("open"));
+    act(() => first.fire("ready", JSON.stringify({ projectId: "p1", resumed: false })));
+    expect(onReconnect).not.toHaveBeenCalled();
+    const second = await dropAndReconnect(first);
     act(() => second.fire("open"));
+    expect(onReconnect).not.toHaveBeenCalled();
+    act(() => second.fire("ready", JSON.stringify({ projectId: "p1", resumed: false })));
+    act(() => second.fire("ready", JSON.stringify({ projectId: "p1", resumed: false })));
     expect(onReconnect).toHaveBeenCalledTimes(1);
+    expect(onReconnect).toHaveBeenCalledWith({ resumed: false });
+  });
+
+  it("resumes from the last event id it saw", async () => {
+    act(() => root.render(createElement(Probe)));
+    await flush();
+    const first = FakeEventSource.instances[0]!;
+    expect(first.url).not.toContain("lastEventId");
+    act(() => first.fire("open"));
+    const message = {
+      type: "ai_session.deleted",
+      aiSessionId: "s1",
+    } satisfies AiStreamEvent;
+    act(() => first.fire("ai_session.deleted", JSON.stringify(message), "41"));
+    act(() => first.fire("ai_session.deleted", JSON.stringify(message), "42"));
+    act(() =>
+      first.fire(
+        "ai_delta",
+        JSON.stringify({
+          type: "ai_delta",
+          aiSessionId: "s1",
+          aiTurnId: "t1",
+          kind: "text",
+          text: "x",
+          seq: 1,
+          fromSeq: 1,
+        }),
+      ),
+    );
+    const second = await dropAndReconnect(first);
+    expect(new URL(second.url).searchParams.get("lastEventId")).toBe("42");
+    expect(new URL(second.url).searchParams.get("ticket")).toBe("tk");
+    act(() => second.fire("open"));
+    act(() => second.fire("ready", JSON.stringify({ projectId: "p1", resumed: true })));
+    expect(onReconnect).toHaveBeenCalledWith({ resumed: true });
+  });
+
+  it("drops a fallback ai_resync that precedes a non-resumed ready", async () => {
+    act(() => root.render(createElement(Probe)));
+    await flush();
+    const first = FakeEventSource.instances[0]!;
+    act(() => first.fire("open"));
+    act(() =>
+      first.fire(
+        "ai_session.deleted",
+        JSON.stringify({ type: "ai_session.deleted", aiSessionId: "s1" }),
+        "7",
+      ),
+    );
+    onEvent.mockReset();
+    const second = await dropAndReconnect(first);
+    act(() => second.fire("open"));
+    act(() => second.fire("ai_resync", "{}"));
+    act(() => second.fire("ready", JSON.stringify({ projectId: "p1", resumed: false })));
+    expect(onEvent).not.toHaveBeenCalled();
+    expect(onReconnect).toHaveBeenCalledWith({ resumed: false });
+    act(() => second.fire("ai_resync", "{}"));
+    expect(onEvent).toHaveBeenCalledWith({ type: "ai_resync" });
   });
 
   it("reports unauthenticated when the ticket is forbidden", async () => {

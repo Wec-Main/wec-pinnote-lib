@@ -29,6 +29,20 @@ export interface RequestPolicy {
   createError?: ApiErrorFactory;
   reportUnauthorized?: boolean;
   acceptNotModified?: boolean;
+  timeoutMs?: number;
+}
+
+const DEFAULT_TIMEOUT_MS = 30000;
+
+function combineSignals(
+  callerSignal: AbortSignal | null | undefined,
+  timeoutSignal: AbortSignal,
+): AbortSignal {
+  if (!callerSignal) return timeoutSignal;
+  if (typeof AbortSignal.any === "function") {
+    return AbortSignal.any([callerSignal, timeoutSignal]);
+  }
+  return callerSignal;
 }
 
 export function reportUnauthorized(status: number, token: string | undefined): void {
@@ -107,15 +121,29 @@ async function send(
   init: RequestInit | undefined,
   policy: RequestPolicy,
 ): Promise<Response> {
-  const response = await fetch(url, {
-    ...init,
-    headers: {
-      Accept: "application/json",
-      ...(init?.body ? { "Content-Type": "application/json" } : {}),
-      ...actorHeaders(authToken),
-      ...init?.headers,
-    },
-  });
+  const timeoutSignal = AbortSignal.timeout(policy.timeoutMs ?? DEFAULT_TIMEOUT_MS);
+  let response: Response;
+  try {
+    response = await fetch(url, {
+      ...init,
+      signal: combineSignals(init?.signal, timeoutSignal),
+      headers: {
+        Accept: "application/json",
+        ...(init?.body ? { "Content-Type": "application/json" } : {}),
+        ...actorHeaders(authToken),
+        ...init?.headers,
+      },
+    });
+  } catch (error) {
+    if (timeoutSignal.aborted && !init?.signal?.aborted) {
+      throw (policy.createError ?? defaultCreateError)(
+        "The request timed out. Check your connection and try again.",
+        0,
+        null,
+      );
+    }
+    throw error;
+  }
 
   if (policy.acceptNotModified && response.status === NOT_MODIFIED_STATUS) {
     return response;

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildEpicExport, epicExportFilename } from "../src/utils/exportEpic";
+import { buildEpicExport, epicExportFilename } from "../src/utils/epicFlow/exportEpic";
 import type { Epic, UserStory } from "../src/types/epicFlow.types";
 
 const base = {

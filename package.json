@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "description": "A reusable React library for website annotations, comments, tags, epics, and visual collaboration.",
   "license": "UNLICENSED",
-  "author": "Wec Technologies",
+  "author": "Wec.ai",
   "type": "module",
   "sideEffects": [
     "**/*.css"

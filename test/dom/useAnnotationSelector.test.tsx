@@ -11,9 +11,7 @@ import { Store } from "../../src/utils/flowchart/store";
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
-function fakeContextValue(
-  overrides: Partial<AnnotationContextValue> = {},
-): AnnotationContextValue {
+function fakeContextValue(overrides: Partial<AnnotationContextValue> = {}): AnnotationContextValue {
   return {
     modeEnabled: false,
     setModeEnabled: () => undefined,

@@ -1,6 +1,7 @@
 import { act } from "react";
-import type { AiRuntimeContextValue } from "../../src/context/AiRuntimeContext";
-import type { AiStreamListener } from "../../src/ai/AiStreamHub";
+import type { AiRuntimeContextValue } from "../../src/features/ai/AiRuntimeContext";
+import type { AiReconnectListener, AiStreamListener } from "../../src/features/ai/AiStreamHub";
+import type { AiStreamReconnect } from "../../src/hooks/useAiStream";
 import type { AiConnector, AiMe, AiProviderId, AiStreamEvent } from "../../src/types/ai.types";
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
@@ -56,12 +57,12 @@ export function aiMe(overrides: Partial<AiMe> = {}): AiMe {
 export interface FakeRuntime {
   value: AiRuntimeContextValue;
   emit: (event: AiStreamEvent) => void;
-  reconnect: () => void;
+  reconnect: (reconnect?: AiStreamReconnect) => void;
 }
 
 export function fakeRuntime(overrides: Partial<AiRuntimeContextValue> = {}): FakeRuntime {
   const listeners = new Set<AiStreamListener>();
-  const reconnectListeners = new Set<() => void>();
+  const reconnectListeners = new Set<AiReconnectListener>();
   const value: AiRuntimeContextValue = {
     apiBaseUrl: API,
     projectId: "p1",
@@ -91,8 +92,8 @@ export function fakeRuntime(overrides: Partial<AiRuntimeContextValue> = {}): Fak
     emit: (event) => {
       for (const listener of [...listeners]) listener(event);
     },
-    reconnect: () => {
-      for (const listener of [...reconnectListeners]) listener();
+    reconnect: (reconnect = { resumed: false }) => {
+      for (const listener of [...reconnectListeners]) listener(reconnect);
     },
   };
 }

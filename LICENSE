@@ -1,17 +1,64 @@
-Copyright (c) 2026 Wec Technologies. All rights reserved.
+Proprietary License
 
-This software and its associated documentation (the "Software") are the
-proprietary and confidential property of Wec Technologies.
+Copyright (c) 2026 Wec.ai. All rights reserved.
 
-No part of the Software may be used, copied, modified, merged, published,
-distributed, sublicensed, sold, reverse engineered, or otherwise exploited,
-in whole or in part, without the prior written permission of Wec Technologies.
-Use of the Software is permitted only under the terms of a separate written
-agreement with Wec Technologies.
+This software, including its source code, object code, documentation, and any
+associated assets (collectively, the "Software"), is the proprietary and
+confidential property of Wec.ai ("Licensor"). The Software is made available
+solely for internal use by Wec.ai and its authorized affiliates, employees,
+contractors, and licensed partners, subject to the terms below.
 
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL
-WEC TECHNOLOGIES BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER
-IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
-CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+1. Ownership
+   The Software is licensed, not sold. Wec.ai retains all right, title, and
+   interest in and to the Software, including all intellectual property
+   rights therein (copyright, trade secret, trademark, and any patent rights).
+   No ownership rights are transferred by possession or use of the Software.
+
+2. Restrictions
+   Except as expressly permitted under a separate written agreement with
+   Wec.ai, no person or entity may, in whole or in part:
+   - use, execute, or deploy the Software outside an authorized environment;
+   - copy, reproduce, or create derivative works of the Software;
+   - modify, merge, adapt, or translate the Software;
+   - publish, distribute, sublicense, sell, rent, or lease the Software;
+   - reverse engineer, decompile, or disassemble the Software, except to the
+     extent such restriction is prohibited by applicable law;
+   - remove or alter any copyright, trademark, or other proprietary notice
+     contained in the Software.
+
+3. Confidentiality
+   The Software and any related technical documentation constitute
+   confidential trade secrets of Wec.ai. Recipients of the Software must
+   maintain its confidentiality using at least the same degree of care used
+   to protect their own confidential information, and must not disclose it
+   to any third party without Wec.ai's prior written consent.
+
+4. Third-party components
+   The Software may depend on open-source or third-party packages, each
+   governed by its own license terms (see `package.json` and `package-lock.json`
+   for the current dependency list). This license does not alter or restrict
+   the terms under which those third-party components are made available.
+
+5. No warranty
+   THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+   IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+   FITNESS FOR A PARTICULAR PURPOSE, TITLE, AND NONINFRINGEMENT.
+
+6. Limitation of liability
+   IN NO EVENT SHALL WEC.AI OR ITS LICENSORS BE LIABLE FOR ANY CLAIM,
+   DAMAGES, OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT, OR
+   OTHERWISE, ARISING FROM, OUT OF, OR IN CONNECTION WITH THE SOFTWARE OR THE
+   USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+7. Termination
+   Any use of the Software not expressly authorized under these terms, or
+   under a separate written agreement with Wec.ai, automatically terminates
+   any license granted herein. Upon termination, all copies of the Software
+   in the recipient's possession or control must be destroyed or returned.
+
+8. Governing law
+   This license is governed by the laws of the jurisdiction in which Wec.ai
+   is incorporated, without regard to conflict-of-law principles, unless a
+   separate written agreement between the parties specifies otherwise.
+
+For licensing inquiries, contact Wec.ai through official company channels.

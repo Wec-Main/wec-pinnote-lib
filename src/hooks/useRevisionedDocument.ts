@@ -72,6 +72,36 @@ interface PendingSave<T> {
   document: T;
 }
 
+function sameShallow(a: unknown, b: unknown): boolean {
+  if (a === b) return true;
+  if (typeof a !== "object" || typeof b !== "object" || a === null || b === null) return false;
+  const left = a as Record<string, unknown>;
+  const right = b as Record<string, unknown>;
+  const keys = new Set([...Object.keys(left), ...Object.keys(right)]);
+  for (const key of keys) {
+    const x = left[key];
+    const y = right[key];
+    if (x === y) continue;
+    if (
+      typeof x !== "object" ||
+      typeof y !== "object" ||
+      x === null ||
+      y === null ||
+      Array.isArray(x) ||
+      Array.isArray(y)
+    ) {
+      return false;
+    }
+    const inner = new Set([...Object.keys(x), ...Object.keys(y)]);
+    for (const name of inner) {
+      if ((x as Record<string, unknown>)[name] !== (y as Record<string, unknown>)[name]) {
+        return false;
+      }
+    }
+  }
+  return true;
+}
+
 function isAbort(error: unknown): boolean {
   return error instanceof DOMException && error.name === "AbortError";
 }
@@ -104,6 +134,7 @@ export function useRevisionedDocument<T>(
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pendingRef = useRef<PendingSave<T> | null>(null);
   const lastSentRef = useRef<string | null>(null);
+  const lastSentDocRef = useRef<T | null>(null);
   const loadGenerationRef = useRef(0);
 
   const describeError = useCallback((err: unknown): string => {
@@ -134,6 +165,7 @@ export function useRevisionedDocument<T>(
         loadedDocumentIdRef.current = documentId;
         const loaded = adapter.parse(record.document);
         lastSentRef.current = JSON.stringify(loaded);
+        lastSentDocRef.current = loaded;
         setDocument(loaded);
         setLoadKey((key) => key + 1);
         setError(null);
@@ -173,6 +205,7 @@ export function useRevisionedDocument<T>(
       const isCurrent = () => generation === loadGenerationRef.current;
       const isShown = () => isCurrent() && loadedDocumentIdRef.current === target.documentId;
       lastSentRef.current = JSON.stringify(next);
+      lastSentDocRef.current = next;
       const run = chainRef.current.then(async () => {
         if (isShown()) {
           setSaveState("saving");
@@ -201,6 +234,7 @@ export function useRevisionedDocument<T>(
         const message = describeError(err);
         if (isShown()) {
           lastSentRef.current = null;
+          lastSentDocRef.current = null;
           setSaveError(message);
           setSaveState("error");
         } else {
@@ -232,7 +266,11 @@ export function useRevisionedDocument<T>(
       if (!target) {
         return;
       }
-      if (JSON.stringify(next) === lastSentRef.current) {
+      const heldWithPending = holdRef.current && pendingRef.current !== null;
+      const unchanged =
+        sameShallow(next, lastSentDocRef.current) ||
+        (!heldWithPending && JSON.stringify(next) === lastSentRef.current);
+      if (unchanged) {
         if ((!autosave || holdRef.current) && pendingRef.current) {
           pendingRef.current = null;
           setHasUnsavedChanges(false);

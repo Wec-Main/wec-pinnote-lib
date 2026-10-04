@@ -1,9 +1,12 @@
 import { act, createElement } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { createAiPreviewStore, type AiPreviewStore } from "../../src/ai/aiPreviewStore";
-import * as opBatchApplier from "../../src/ai/opBatchApplier";
-import { useAiOpBatchApplier, type AiOpBatchApplier } from "../../src/ai/useAiOpBatchApplier";
+import { createAiPreviewStore, type AiPreviewStore } from "../../src/features/ai/aiPreviewStore";
+import * as opBatchApplier from "../../src/features/ai/opBatchApplier";
+import {
+  useAiOpBatchApplier,
+  type AiOpBatchApplier,
+} from "../../src/features/ai/useAiOpBatchApplier";
 import type { RevisionedDocumentState } from "../../src/hooks/useRevisionedDocument";
 import type { AiOpBatch } from "../../src/types/ai.types";
 import type { ErdDocumentJSON } from "../../src/types/dataModel.types";
@@ -74,6 +77,8 @@ function Probe() {
   });
   return null;
 }
+
+const historyDepth = () => (engine.history as unknown as { past: unknown[] }).past.length;
 
 const render = () => act(() => root.render(createElement(Probe)));
 
@@ -205,7 +210,7 @@ describe("useAiOpBatchApplier", () => {
     });
     expect(engine.getState().entities.map((e) => e.name)).toContain("alpha");
 
-    const spy = vi.spyOn(opBatchApplier, "applyPartialOps").mockResolvedValueOnce(null);
+    const spy = vi.spyOn(opBatchApplier, "advanceDraftSession").mockResolvedValueOnce(null);
     await act(async () => {
       expect(await applier.draft([alpha, beta])).toBe(false);
     });
@@ -223,7 +228,7 @@ describe("useAiOpBatchApplier", () => {
     const alpha = { op: "addEntity", name: "alpha" };
     const beta = { op: "addEntity", name: "beta" };
 
-    const spy = vi.spyOn(opBatchApplier, "applyPartialOps").mockResolvedValueOnce(null);
+    const spy = vi.spyOn(opBatchApplier, "advanceDraftSession").mockResolvedValueOnce(null);
     await act(async () => {
       expect(await applier.draft([alpha])).toBe(false);
     });
@@ -235,5 +240,86 @@ describe("useAiOpBatchApplier", () => {
     });
     const names = engine.getState().entities.map((e) => e.name);
     expect(names).toEqual(expect.arrayContaining(["alpha", "beta"]));
+  });
+
+  it("promotes a finished draft to the preview without undoing and re-applying it", async () => {
+    const alpha = { op: "addEntity", tempId: "$a", name: "alpha" };
+    const beta = { op: "addEntity", name: "beta", near: "$a" };
+    const original = engine.getState().entities;
+    await act(async () => {
+      expect(await applier.draft([alpha])).toBe(true);
+    });
+    const drafted = engine.getState().entityLookup;
+    const alphaEntity = engine.getState().entities.find((e) => e.name === "alpha")!;
+    expect(historyDepth()).toBe(1);
+    const full = vi.spyOn(opBatchApplier, "applyBatchToDocument");
+    await act(async () => {
+      const outcome = await applier.promoteDraft(
+        batch("ob9", [JSON.parse(JSON.stringify(alpha)), beta] as AiOpBatch["ops"]),
+      );
+      expect(outcome.ok).toBe(true);
+    });
+    expect(full).not.toHaveBeenCalled();
+    full.mockRestore();
+    expect(historyDepth()).toBe(1);
+    const names = engine.getState().entities.map((e) => e.name);
+    expect(names).toEqual(expect.arrayContaining(["alpha", "beta"]));
+    expect(engine.getState().entities.find((e) => e.name === "alpha")).toBe(alphaEntity);
+    for (const entity of original) {
+      expect(engine.getState().entityLookup.get(entity.id)).toBe(drafted.get(entity.id));
+    }
+    expect(applier.previewingBatchId).toBe("ob9");
+    expect(store.get("data_model", "dm1")?.added.size).toBe(2);
+    expect(patches()).toEqual([{ id: "ob9", body: { status: "applied" } }]);
+
+    await act(async () => {
+      await applier.reject();
+    });
+    expect(engine.getState().entities).toBe(original);
+  });
+
+  it("falls back to a full preview when the final ops differ from the draft", async () => {
+    const original = engine.getState().entities;
+    await act(async () => {
+      expect(await applier.draft([{ op: "addEntity", name: "alpha" }])).toBe(true);
+    });
+    const full = vi.spyOn(opBatchApplier, "applyBatchToDocument");
+    await act(async () => {
+      const outcome = await applier.promoteDraft(
+        batch("ob8", [{ op: "addEntity", name: "gamma" }] as AiOpBatch["ops"]),
+      );
+      expect(outcome.ok).toBe(true);
+    });
+    expect(full).toHaveBeenCalledTimes(1);
+    full.mockRestore();
+    const names = engine.getState().entities.map((e) => e.name);
+    expect(names).toContain("gamma");
+    expect(names).not.toContain("alpha");
+    expect(historyDepth()).toBe(1);
+    await act(async () => {
+      await applier.reject();
+    });
+    expect(engine.getState().entities).toBe(original);
+  });
+
+  it("coalesces draft steps queued while one is running to the latest ops", async () => {
+    const spy = vi.spyOn(opBatchApplier, "advanceDraftSession");
+    const alpha = { op: "addEntity", name: "alpha" };
+    const beta = { op: "addEntity", name: "beta" };
+    const gamma = { op: "addEntity", name: "gamma" };
+    await act(async () => {
+      const results = await Promise.all([
+        applier.draft([alpha]),
+        applier.draft([alpha, beta]),
+        applier.draft([alpha, beta, gamma]),
+      ]);
+      expect(results).toEqual([true, true, true]);
+    });
+    expect(spy).toHaveBeenCalledTimes(2);
+    expect(spy.mock.calls[1]![1]).toHaveLength(3);
+    spy.mockRestore();
+    const names = engine.getState().entities.map((e) => e.name);
+    expect(names).toEqual(expect.arrayContaining(["alpha", "beta", "gamma"]));
+    expect(historyDepth()).toBe(1);
   });
 });

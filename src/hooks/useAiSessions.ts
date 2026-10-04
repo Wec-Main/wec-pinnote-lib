@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { reduceSessionList, type AiSessionFilter } from "../ai/sessionReducer";
-import { useAiRuntimeActions } from "../context/AiRuntimeContext";
-import { updateAiSession } from "../services/aiApi";
-import { aiSessionsCacheKey } from "../ai/cacheKeys";
-import { loadAiSessionPage, type AiSessionPage } from "../ai/prefetch";
+import { reduceSessionList, type AiSessionFilter } from "../features/ai/sessionReducer";
+import { useAiRuntimeActions } from "../features/ai/AiRuntimeContext";
+import { updateAiSession } from "../services/aiService";
+import { aiSessionsCacheKey } from "../features/ai/cacheKeys";
+import { loadAiSessionPage, type AiSessionPage } from "../features/ai/prefetch";
 import { withRequestTimeout } from "../utils/requestTimeout";
 import { useCachedResource } from "./useCachedResource";
 import type { AiSession } from "../types/ai.types";
@@ -86,21 +86,26 @@ export function useAiSessions(filter: UseAiSessionsOptions = {}): AiSessionsStat
 
   useEffect(() => {
     if (!active) return undefined;
-    return subscribe((event) => {
-      if (event.type === "ai_resync") {
-        reload();
-        return;
-      }
-      update((current) => {
-        const sessions = reduceSessionList(
-          current.sessions,
-          event,
-          filterRef.current,
-          currentUserId,
-        );
-        return sessions === current.sessions ? current : { ...current, sessions };
-      });
-    }, reload);
+    return subscribe(
+      (event) => {
+        if (event.type === "ai_resync") {
+          reload();
+          return;
+        }
+        update((current) => {
+          const sessions = reduceSessionList(
+            current.sessions,
+            event,
+            filterRef.current,
+            currentUserId,
+          );
+          return sessions === current.sessions ? current : { ...current, sessions };
+        });
+      },
+      (reconnect) => {
+        if (!reconnect.resumed) reload();
+      },
+    );
   }, [active, currentUserId, update, reload, subscribe]);
 
   const hasMore = rawCount >= limit && limit < MAX_LIMIT;

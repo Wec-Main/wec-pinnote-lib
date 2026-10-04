@@ -1,10 +1,13 @@
 import { act, createElement } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { ConnectionsPanel, ConnectorsPanel } from "../../src/components/Ai/ConnectorsPanel";
-import { IntegrationsButton } from "../../src/components/Ai/IntegrationsButton";
-import { IntegrationsTab } from "../../src/components/Settings/IntegrationsTab";
-import { AiRuntimeContext } from "../../src/context/AiRuntimeContext";
+import {
+  ConnectionsPanel,
+  ConnectorsPanel,
+} from "../../src/features/ai/components/ConnectorsPanel";
+import { IntegrationsButton } from "../../src/features/ai/components/IntegrationsButton";
+import { IntegrationsTab } from "../../src/features/settings/components/IntegrationsTab";
+import { AiRuntimeContext } from "../../src/features/ai/AiRuntimeContext";
 import {
   AnnotationUiContext,
   type AnnotationUiContextValue,
@@ -77,9 +80,11 @@ afterEach(async () => {
 });
 
 describe("IntegrationsButton", () => {
-  it("renders nothing when /ai/me failed (no AI routes)", () => {
+  it("stays visible with an error state when /ai/me fails, instead of disappearing", () => {
     render(IntegrationsButton, null, "Not found");
-    expect(container.querySelector('[aria-label="AI integrations"]')).toBeNull();
+    const button = container.querySelector('[aria-label="AI integrations"]');
+    expect(button).not.toBeNull();
+    expect(button?.classList.contains("wpn-ai-integrations-btn--error")).toBe(true);
   });
 
   it("opens Settings and reports whether an agent is connected", () => {

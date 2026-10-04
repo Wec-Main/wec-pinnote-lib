@@ -1,5 +1,5 @@
-import type { Dimensions, XYPosition } from "../../types/flowchart.types";
-import type { ErdEntity, ErdRelationship } from "../../types/dataModel.types";
+import type { Dimensions, Rect, XYPosition } from "../../types/flowchart.types";
+import type { ErdEntity, ErdNote, ErdRelationship } from "../../types/dataModel.types";
 import { GRID_GAP, LAYER_GAP_X, LAYER_GAP_Y } from "./erdConstants";
 
 export type ErdLayoutMode = "grid" | "layered";
@@ -169,4 +169,42 @@ export function layoutErd(
 ): ErdPositions {
   if (mode === "grid") return gridPositions(entities, measure, { x: 0, y: 0 });
   return layeredPositions(entities, relationships, measure);
+}
+
+export const NOTE_ROW_GAP = 24;
+const NOTES_PER_ROW_MIN = 3;
+
+export function layoutNotesBelow(
+  entityRects: readonly Rect[],
+  notes: readonly ErdNote[],
+): ErdPositions {
+  if (notes.length === 0) return {};
+  const left = entityRects.length ? Math.min(...entityRects.map((rect) => rect.x)) : 0;
+  const top = entityRects.length
+    ? Math.max(...entityRects.map((rect) => rect.y + rect.height)) + GRID_GAP
+    : 0;
+  const right = entityRects.length
+    ? Math.max(...entityRects.map((rect) => rect.x + rect.width))
+    : left;
+  const widest = Math.max(...notes.map((note) => note.width));
+  const limit = left + Math.max(right - left, NOTES_PER_ROW_MIN * (widest + NOTE_ROW_GAP));
+  const positions: ErdPositions = {};
+  let x = left;
+  let y = top;
+  let rowHeight = 0;
+  for (const note of notes) {
+    if (x > left && x + note.width > limit) {
+      x = left;
+      y += rowHeight + NOTE_ROW_GAP;
+      rowHeight = 0;
+    }
+    positions[note.id] = { x, y };
+    x += note.width + NOTE_ROW_GAP;
+    rowHeight = Math.max(rowHeight, note.height);
+  }
+  return positions;
+}
+
+export function readingOrder(notes: readonly ErdNote[]): ErdNote[] {
+  return [...notes].sort((a, b) => a.position.y - b.position.y || a.position.x - b.position.x);
 }

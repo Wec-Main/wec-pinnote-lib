@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { otherProviderRoute, shouldAutoFallbackProvider } from "../src/components/Ai/AiChatView";
+import {
+  otherProviderRoute,
+  shouldAutoFallbackProvider,
+} from "../src/features/ai/components/AiChatView";
 import type { AiMe } from "../src/types/ai.types";
 
 function me(overrides: Partial<AiMe> = {}): AiMe {
@@ -89,7 +92,11 @@ describe("shouldAutoFallbackProvider", () => {
       shouldAutoFallbackProvider({ enabled: true, code: "forbidden", alreadyTried: false }),
     ).toBe(false);
     expect(
-      shouldAutoFallbackProvider({ enabled: true, code: "stale_base_revision", alreadyTried: false }),
+      shouldAutoFallbackProvider({
+        enabled: true,
+        code: "stale_base_revision",
+        alreadyTried: false,
+      }),
     ).toBe(false);
   });
 
@@ -108,7 +115,11 @@ describe("otherProviderRoute", () => {
   });
 
   it("finds a different connected provider", () => {
-    const route = otherProviderRoute(me(), { provider: "claude", model: "claude-model", effort: null });
+    const route = otherProviderRoute(me(), {
+      provider: "claude",
+      model: "claude-model",
+      effort: null,
+    });
     expect(route?.provider).toBe("codex");
   });
 

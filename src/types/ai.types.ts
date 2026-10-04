@@ -1,4 +1,4 @@
-import type { ErdOp, FlowOp, WorkspaceOp } from "../ai/ops/types";
+import type { ErdOp, FlowOp, WorkspaceOp } from "../features/ai/ops/types";
 
 export type AiProviderId = "claude" | "codex" | "gemini";
 // The canonical list of built-in provider ids. The full descriptor for each
@@ -250,6 +250,7 @@ export interface CreateAiSessionRequest {
   model: string;
   effort?: string | null;
   visibility?: AiVisibility;
+  message?: SendAiMessageRequest;
 }
 
 export interface UpdateAiSessionRequest {
@@ -331,17 +332,19 @@ export type AiStreamEventType = AiStreamEvent["type"];
 
 export type AiActionKey =
   | "chat"
-  | "comment.summarize"
-  | "comment.draft_reply"
-  | "comment.improve"
   | "erd.generate"
   | "erd.edit"
   | "erd.review"
   | "erd.explain"
+  | "erd.ask"
   | "flow.generate"
   | "flow.edit"
   | "flow.explain"
-  | "workspace.assist";
+  | "flow.ask"
+  | "workspace.assist"
+  | "workspace.ask"
+  | "workspace.explain"
+  | "notes.rewrite";
 
 export interface AiActionTarget {
   kind: "data_model" | "flow" | "annotation" | "workspace";
@@ -410,7 +413,12 @@ export type AiActionEvent =
   | ({ type: "result" } & AiActionResult)
   | ({ type: "usage" } & AiActionUsage)
   | ({ type: "error" } & AiActionError)
-  | { type: "done"; runId: string; status: AiActionRunStatus | string };
+  | {
+      type: "done";
+      runId: string;
+      status: AiActionRunStatus | string;
+      aiSessionId?: string | null;
+    };
 
 export type AiActionEventType = AiActionEvent["type"];
 
@@ -430,6 +438,7 @@ export interface AiActionRunState {
   result: AiActionResult | null;
   usage: AiActionUsage | null;
   error: AiActionError | null;
+  aiSessionId: string | null;
   startedAt: number | null;
   finishedAt: number | null;
 }
@@ -538,6 +547,7 @@ export interface AiWarmRequest {
   provider?: AiProviderId;
   model?: string;
   effort?: string | null;
+  actionKeys?: AiActionKey[];
 }
 
 export interface AiWarmResponse {

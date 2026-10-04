@@ -2,7 +2,7 @@ import {
   fetchDataModelDocument,
   publishDataModel,
   saveDataModelDocument,
-} from "../services/dataModelApi";
+} from "../services/erdService";
 import type { ErdDocumentJSON } from "../types/dataModel.types";
 import { parseErdDocument } from "../utils/erd/erdSerialization";
 import {

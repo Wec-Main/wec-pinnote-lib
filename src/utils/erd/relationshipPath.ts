@@ -3,7 +3,7 @@ import type { ErdCardinality, ErdEntity, ErdRelationship } from "../../types/dat
 import { getEdgePath } from "../flowchart/edgePaths";
 import { sideVector } from "../flowchart/geometry";
 import { MARKER_HALF_SPREAD, MARKER_LENGTH } from "./erdConstants";
-import { entityAnchor, getEntityRect, type ErdSide } from "./erdGeometry";
+import { entityAnchor, fieldAnchor, getEntityRect, type ErdSide } from "./erdGeometry";
 
 export type CrowFootKind = "one" | "many";
 
@@ -49,6 +49,17 @@ export function chooseSides(
   return { sourceSide: "right", targetSide: "right" };
 }
 
+function endAnchor(
+  entity: ErdEntity,
+  fieldIds: readonly (string | undefined)[],
+  side: ErdSide,
+): XYPosition {
+  const fieldId = fieldIds.find(
+    (id): id is string => !!id && entity.fields.some((field) => field.id === id),
+  );
+  return fieldId ? fieldAnchor(entity, fieldId, side) : entityAnchor(entity, side);
+}
+
 function pushOut(anchor: XYPosition, side: HandleSide, distance: number): XYPosition {
   const vector = sideVector[side];
   return { x: anchor.x + vector.x * distance, y: anchor.y + vector.y * distance };
@@ -62,8 +73,16 @@ export function relationshipGeometry(
   const target = lookup.get(relationship.targetEntityId);
   if (!source || !target) return null;
   const { sourceSide, targetSide } = chooseSides(getEntityRect(source), getEntityRect(target));
-  const sourceAnchor = entityAnchor(source, sourceSide);
-  const targetAnchor = entityAnchor(target, targetSide);
+  const sourceAnchor = endAnchor(
+    source,
+    [relationship.sourceFieldId, relationship.sourceFieldIds?.[0]],
+    sourceSide,
+  );
+  const targetAnchor = endAnchor(
+    target,
+    [relationship.targetFieldId, relationship.targetFieldIds?.[0]],
+    targetSide,
+  );
   const route = getEdgePath("step", {
     source: pushOut(sourceAnchor, sourceSide, MARKER_LENGTH),
     sourceSide,

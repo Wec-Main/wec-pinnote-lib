@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { applyEpicFlowStreamEvent } from "../src/utils/applyEpicFlowStreamEvent";
+import { applyEpicFlowStreamEvent } from "../src/utils/epicFlow/applyEpicFlowStreamEvent";
 import type { Epic, UserStory } from "../src/types/epicFlow.types";
 import type { StreamEvent, StreamEventType } from "../src/types/stream.types";
 

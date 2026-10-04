@@ -11,7 +11,7 @@ const fetchFlowPins = vi.fn();
 const createFlowPin = vi.fn();
 const deleteFlowPin = vi.fn();
 
-vi.mock("../../src/services/flowApi", () => ({
+vi.mock("../../src/services/flowchartService", () => ({
   fetchFlowPins: (...args: unknown[]) => fetchFlowPins(...args),
   createFlowPin: (...args: unknown[]) => createFlowPin(...args),
   deleteFlowPin: (...args: unknown[]) => deleteFlowPin(...args),

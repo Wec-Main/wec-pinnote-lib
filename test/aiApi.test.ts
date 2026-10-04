@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import * as ai from "../src/services/aiApi";
+import * as ai from "../src/services/aiService";
 
 const BASE = "https://api.example.com";
 const PREFIX = `${BASE}/api/v1/pinnote`;
@@ -200,5 +200,47 @@ describe("aiApi routes", () => {
       status: 403,
       message: "Claude sign-in is turned off",
     });
+  });
+});
+
+describe("createAiSessionWithMessage", () => {
+  const input = {
+    projectId: "p1",
+    mode: "model" as const,
+    scopeKind: "project" as const,
+    provider: "claude" as const,
+    model: "m",
+    message: { text: "hi", mode: "model" as const, clientMessageId: "c1" },
+  };
+
+  it("returns the sent message from a session detail response", async () => {
+    const message = { aiMessageId: "m1", aiTurnId: "t1", role: "user" };
+    const turn = { aiTurnId: "t1", status: "queued" };
+    const fetchMock = stubFetch(201, {
+      session: { aiSessionId: "s1", activeTurn: turn },
+      messages: [message],
+      hasMoreMessages: false,
+      opBatches: [],
+      commentDrafts: [],
+    });
+    const result = await ai.createAiSessionWithMessage(BASE, "t", input);
+    expect(lastCall(fetchMock).body.message).toEqual({ text: "hi", clientMessageId: "c1" });
+    expect(result.session.aiSessionId).toBe("s1");
+    expect(result.sent).toEqual({ message, turn });
+    expect(result.detail?.messages).toEqual([message]);
+  });
+
+  it("reports nothing sent for a plain session response", async () => {
+    stubFetch(201, { aiSessionId: "s1" });
+    const result = await ai.createAiSessionWithMessage(BASE, "t", input);
+    expect(result).toEqual({ session: { aiSessionId: "s1" }, detail: null, sent: null });
+  });
+
+  it("rethrows validation errors unrelated to the message field", async () => {
+    const fetchMock = stubFetch(400, { error: "Validation failed", details: { model: ["bad"] } });
+    await expect(ai.createAiSessionWithMessage(BASE, "t", input)).rejects.toMatchObject({
+      status: 400,
+    });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 });

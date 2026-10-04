@@ -1,11 +1,11 @@
 import { act, createElement } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { aiPreviewStore } from "../../src/ai/aiPreviewStore";
-import { useAiOpBatchApplier } from "../../src/ai/useAiOpBatchApplier";
-import { AiInlineBar } from "../../src/components/Ai/AiInlineBar";
-import { aiEditorRequests } from "../../src/components/Ai/aiEditorRequests";
-import { AiRuntimeContext } from "../../src/context/AiRuntimeContext";
+import { aiPreviewStore } from "../../src/features/ai/aiPreviewStore";
+import { useAiOpBatchApplier } from "../../src/features/ai/useAiOpBatchApplier";
+import { AiInlineBar } from "../../src/features/ai/components/AiInlineBar";
+import { aiEditorRequests } from "../../src/features/ai/components/aiEditorRequests";
+import { AiRuntimeContext } from "../../src/features/ai/AiRuntimeContext";
 import type { RevisionedDocumentState } from "../../src/hooks/useRevisionedDocument";
 import type { AiOpBatch } from "../../src/types/ai.types";
 import type { ErdDocumentJSON } from "../../src/types/dataModel.types";

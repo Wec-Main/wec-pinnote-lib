@@ -1,10 +1,14 @@
 import { act, createElement } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { AiSessionList, SLOW_LOAD_MS, filterSessions } from "../../src/components/Ai/AiSessionList";
+import {
+  AiSessionList,
+  SLOW_LOAD_MS,
+  filterSessions,
+} from "../../src/features/ai/components/AiSessionList";
 import type { AiSessionsState } from "../../src/hooks/useAiSessions";
 import type { AiSession } from "../../src/types/ai.types";
-import { AiRuntimeContext } from "../../src/context/AiRuntimeContext";
+import { AiRuntimeContext } from "../../src/features/ai/AiRuntimeContext";
 import { T0, buttonByText, click, fakeRuntime } from "./aiTestUtils";
 
 let container: HTMLDivElement;

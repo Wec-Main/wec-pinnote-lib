@@ -10,7 +10,10 @@ interface PanelErrorBoundaryState {
   hasError: boolean;
 }
 
-export class PanelErrorBoundary extends Component<PanelErrorBoundaryProps, PanelErrorBoundaryState> {
+export class PanelErrorBoundary extends Component<
+  PanelErrorBoundaryProps,
+  PanelErrorBoundaryState
+> {
   state: PanelErrorBoundaryState = { hasError: false };
 
   static getDerivedStateFromError(): PanelErrorBoundaryState {

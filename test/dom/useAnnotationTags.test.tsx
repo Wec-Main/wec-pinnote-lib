@@ -13,7 +13,7 @@ const createAnnotationTag = vi.fn();
 const deleteAnnotationTag = vi.fn();
 const updateAnnotationTag = vi.fn();
 
-vi.mock("../../src/services/annotationTagsApi", () => ({
+vi.mock("../../src/services/annotationTagsService", () => ({
   fetchAnnotationTags: (...args: unknown[]) => fetchAnnotationTags(...args),
   fetchPreferences: (...args: unknown[]) => fetchPreferences(...args),
   saveTagsVisible: (...args: unknown[]) => saveTagsVisible(...args),
@@ -125,16 +125,21 @@ describe("useAnnotationTags (on usePageScopedResource)", () => {
     await flush();
     expect(latest!.annotationTags).toEqual([loaded]);
 
-    act(() => latest!.startTagDraft({
-      selector: "",
-      elementIdentifier: "x",
-      relativeX: 0,
-      relativeY: 0,
-      fallbackX: 0,
-      fallbackY: 0,
-      viewportWidth: 0,
-      viewportHeight: 0,
-    }, "label"));
+    act(() =>
+      latest!.startTagDraft(
+        {
+          selector: "",
+          elementIdentifier: "x",
+          relativeX: 0,
+          relativeY: 0,
+          fallbackX: 0,
+          fallbackY: 0,
+          viewportWidth: 0,
+          viewportHeight: 0,
+        },
+        "label",
+      ),
+    );
     expect(latest!.tagDraft).not.toBeNull();
 
     fetchAnnotationTags.mockResolvedValue([]);

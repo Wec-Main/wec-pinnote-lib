@@ -1,10 +1,10 @@
 node_modules
 dist
 examples/
-example_v2/
 *.local
 .DS_Store
 .vscode
 .idea
 coverage
 .claude/
+.env

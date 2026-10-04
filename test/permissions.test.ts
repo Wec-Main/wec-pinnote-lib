@@ -7,7 +7,7 @@ import {
   canEditUser,
   canManageOrganizations,
   userScopeFor,
-} from "../src/utils/permissions";
+} from "../src/utils/auth/permissions";
 import type { UserManagementRole } from "../src/types/userManagement.types";
 
 const ROLES: UserManagementRole[] = [

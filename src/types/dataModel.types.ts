@@ -28,13 +28,21 @@ export interface ErdField {
   unique: boolean;
   defaultValue?: string;
   enumId?: string;
+  comment?: string;
+  check?: string;
+  generated?: { expression: string; stored?: boolean };
 }
+
+export const ERD_INDEX_METHODS = ["btree", "gin", "gist", "hash", "brin"] as const;
+export type ErdIndexMethod = (typeof ERD_INDEX_METHODS)[number];
 
 export interface ErdIndex {
   id: string;
   name: string;
   fieldIds: string[];
   unique: boolean;
+  method?: ErdIndexMethod;
+  where?: string;
 }
 
 export interface ErdEntity {
@@ -47,6 +55,10 @@ export interface ErdEntity {
   collapsed?: boolean;
   fields: ErdField[];
   indexes: ErdIndex[];
+  color?: string;
+  fillColor?: string;
+  group?: string;
+  locked?: boolean;
 }
 
 export interface ErdRelationship {
@@ -54,8 +66,10 @@ export interface ErdRelationship {
   name?: string;
   sourceEntityId: string;
   sourceFieldId?: string;
+  sourceFieldIds?: string[];
   targetEntityId: string;
   targetFieldId?: string;
+  targetFieldIds?: string[];
   cardinality: ErdCardinality;
   sourceOptional: boolean;
   targetOptional: boolean;
@@ -67,6 +81,7 @@ export interface ErdEnum {
   id: string;
   name: string;
   values: string[];
+  descriptions?: Record<string, string>;
 }
 
 export interface ErdNote {
@@ -76,6 +91,7 @@ export interface ErdNote {
   width: number;
   height: number;
   color?: string;
+  titleColor?: string;
 }
 
 export interface ErdDocumentMeta {

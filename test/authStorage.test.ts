@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { normalizeStoredAuth } from "../src/hooks/useAuthSessions";
-import { isSession, isTokenUnexpired } from "../src/utils/authSession";
+import { isSession, isTokenUnexpired } from "../src/utils/auth/authSession";
 
 function encodeSegment(payload: unknown): string {
   const json = JSON.stringify(payload);

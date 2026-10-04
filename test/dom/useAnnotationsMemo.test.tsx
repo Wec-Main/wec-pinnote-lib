@@ -52,13 +52,7 @@ function Probe() {
   return null;
 }
 
-function Harness({
-  data,
-  ui,
-}: {
-  data: AnnotationDataContextValue;
-  ui: AnnotationUiContextValue;
-}) {
+function Harness({ data, ui }: { data: AnnotationDataContextValue; ui: AnnotationUiContextValue }) {
   return createElement(
     AnnotationDataContext.Provider,
     { value: data },

@@ -1,22 +1,22 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { chooseDockAction, describeLiveOp } from "../src/components/Ai/aiDockLogic";
-import { describeOpBatch } from "../src/components/Ai/aiOpChanges";
-import { postDraftOnce, resetPostedDrafts } from "../src/components/Ai/useAiCardActions";
+import { chooseDockAction, describeLiveOp } from "../src/features/ai/components/aiDockLogic";
+import { describeOpBatch } from "../src/features/ai/components/aiOpChanges";
+import { postDraftOnce, resetPostedDrafts } from "../src/features/ai/components/useAiCardActions";
 import type { AiOpBatch } from "../src/types/ai.types";
 import { blogDocument } from "./erdFixtures";
 
 describe("chooseDockAction", () => {
-  it("generates for an empty document and edits otherwise", () => {
+  it("defaults to ask with no chip pinned, regardless of document state", () => {
     expect(chooseDockAction("data_model", { empty: true, selectionCount: 0 })).toEqual({
-      actionKey: "erd.generate",
+      actionKey: "erd.ask",
       useSelection: false,
     });
     expect(chooseDockAction("data_model", { empty: false, selectionCount: 0 })).toEqual({
-      actionKey: "erd.edit",
+      actionKey: "erd.ask",
       useSelection: false,
     });
     expect(chooseDockAction("flow", { empty: false, selectionCount: 2 })).toEqual({
-      actionKey: "flow.edit",
+      actionKey: "flow.ask",
       useSelection: true,
     });
   });
@@ -98,17 +98,6 @@ describe("postDraftOnce", () => {
     await postDraftOnce({ aiCommentDraftId: "d2", postedCommentId: "c9" }, create, mark);
     expect(create).not.toHaveBeenCalled();
     expect(mark).toHaveBeenCalledWith("c9");
-  });
-});
-
-describe("friendlyCommentAiError", () => {
-  it("explains the no_context case", async () => {
-    const { friendlyCommentAiError, NO_CONTEXT_MESSAGE } =
-      await import("../src/components/Ai/AnnotationAiActions");
-    expect(friendlyCommentAiError({ code: "no_context", message: "x", retryable: false })).toBe(
-      NO_CONTEXT_MESSAGE,
-    );
-    expect(NO_CONTEXT_MESSAGE).toContain("Add to AI context");
   });
 });
 

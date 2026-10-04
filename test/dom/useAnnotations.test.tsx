@@ -139,8 +139,6 @@ describe("useAnnotationCollection ref sync", () => {
     const created = await createdPromise!;
 
     expect(created.createdBy.id).toBe(userB.id);
-    expect(latest!.annotations.find((item) => item.id === created.id)?.createdBy.id).toBe(
-      userB.id,
-    );
+    expect(latest!.annotations.find((item) => item.id === created.id)?.createdBy.id).toBe(userB.id);
   });
 });

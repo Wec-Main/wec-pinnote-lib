@@ -1,10 +1,10 @@
 import { act, createElement } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { WorkspaceApplyResult } from "../../src/ai/ops/workspaceOps";
-import { AiWorkspaceDialog } from "../../src/components/Ai/AiWorkspaceDialog";
-import { AiRuntimeContext } from "../../src/context/AiRuntimeContext";
-import { resetAiWarmThrottle } from "../../src/services/aiActionsStream";
+import type { WorkspaceApplyResult } from "../../src/features/ai/ops/workspaceOps";
+import { AiWorkspaceDialog } from "../../src/features/ai/components/AiWorkspaceDialog";
+import { AiRuntimeContext } from "../../src/features/ai/AiRuntimeContext";
+import { resetAiWarmThrottle } from "../../src/services/aiActionsStreamService";
 import type { AiOpBatch } from "../../src/types/ai.types";
 import {
   T0,
@@ -24,13 +24,13 @@ const apply = vi.fn();
 const discard = vi.fn();
 const openReference = vi.fn();
 
-vi.mock("../../src/components/Ai/useAiWorkspaceApplier", async (importOriginal) => {
+vi.mock("../../src/features/ai/components/useAiWorkspaceApplier", async (importOriginal) => {
   const original =
-    await importOriginal<typeof import("../../src/components/Ai/useAiWorkspaceApplier")>();
+    await importOriginal<typeof import("../../src/features/ai/components/useAiWorkspaceApplier")>();
   return { ...original, useAiWorkspaceApplier: () => ({ apply, discard }) };
 });
 
-vi.mock("../../src/components/Ai/useAiMentionCandidates", () => ({
+vi.mock("../../src/features/ai/components/useAiMentionCandidates", () => ({
   useAiMentionCandidates: () => ({ candidates: [], request: () => undefined }),
 }));
 
@@ -87,7 +87,7 @@ function sse(): Response {
       frame("step", { id: "s1", label: "Reading your workspace", status: "done" }) +
       frame("progress", { ops: 1, from: 0, newOps: [batch.ops[0]] }) +
       frame("result", result.kind ? result : { kind: "op_batch", batch, value: {} }) +
-      frame("done", { runId: "r1", status: "completed" }),
+      frame("done", { runId: "r1", status: "completed", aiSessionId: "chat-1" }),
     { status: 200 },
   );
 }
@@ -115,6 +115,16 @@ async function ask(text: string) {
   typeInto(field(), text);
   press(field(), "Enter");
   await flush(30);
+}
+
+function pickMode(label: string) {
+  click(document.querySelector(".wpn-ai-ws .wpn-ai-switcher__trigger"));
+  click(buttonByText(document.body, label));
+}
+
+async function create(text: string) {
+  pickMode("Create");
+  await ask(text);
 }
 
 const doneResult: WorkspaceApplyResult = {
@@ -193,7 +203,7 @@ describe("AiWorkspaceDialog", () => {
       mentions: [{ kind: "epic", id: "e9", label: "Checkout" }],
       selection: ["e9"],
     });
-    await ask("Add user stories");
+    await create("Add user stories");
     expect(runs).toHaveLength(1);
     expect(runs[0]).toMatchObject({
       actionKey: "workspace.assist",
@@ -210,7 +220,7 @@ describe("AiWorkspaceDialog", () => {
 
   it("lists the proposed changes and creates nothing until approved", async () => {
     await mount();
-    await ask("Create a checkout epic");
+    await create("Create a checkout epic");
     const card = document.querySelector(".wpn-ai-ws__proposal")!;
     const tab = (name: string) =>
       Array.from(card.querySelectorAll<HTMLButtonElement>('[role="tab"]')).find((el) =>
@@ -239,7 +249,7 @@ describe("AiWorkspaceDialog", () => {
 
   it("creates everything on Approve and offers to open what was made", async () => {
     await mount();
-    await ask("Create a checkout epic");
+    await create("Create a checkout epic");
     click(buttonByText(document.body, "Approve & create"));
     await flush(20);
     expect(apply).toHaveBeenCalledTimes(1);
@@ -279,7 +289,7 @@ describe("AiWorkspaceDialog", () => {
       failed: 1,
     });
     await mount();
-    await ask("Create a checkout epic");
+    await create("Create a checkout epic");
     click(buttonByText(document.body, "Approve & create"));
     await flush(20);
     const card = document.querySelector(".wpn-ai-ws__proposal")!;
@@ -290,7 +300,7 @@ describe("AiWorkspaceDialog", () => {
 
   it("discards a proposal without creating anything", async () => {
     await mount();
-    await ask("Create a checkout epic");
+    await create("Create a checkout epic");
     click(buttonByText(document.body, "Discard"));
     await flush(10);
     expect(discard).toHaveBeenCalledTimes(1);
@@ -304,17 +314,70 @@ describe("AiWorkspaceDialog", () => {
       value: { title: "Need more detail", rationale: "", questions: ["Which payment providers?"] },
     };
     await mount();
-    await ask("Create something");
+    await create("Create something");
     expect(document.querySelector(".wpn-ai-ws__note")!.textContent).toContain(
       "Which payment providers?",
     );
     expect(document.querySelector(".wpn-ai-ws__proposal")).toBeNull();
   });
 
+  it("defaults to Ask and answers in plain text without proposing changes", async () => {
+    result = { kind: "text", text: "Three epics are in progress." };
+    await mount();
+    await ask("How many epics are in progress?");
+    expect(runs[0]).toMatchObject({ actionKey: "workspace.ask" });
+    expect(document.querySelector(".wpn-ai-ws__answer")?.textContent).toContain(
+      "Three epics are in progress.",
+    );
+    expect(document.querySelector(".wpn-ai-ws__proposal")).toBeNull();
+    expect(apply).not.toHaveBeenCalled();
+  });
+
+  it("answers in Explain mode without proposing changes", async () => {
+    result = { kind: "markdown", text: "The checkout epic covers payment and shipping." };
+    await mount({ mentions: [{ kind: "epic", id: "e9", label: "Checkout" }] });
+    pickMode("Explain");
+    await ask("Explain the tagged epic");
+    expect(runs[0]).toMatchObject({ actionKey: "workspace.explain" });
+    expect(document.querySelector(".wpn-ai-ws__answer")?.textContent).toContain(
+      "The checkout epic covers payment and shipping.",
+    );
+    expect(document.querySelector(".wpn-ai-ws__proposal")).toBeNull();
+  });
+
+  it("continues the same chat and keeps the tagged subject on an untagged follow-up", async () => {
+    result = { kind: "markdown", text: "Ticket Management covers creation and resolution." };
+    const epic = { kind: "epic" as const, id: "e9", label: "Ticket Management" };
+    await mount({ mentions: [epic], selection: ["about-project"] });
+    await ask("What is the scope of the tagged epic?");
+    expect(runs[0]?.body).toMatchObject({
+      newChat: true,
+      mentions: [epic],
+      selection: ["about-project"],
+    });
+    await ask("How can we improve this?");
+    expect(runs[1]?.body).toMatchObject({ sessionId: "chat-1", mentions: [epic] });
+    expect(runs[1]?.body).not.toHaveProperty("newChat");
+    expect(runs[1]?.body).not.toHaveProperty("selection");
+  });
+
+  it("sends the current selection only while nothing is tagged", async () => {
+    result = { kind: "text", text: "It has two stories." };
+    await mount({ selection: ["about-project"] });
+    await ask("What is in this epic?");
+    expect(runs[0]?.body).toMatchObject({ selection: ["about-project"] });
+    expect(runs[0]?.body).not.toHaveProperty("mentions");
+  });
+
   it("offers starters for a tagged epic and seeds the composer when one is chosen", async () => {
     await mount({ mentions: [{ kind: "epic", id: "e9", label: "Checkout" }] });
-    click(buttonByText(document.body, "Add user stories"));
+    expect(document.querySelectorAll(".wpn-ai-ws__card")).toHaveLength(4);
+    click(buttonByText(document.body, "Epic with stories"));
     await flush(5);
     expect(field().value).toContain("user stories");
+    expect(buttonByText(document.body, "AI mode: Create")).not.toBeNull();
+    click(buttonByText(document.body, "Improve a story"));
+    await flush(5);
+    expect(buttonByText(document.body, "AI mode: Improve")).not.toBeNull();
   });
 });

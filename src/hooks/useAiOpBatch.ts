@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
-import { useOptionalAiRuntime } from "../context/AiRuntimeContext";
-import { fetchAiOpBatch } from "../services/aiApi";
+import { useOptionalAiRuntime } from "../features/ai/AiRuntimeContext";
+import { fetchAiOpBatch } from "../services/aiService";
 import type { AiOpBatch } from "../types/ai.types";
 
 export function useAiOpBatch(aiOpBatchId: string, skip: boolean): AiOpBatch | null {

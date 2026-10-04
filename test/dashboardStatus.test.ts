@@ -6,7 +6,7 @@ import {
   hasTrendActivity,
   initialSectionReloads,
   widgetView,
-} from "../src/components/Settings/Dashboard/dashboardStatus";
+} from "../src/features/settings/components/Dashboard/dashboardStatus";
 import type { TrendDay } from "../src/types/analytics.types";
 
 function day(overrides: Partial<TrendDay> = {}): TrendDay {

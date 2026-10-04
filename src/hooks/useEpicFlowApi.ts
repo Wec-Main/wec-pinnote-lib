@@ -1,6 +1,6 @@
 import { useMemo } from "react";
 import { DEFAULT_PINNOTE_API_URL } from "../config/env";
-import { createEpicFlowApi, type EpicFlowApiClient } from "../services/epicFlowApi";
+import { createEpicFlowApi, type EpicFlowApiClient } from "../services/epicFlowService";
 import type { AnnotationConfig } from "../types/annotation.types";
 import { useTokenGetter } from "./useTokenGetter";
 

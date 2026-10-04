@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { caretPosition } from "../../src/utils/caretPosition";
+import { caretPosition } from "../../src/utils/dom/caretPosition";
 
 function makeField(value: string): HTMLTextAreaElement {
   const field = document.createElement("textarea");

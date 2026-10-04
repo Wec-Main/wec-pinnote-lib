@@ -7,6 +7,13 @@
 
 Figma-like website annotations and comments for any React application. The library renders the annotation UI, detects DOM elements, positions pins on them, and runs threaded, @mention-aware comment conversations against **your** REST API. It does not connect to a database and does not read host environment variables.
 
+**This README covers integration and user-facing behavior.** For internal technical docs, see:
+
+- [docs/PROJECT_OVERVIEW.md](docs/PROJECT_OVERVIEW.md) — what this project is and how its docs are organized
+- [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) — folder structure, feature domains, build pipeline, state management
+- [docs/API_CONTRACT.md](docs/API_CONTRACT.md) — the full backend REST contract
+- [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) — scripts, environment setup, testing, adding a feature
+
 ---
 
 ## Core Principles
@@ -332,7 +339,7 @@ Agents are connected in **Settings → Integrations**, which has two tabs:
 
 - **Connections** — **Your connections** (Check now, Reconnect, Disconnect) and **Shared with your organization** (connected by; manageable by admins, read-only for everyone else).
 
-Until an agent is connected, AI entry points say "Connect Claude or Codex in Settings → Integrations, or ask an admin to connect it for everyone" and link there (`useAiUi().openIntegrations("connectors")`). Connector state comes from `GET /ai/me` (`me.connectors`, `me.systemConnectors`) and is kept live by the `ai_connectors.updated` and `ai_connector_login.updated` stream events — nothing is polled. The routes are listed in [docs/api-contract.md](docs/api-contract.md#ai-connectors-api-contract).
+Until an agent is connected, AI entry points say "Connect Claude or Codex in Settings → Integrations, or ask an admin to connect it for everyone" and link there (`useAiUi().openIntegrations("connectors")`). Connector state comes from `GET /ai/me` (`me.connectors`, `me.systemConnectors`) and is kept live by the `ai_connectors.updated` and `ai_connector_login.updated` stream events — nothing is polled. The routes are listed in [docs/API_CONTRACT.md](docs/API_CONTRACT.md#ai-connectors-api-contract).
 
 The op appliers are loaded on demand so they stay out of the main bundle: `applyErdOps`, `applyFlowOps` and `applyBatchToDocument` are **async** and return a `Promise`. Op batches can be in the `applying` status (another client is applying them); status updates are compare-and-set, so a `409` with code `op_batch_status_conflict` makes the client refetch the batch with `fetchAiOpBatch` (`GET /ai/op-batches/{aiOpBatchId}`) and adopt the server's status.
 
@@ -399,7 +406,7 @@ import { AnnotationProvider } from "wec-pinnote-lib";
 
 ## API contract
 
-The library calls these annotation endpoints. Full request/response shapes live in [docs/api-contract.md](docs/api-contract.md).
+The library calls these annotation endpoints. Full request/response shapes live in [docs/API_CONTRACT.md](docs/API_CONTRACT.md).
 
 - `GET /annotations?projectId=&pageKey=`
 - `POST /annotations`
@@ -439,48 +446,43 @@ npm run dev
 ```text
 wec-pinnote-lib/
 ├── src/
-│   ├── index.ts                  # Public exports — the package root
-│   ├── context/                  # AnnotationProvider, split Data/Ui/Auth contexts, FlowContext
-│   ├── components/
-│   │   ├── AnnotationLayer.tsx    # Portaled overlay root: pins, panels, dialogs, toasts
-│   │   ├── AnnotationOverlay/     # Annotation mode — hover highlight, click capture
-│   │   ├── AnnotationPin/         # Numbered pin, orphaned styling
-│   │   ├── AnnotationComposer/    # New-pin composer with initial status
-│   │   ├── AnnotationThreadPanel/ # Floating thread panel, delete confirmation
-│   │   ├── AnnotationThread/      # Comment list with reply/edit/delete actions
-│   │   ├── AnnotationReplyComposer/ # Reply box with quote target
-│   │   ├── AnnotationStatusSelect/  # Status menu with descriptions
-│   │   ├── AnnotationListPanel/   # Comments list — ThreadCard, commentFilters
-│   │   ├── CommentQuote/          # Quoted comment preview
-│   │   ├── CommentMessage/        # Message renderer with mention chips
-│   │   ├── MentionTextarea/       # Textarea with @mention suggestions
-│   │   ├── ComposerHint/          # Keyboard hint and character counter
-│   │   ├── AnnotationToggleButton/, AnnotationToolbar/, AnnotationErrorBoundary/
-│   │   ├── Auth/                  # LoginDialog, ToolbarAuthControl
-│   │   ├── Settings/              # SettingsPanel — organizations, projects, tags, dashboard
-│   │   ├── UserManagement/        # UserManagementPanel, ConfirmDialog
-│   │   ├── AuditHistory/          # AuditHistoryPanel
-│   │   ├── EpicFlow/              # Epic / user-story board
-│   │   ├── WecFlow/               # Flowchart editor
-│   │   ├── FlowPin/, TagPin/      # Flow and tag pins
-│   │   └── primitives/            # Menu, Tooltip, SearchableSelect, ModalShell, …
-│   ├── hooks/                    # useAnnotations, useAnnotationMode, useAuthSessions, streams,
-│   │                             #   usePageKey, usePageVisitTracker, useMentionCandidates, …
-│   │   └── flowchart/            # Flowchart editor hooks
-│   ├── services/                 # REST clients — annotations, auth, analytics, users, tags, …
-│   ├── types/                    # Domain and request/response types
-│   ├── utils/                    # status, mentions, anchoring/selectors, page keys, permissions, …
-│   │   └── flowchart/            # Flowchart engine, geometry, validation
-│   ├── data/                     # Static option lists
-│   ├── assets/icons/             # Bundled icons
-│   └── styles/                   # annotation.css (→ dist/style.css), flowchart.css
-├── test/                         # Vitest suites
-├── docs/api-contract.md          # Backend contract
-├── examples/demo/                # Integration example app
+│   ├── index.ts                  # Public exports — the ONLY public entry point
+│   ├── context/                  # AnnotationProvider (mounting root) + split Data/Ui/Auth contexts
+│   ├── features/                 # One folder per domain — each owns its own components/ (and,
+│   │   │                         #   where relevant, its own context). No index.ts barrels — see
+│   │   │                         #   docs/ARCHITECTURE.md §3.
+│   │   ├── annotation/            # Pins, threads, comments, tags-on-page, toolbar, overlay —
+│   │   │                          #   includes AnnotationLayer, the orchestration root
+│   │   ├── ai/                    # AI dock, op system (ai/ops/), session stores, AiStreamHub
+│   │   ├── erd/                   # Data-model (ERD) editor → DataModelPanel
+│   │   ├── flowchart/             # Flowchart editor ("WecFlow") → WecFlowPanel
+│   │   ├── epicFlow/              # Kanban board → EpicFlowPanel
+│   │   ├── flowPin/               # Flow pins placed on page elements
+│   │   ├── tags/                  # Tag pins placed on page elements
+│   │   ├── settings/              # SettingsPanel — organizations, projects, tags, dashboard
+│   │   ├── userManagement/        # UserManagementPanel
+│   │   ├── auditHistory/          # AuditHistoryPanel
+│   │   └── auth/                  # LoginDialog, ToolbarAuthControl
+│   ├── components/                # Shared/generic UI only — primitives/, Loading/, Versions/
+│   ├── hooks/                     # Flat — one use*.ts per concern (see ARCHITECTURE.md §4)
+│   ├── services/                  # Flat — one <domain>Service.ts REST client per concern
+│   ├── types/                     # Flat — one <domain>.types.ts per concern
+│   ├── utils/                     # Mostly flat; utils/erd/ and utils/flowchart/ stay as
+│   │                               #   multi-file subsystems (engine, geometry, DDL, validation)
+│   ├── config/                    # env.ts — the library's own build-time env (not the host's)
+│   ├── assets/icons/              # Bundled icons
+│   └── styles/                    # Plain CSS, concatenated into dist/style.css
+├── test/                          # Vitest suites (flat, "node" + "dom" projects)
+├── docs/                          # ARCHITECTURE.md, API_CONTRACT.md, DEVELOPMENT.md, PROJECT_OVERVIEW.md
+├── examples/demo/                 # Integration example app (aliased to src/, not dist/)
 ├── vite.config.ts
 ├── tsconfig.json / tsconfig.build.json
 └── package.json
 ```
+
+See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the full technical breakdown of this layout —
+why logic folders stay flat while UI is grouped by feature, the barrel policy, state management
+patterns, and the build pipeline.
 
 ---
 
@@ -511,4 +513,4 @@ The admin panels (settings, user management, audit history, EpicFlow) are split 
 
 ## License
 
-Proprietary. Copyright (c) 2026 Wec Technologies. All rights reserved. See [LICENSE](LICENSE).
+Proprietary. Copyright (c) 2026 Wec.ai. All rights reserved. See [LICENSE](LICENSE) for the full terms.

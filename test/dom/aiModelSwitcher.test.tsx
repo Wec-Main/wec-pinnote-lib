@@ -1,9 +1,9 @@
 import { act, createElement } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { AiModelSwitcher } from "../../src/components/Ai/AiModelSwitcher";
-import { AiMarkdown } from "../../src/components/Ai/AiMarkdown";
-import type { AiRoute } from "../../src/components/Ai/aiHelpers";
+import { AiModelSwitcher } from "../../src/features/ai/components/AiModelSwitcher";
+import { AiMarkdown } from "../../src/features/ai/components/AiMarkdown";
+import type { AiRoute } from "../../src/features/ai/components/aiHelpers";
 import type { AiMe } from "../../src/types/ai.types";
 import { aiMe, click, connector, flush, press } from "./aiTestUtils";
 

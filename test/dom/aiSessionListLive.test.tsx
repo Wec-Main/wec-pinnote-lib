@@ -1,10 +1,10 @@
 import { act, createElement } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { AiSessionList } from "../../src/components/Ai/AiSessionList";
+import { AiSessionList } from "../../src/features/ai/components/AiSessionList";
 import { SESSIONS_TIMEOUT_MS } from "../../src/hooks/useAiSessions";
 import { clearResources } from "../../src/utils/resourceCache";
-import { AiRuntimeContext } from "../../src/context/AiRuntimeContext";
+import { AiRuntimeContext } from "../../src/features/ai/AiRuntimeContext";
 import { T0, fakeRuntime, flush, jsonResponse } from "./aiTestUtils";
 
 let container: HTMLDivElement;

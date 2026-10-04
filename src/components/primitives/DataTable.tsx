@@ -78,7 +78,11 @@ export function DataTable<T>({
   const table = (
     <div className="wpn-users-table-wrap">
       <table
-        className={["wpn-users-table", tableClassName, refetching ? "wpn-users-table--refetching" : ""]
+        className={[
+          "wpn-users-table",
+          tableClassName,
+          refetching ? "wpn-users-table--refetching" : "",
+        ]
           .filter(Boolean)
           .join(" ")}
       >

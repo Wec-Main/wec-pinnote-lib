@@ -1,4 +1,4 @@
-import { fetchFlowDocument, publishFlow, saveFlowDocument } from "../services/flowApi";
+import { fetchFlowDocument, publishFlow, saveFlowDocument } from "../services/flowchartService";
 import type { FlowJSON } from "../types/flowchart.types";
 import { parseFlow } from "../utils/flowchart/serialization";
 import {

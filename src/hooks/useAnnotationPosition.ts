@@ -1,14 +1,14 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type RefObject } from "react";
 import type { AnnotationAnchor } from "../types/annotation.types";
-import { isLibraryElement, resolveElement } from "../utils/elementResolver";
-import { ANNOTATION_SCOPE_ATTRIBUTE } from "../utils/annotationScope";
+import { isLibraryElement, resolveElement } from "../utils/dom/elementResolver";
+import { ANNOTATION_SCOPE_ATTRIBUTE } from "../utils/annotation/annotationScope";
 import {
   computePinPosition,
   placePanel,
   positionsEqual,
   type PanelPlacement,
   type PinScreenPosition,
-} from "../utils/positioning";
+} from "../utils/dom/positioning";
 
 export interface PositionedItem {
   id: string;

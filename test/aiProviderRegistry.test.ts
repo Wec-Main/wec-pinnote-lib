@@ -6,7 +6,7 @@ import {
   listProviders,
   registerProvider,
   type ProviderDescriptor,
-} from "../src/ai/providerRegistry";
+} from "../src/features/ai/providerRegistry";
 
 describe("providerRegistry", () => {
   it("registers claude, codex and gemini as built-ins", () => {

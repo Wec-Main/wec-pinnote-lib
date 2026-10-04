@@ -1,8 +1,8 @@
 import { act, createElement } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { IntegrationsTab } from "../../src/components/Settings/IntegrationsTab";
-import { AiRuntimeContext } from "../../src/context/AiRuntimeContext";
+import { IntegrationsTab } from "../../src/features/settings/components/IntegrationsTab";
+import { AiRuntimeContext } from "../../src/features/ai/AiRuntimeContext";
 import {
   AnnotationUiContext,
   type AnnotationUiContextValue,

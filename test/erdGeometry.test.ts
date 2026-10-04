@@ -101,6 +101,22 @@ describe("relationship geometry", () => {
     });
   });
 
+  it("attaches each end to its key and foreign key rows when the fields are known", () => {
+    const keyed = relationship("r", "p", "c", {
+      sourceFieldId: parent.fields[0]!.id,
+      targetFieldId: child.fields[child.fields.length - 1]!.id,
+    });
+    const geometry = relationshipGeometry(keyed, lookup);
+    expect(geometry?.sourceAnchor).toEqual(fieldAnchor(parent, parent.fields[0]!.id, "right"));
+    expect(geometry?.targetAnchor).toEqual(
+      fieldAnchor(child, child.fields[child.fields.length - 1]!.id, "left"),
+    );
+    const stale = relationship("r", "p", "c", { sourceFieldId: "gone" });
+    expect(relationshipGeometry(stale, lookup)?.sourceAnchor).toEqual(
+      entityAnchor(parent, "right"),
+    );
+  });
+
   it("maps cardinality onto marker kinds", () => {
     expect(relationshipEndKinds("one-to-one")).toEqual({ source: "one", target: "one" });
     expect(relationshipEndKinds("one-to-many")).toEqual({ source: "one", target: "many" });

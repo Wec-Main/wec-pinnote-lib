@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { parseAnswers } from "../src/components/Ai/AiTranscript";
+import { parseAnswers } from "../src/features/ai/components/AiTranscript";
 import {
   answerText,
   formatAnswers,
@@ -7,7 +7,7 @@ import {
   toQuestions,
   withAnswers,
   SKIPPED_TEXT,
-} from "../src/components/Ai/aiQuestions";
+} from "../src/features/ai/components/aiQuestions";
 
 describe("aiQuestions", () => {
   it("normalizes strings and structured questions", () => {

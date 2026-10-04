@@ -6,8 +6,8 @@ import {
   summarizeChanges,
   summarizeErd,
   type ErdOp,
-} from "../src/ai/ops";
-import { applyErdOps } from "../src/ai/ops/applyErdOps";
+} from "../src/features/ai/ops";
+import { applyErdOps } from "../src/features/ai/ops/applyErdOps";
 import type { ErdDocumentJSON } from "../src/types/dataModel.types";
 import { getEntityRect, getNoteRect } from "../src/utils/erd/erdGeometry";
 import { parseErdDocument } from "../src/utils/erd/erdSerialization";
@@ -42,7 +42,7 @@ const ent = (doc: ErdDocumentJSON, name: string) => {
 };
 
 describe("applyErdOps: entities", () => {
-  it("adds an entity shaped like the editor's, with a default id primary key", () => {
+  it("adds an entity shaped like the editor's, with a default <table>_id primary key", () => {
     const { document, idMap, diff } = ok([{ op: "addEntity", tempId: "$tags", name: "labels" }]);
     const tags = ent(document, "labels");
     expect(tags).toMatchObject({ schema: "public", indexes: [] });
@@ -50,7 +50,7 @@ describe("applyErdOps: entities", () => {
     expect(tags.fields).toEqual([
       {
         id: expect.stringMatching(/^field_/),
-        name: "id",
+        name: "label_id",
         type: "integer",
         nullable: false,
         primaryKey: true,
@@ -558,7 +558,296 @@ describe("applyErdOps: all or nothing", () => {
   });
 });
 
+describe("applyErdOps: new field/entity/index/enum/relationship properties", () => {
+  it("sets color, group and locked on a new or existing entity", () => {
+    const { document } = ok([
+      { op: "addEntity", tempId: "$a", name: "a", color: "#ef4444", group: "Billing" },
+      { op: "updateEntity", entity: "users", patch: { color: "#10b981", group: "Core" } },
+    ]);
+    const a = ent(document, "a");
+    expect(a).toMatchObject({ color: "#ef4444", group: "Billing" });
+    expect(ent(document, "users")).toMatchObject({ color: "#10b981", group: "Core" });
+  });
+
+  it("sets and clears comment, check and generated on a field", () => {
+    const added = ok([
+      {
+        op: "addField",
+        entity: "users",
+        tempId: "$f",
+        field: {
+          name: "total",
+          type: "numeric",
+          comment: "Computed total",
+          check: "total >= 0",
+          generated: { expression: "price * qty", stored: true },
+        },
+      },
+    ]);
+    const total = ent(added.document, "users").fields.at(-1);
+    expect(total).toMatchObject({
+      comment: "Computed total",
+      check: "total >= 0",
+      generated: { expression: "price * qty", stored: true },
+    });
+    const cleared = ok([
+      {
+        op: "addField",
+        entity: "users",
+        tempId: "$f",
+        field: { name: "total", type: "numeric", generated: { expression: "price * qty" } },
+      },
+      { op: "updateField", entity: "users", field: "$f", patch: { generated: null } },
+    ]);
+    expect(ent(cleared.document, "users").fields.at(-1)?.generated).toBeUndefined();
+  });
+
+  it("plumbs index method and where through add and update", () => {
+    const added = ok([
+      {
+        op: "addIndex",
+        entity: "users",
+        tempId: "$i",
+        fields: ["email"],
+        method: "gin",
+        where: "deleted_at IS NULL",
+      },
+    ]);
+    expect(ent(added.document, "users").indexes[0]).toMatchObject({
+      method: "gin",
+      where: "deleted_at IS NULL",
+    });
+    const updated = ok([
+      { op: "addIndex", entity: "users", tempId: "$i", fields: ["email"] },
+      { op: "updateIndex", entity: "users", index: "$i", patch: { method: "hash" } },
+    ]);
+    expect(ent(updated.document, "users").indexes[0]).toMatchObject({ method: "hash" });
+  });
+
+  it("stores per-value descriptions on an enum", () => {
+    const { document, idMap } = ok([
+      {
+        op: "addEnum",
+        tempId: "$e",
+        name: "status",
+        values: ["open", "closed"],
+        descriptions: { open: "Still active", closed: "Done" },
+      },
+    ]);
+    const entry = document.enums.find((e) => e.id === idMap.$e);
+    expect(entry?.descriptions).toEqual({ open: "Still active", closed: "Done" });
+  });
+
+  it("creates a composite foreign key from sourceFieldIds/targetFieldIds", () => {
+    const { document } = ok([
+      {
+        op: "addEntity",
+        tempId: "$a",
+        name: "a",
+        fields: [
+          { name: "id", type: "uuid", primaryKey: true },
+          { name: "tenant_id", type: "uuid" },
+        ],
+      },
+      {
+        op: "addEntity",
+        tempId: "$b",
+        name: "b",
+        fields: [
+          { tempId: "$b_id", name: "id", type: "uuid", primaryKey: true },
+          { tempId: "$b_tenant", name: "tenant_id", type: "uuid" },
+        ],
+      },
+      {
+        op: "addRelationship",
+        source: "$a",
+        sourceFieldIds: ["id", "tenant_id"],
+        target: "$b",
+        targetFieldIds: ["$b_id", "$b_tenant"],
+        cardinality: "one-to-many",
+      },
+    ]);
+    const rel = document.relationships.at(-1);
+    expect(rel?.sourceFieldIds).toHaveLength(2);
+    expect(rel?.targetFieldIds).toHaveLength(2);
+  });
+
+  it("rejects mismatched composite key lengths", () => {
+    const errors = errorsOf([
+      {
+        op: "addRelationship",
+        source: "users",
+        sourceFieldIds: ["email", "id"],
+        target: "posts",
+        targetFieldIds: ["author_id"],
+        cardinality: "one-to-many",
+      },
+    ]);
+    expect(errors.some((e) => e.code === "invalid_value")).toBe(true);
+  });
+
+  it("rejects ops that modify a locked entity", () => {
+    const doc = blogDocument();
+    const posts = doc.entities.find((e) => e.id === "posts");
+    if (posts) posts.locked = true;
+    expect(
+      errorsOf([{ op: "updateEntity", entity: "posts", patch: { comment: "x" } }], doc)[0],
+    ).toMatchObject({ code: "invalid_value" });
+    expect(
+      errorsOf([{ op: "addField", entity: "posts", field: { name: "x", type: "int" } }], doc)[0],
+    ).toMatchObject({ code: "invalid_value" });
+    expect(
+      errorsOf(
+        [{ op: "updateField", entity: "posts", field: "posts_title", patch: { nullable: true } }],
+        doc,
+      )[0],
+    ).toMatchObject({ code: "invalid_value" });
+    expect(
+      errorsOf([{ op: "removeField", entity: "posts", field: "posts_title" }], doc)[0],
+    ).toMatchObject({ code: "invalid_value" });
+    expect(
+      errorsOf([{ op: "addIndex", entity: "posts", fields: ["posts_title"] }], doc)[0],
+    ).toMatchObject({ code: "invalid_value" });
+    expect(
+      errorsOf(
+        [{ op: "updateIndex", entity: "posts", index: "idx1", patch: { unique: true } }],
+        doc,
+      )[0],
+    ).toMatchObject({ code: "invalid_value" });
+    expect(errorsOf([{ op: "removeIndex", entity: "posts", index: "idx1" }], doc)[0]).toMatchObject(
+      {
+        code: "invalid_value",
+      },
+    );
+    expect(errorsOf([{ op: "removeEntity", entity: "posts" }], doc)[0]).toMatchObject({
+      code: "invalid_value",
+    });
+  });
+
+  it("rejects relationship ops that touch a locked entity", () => {
+    const doc = blogDocument();
+    const posts = doc.entities.find((e) => e.id === "posts");
+    if (posts) posts.locked = true;
+    expect(
+      errorsOf(
+        [{ op: "addRelationship", source: "posts", target: "tags", cardinality: "one-to-many" }],
+        doc,
+      )[0],
+    ).toMatchObject({ code: "invalid_value" });
+    expect(
+      errorsOf([{ op: "updateRelationship", relationship: "r1", patch: { name: "x" } }], doc)[0],
+    ).toMatchObject({ code: "invalid_value" });
+    expect(errorsOf([{ op: "removeRelationship", relationship: "r1" }], doc)[0]).toMatchObject({
+      code: "invalid_value",
+    });
+  });
+});
+
 describe("applyErdOps: placement and round trip", () => {
+  it("fills in the key and foreign key fields when the AI leaves them out", () => {
+    const { document, idMap } = ok([
+      {
+        op: "addEntity",
+        tempId: "$c",
+        name: "customers",
+        fields: [{ tempId: "$cid", name: "customer_id", type: "uuid", primaryKey: true }],
+      },
+      {
+        op: "addEntity",
+        tempId: "$o",
+        name: "orders",
+        fields: [
+          { tempId: "$oid", name: "order_id", type: "uuid", primaryKey: true },
+          { tempId: "$fk", name: "customer_id", type: "uuid" },
+        ],
+      },
+      {
+        op: "addRelationship",
+        tempId: "$r",
+        source: "$c",
+        target: "$o",
+        cardinality: "one-to-many",
+      },
+    ]);
+    expect(document.relationships.find((r) => r.id === idMap.$r)).toMatchObject({
+      sourceEntityId: idMap.$c,
+      sourceFieldId: idMap.$cid,
+      targetEntityId: idMap.$o,
+      targetFieldId: idMap.$fk,
+    });
+  });
+
+  it("turns a relationship the AI drew from child to parent the right way round", () => {
+    const { document, idMap } = ok([
+      {
+        op: "addEntity",
+        tempId: "$c",
+        name: "customers",
+        fields: [{ tempId: "$cid", name: "id", type: "uuid", primaryKey: true }],
+      },
+      {
+        op: "addEntity",
+        tempId: "$o",
+        name: "orders",
+        fields: [
+          { name: "id", type: "uuid", primaryKey: true },
+          { tempId: "$fk", name: "customer_id", type: "uuid" },
+        ],
+      },
+      {
+        op: "addRelationship",
+        tempId: "$r",
+        source: "$o",
+        target: "$c",
+        cardinality: "one-to-many",
+      },
+    ]);
+    expect(document.relationships.find((r) => r.id === idMap.$r)).toMatchObject({
+      sourceEntityId: idMap.$c,
+      sourceFieldId: idMap.$cid,
+      targetEntityId: idMap.$o,
+      targetFieldId: idMap.$fk,
+    });
+  });
+
+  it("places a new entity beside the entity it relates to", () => {
+    const { document } = ok([
+      { op: "addEntity", name: "far", fields: [{ name: "far_id", type: "int", primaryKey: true }] },
+      {
+        op: "addEntity",
+        tempId: "$c",
+        name: "comments",
+        fields: [{ name: "user_id", type: "int" }],
+      },
+      { op: "addRelationship", source: "users", target: "$c", cardinality: "one-to-many" },
+    ]);
+    const users = getEntityRect(ent(document, "users"));
+    const comments = getEntityRect(ent(document, "comments"));
+    const far = getEntityRect(ent(document, "far"));
+    expect(comments.x).toBe(users.x + users.width + 80);
+    expect(comments.x).toBeLessThan(far.x + far.width);
+  });
+
+  it("lines notes up in a row below the model, left to right", () => {
+    const { document } = ok([
+      { op: "addNote", text: "first" },
+      { op: "addNote", text: "second" },
+      { op: "addNote", text: "third" },
+    ]);
+    const bottom = Math.max(
+      ...document.entities.map((e) => getEntityRect(e).y + getEntityRect(e).height),
+    );
+    const left = Math.min(...document.entities.map((e) => getEntityRect(e).x));
+    const notes = ["first", "second", "third"].map((text) =>
+      document.notes.find((note) => note.text === text)!,
+    );
+    expect(notes.every((note) => note.position.y === notes[0]!.position.y)).toBe(true);
+    expect(notes[0]!.position.y).toBeGreaterThan(bottom);
+    expect(notes[0]!.position.x).toBe(left);
+    expect(notes[1]!.position.x).toBeGreaterThan(notes[0]!.position.x);
+    expect(notes[2]!.position.x).toBeGreaterThan(notes[1]!.position.x);
+  });
+
   it("places new entities right of the right-most entity without overlaps", () => {
     const { document } = ok([
       {
@@ -665,7 +954,7 @@ describe("parseErdOps", () => {
       { op: "updateEnum", enum: "e", patch: { values: [] } },
       { op: "removeEnum", enum: "e" },
       { op: "addNote", text: "t" },
-      { op: "updateNote", note: "n", patch: { color: "red" } },
+      { op: "updateNote", note: "n", patch: { color: "#ec4899" } },
       { op: "removeNote", note: "n" },
       { op: "setEngine", engine: "postgres" },
       { op: "autoLayout" },

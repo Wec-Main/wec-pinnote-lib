@@ -10,7 +10,7 @@ import {
   publishDataModel,
   saveDataModelDocument,
   updateDataModel,
-} from "../src/services/dataModelApi";
+} from "../src/services/erdService";
 import { createEmptyErdDocument } from "../src/utils/erd/erdSerialization";
 
 const BASE = "https://api.example.com";

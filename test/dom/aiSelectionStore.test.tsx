@@ -5,7 +5,7 @@ import {
   aiSelectionLabel,
   aiSelectionStore,
   usePublishAiSelection,
-} from "../../src/ai/aiSelectionStore";
+} from "../../src/features/ai/aiSelectionStore";
 
 const NOUN = ["entity", "entities"] as const;
 const names: Record<string, string> = { e1: "users", e2: "posts" };

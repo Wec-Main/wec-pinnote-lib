@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
-import { AiStreamHub } from "../src/ai/AiStreamHub";
-import { createAiPreviewStore } from "../src/ai/aiPreviewStore";
+import { AiStreamHub } from "../src/features/ai/AiStreamHub";
+import { createAiPreviewStore } from "../src/features/ai/aiPreviewStore";
 import {
   NO_APPLIED_BATCHES,
   applyBatchToDocument,
@@ -10,7 +10,7 @@ import {
   withAccepted,
   withPreview,
   withRejected,
-} from "../src/ai/opBatchApplier";
+} from "../src/features/ai/opBatchApplier";
 import {
   EMPTY_AI_SESSION_VIEW,
   loadSessionDetail,
@@ -22,7 +22,7 @@ import {
   selectDetail,
   markDraftStale,
   isSeqGap,
-} from "../src/ai/sessionReducer";
+} from "../src/features/ai/sessionReducer";
 import type {
   AiMessage,
   AiOpBatch,
@@ -31,8 +31,8 @@ import type {
   AiStreamEvent,
   AiTurn,
 } from "../src/types/ai.types";
-import { parseAiStreamEvent } from "../src/utils/aiStreamGuards";
-import { canApplyAiModelOps, canManageAiTemplates, canUseAi } from "../src/utils/permissions";
+import { parseAiStreamEvent } from "../src/utils/ai/aiStreamGuards";
+import { canApplyAiModelOps, canManageAiTemplates, canUseAi } from "../src/utils/auth/permissions";
 import type { UserManagementRole } from "../src/types/userManagement.types";
 import { blogDocument } from "./erdFixtures";
 

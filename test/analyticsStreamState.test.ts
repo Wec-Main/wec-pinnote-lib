@@ -7,7 +7,7 @@ import {
   nextReconnectDelay,
   parseAnalyticsChange,
   streamStateAfterFailure,
-} from "../src/components/Settings/Dashboard/analyticsStreamState";
+} from "../src/features/settings/components/Dashboard/analyticsStreamState";
 
 describe("createReloadScheduler", () => {
   beforeEach(() => {

@@ -6,7 +6,7 @@ import {
   reduceSessionList,
   reduceSessionView,
   sessionMatchesFilter,
-} from "../src/ai/sessionReducer";
+} from "../src/features/ai/sessionReducer";
 import type { AiSession, AiStreamEvent, AiTurn } from "../src/types/ai.types";
 
 const base = {

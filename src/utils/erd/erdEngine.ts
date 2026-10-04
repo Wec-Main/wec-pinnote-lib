@@ -26,7 +26,7 @@ import {
   NOTE_DEFAULT_SIZE,
 } from "./erdConstants";
 import { getEntityRect, getNoteRect } from "./erdGeometry";
-import { layoutErd, type ErdLayoutMode } from "./erdLayout";
+import { layoutErd, layoutNotesBelow, readingOrder, type ErdLayoutMode } from "./erdLayout";
 import { validateErd, type ErdIssueSeverity, type ErdValidationResult } from "./erdValidator";
 
 export type { ErdLayoutMode } from "./erdLayout";
@@ -139,6 +139,18 @@ function nextName(prefix: string, taken: readonly string[]): string {
   let n = taken.length + 1;
   while (used.has(`${prefix}_${n}`)) n++;
   return `${prefix}_${n}`;
+}
+
+function singularize(name: string): string {
+  const lower = name.trim().toLowerCase();
+  if (lower.endsWith("ies") && lower.length > 3) return lower.slice(0, -3) + "y";
+  if (/(ses|xes|zes|ches|shes)$/.test(lower)) return lower.slice(0, -2);
+  if (lower.endsWith("s") && !lower.endsWith("ss")) return lower.slice(0, -1);
+  return lower;
+}
+
+function defaultPrimaryKeyName(entityName: string): string {
+  return `${singularize(entityName) || "record"}_id`;
 }
 
 function toggled(set: ReadonlySet<string>, id: string): Set<string> {
@@ -312,25 +324,30 @@ export class ErdEngine {
     document: Partial<ErdDocumentJSON>,
     options: { recordHistory?: boolean } = {},
   ): void {
+    this.replaceDocument(document, options.recordHistory ? "commit" : "reset");
+  }
+
+  applyDraftDocument(document: Partial<ErdDocumentJSON>, options: { push: boolean }): void {
+    this.replaceDocument(document, options.push ? "push" : "replace");
+  }
+
+  private replaceDocument(
+    document: Partial<ErdDocumentJSON>,
+    mode: "commit" | "reset" | "push" | "replace",
+  ): void {
     this.interactionDepth = 0;
     this.interactionStart = null;
     if (document.meta) this.meta = { ...document.meta };
-    const name = document.meta?.name ?? this.getState().name;
+    const s = this.getState();
     const next: ErdSnapshot = {
-      engine: document.engine ?? this.getState().engine,
+      engine: document.engine ?? s.engine,
       entities: document.entities ?? [],
       relationships: document.relationships ?? [],
       enums: document.enums ?? [],
       notes: document.notes ?? [],
     };
-    if (options.recordHistory) {
-      this.commit(next);
-    } else {
-      this.history.clear();
-      this.applySnapshot(next);
-    }
-    this.store.setState({
-      name,
+    const extra: Partial<ErdState> = {
+      name: document.meta?.name ?? s.name,
       connection: null,
       selectionRect: null,
       activeFieldId: null,
@@ -338,7 +355,20 @@ export class ErdEngine {
       issueEntityIds: EMPTY_ISSUES,
       issueRelationshipIds: EMPTY_ISSUES,
       issueFieldIds: EMPTY_ISSUES,
-    });
+    };
+    const current = this.getSnapshot();
+    const changed = ErdEngine.differs(current, next);
+    if (mode === "reset") {
+      this.history.clear();
+      this.applySnapshot(next, extra);
+      return;
+    }
+    if (!changed || (mode === "commit" && s.readOnly)) {
+      this.store.setState(extra);
+      return;
+    }
+    if (mode !== "replace") this.history.push(current);
+    this.applySnapshot(next, extra);
   }
 
   setName(name: string): void {
@@ -353,7 +383,7 @@ export class ErdEngine {
     this.commit({ engine });
   }
 
-  private applySnapshot(next: ErdSnapshot): void {
+  private applySnapshot(next: ErdSnapshot, extra: Partial<ErdState> = {}): void {
     const s = this.getState();
     const entityLookup =
       next.entities === s.entities
@@ -368,6 +398,7 @@ export class ErdEngine {
     const enumLookup =
       next.enums === s.enums ? s.enumLookup : new Map(next.enums.map((entry) => [entry.id, entry]));
     this.store.setState({
+      ...extra,
       ...next,
       entityLookup,
       relationshipLookup,
@@ -516,20 +547,21 @@ export class ErdEngine {
 
   addEntity(input: NewEntityInput = {}): ErdEntity {
     const s = this.getState();
+    const name =
+      input.name ??
+      nextName(
+        "entity",
+        s.entities.map((e) => e.name),
+      );
     const entity: ErdEntity = {
       id: input.id ?? createId("entity"),
-      name:
-        input.name ??
-        nextName(
-          "entity",
-          s.entities.map((e) => e.name),
-        ),
+      name,
       schema: "public",
       position: { ...(input.position ?? { x: 0, y: 0 }) },
       fields: [
         {
           id: createId("field"),
-          name: "id",
+          name: defaultPrimaryKeyName(name),
           type: "integer",
           nullable: false,
           primaryKey: true,
@@ -742,6 +774,113 @@ export class ErdEngine {
     this.commit({
       enums: s.enums.map((entry) => (entry.id === id ? { ...entry, ...patch, id } : entry)),
     });
+  }
+
+  addAuditColumns(
+    entityId: string,
+    options: { timestamps?: boolean; softDelete?: boolean; actorTracking?: boolean } = {},
+  ): void {
+    const entity = this.getEntity(entityId);
+    if (!entity) return;
+    const { timestamps = true, softDelete = true, actorTracking = false } = options;
+    const candidates: ErdFieldInput[] = [];
+    if (timestamps) {
+      candidates.push(
+        { name: "created_at", type: "timestamp", nullable: false, defaultValue: "now()" },
+        { name: "updated_at", type: "timestamp", nullable: false, defaultValue: "now()" },
+      );
+    }
+    if (softDelete) candidates.push({ name: "deleted_at", type: "timestamp", nullable: true });
+    if (actorTracking) {
+      candidates.push(
+        { name: "created_by", type: "uuid", nullable: true },
+        { name: "updated_by", type: "uuid", nullable: true },
+      );
+    }
+    const existingNames = new Set(entity.fields.map((field) => field.name.toLowerCase()));
+    const toAdd = candidates.filter(
+      (input) => !existingNames.has((input.name ?? "").toLowerCase()),
+    );
+    if (toAdd.length === 0) return;
+    this.beginInteraction();
+    for (const input of toAdd) this.addField(entityId, input);
+    this.endInteraction();
+  }
+
+  convertEnumToTable(enumId: string): ErdEntity | null {
+    const enumEntry = this.getEnum(enumId);
+    if (!enumEntry) return null;
+    const targets = this.getState().entities.flatMap((entity) =>
+      entity.fields
+        .filter((field) => field.enumId === enumId)
+        .map((field) => ({ entityId: entity.id, fieldId: field.id })),
+    );
+    this.beginInteraction();
+    const lookupEntity = this.addEntity({ name: enumEntry.name });
+    const idField = lookupEntity.fields[0] as ErdField;
+    this.addField(lookupEntity.id, {
+      name: "value",
+      type: "text",
+      nullable: false,
+      unique: true,
+      comment: `Seed values: ${enumEntry.values.join(", ")}`,
+    });
+    for (const target of targets) {
+      const entity = this.getEntity(target.entityId);
+      const field = entity?.fields.find((f) => f.id === target.fieldId);
+      if (!entity || !field) continue;
+      const { enumId: _removed, ...rest } = field;
+      this.updateEntity(entity.id, {
+        fields: entity.fields.map((f) => (f.id === field.id ? { ...rest, type: idField.type } : f)),
+      });
+      this.addRelationship(lookupEntity.id, entity.id, {
+        cardinality: "one-to-many",
+        sourceFieldId: idField.id,
+        targetFieldId: field.id,
+      });
+    }
+    this.removeEnum(enumId);
+    this.endInteraction();
+    return this.getEntity(lookupEntity.id) ?? null;
+  }
+
+  materializeJoinTable(relationshipId: string): ErdEntity | null {
+    const relationship = this.getRelationship(relationshipId);
+    if (!relationship || relationship.cardinality !== "many-to-many") return null;
+    const source = this.getEntity(relationship.sourceEntityId);
+    const target = this.getEntity(relationship.targetEntityId);
+    if (!source || !target) return null;
+    const sourcePk = source.fields.find((field) => field.primaryKey);
+    const targetPk = target.fields.find((field) => field.primaryKey);
+    this.beginInteraction();
+    const join = this.addEntity({ name: `${source.name}_${target.name}` });
+    const defaultFieldId = join.fields[0]?.id;
+    if (defaultFieldId) this.removeField(join.id, defaultFieldId);
+    const sourceFkField = this.addField(join.id, {
+      name: `${source.name}_id`,
+      type: sourcePk?.type ?? "integer",
+      nullable: false,
+      primaryKey: true,
+    });
+    const targetFkField = this.addField(join.id, {
+      name: `${target.name}_id`,
+      type: targetPk?.type ?? "integer",
+      nullable: false,
+      primaryKey: true,
+    });
+    this.addRelationship(source.id, join.id, {
+      cardinality: "one-to-many",
+      sourceFieldId: sourcePk?.id,
+      targetFieldId: sourceFkField?.id,
+    });
+    this.addRelationship(target.id, join.id, {
+      cardinality: "one-to-many",
+      sourceFieldId: targetPk?.id,
+      targetFieldId: targetFkField?.id,
+    });
+    this.removeRelationships([relationship.id]);
+    this.endInteraction();
+    return this.getEntity(join.id) ?? null;
   }
 
   removeEnum(id: string): void {
@@ -1065,12 +1204,19 @@ export class ErdEngine {
 
   applyLayout(mode: ErdLayoutMode): void {
     const s = this.getState();
-    this.setNodePositions(
-      layoutErd(mode, s.entities, s.relationships, (entity) => {
-        const { width, height } = getEntityRect(entity);
-        return { width, height };
-      }),
-    );
+    const measure = (entity: ErdEntity) => {
+      const { width, height } = getEntityRect(entity);
+      return { width, height };
+    };
+    const positions = layoutErd(mode, s.entities, s.relationships, measure);
+    const rects = s.entities.map((entity) => ({
+      ...(positions[entity.id] ?? entity.position),
+      ...measure(entity),
+    }));
+    this.setNodePositions({
+      ...positions,
+      ...layoutNotesBelow(rects, readingOrder(s.notes)),
+    });
     this.fitView();
   }
 

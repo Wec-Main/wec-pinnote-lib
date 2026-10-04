@@ -1,7 +1,7 @@
 import { act, createElement } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { ErdEditor } from "../../src/components/DataModel/erd/ErdEditor";
+import { ErdEditor } from "../../src/features/erd/components/erd/ErdEditor";
 import type { ErdDocumentJSON } from "../../src/types/dataModel.types";
 import { blogDocument, entity, field, relationship } from "../erdFixtures";
 import { buttonByText, click } from "./aiTestUtils";
@@ -50,7 +50,7 @@ afterEach(() => {
   container.remove();
 });
 
-const panel = () => container.querySelector(".wpn-erd__validation");
+const panel = () => container.querySelector(".wpn-erd-validation__panel");
 const badge = () => container.querySelector(".wpn-erd-validate-badge");
 
 describe("data model validation UI", () => {
@@ -79,16 +79,16 @@ describe("data model validation UI", () => {
 
   it("filters by severity and focuses a field when an issue is clicked", () => {
     act(() => click(buttonByText(container, "Validate")));
-    const rows = () => panel()!.querySelectorAll(".wpn-flowchart-validation__issue");
+    const rows = () => panel()!.querySelectorAll(".wpn-erd-validation__issue");
     const all = rows().length;
     act(() => click(buttonByText(panel() as unknown as HTMLElement, /^Warnings/)));
     const warnings = rows().length;
     expect(warnings).toBeGreaterThan(0);
     expect(warnings).toBeLessThan(all);
     act(() => click(buttonByText(panel() as unknown as HTMLElement, /^Errors/)));
-    expect([...rows()].every((row) => row.querySelector(".wpn-flowchart-validation__error"))).toBe(
-      true,
-    );
+    expect(
+      [...rows()].every((row) => row.querySelector(".wpn-erd-validation__severity--error")),
+    ).toBe(true);
     const target = [...rows()].find((row) => row.textContent?.includes("needs a length"));
     act(() => click(target));
     expect(container.querySelector(".wpn-erd-field--active")).not.toBeNull();

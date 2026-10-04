@@ -1,22 +1,25 @@
 import { act, createElement } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { AiFloatingButton } from "../../src/components/Ai/AiFloatingButton";
-import { resetAiWarmThrottle } from "../../src/services/aiActionsStream";
+import { AiFloatingButton } from "../../src/features/ai/components/AiFloatingButton";
+import { resetAiWarmThrottle } from "../../src/services/aiActionsStreamService";
 import {
   AnnotationAuthContext,
   AnnotationUiContext,
   type AnnotationAuthContextValue,
   type AnnotationUiContextValue,
 } from "../../src/context/AnnotationContext";
-import { AiRuntimeContext, type AiRuntimeContextValue } from "../../src/context/AiRuntimeContext";
+import {
+  AiRuntimeContext,
+  type AiRuntimeContextValue,
+} from "../../src/features/ai/AiRuntimeContext";
 import { aiMe, connector, fakeRuntime, flush, jsonResponse, press } from "./aiTestUtils";
 
-vi.mock("../../src/components/Ai/useAiMentionCandidates", () => ({
+vi.mock("../../src/features/ai/components/useAiMentionCandidates", () => ({
   useAiMentionCandidates: () => ({ candidates: [], request: () => undefined }),
 }));
 
-vi.mock("../../src/components/Ai/useAiCardActions", () => ({
+vi.mock("../../src/features/ai/components/useAiCardActions", () => ({
   useAiCardActions: () => ({}),
 }));
 

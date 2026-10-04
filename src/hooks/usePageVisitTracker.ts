@@ -5,7 +5,7 @@ import {
   mintIngestToken,
   sendVisitBatch,
   type VisitSendMode,
-} from "../services/analyticsIngestApi";
+} from "../services/analyticsIngestService";
 import { createClientId } from "../utils/format";
 import {
   FLUSH_INTERVAL_MS,

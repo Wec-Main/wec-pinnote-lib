@@ -1,4 +1,4 @@
-import { useAiRuntimeActions, useAiRuntimeState } from "../context/AiRuntimeContext";
+import { useAiRuntimeActions, useAiRuntimeState } from "../features/ai/AiRuntimeContext";
 import type { AiMe } from "../types/ai.types";
 
 export interface AiMeState {

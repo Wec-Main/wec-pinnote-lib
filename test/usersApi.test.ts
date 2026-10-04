@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { resetUserPassword } from "../src/services/usersApi";
+import { resetUserPassword } from "../src/services/userManagementService";
 
 const STALE_TOKEN = "stale.jwt.token";
 const FRESH_TOKEN = "fresh.jwt.token";

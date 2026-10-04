@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { useOptionalAiRuntimeActions } from "../context/AiRuntimeContext";
-import { getAiActionHistory } from "../services/aiApi";
+import { useOptionalAiRuntimeActions } from "../features/ai/AiRuntimeContext";
+import { getAiActionHistory } from "../services/aiService";
 import type { AiActionTarget, AiMessage } from "../types/ai.types";
 
 const NO_MESSAGES: AiMessage[] = [];

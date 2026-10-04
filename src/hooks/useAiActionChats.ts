@@ -1,6 +1,6 @@
-import { useCallback, useEffect, useState } from "react";
-import { useOptionalAiRuntimeActions } from "../context/AiRuntimeContext";
-import { listAiActionChats, updateAiSession } from "../services/aiApi";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { useOptionalAiRuntimeActions } from "../features/ai/AiRuntimeContext";
+import { listAiActionChats, updateAiSession } from "../services/aiService";
 import type { AiActionTarget, AiSession } from "../types/ai.types";
 
 const NO_CHATS: AiSession[] = [];
@@ -9,6 +9,7 @@ export interface AiActionChats {
   chats: AiSession[];
   loading: boolean;
   reload: () => void;
+  touch: (aiSessionId: string, at?: string) => void;
   rename: (aiSessionId: string, title: string) => Promise<void>;
   archive: (aiSessionId: string) => Promise<void>;
 }
@@ -55,6 +56,21 @@ export function useAiActionChats(
 
   const reload = useCallback(() => setTick((value) => value + 1), []);
 
+  const chatsRef = useRef(chats);
+  chatsRef.current = chats;
+
+  const touch = useCallback((aiSessionId: string, at: string = new Date().toISOString()) => {
+    const found = chatsRef.current.find((chat) => chat.aiSessionId === aiSessionId);
+    if (!found) {
+      setTick((value) => value + 1);
+      return;
+    }
+    setChats((current) => [
+      { ...found, lastMessageAt: at, updatedAt: at },
+      ...current.filter((chat) => chat.aiSessionId !== aiSessionId),
+    ]);
+  }, []);
+
   const patch = useCallback(
     async (aiSessionId: string, input: { title?: string; archived?: boolean }) => {
       if (!runtime) return;
@@ -69,6 +85,7 @@ export function useAiActionChats(
     chats: active ? chats : NO_CHATS,
     loading,
     reload,
+    touch,
     rename: (aiSessionId, title) => patch(aiSessionId, { title }),
     archive: (aiSessionId) => patch(aiSessionId, { archived: true }),
   };

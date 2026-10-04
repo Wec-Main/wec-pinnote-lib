@@ -7,11 +7,11 @@ import {
   effectiveConnector,
   modelsFor,
   resolveRoute,
-} from "../src/components/Ai/aiHelpers";
-import { connectorAccountText, usageText } from "../src/components/Ai/ProviderCard";
-import { mergeAiMeConnectors } from "../src/context/AiRuntimeContext";
+} from "../src/features/ai/components/aiHelpers";
+import { connectorAccountText, usageText } from "../src/features/ai/components/ProviderCard";
+import { mergeAiMeConnectors } from "../src/features/ai/AiRuntimeContext";
 import type { AiConnector, AiMe, AiProviderId } from "../src/types/ai.types";
-import { parseAiStreamEvent } from "../src/utils/aiStreamGuards";
+import { parseAiStreamEvent } from "../src/utils/ai/aiStreamGuards";
 
 function row(
   provider: AiProviderId,

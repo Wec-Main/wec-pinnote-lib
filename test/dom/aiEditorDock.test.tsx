@@ -1,16 +1,16 @@
 import { act, createElement, Fragment } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { useAiDockControl } from "../../src/ai/aiDockState";
-import { aiPreviewStore } from "../../src/ai/aiPreviewStore";
+import { useAiDockControl } from "../../src/features/ai/aiDockState";
+import { aiPreviewStore } from "../../src/features/ai/aiPreviewStore";
 import { useStoreSelector } from "../../src/hooks/useStoreSelector";
-import { useAiOpBatchApplier } from "../../src/ai/useAiOpBatchApplier";
-import { AiEditorDock, type AiMentionSource } from "../../src/components/Ai/AiEditorDock";
-import { AskAiButton } from "../../src/components/Ai/ErdAiIntegration";
-import { aiEditorRequests } from "../../src/components/Ai/aiEditorRequests";
-import { AiRuntimeContext } from "../../src/context/AiRuntimeContext";
+import { useAiOpBatchApplier } from "../../src/features/ai/useAiOpBatchApplier";
+import { AiEditorDock, type AiMentionSource } from "../../src/features/ai/components/AiEditorDock";
+import { AskAiButton } from "../../src/features/ai/components/ErdAiIntegration";
+import { aiEditorRequests } from "../../src/features/ai/components/aiEditorRequests";
+import { AiRuntimeContext } from "../../src/features/ai/AiRuntimeContext";
 import type { RevisionedDocumentState } from "../../src/hooks/useRevisionedDocument";
-import { resetAiWarmThrottle } from "../../src/services/aiActionsStream";
+import { resetAiWarmThrottle } from "../../src/services/aiActionsStreamService";
 import type { AiOpBatch } from "../../src/types/ai.types";
 import type { ErdDocumentJSON } from "../../src/types/dataModel.types";
 import { ErdEngine } from "../../src/utils/erd/erdEngine";
@@ -228,7 +228,7 @@ afterEach(() => {
 });
 
 describe("AiEditorDock", () => {
-  it("warms the AI on mount and picks edit for a non-empty model", async () => {
+  it("warms the AI on mount, picks ask by default, and offers only Ask and Edit", async () => {
     await mount();
     const warmCall = fetchMock.mock.calls.find(([url]) => path(String(url)) === "/ai/warm");
     expect(warmCall).toBeDefined();
@@ -238,6 +238,17 @@ describe("AiEditorDock", () => {
     expect(JSON.parse(String((warmCall![1] as RequestInit).body))).not.toHaveProperty("surface");
     await ask("Add a tags table");
     expect(runs[0]).toMatchObject({
+      actionKey: "erd.ask",
+      body: { prompt: "Add a tags table", targetId: "dm1", provider: "claude" },
+    });
+    click(container.querySelector(".wpn-ai-dock__action-trigger"));
+    const modes = [...document.querySelectorAll(".wpn-menu__item-label")].map(
+      (el) => el.textContent,
+    );
+    expect(modes).toEqual(["Ask", "Edit"]);
+    click(buttonByText(container, "Edit"));
+    await ask("Add a tags table");
+    expect(runs[1]).toMatchObject({
       actionKey: "erd.edit",
       body: { prompt: "Add a tags table", targetId: "dm1", provider: "claude" },
     });
@@ -272,37 +283,16 @@ describe("AiEditorDock", () => {
     expect(runs[0]?.body.selection).toEqual([ids[0]]);
   });
 
-  it("shows review findings from value.findings and the rationale when there are no ops", async () => {
+  it("shows the rationale as a note when a json result has no ops", async () => {
     await mount();
-    results.push(
-      {
-        raw: {
-          kind: "op_batch",
-          batch: batch("ob9", "review"),
-          value: {
-            title: "Review fixes",
-            rationale: "Mostly fine",
-            findings: [
-              { severity: "high", where: "posts.author_id", issue: "No index", fix: "Add one" },
-            ],
-            ops: [],
-          },
-        },
+    results.push({
+      raw: {
+        kind: "json",
+        value: { title: "Nothing to change", rationale: "Already normalised", ops: [] },
       },
-      {
-        raw: {
-          kind: "json",
-          value: { title: "Nothing to change", rationale: "Already normalised", ops: [] },
-        },
-      },
-    );
+    });
     click(container.querySelector(".wpn-ai-dock__action-trigger"));
-    click(buttonByText(container, "Review model"));
-    await flush(30);
-    const finding = container.querySelector(".wpn-ai-dock__finding--high");
-    expect(finding?.textContent).toContain("posts.author_id");
-    expect(finding?.textContent).toContain("No index");
-    expect(finding?.textContent).toContain("Fix: Add one");
+    click(buttonByText(container, "Edit"));
     await ask("Tidy it");
     expect(container.querySelector(".wpn-ai-dock__note")?.textContent).toContain(
       "Already normalised",
@@ -310,43 +300,48 @@ describe("AiEditorDock", () => {
     expect(container.querySelector(".wpn-ai-dock__json")).toBeNull();
   });
 
-  it("picks generate for an empty model and honours the quick chips", async () => {
+  it("picks ask by default even for an empty model, and honours the quick chips", async () => {
     await mount({ ...blogDocument(), entities: [], relationships: [] });
     await ask("A shop");
-    expect(runs[0]?.actionKey).toBe("erd.generate");
-    click(container.querySelector(".wpn-ai-dock__action-trigger"));
-    click(buttonByText(container, "Review model"));
-    await flush(30);
-    expect(runs[1]?.actionKey).toBe("erd.review");
+    expect(runs[0]?.actionKey).toBe("erd.ask");
     expect(container.textContent).toContain("It is a blog.");
     expect(buttonByText(container, /Retry/)).not.toBeNull();
-  });
-
-  it("publishes in parallel, clears the canvas and builds fresh on Generate, but not for edits", async () => {
-    onSnapshot = vi.fn(() => new Promise<void>(() => undefined));
-    await mount();
-    const original = names();
-    await ask("Tidy it");
-    expect(onSnapshot).not.toHaveBeenCalled();
-    expect(runs[0]?.body.fresh).toBeUndefined();
-    results.push(batch("ob9", "products"));
     click(container.querySelector(".wpn-ai-dock__action-trigger"));
     click(buttonByText(container, "Generate"));
-    typeInto(input(), "A shop");
-    press(input(), "Enter");
-    expect(onSnapshot).toHaveBeenCalledTimes(1);
-    expect(container.classList.contains("wpn-ai-working")).toBe(true);
-    await flush(30);
-    expect(container.classList.contains("wpn-ai-working")).toBe(false);
-    expect(runs[1]).toMatchObject({ actionKey: "erd.generate", body: { fresh: true } });
-    expect(names()).toEqual(["products"]);
-    click(buttonByText(container, "Discard"));
-    await flush();
-    expect(names()).toEqual(original);
+    await ask("A shop");
+    expect(runs[1]?.actionKey).toBe("erd.generate");
+  });
+
+  it("edits a non-empty model in place, scoped to the selection when there is one", async () => {
+    onSnapshot = vi.fn(async () => undefined);
+    await mount();
+    const original = names();
+    results.push(batch("ob9", "products"));
+    click(container.querySelector(".wpn-ai-dock__action-trigger"));
+    click(buttonByText(container, "Edit"));
+    await ask("Add products");
+    expect(onSnapshot).not.toHaveBeenCalled();
+    expect(runs[0]).toMatchObject({ actionKey: "erd.edit" });
+    expect(runs[0]?.body.fresh).toBeUndefined();
+    expect(runs[0]?.body).not.toHaveProperty("selection");
+    expect(names()).toEqual([...original, "products"]);
+    const ids = engine.getState().entities.map((entity) => entity.id);
+    act(() => engine.setSelection({ entityIds: [ids[0]!] }));
+    act(() =>
+      root.render(
+        createElement(AiRuntimeContext.Provider, { value: runtime.value }, createElement(Harness)),
+      ),
+    );
+    click(container.querySelector(".wpn-ai-dock__action-trigger"));
+    click(buttonByText(container, "Edit"));
+    await ask("Rename it");
+    expect(runs[1]).toMatchObject({ actionKey: "erd.edit", body: { selection: [ids[0]] } });
   });
 
   it("shows a waiting shimmer on an empty canvas until the AI finishes", async () => {
     await mount({ ...blogDocument(), entities: [], relationships: [] });
+    click(container.querySelector(".wpn-ai-dock__action-trigger"));
+    click(buttonByText(container, "Generate"));
     typeInto(input(), "A shop");
     press(input(), "Enter");
     expect(container.classList.contains("wpn-ai-waiting")).toBe(true);
@@ -471,6 +466,8 @@ describe("AiEditorDock", () => {
         stream = controller;
       },
     });
+    click(container.querySelector(".wpn-ai-dock__action-trigger"));
+    click(buttonByText(container, "Edit"));
     typeInto(input(), "Add coupons");
     press(input(), "Enter");
     await flush(10);
@@ -534,18 +531,6 @@ describe("AiEditorDock", () => {
     expect(container.querySelector(".wpn-ai-dock__prompt-chips")?.textContent).toContain(
       "Checkout flow",
     );
-  });
-
-  it("restores the original when a fresh build returns no changes", async () => {
-    onSnapshot = vi.fn(async () => undefined);
-    await mount();
-    const original = names();
-    click(container.querySelector(".wpn-ai-dock__action-trigger"));
-    click(buttonByText(container, "Generate"));
-    typeInto(input(), "A shop");
-    press(input(), "Enter");
-    await flush(30);
-    expect(names()).toEqual(original);
   });
 
   it("keeps the proposal Applied, not Apply again, when the document is saved while previewing", async () => {
@@ -645,8 +630,12 @@ describe("AiEditorDock", () => {
   it("keeps an earlier proposal and builds the next one on top of it", async () => {
     await mount();
     results.push(batch("ob3", "first"), batch("ob4", "second"));
+    click(container.querySelector(".wpn-ai-dock__action-trigger"));
+    click(buttonByText(container, "Edit"));
     await ask("first");
     expect(names()).toContain("first");
+    click(container.querySelector(".wpn-ai-dock__action-trigger"));
+    click(buttonByText(container, "Edit"));
     await ask("second");
     expect(names()).toContain("first");
     expect(names()).toContain("second");
@@ -738,6 +727,8 @@ describe("AiEditorDock", () => {
     it("keeps running while hidden, then opens itself and previews the result", async () => {
       await mount();
       results.push(batch("ob5", "stickers"));
+      click(container.querySelector(".wpn-ai-dock__action-trigger"));
+      click(buttonByText(container, "Edit"));
       typeInto(input(), "Add stickers");
       press(input(), "Enter");
       act(() => {

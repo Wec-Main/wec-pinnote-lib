@@ -10,6 +10,7 @@ import {
   renderDefault,
   renderForeignKeys,
   renderIndexes,
+  skippedComments,
 } from "./ddlCommon";
 
 const DEFAULT_VARCHAR_LENGTH = 255;
@@ -61,10 +62,15 @@ function columnType(field: ErdField, enums: ReadonlyMap<string, ErdEnum>): strin
 function columnDefinition(field: ErdField, enums: ReadonlyMap<string, ErdEnum>): string {
   const parts = [quote(field.name), columnType(field, enums)];
   if (!field.nullable || field.primaryKey) parts.push("NOT NULL");
-  if (field.defaultValue !== undefined && field.defaultValue !== "") {
+  if (field.generated) {
+    const mode = field.generated.stored === false ? "VIRTUAL" : "STORED";
+    parts.push(`GENERATED ALWAYS AS (${field.generated.expression}) ${mode}`);
+  } else if (field.defaultValue !== undefined && field.defaultValue !== "") {
     parts.push(`DEFAULT ${renderDefault(field.defaultValue, "mysql")}`);
   }
   if (field.unique && !field.primaryKey) parts.push("UNIQUE");
+  if (field.check) parts.push(`CHECK (${field.check})`);
+  if (field.comment) parts.push(`COMMENT ${literal(field.comment)}`);
   return parts.join(" ");
 }
 
@@ -83,6 +89,7 @@ export function renderMysqlDdl(document: ErdDocumentJSON): string {
   const model = buildDdlModel(document);
   const enums = new Map(document.enums.map((entry) => [entry.id, entry]));
   return joinStatements([
+    ...skippedComments(model),
     ...model.tables.map((table) => createTable(table, enums)),
     ...renderIndexes(model, "mysql"),
     ...renderForeignKeys(model, "mysql"),

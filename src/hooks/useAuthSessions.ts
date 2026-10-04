@@ -1,10 +1,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { createAuthApi } from "../services/authApi";
+import { createAuthApi } from "../services/authService";
 import { UNAUTHORIZED_EVENT, type UnauthorizedDetail } from "../services/httpClient";
 import { useSharedFetch } from "./useSharedFetch";
 import { AnnotationApiError } from "../types/annotation.types";
 import type { AuthApiClient, AuthSession, LoginOption } from "../types/auth.types";
-import { isSession, isTokenUnexpired, tokenExpiry, tokenIssuedAt } from "../utils/authSession";
+import { isSession, isTokenUnexpired, tokenExpiry, tokenIssuedAt } from "../utils/auth/authSession";
 import { tokenStorage } from "./tokenStorage";
 
 export interface StoredAuth {

@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it } from "vitest";
-import { getElementLabel, resolveElement } from "../../src/utils/elementResolver";
-import { generateSelector } from "../../src/utils/selectorGenerator";
-import { ANNOTATION_SCOPE_ATTRIBUTE } from "../../src/utils/annotationScope";
+import { getElementLabel, resolveElement } from "../../src/utils/dom/elementResolver";
+import { generateSelector } from "../../src/utils/dom/selectorGenerator";
+import { ANNOTATION_SCOPE_ATTRIBUTE } from "../../src/utils/annotation/annotationScope";
 import type { AnnotationAnchor } from "../../src/types/annotation.types";
 
 afterEach(() => {

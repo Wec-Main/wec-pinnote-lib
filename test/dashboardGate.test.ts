@@ -2,12 +2,12 @@ import { readFileSync } from "node:fs";
 import { createElement } from "react";
 import { renderToString } from "react-dom/server";
 import { describe, expect, it } from "vitest";
-import { DashboardStatusGate } from "../src/components/Settings/Dashboard/DashboardStatusGate";
-import { KpiCards } from "../src/components/Settings/Dashboard/KpiCards";
+import { DashboardStatusGate } from "../src/features/settings/components/Dashboard/DashboardStatusGate";
+import { KpiCards } from "../src/features/settings/components/Dashboard/KpiCards";
 import type {
   DashboardError,
   DashboardStatus,
-} from "../src/components/Settings/Dashboard/dashboardStatus";
+} from "../src/features/settings/components/Dashboard/dashboardStatus";
 import type { AnalyticsKpis } from "../src/types/analytics.types";
 
 const kpisFixture: AnalyticsKpis = {
@@ -109,7 +109,10 @@ describe("KpiCards", () => {
 
 describe("DashboardTab gating", () => {
   it("mounts every widget only inside the status gate", () => {
-    const source = readFileSync("src/components/Settings/Dashboard/DashboardTab.tsx", "utf8");
+    const source = readFileSync(
+      "src/features/settings/components/Dashboard/DashboardTab.tsx",
+      "utf8",
+    );
     const gateOpen = source.indexOf("<DashboardStatusGate");
     const gateClose = source.indexOf("</DashboardStatusGate>");
 

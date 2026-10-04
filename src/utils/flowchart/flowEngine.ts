@@ -445,7 +445,12 @@ export class FlowEngine {
     const changedEdges: FlowEdge[] = [];
     let edgesChanged = false;
     const edges = s.edges.map((e) => {
-      const next = this.carryBend(e, s.nodeLookup.get(e.source), moves.get(e.source), moves.get(e.target));
+      const next = this.carryBend(
+        e,
+        s.nodeLookup.get(e.source),
+        moves.get(e.source),
+        moves.get(e.target),
+      );
       if (next !== e) {
         changedEdges.push(next);
         edgesChanged = true;

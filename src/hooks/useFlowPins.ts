@@ -1,7 +1,7 @@
 import { useCallback, useMemo, useRef, useState } from "react";
 import type { AnnotationAnchor } from "../types/annotation.types";
 import type { DraftFlowPin, FlowPin } from "../types/flowPin.types";
-import { createFlowPin, deleteFlowPin, fetchFlowPins } from "../services/flowApi";
+import { createFlowPin, deleteFlowPin, fetchFlowPins } from "../services/flowchartService";
 import { createClientId } from "../utils/format";
 import { usePersistentState } from "./usePersistentState";
 import { isBoolean } from "../utils/valueGuards";

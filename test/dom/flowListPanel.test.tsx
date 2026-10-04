@@ -1,7 +1,7 @@
 import { act, createElement } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { FlowListPanel } from "../../src/components/WecFlow/FlowListPanel";
+import { FlowListPanel } from "../../src/features/flowchart/components/FlowListPanel";
 import { click, flush } from "./aiTestUtils";
 
 const mocks = vi.hoisted(() => ({
@@ -37,7 +37,12 @@ vi.mock("../../src/context/AnnotationContext", () => ({
 }));
 
 vi.mock("../../src/hooks/useSharedFetch", () => ({
-  useSharedFetch: () => ({ data: [flowRow], loading: false, error: null, reload: vi.fn() }),
+  useSharedFetch: () => ({
+    data: { flows: [flowRow], total: 1, limit: 10, offset: 0 },
+    loading: false,
+    error: null,
+    reload: vi.fn(),
+  }),
 }));
 
 vi.mock("../../src/hooks/useFlowStream", () => ({ useFlowStream: () => undefined }));
@@ -45,7 +50,7 @@ vi.mock("../../src/hooks/useTokenGetter", () => ({
   useTokenGetter: (getter: () => Promise<string>) => getter,
 }));
 
-vi.mock("../../src/services/flowApi", () => ({
+vi.mock("../../src/services/flowchartService", () => ({
   deleteFlow: vi.fn(),
   listFlows: vi.fn(),
   fetchFlowDocument: mocks.fetchFlowDocument,
@@ -94,6 +99,11 @@ describe("FlowListPanel", () => {
   it("exports the flow document as JSON for admins", async () => {
     await mount();
     click(container.querySelector('button[aria-label="Export Checkout flow"]'));
+    await flush();
+    const jsonItem = Array.from(container.querySelectorAll('button[role="menuitem"]')).find(
+      (button) => button.textContent?.trim() === "Export as JSON",
+    );
+    click(jsonItem);
     await flush();
     expect(mocks.fetchFlowDocument).toHaveBeenCalledWith("https://api.example.com", "tok", "f1");
     expect(mocks.downloadJson).toHaveBeenCalledTimes(1);

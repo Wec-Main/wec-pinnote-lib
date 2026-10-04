@@ -2,20 +2,24 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { AiStreamEvent } from "../types/ai.types";
 import type { StreamConnectionState } from "../types/stream.types";
 import { AnnotationApiError } from "../types/annotation.types";
-import { fetchAiStreamTicket } from "../services/aiApi";
+import { fetchAiStreamTicket } from "../services/aiService";
 import { normalizeApiBase } from "../services/httpClient";
-import { AI_STREAM_EVENT_TYPES, parseAiStreamEvent } from "../utils/aiStreamGuards";
+import { AI_STREAM_EVENT_TYPES, parseAiStreamEvent } from "../utils/ai/aiStreamGuards";
 import { withJitter } from "../utils/backoff";
 import type { StreamTokenGetter } from "./useSseStream";
 
 const RECONNECT_DELAY_MS = 2000;
 const MAX_RECONNECT_DELAY_MS = 30000;
 const STABLE_OPEN_MS = 5000;
-const HIDDEN_PAUSE_MS = 30000;
+const HIDDEN_PAUSE_MS = 120000;
 
 export interface AiStreamConnection {
   state: StreamConnectionState;
   reconnect: () => void;
+}
+
+export interface AiStreamReconnect {
+  resumed: boolean;
 }
 
 export interface AiStreamOptions {
@@ -24,15 +28,31 @@ export interface AiStreamOptions {
   getAuthToken: StreamTokenGetter | undefined;
   enabled: boolean;
   onEvent: (event: AiStreamEvent) => void;
-  onReconnect?: () => void;
+  onReconnect?: (reconnect: AiStreamReconnect) => void;
   keepAlive?: () => boolean;
 }
 
-function streamUrl(apiBaseUrl: string, ticket: string): string {
+function streamUrl(apiBaseUrl: string, ticket: string, lastEventId: string): string {
   const base = normalizeApiBase(apiBaseUrl);
   const url = new URL(`${base}/ai/stream`, window.location.origin);
   url.searchParams.set("ticket", ticket);
+  if (lastEventId) {
+    url.searchParams.set("lastEventId", lastEventId);
+  }
   return url.toString();
+}
+
+export function isResumedReady(data: string): boolean {
+  try {
+    const parsed: unknown = JSON.parse(data);
+    return (
+      typeof parsed === "object" &&
+      parsed !== null &&
+      (parsed as { resumed?: unknown }).resumed === true
+    );
+  } catch {
+    return false;
+  }
 }
 
 function isForbidden(err: unknown): boolean {
@@ -81,6 +101,8 @@ export function useAiStreamConnection({
     let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
     let reconnectDelay = RECONNECT_DELAY_MS;
     let openedOnce = false;
+    let awaitingReady = false;
+    let lastEventId = "";
     let ticketController: AbortController | null = null;
     let paused = false;
     let stableTimer: ReturnType<typeof setTimeout> | null = null;
@@ -102,10 +124,17 @@ export function useAiStreamConnection({
 
     const handleMessage = (event: MessageEvent<string>) => {
       const parsed = parseAiStreamEvent(event.type, event.data);
-      if (parsed) {
-        reconnectDelay = RECONNECT_DELAY_MS;
-        onEventRef.current(parsed);
+      if (!parsed) {
+        return;
       }
+      if (event.lastEventId) {
+        lastEventId = event.lastEventId;
+      }
+      reconnectDelay = RECONNECT_DELAY_MS;
+      if (parsed.type === "ai_resync" && awaitingReady) {
+        return;
+      }
+      onEventRef.current(parsed);
     };
 
     const clearReconnectTimer = () => {
@@ -128,7 +157,7 @@ export function useAiStreamConnection({
     };
 
     const openSource = (ticket: string) => {
-      const next = new EventSource(streamUrl(apiBaseUrl, ticket));
+      const next = new EventSource(streamUrl(apiBaseUrl, ticket, lastEventId));
       source = next;
       next.addEventListener("open", () => {
         if (source !== next) {
@@ -141,10 +170,17 @@ export function useAiStreamConnection({
         }, STABLE_OPEN_MS);
         setState("open");
         if (openedOnce) {
-          onReconnectRef.current?.();
+          awaitingReady = true;
         }
         openedOnce = true;
       });
+      next.addEventListener("ready", ((event: MessageEvent<string>) => {
+        if (source !== next || !awaitingReady) {
+          return;
+        }
+        awaitingReady = false;
+        onReconnectRef.current?.({ resumed: isResumedReady(event.data) });
+      }) as EventListener);
       next.addEventListener("error", () => {
         if (stopped || source !== next) {
           return;
