@@ -1,7 +1,10 @@
 import { memo, useId } from "react";
 import { Icon } from "../primitives";
+import { useIncrementalList } from "../../hooks/useIncrementalList";
 import type { PageGroup } from "./commentFilters";
 import { ThreadCard } from "./ThreadCard";
+
+const THREAD_PAGE_SIZE = 20;
 
 interface PageGroupSectionProps {
   group: PageGroup;
@@ -29,6 +32,14 @@ export const PageGroupSection = memo(function PageGroupSection({
   const listId = useId();
   const total = group.threads.length;
   const showLocation = group.location !== group.title;
+  const selectedIndex = selectedId
+    ? group.threads.findIndex((thread) => thread.annotation.id === selectedId)
+    : -1;
+  const { visible, remaining, showMore } = useIncrementalList(
+    group.threads,
+    THREAD_PAGE_SIZE,
+    selectedIndex,
+  );
 
   return (
     <section
@@ -69,20 +80,28 @@ export const PageGroupSection = memo(function PageGroupSection({
         </span>
       </button>
       {collapsed ? null : (
-        <ul id={listId} className="wpn-thread-list wpn-page-group__list">
-          {group.threads.map((thread) => (
-            <ThreadCard
-              key={thread.annotation.id}
-              thread={thread}
-              active={selectedId === thread.annotation.id}
-              currentUserId={currentUserId}
-              repliesCollapsed={!openReplies.has(thread.annotation.id)}
-              inView={presentIds.has(thread.annotation.id)}
-              onToggleReplies={onToggleReplies}
-              onSelect={onSelect}
-            />
-          ))}
-        </ul>
+        <>
+          <ul id={listId} className="wpn-thread-list wpn-page-group__list">
+            {visible.map((thread) => (
+              <ThreadCard
+                key={thread.annotation.id}
+                thread={thread}
+                active={selectedId === thread.annotation.id}
+                currentUserId={currentUserId}
+                repliesCollapsed={!openReplies.has(thread.annotation.id)}
+                inView={presentIds.has(thread.annotation.id)}
+                onToggleReplies={onToggleReplies}
+                onSelect={onSelect}
+              />
+            ))}
+          </ul>
+          {remaining > 0 ? (
+            <button type="button" className="wpn-page-group__show-more" onClick={showMore}>
+              <Icon name="chevronDown" className="wpn-page-group__show-more-icon" />
+              Show {Math.min(remaining, THREAD_PAGE_SIZE)} more
+            </button>
+          ) : null}
+        </>
       )}
     </section>
   );
