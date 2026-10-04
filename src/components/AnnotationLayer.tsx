@@ -14,6 +14,7 @@ import { AnnotationToolbar } from "./AnnotationToolbar";
 import { TagPicker, TagPin } from "./TagPin";
 import { FlowPinPanel, FlowPinPicker, FlowPinPin } from "./FlowPin";
 import { ConfirmDialog } from "./UserManagement/ConfirmDialog";
+import { PanelErrorBoundary } from "./primitives/PanelErrorBoundary";
 import { annotationLabel } from "../utils/annotationLabel";
 import { canDeleteBoardItem } from "../utils/boardPermissions";
 import type { AnnotationTag, UpdateAnnotationTagInput } from "../types/annotationTag.types";
@@ -496,9 +497,11 @@ export function AnnotationLayer() {
       ) : null}
       {listOpen && authenticated ? <AnnotationListPanel /> : null}
       {epicFlowOpen && authenticated ? (
-        <Suspense fallback={null}>
-          <EpicFlowPanel />
-        </Suspense>
+        <PanelErrorBoundary label="Draft Board failed to render.">
+          <Suspense fallback={null}>
+            <EpicFlowPanel />
+          </Suspense>
+        </PanelErrorBoundary>
       ) : null}
       {flowOpen && authenticated ? (
         <Suspense fallback={null}>
@@ -511,9 +514,11 @@ export function AnnotationLayer() {
         </Suspense>
       ) : null}
       {userManagementOpen ? (
-        <Suspense fallback={null}>
-          <SettingsPanel />
-        </Suspense>
+        <PanelErrorBoundary label="Settings failed to render.">
+          <Suspense fallback={null}>
+            <SettingsPanel />
+          </Suspense>
+        </PanelErrorBoundary>
       ) : null}
       {aiPanelOpen && authenticated ? (
         <Suspense fallback={null}>
