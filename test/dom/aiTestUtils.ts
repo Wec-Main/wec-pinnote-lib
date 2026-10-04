@@ -83,6 +83,7 @@ export function fakeRuntime(overrides: Partial<AiRuntimeContextValue> = {}): Fak
       };
     },
     connection: "open",
+    reconnect: () => undefined,
     ...overrides,
   };
   return {
