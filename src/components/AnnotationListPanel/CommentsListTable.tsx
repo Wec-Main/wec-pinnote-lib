@@ -1,3 +1,4 @@
+import { memo, useCallback, type CSSProperties, type KeyboardEvent, type MouseEvent } from "react";
 import { formatRelativeTime, getInitials } from "../../utils/format";
 import { mentionsToPlainText } from "../../utils/mentions";
 import { statusLabel } from "../../utils/status";
@@ -33,7 +34,7 @@ function CommentCell({ label, message, previewOpen, onTogglePreview }: CommentCe
         <div className="wpn-comments-list-table__message-wrap">
           <p
             className="wpn-comments-list-table__message"
-            style={{ "--clamp": COMMENT_CLAMP_LINES } as React.CSSProperties}
+            style={{ "--clamp": COMMENT_CLAMP_LINES } as CSSProperties}
           >
             {plainText}
           </p>
@@ -60,6 +61,134 @@ function CommentCell({ label, message, previewOpen, onTogglePreview }: CommentCe
     </div>
   );
 }
+
+interface CommentRowProps {
+  thread: CommentThread;
+  selected: boolean;
+  onSelect: (annotationId: string) => void;
+  onClosePreview: () => void;
+  onRevealOnPage: (annotationId: string) => void;
+}
+
+const CommentRow = memo(function CommentRow({
+  thread,
+  selected,
+  onSelect,
+  onClosePreview,
+  onRevealOnPage,
+}: CommentRowProps) {
+  const { annotation, label, root, replies, lastActivityAt } = thread;
+  const annotationId = annotation.id;
+
+  const handleRowClick = useCallback(() => onSelect(annotationId), [onSelect, annotationId]);
+
+  const handleRowKeyDown = useCallback(
+    (event: KeyboardEvent<HTMLTableRowElement>) => {
+      if (event.key === "Enter" || event.key === " ") {
+        event.preventDefault();
+        onSelect(annotationId);
+      }
+    },
+    [onSelect, annotationId],
+  );
+
+  const handleTogglePreview = useCallback(() => {
+    if (selected) {
+      onClosePreview();
+    } else {
+      onSelect(annotationId);
+    }
+  }, [selected, onClosePreview, onSelect, annotationId]);
+
+  const handlePreviewClick = useCallback(
+    (event: MouseEvent) => {
+      event.stopPropagation();
+      onSelect(annotationId);
+    },
+    [onSelect, annotationId],
+  );
+
+  const handleOpenClick = useCallback(
+    (event: MouseEvent) => {
+      event.stopPropagation();
+      onRevealOnPage(annotationId);
+    },
+    [onRevealOnPage, annotationId],
+  );
+
+  return (
+    <tr
+      className={selected ? "wpn-comments-list-table__row--active" : undefined}
+      tabIndex={0}
+      onClick={handleRowClick}
+      onKeyDown={handleRowKeyDown}
+    >
+      <td>
+        <CommentCell
+          label={label}
+          message={root.message}
+          previewOpen={selected}
+          onTogglePreview={handleTogglePreview}
+        />
+      </td>
+      <td className="wpn-users-table__muted">
+        {replies.length} {replies.length === 1 ? "reply" : "replies"}
+      </td>
+      <td className="wpn-users-table__muted">
+        <Tooltip label={new Date(lastActivityAt).toLocaleString()} placement="bottom">
+          <span className="wpn-table-date">
+            <Icon name="calendar" className="wpn-table-date__icon" />
+            {formatRelativeTime(lastActivityAt)}
+          </span>
+        </Tooltip>
+      </td>
+      <td>
+        <span className="wpn-users-identity">
+          {root.createdBy.avatarUrl ? (
+            <img className="wpn-avatar" src={root.createdBy.avatarUrl} alt="" />
+          ) : (
+            <span className="wpn-avatar wpn-avatar--fallback">
+              {getInitials(root.createdBy.name)}
+            </span>
+          )}
+          <span className="wpn-users-identity__name">{root.createdBy.name}</span>
+        </span>
+      </td>
+      <td>
+        <span className={`wpn-status-chip wpn-status-chip--sm wpn-tone--${annotation.status}`}>
+          {statusLabel(annotation.status)}
+        </span>
+      </td>
+      <td>
+        <div className="wpn-users-actions">
+          <Tooltip label="Preview conversation" placement="left">
+            <button
+              type="button"
+              className="wpn-users-action wpn-users-action--labeled"
+              aria-label={`Preview "${label}"`}
+              aria-pressed={selected}
+              onClick={handlePreviewClick}
+            >
+              <Icon name="eye" />
+              <span>Preview</span>
+            </button>
+          </Tooltip>
+          <Tooltip label="Open on page" placement="left">
+            <button
+              type="button"
+              className="wpn-users-action wpn-users-action--primary wpn-users-action--labeled"
+              aria-label={`Open "${label}" on the page`}
+              onClick={handleOpenClick}
+            >
+              <Icon name="arrowUpRight" />
+              <span>Open</span>
+            </button>
+          </Tooltip>
+        </div>
+      </td>
+    </tr>
+  );
+});
 
 export function CommentsListTable({
   threads,
@@ -92,99 +221,16 @@ export function CommentsListTable({
           </tr>
         </thead>
         <tbody>
-          {threads.map((thread) => {
-            const { annotation, label, root, replies, lastActivityAt } = thread;
-            return (
-              <tr
-                key={annotation.id}
-                className={
-                  annotation.id === selectedId ? "wpn-comments-list-table__row--active" : undefined
-                }
-                tabIndex={0}
-                onClick={() => onSelect(annotation.id)}
-                onKeyDown={(event) => {
-                  if (event.key === "Enter" || event.key === " ") {
-                    event.preventDefault();
-                    onSelect(annotation.id);
-                  }
-                }}
-              >
-                <td>
-                  <CommentCell
-                    label={label}
-                    message={root.message}
-                    previewOpen={annotation.id === selectedId}
-                    onTogglePreview={() =>
-                      annotation.id === selectedId ? onClosePreview() : onSelect(annotation.id)
-                    }
-                  />
-                </td>
-                <td className="wpn-users-table__muted">
-                  {replies.length} {replies.length === 1 ? "reply" : "replies"}
-                </td>
-                <td className="wpn-users-table__muted">
-                  <Tooltip label={new Date(lastActivityAt).toLocaleString()} placement="bottom">
-                    <span className="wpn-table-date">
-                      <Icon name="calendar" className="wpn-table-date__icon" />
-                      {formatRelativeTime(lastActivityAt)}
-                    </span>
-                  </Tooltip>
-                </td>
-                <td>
-                  <span className="wpn-users-identity">
-                    {root.createdBy.avatarUrl ? (
-                      <img className="wpn-avatar" src={root.createdBy.avatarUrl} alt="" />
-                    ) : (
-                      <span className="wpn-avatar wpn-avatar--fallback">
-                        {getInitials(root.createdBy.name)}
-                      </span>
-                    )}
-                    <span className="wpn-users-identity__name">{root.createdBy.name}</span>
-                  </span>
-                </td>
-                <td>
-                  <span
-                    className={`wpn-status-chip wpn-status-chip--sm wpn-tone--${annotation.status}`}
-                  >
-                    {statusLabel(annotation.status)}
-                  </span>
-                </td>
-                <td>
-                  <div className="wpn-users-actions">
-                    <Tooltip label="Preview conversation" placement="left">
-                      <button
-                        type="button"
-                        className="wpn-users-action wpn-users-action--labeled"
-                        aria-label={`Preview "${label}"`}
-                        aria-pressed={annotation.id === selectedId}
-                        onClick={(event) => {
-                          event.stopPropagation();
-                          onSelect(annotation.id);
-                        }}
-                      >
-                        <Icon name="eye" />
-                        <span>Preview</span>
-                      </button>
-                    </Tooltip>
-                    <Tooltip label="Open on page" placement="left">
-                      <button
-                        type="button"
-                        className="wpn-users-action wpn-users-action--primary wpn-users-action--labeled"
-                        aria-label={`Open "${label}" on the page`}
-                        onClick={(event) => {
-                          event.stopPropagation();
-                          onRevealOnPage(annotation.id);
-                        }}
-                      >
-                        <Icon name="arrowUpRight" />
-                        <span>Open</span>
-                      </button>
-                    </Tooltip>
-                  </div>
-                </td>
-              </tr>
-            );
-          })}
+          {threads.map((thread) => (
+            <CommentRow
+              key={thread.annotation.id}
+              thread={thread}
+              selected={thread.annotation.id === selectedId}
+              onSelect={onSelect}
+              onClosePreview={onClosePreview}
+              onRevealOnPage={onRevealOnPage}
+            />
+          ))}
         </tbody>
       </table>
     </div>

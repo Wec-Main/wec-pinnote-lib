@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useCallback, useState } from "react";
 import { useAnnotationUi } from "../../context/AnnotationContext";
 import { mentionsToPlainText } from "../../utils/mentions";
 import { Icon, ListSearchBar, RefreshButton, TablePagination, Tooltip } from "../primitives";
@@ -73,6 +73,11 @@ export function CommentsFullScreenView({
     commentsFullScreenSelectedThreadId: selectedThreadId,
     setCommentsFullScreenSelectedThreadId: setSelectedThreadId,
   } = useAnnotationUi();
+
+  const closeThreadPreview = useCallback(
+    () => setSelectedThreadId(null),
+    [setSelectedThreadId],
+  );
 
   const effectiveActivePageKey =
     (activePageKey && pageGroups.some((group) => group.pageKey === activePageKey)
@@ -234,7 +239,7 @@ export function CommentsFullScreenView({
                     threads={pagedThreads}
                     selectedId={selectedThreadId}
                     onSelect={setSelectedThreadId}
-                    onClosePreview={() => setSelectedThreadId(null)}
+                    onClosePreview={closeThreadPreview}
                     onRevealOnPage={onRevealOnPage}
                   />
                 )}
