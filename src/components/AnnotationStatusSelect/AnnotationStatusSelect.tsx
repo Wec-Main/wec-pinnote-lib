@@ -1,13 +1,6 @@
-import {
-  useEffect,
-  useId,
-  useRef,
-  useState,
-  type KeyboardEvent as ReactKeyboardEvent,
-} from "react";
 import type { AnnotationStatus } from "../../types/annotation.types";
 import { ANNOTATION_STATUS_OPTIONS, statusLabel, type StatusOption } from "../../utils/status";
-import { useEscapeKey } from "../../hooks/useEscapeKey";
+import { useComboboxList, type ComboboxOption } from "../../hooks/useComboboxList";
 import { Icon } from "../primitives";
 
 interface AnnotationStatusSelectProps {
@@ -23,87 +16,30 @@ export function AnnotationStatusSelect({
   disabled,
   options = ANNOTATION_STATUS_OPTIONS,
 }: AnnotationStatusSelectProps) {
-  const [open, setOpen] = useState(false);
-  const [activeIndex, setActiveIndex] = useState(() =>
-    options.findIndex((option) => option.value === value),
-  );
-  const rootRef = useRef<HTMLDivElement>(null);
-  const triggerRef = useRef<HTMLButtonElement>(null);
-  const optionIdPrefix = useId();
+  const {
+    open,
+    setOpen,
+    activeIndex,
+    setActiveIndex,
+    rootRef,
+    triggerRef,
+    listboxId,
+    optionId,
+    activeDescendant,
+    openMenu,
+    onRootKeyDown,
+  } = useComboboxList({ options, activeValue: value });
 
-  const close = () => setOpen(false);
-
-  useEffect(() => {
-    if (!open) {
-      return;
-    }
-    const onPointerDown = (event: PointerEvent) => {
-      if (!rootRef.current?.contains(event.target as Node)) {
-        setOpen(false);
-      }
-    };
-    document.addEventListener("pointerdown", onPointerDown, true);
-    return () => document.removeEventListener("pointerdown", onPointerDown, true);
-  }, [open]);
-
-  useEscapeKey(() => {
-    close();
-    triggerRef.current?.focus();
-  }, open);
-
-  const openMenu = () => {
-    setActiveIndex(options.findIndex((option) => option.value === value));
-    setOpen(true);
+  const commit = (option: ComboboxOption) => {
+    onChange(option.value as AnnotationStatus);
+    setOpen(false);
   };
 
-  const commit = (index: number) => {
-    const option = options[index];
-    if (option) {
-      onChange(option.value);
-    }
-    close();
-  };
-
-  const handleTriggerKeyDown = (event: ReactKeyboardEvent<HTMLButtonElement>) => {
-    if (event.key === "ArrowDown" || event.key === "ArrowUp") {
-      event.preventDefault();
-      openMenu();
-    }
-  };
-
-  const handleListKeyDown = (event: ReactKeyboardEvent<HTMLDivElement>) => {
-    if (event.key === "ArrowDown") {
-      event.preventDefault();
-      setActiveIndex((current) => (current + 1) % options.length);
-      return;
-    }
-    if (event.key === "ArrowUp") {
-      event.preventDefault();
-      setActiveIndex((current) => (current - 1 + options.length) % options.length);
-      return;
-    }
-    if (event.key === "Home") {
-      event.preventDefault();
-      setActiveIndex(0);
-      return;
-    }
-    if (event.key === "End") {
-      event.preventDefault();
-      setActiveIndex(options.length - 1);
-      return;
-    }
-    if (event.key === "Enter" || event.key === " ") {
-      event.preventDefault();
-      commit(activeIndex);
-    }
-  };
-
-  const activeOption = options[activeIndex];
   const currentLabel =
     options.find((option) => option.value === value)?.label ?? statusLabel(value);
 
   return (
-    <div className="wpn-status" ref={rootRef}>
+    <div className="wpn-status" ref={rootRef} onKeyDown={(event) => onRootKeyDown(event, commit)}>
       <button
         ref={triggerRef}
         type="button"
@@ -112,8 +48,9 @@ export function AnnotationStatusSelect({
         aria-label={`Status: ${currentLabel}`}
         aria-haspopup="listbox"
         aria-expanded={open}
-        onClick={() => (open ? close() : openMenu())}
-        onKeyDown={handleTriggerKeyDown}
+        aria-controls={open ? listboxId : undefined}
+        aria-activedescendant={activeDescendant}
+        onClick={() => (open ? setOpen(false) : openMenu())}
       >
         <span className="wpn-status__dot" />
         {currentLabel}
@@ -122,24 +59,14 @@ export function AnnotationStatusSelect({
         </svg>
       </button>
       {open ? (
-        <div
-          className="wpn-status__menu"
-          role="listbox"
-          aria-label="Change status"
-          tabIndex={0}
-          aria-activedescendant={
-            activeOption ? `${optionIdPrefix}-${activeOption.value}` : undefined
-          }
-          onKeyDown={handleListKeyDown}
-          ref={(element) => element?.focus()}
-        >
+        <div className="wpn-status__menu" role="listbox" id={listboxId} aria-label="Change status">
           <div className="wpn-status__menu-title" aria-hidden="true">
             Change status
           </div>
           {options.map((option, index) => (
             <button
               key={option.value}
-              id={`${optionIdPrefix}-${option.value}`}
+              id={optionId(index)}
               type="button"
               role="option"
               aria-selected={option.value === value}
@@ -148,7 +75,7 @@ export function AnnotationStatusSelect({
                 option.value === value ? "wpn-status__option--active" : ""
               } ${index === activeIndex ? "wpn-status__option--focused" : ""}`}
               onPointerEnter={() => setActiveIndex(index)}
-              onClick={() => commit(index)}
+              onClick={() => commit(option)}
             >
               <span className="wpn-status__dot" />
               <span className="wpn-status__option-copy">
