@@ -10,13 +10,14 @@ import {
 import type { Organization, Project, ProjectDraft } from "../../types/organization.types";
 import { invalidateSharedFetch, useSharedFetch } from "../../hooks/useSharedFetch";
 import {
+  DataTable,
   Icon,
   ListSearchBar,
   ModalShell,
+  resolveDataTableState,
   RefreshButton,
   SearchableSelect,
   TablePagination,
-  TableSkeleton,
   Tooltip,
 } from "../primitives";
 import { ConfirmDialog } from "../UserManagement/ConfirmDialog";
@@ -183,124 +184,117 @@ export function ProjectsTab() {
         </div>
       ) : null}
 
-      <div className="wpn-table-card">
-        <div className="wpn-users-table-wrap">
-          <table
-            className={["wpn-users-table", loading && loaded ? "wpn-users-table--refetching" : ""]
-              .filter(Boolean)
-              .join(" ")}
-          >
-            <thead>
-              <tr>
-                <th>Project</th>
-                {manageable ? <th>Organization</th> : null}
-                <th>Status</th>
-                <th className="wpn-users-table__version-settings-head">Version Settings</th>
-                {manageable ? <th className="wpn-users-table__actions-head">Actions</th> : null}
-              </tr>
-            </thead>
-            <tbody>
-              {loading && !loaded ? (
-                <TableSkeleton
-                  rows={5}
-                  columns={
-                    manageable
-                      ? ["identity", "text", "pill", "actions", "actions"]
-                      : ["identity", "pill", "actions"]
-                  }
-                  label="Loading projects"
-                />
-              ) : loadError && projects.length === 0 ? (
-                <tr>
-                  <td colSpan={columnCount} className="wpn-users-table__empty">
-                    <Icon name="alert" className="wpn-users-table__empty-icon" />
-                    <span>{loadError}</span>
-                    <button type="button" className="wpn-btn wpn-btn--ghost" onClick={reload}>
-                      Retry
+      <DataTable<Project>
+        state={resolveDataTableState({
+          loading,
+          loaded,
+          error: loadError,
+          isEmpty: visible.length === 0,
+        })}
+        items={pageItems}
+        getRowKey={(project) => project.id}
+        refetching={loading && loaded}
+        skeleton={{
+          rows: 5,
+          columns: manageable
+            ? ["identity", "text", "pill", "actions", "actions"]
+            : ["identity", "pill", "actions"],
+          label: "Loading projects",
+        }}
+        head={
+          <>
+            <th>Project</th>
+            {manageable ? <th>Organization</th> : null}
+            <th>Status</th>
+            <th className="wpn-users-table__version-settings-head">Version Settings</th>
+            {manageable ? <th className="wpn-users-table__actions-head">Actions</th> : null}
+          </>
+        }
+        errorRow={
+          <tr>
+            <td colSpan={columnCount} className="wpn-users-table__empty">
+              <Icon name="alert" className="wpn-users-table__empty-icon" />
+              <span>{loadError}</span>
+              <button type="button" className="wpn-btn wpn-btn--ghost" onClick={reload}>
+                Retry
+              </button>
+            </td>
+          </tr>
+        }
+        emptyRow={
+          <tr>
+            <td colSpan={columnCount} className="wpn-users-table__empty">
+              <Icon name="folder" className="wpn-users-table__empty-icon" />
+              <span>
+                {!manageable
+                  ? "No projects are assigned to you yet."
+                  : organizationList.length === 0
+                    ? "Create an organization before adding projects."
+                    : "No projects yet."}
+              </span>
+            </td>
+          </tr>
+        }
+        renderRow={(project) => (
+          <tr>
+            <td>
+              <div className="wpn-users-identity">
+                <div className="wpn-users-identity__copy">
+                  <span className="wpn-users-identity__name">{project.name}</span>
+                  <span className="wpn-users-identity__email">{project.id}</span>
+                </div>
+              </div>
+            </td>
+            {manageable ? (
+              <td className="wpn-users-muted">{organizationName(project.organizationId)}</td>
+            ) : null}
+            <td>
+              <span className={`wpn-users-pill wpn-users-pill--status-${project.status}`}>
+                {project.status}
+              </span>
+            </td>
+            <td className="wpn-users-table__version-settings-cell">
+              <Tooltip label="Version settings" placement="left">
+                <button
+                  type="button"
+                  className="wpn-icon-btn"
+                  aria-label={`Version settings for ${project.name}`}
+                  onClick={() => setVersionsTarget(project)}
+                >
+                  <Icon name="settings" />
+                </button>
+              </Tooltip>
+            </td>
+            {manageable ? (
+              <td>
+                <div className="wpn-users-actions">
+                  <Tooltip label="Edit" placement="left">
+                    <button
+                      type="button"
+                      className="wpn-users-action wpn-users-action--primary"
+                      aria-label={`Edit ${project.name}`}
+                      onClick={() => open(project)}
+                    >
+                      <Icon name="edit" />
                     </button>
-                  </td>
-                </tr>
-              ) : visible.length === 0 ? (
-                <tr>
-                  <td colSpan={columnCount} className="wpn-users-table__empty">
-                    <Icon name="folder" className="wpn-users-table__empty-icon" />
-                    <span>
-                      {!manageable
-                        ? "No projects are assigned to you yet."
-                        : organizationList.length === 0
-                          ? "Create an organization before adding projects."
-                          : "No projects yet."}
-                    </span>
-                  </td>
-                </tr>
-              ) : (
-                pageItems.map((project) => (
-                  <tr key={project.id}>
-                    <td>
-                      <div className="wpn-users-identity">
-                        <div className="wpn-users-identity__copy">
-                          <span className="wpn-users-identity__name">{project.name}</span>
-                          <span className="wpn-users-identity__email">{project.id}</span>
-                        </div>
-                      </div>
-                    </td>
-                    {manageable ? (
-                      <td className="wpn-users-muted">
-                        {organizationName(project.organizationId)}
-                      </td>
-                    ) : null}
-                    <td>
-                      <span className={`wpn-users-pill wpn-users-pill--status-${project.status}`}>
-                        {project.status}
-                      </span>
-                    </td>
-                    <td className="wpn-users-table__version-settings-cell">
-                      <Tooltip label="Version settings" placement="left">
-                        <button
-                          type="button"
-                          className="wpn-icon-btn"
-                          aria-label={`Version settings for ${project.name}`}
-                          onClick={() => setVersionsTarget(project)}
-                        >
-                          <Icon name="settings" />
-                        </button>
-                      </Tooltip>
-                    </td>
-                    {manageable ? (
-                      <td>
-                        <div className="wpn-users-actions">
-                          <Tooltip label="Edit" placement="left">
-                            <button
-                              type="button"
-                              className="wpn-users-action wpn-users-action--primary"
-                              aria-label={`Edit ${project.name}`}
-                              onClick={() => open(project)}
-                            >
-                              <Icon name="edit" />
-                            </button>
-                          </Tooltip>
-                          <Tooltip label="Delete" placement="left">
-                            <button
-                              type="button"
-                              className="wpn-users-action wpn-users-action--danger"
-                              aria-label={`Delete ${project.name}`}
-                              onClick={() => askDelete(project)}
-                            >
-                              <Icon name="trash" />
-                            </button>
-                          </Tooltip>
-                        </div>
-                      </td>
-                    ) : null}
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
-
-        <TablePagination {...paginationProps} itemLabel="projects" />
-      </div>
+                  </Tooltip>
+                  <Tooltip label="Delete" placement="left">
+                    <button
+                      type="button"
+                      className="wpn-users-action wpn-users-action--danger"
+                      aria-label={`Delete ${project.name}`}
+                      onClick={() => askDelete(project)}
+                    >
+                      <Icon name="trash" />
+                    </button>
+                  </Tooltip>
+                </div>
+              </td>
+            ) : null}
+          </tr>
+        )}
+        pagination={<TablePagination {...paginationProps} itemLabel="projects" />}
+      />
 
       {formOpen ? (
         <ProjectFormModal

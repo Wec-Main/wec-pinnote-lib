@@ -1,20 +1,20 @@
-import { Fragment, useState } from "react";
+import { Fragment, memo, useCallback, useState } from "react";
 import { useAnnotationContext } from "../../../context/AnnotationContext";
 import { useTokenGetter } from "../../../hooks/useTokenGetter";
 import { downloadAnalyticsVisitsCsv, fetchAnalyticsVisits } from "../../../services/analyticsApi";
 import type { AnalyticsFilters, VisitRecord } from "../../../types/analytics.types";
 import { formatRelativeTime, formatTimestamp } from "../../../utils/format";
 import {
+  DataTable,
   Icon,
   SearchableSelect,
   TablePagination,
-  TableSkeleton,
   Tooltip,
   type SelectOption,
 } from "../../primitives";
 import { formatDuration } from "./dashboardFormat";
 import { widgetView } from "./dashboardStatus";
-import { WidgetMessage, WidgetMessageRow } from "./DashboardWidgetMessage";
+import { WidgetMessage } from "./DashboardWidgetMessage";
 import { useDashboardFetch, useKnownTotal } from "./useDashboardFetch";
 
 interface VisitLogTableProps {
@@ -28,11 +28,9 @@ interface VisitLogTableProps {
 interface VisitLogRowProps {
   visit: VisitRecord;
   isOpen: boolean;
-  onToggle: () => void;
+  onToggle: (visitId: string) => void;
   projectName: (projectId: string) => string;
 }
-
-const VISIT_LOG_COLUMNS = 6;
 
 function exportFileName(filters: AnalyticsFilters): string {
   return ["visits", filters.from, filters.to].filter(Boolean).join("-") + ".csv";
@@ -49,7 +47,14 @@ function saveBlob(blob: Blob, fileName: string): void {
   setTimeout(() => URL.revokeObjectURL(url), 0);
 }
 
-function VisitLogRow({ visit, isOpen, onToggle, projectName }: VisitLogRowProps) {
+const VisitLogRow = memo(function VisitLogRow({
+  visit,
+  isOpen,
+  onToggle,
+  projectName,
+}: VisitLogRowProps) {
+  const handleToggle = useCallback(() => onToggle(visit.visitId), [onToggle, visit.visitId]);
+
   return (
     <Fragment>
       <tr className="wpn-dashboard-reveal">
@@ -76,7 +81,7 @@ function VisitLogRow({ visit, isOpen, onToggle, projectName }: VisitLogRowProps)
               className="wpn-users-action"
               aria-label={isOpen ? "Hide details" : "Show details"}
               aria-expanded={isOpen}
-              onClick={onToggle}
+              onClick={handleToggle}
             >
               <Icon name={isOpen ? "collapse" : "expand"} />
             </button>
@@ -85,7 +90,7 @@ function VisitLogRow({ visit, isOpen, onToggle, projectName }: VisitLogRowProps)
       </tr>
       {isOpen ? (
         <tr className="wpn-audit-details-row">
-          <td colSpan={VISIT_LOG_COLUMNS}>
+          <td colSpan={6}>
             <div className="wpn-audit-details">
               <dl className="wpn-audit-meta">
                 <div className="wpn-audit-meta__item">
@@ -111,7 +116,7 @@ function VisitLogRow({ visit, isOpen, onToggle, projectName }: VisitLogRowProps)
       ) : null}
     </Fragment>
   );
-}
+});
 
 export function VisitLogTable({
   filters,
@@ -149,6 +154,10 @@ export function VisitLogTable({
   );
   const visits = data?.visits ?? [];
   const total = useKnownTotal(data?.total);
+
+  const toggleExpanded = useCallback((visitId: string) => {
+    setExpanded((current) => (current === visitId ? null : visitId));
+  }, []);
 
   const changeUser = (next: string) => {
     setUserId(next);
@@ -216,80 +225,69 @@ export function VisitLogTable({
         </div>
       </div>
 
-      <div className="wpn-users-table-wrap">
-        <table
-          className={[
-            "wpn-users-table",
-            "wpn-dashboard-visits__table",
-            loading && loaded ? "wpn-users-table--refetching" : "",
-          ]
-            .filter(Boolean)
-            .join(" ")}
-        >
-          <thead>
-            <tr>
-              <th scope="col">When</th>
-              <th scope="col">User</th>
-              <th scope="col">Page</th>
-              <th scope="col" className="wpn-dashboard-pages__numeric">
-                Duration
-              </th>
-              <th scope="col" className="wpn-dashboard-pages__numeric">
-                Scroll
-              </th>
-              <th scope="col" className="wpn-users-table__actions-head">
-                Details
-              </th>
-            </tr>
-          </thead>
-          <tbody>
-            {view === "loading" ? (
-              <TableSkeleton
-                rows={Math.min(pageSize, 5)}
-                columns={["text", "text", "text", "text", "text", "actions"]}
-                label="Loading the visit log..."
-              />
-            ) : view === "error" ? (
-              <WidgetMessageRow
-                colSpan={VISIT_LOG_COLUMNS}
-                tone="error"
-                icon="alert"
-                title={error ?? ""}
-              />
-            ) : view === "empty" ? (
-              <WidgetMessageRow
-                colSpan={VISIT_LOG_COLUMNS}
-                tone="empty"
-                icon="history"
-                title="No visits match these filters"
-              />
-            ) : (
-              visits.map((visit) => (
-                <VisitLogRow
-                  key={visit.visitId}
-                  visit={visit}
-                  isOpen={expanded === visit.visitId}
-                  onToggle={() =>
-                    setExpanded((current) => (current === visit.visitId ? null : visit.visitId))
-                  }
-                  projectName={projectName}
-                />
-              ))
-            )}
-          </tbody>
-        </table>
-      </div>
-
-      <TablePagination
-        page={page}
-        pageSize={pageSize}
-        totalItems={total}
-        itemLabel="visits"
-        onPageChange={setPage}
-        onPageSizeChange={(next) => {
-          setPageSize(next);
-          setPage(1);
+      <DataTable<VisitRecord>
+        state={view}
+        items={visits}
+        getRowKey={(visit) => visit.visitId}
+        cardWrap={false}
+        tableClassName="wpn-dashboard-visits__table"
+        refetching={loading && loaded}
+        skeleton={{
+          rows: Math.min(pageSize, 5),
+          columns: ["text", "text", "text", "text", "text", "actions"],
+          label: "Loading the visit log...",
         }}
+        head={
+          <>
+            <th scope="col">When</th>
+            <th scope="col">User</th>
+            <th scope="col">Page</th>
+            <th scope="col" className="wpn-dashboard-pages__numeric">
+              Duration
+            </th>
+            <th scope="col" className="wpn-dashboard-pages__numeric">
+              Scroll
+            </th>
+            <th scope="col" className="wpn-users-table__actions-head">
+              Details
+            </th>
+          </>
+        }
+        errorRow={
+          <tr>
+            <td colSpan={6}>
+              <WidgetMessage tone="error" icon="alert" title={error ?? ""} />
+            </td>
+          </tr>
+        }
+        emptyRow={
+          <tr>
+            <td colSpan={6}>
+              <WidgetMessage tone="empty" icon="history" title="No visits match these filters" />
+            </td>
+          </tr>
+        }
+        renderRow={(visit) => (
+          <VisitLogRow
+            visit={visit}
+            isOpen={expanded === visit.visitId}
+            onToggle={toggleExpanded}
+            projectName={projectName}
+          />
+        )}
+        pagination={
+          <TablePagination
+            page={page}
+            pageSize={pageSize}
+            totalItems={total}
+            itemLabel="visits"
+            onPageChange={setPage}
+            onPageSizeChange={(next) => {
+              setPageSize(next);
+              setPage(1);
+            }}
+          />
+        }
       />
     </section>
   );

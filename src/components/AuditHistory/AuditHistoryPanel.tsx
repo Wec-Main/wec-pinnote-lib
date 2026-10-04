@@ -3,11 +3,12 @@ import { useAnnotationContext } from "../../context/AnnotationContext";
 import { fetchAuditPage } from "../../services/auditApi";
 import { formatRelativeTime, formatTimestamp, getInitials } from "../../utils/format";
 import {
+  DataTable,
   Icon,
   ListSearchBar,
+  resolveDataTableState,
   SearchableSelect,
   TablePagination,
-  TableSkeleton,
   Tooltip,
   type SelectOption,
 } from "../primitives";
@@ -287,213 +288,191 @@ export function AuditHistoryPanel({ embedded = false }: AuditHistoryPanelProps =
         </div>
       ) : null}
 
-      <div className="wpn-table-card">
-        <div className="wpn-users-table-wrap">
-          <table
-            className={[
-              "wpn-users-table",
-              "wpn-audit-table",
-              loading && loaded ? "wpn-users-table--refetching" : "",
-            ]
-              .filter(Boolean)
-              .join(" ")}
-          >
-            <thead>
+      <DataTable<AuditRecord>
+        state={resolveDataTableState({
+          loading,
+          loaded,
+          error: null,
+          isEmpty: entries.length === 0,
+        })}
+        items={entries}
+        getRowKey={(entry) => entry.auditId}
+        tableClassName="wpn-audit-table"
+        refetching={loading && loaded}
+        skeleton={{
+          rows: Math.min(pageSize, 5),
+          columns: ["text", "identity", "pill", "text", "text", "actions"],
+          label: "Loading audit history...",
+        }}
+        head={
+          <>
+            <th scope="col">When</th>
+            <th scope="col">Who</th>
+            <th scope="col">Action</th>
+            <th scope="col">Target</th>
+            <th scope="col">IP address</th>
+            <th scope="col" className="wpn-users-table__actions-head">
+              Details
+            </th>
+          </>
+        }
+        errorRow={null}
+        emptyRow={
+          <tr>
+            <td colSpan={6} className="wpn-users-table__empty">
+              <Icon name="history" className="wpn-users-table__empty-icon" />
+              <span>
+                {filtersActive ? "No activity matches these filters." : "No activity recorded yet."}
+              </span>
+              {filtersActive ? (
+                <button type="button" className="wpn-btn wpn-btn--ghost" onClick={clearFilters}>
+                  <Icon name="refresh" className="wpn-btn__icon" />
+                  Clear filters
+                </button>
+              ) : null}
+            </td>
+          </tr>
+        }
+        renderRow={(entry) => {
+          const meta = actionMeta(entry.action);
+          const changes = diffFields(entry);
+          const isOpen = expanded === entry.auditId;
+          const actor =
+            entry.actorName ?? (entry.actorUserId ? shortId(entry.actorUserId) : "System");
+          const actorTitle = entry.actorUserId ?? undefined;
+          return (
+            <Fragment>
               <tr>
-                <th scope="col">When</th>
-                <th scope="col">Who</th>
-                <th scope="col">Action</th>
-                <th scope="col">Target</th>
-                <th scope="col">IP address</th>
-                <th scope="col" className="wpn-users-table__actions-head">
-                  Details
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {loading && !loaded ? (
-                <TableSkeleton
-                  rows={Math.min(pageSize, 5)}
-                  columns={["text", "identity", "pill", "text", "text", "actions"]}
-                  label="Loading audit history..."
-                />
-              ) : entries.length === 0 ? (
-                <tr>
-                  <td colSpan={6} className="wpn-users-table__empty">
-                    <Icon name="history" className="wpn-users-table__empty-icon" />
-                    <span>
-                      {filtersActive
-                        ? "No activity matches these filters."
-                        : "No activity recorded yet."}
+                <td className="wpn-users-table__muted">
+                  <Tooltip label={formatTimestamp(entry.createdAt)} placement="top">
+                    <span>{formatRelativeTime(entry.createdAt)}</span>
+                  </Tooltip>
+                </td>
+                <td>
+                  <div className="wpn-users-identity">
+                    <span className="wpn-avatar wpn-avatar--fallback">{getInitials(actor)}</span>
+                    <span className="wpn-users-identity__copy">
+                      <span className="wpn-users-identity__name" title={actorTitle}>
+                        {actor}
+                      </span>
+                      {entry.actorName && entry.actorUserId ? (
+                        <span className="wpn-users-identity__email" title={actorTitle}>
+                          {shortId(entry.actorUserId)}
+                        </span>
+                      ) : null}
                     </span>
-                    {filtersActive ? (
-                      <button
-                        type="button"
-                        className="wpn-btn wpn-btn--ghost"
-                        onClick={clearFilters}
-                      >
-                        <Icon name="refresh" className="wpn-btn__icon" />
-                        Clear filters
-                      </button>
-                    ) : null}
+                  </div>
+                </td>
+                <td>
+                  <span className={`wpn-users-pill wpn-audit-pill--${meta.tone}`}>{meta.label}</span>
+                </td>
+                <td>
+                  <span className="wpn-users-org">{entityLabel(entry.entityType)}</span>
+                  <span className="wpn-users-org__country">{summarize(entry)}</span>
+                </td>
+                <td className="wpn-users-table__muted wpn-audit-ip">{entry.ipAddress ?? "—"}</td>
+                <td>
+                  <div className="wpn-users-actions">
+                    <button
+                      type="button"
+                      className="wpn-users-action wpn-users-action--primary"
+                      aria-label={isOpen ? "Hide details" : "Show details"}
+                      aria-expanded={isOpen}
+                      onClick={() =>
+                        setExpanded((current) => (current === entry.auditId ? null : entry.auditId))
+                      }
+                    >
+                      <Icon name={isOpen ? "collapse" : "expand"} />
+                    </button>
+                  </div>
+                </td>
+              </tr>
+              {isOpen ? (
+                <tr className="wpn-audit-details-row">
+                  <td colSpan={6}>
+                    <div className="wpn-audit-details">
+                      <dl className="wpn-audit-meta">
+                        <div className="wpn-audit-meta__item">
+                          <dt>Occurred</dt>
+                          <dd>{formatTimestamp(entry.createdAt)}</dd>
+                        </div>
+                        {entry.projectId ? (
+                          <div className="wpn-audit-meta__item">
+                            <dt>Project</dt>
+                            <dd>{entry.projectId}</dd>
+                          </div>
+                        ) : null}
+                        {entry.pageKey ? (
+                          <div className="wpn-audit-meta__item">
+                            <dt>Page</dt>
+                            <dd>{entry.pageKey}</dd>
+                          </div>
+                        ) : null}
+                        {entry.entityId ? (
+                          <div className="wpn-audit-meta__item">
+                            <dt>{entityLabel(entry.entityType)} id</dt>
+                            <dd>{entry.entityId}</dd>
+                          </div>
+                        ) : null}
+                        {entry.ipAddress ? (
+                          <div className="wpn-audit-meta__item">
+                            <dt>IP address</dt>
+                            <dd>{entry.ipAddress}</dd>
+                          </div>
+                        ) : null}
+                        {entry.userAgent ? (
+                          <div className="wpn-audit-meta__item wpn-audit-meta__item--wide">
+                            <dt>User agent</dt>
+                            <dd>{entry.userAgent}</dd>
+                          </div>
+                        ) : null}
+                      </dl>
+
+                      {changes.length > 0 ? (
+                        <table className="wpn-audit-changes">
+                          <thead>
+                            <tr>
+                              <th scope="col">Field</th>
+                              <th scope="col">Before</th>
+                              <th scope="col">After</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {changes.map((change) => (
+                              <tr key={change.field}>
+                                <th scope="row">{change.field}</th>
+                                <td className="wpn-audit-changes__before">{change.before ?? "—"}</td>
+                                <td className="wpn-audit-changes__after">{change.after ?? "—"}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      ) : (
+                        <p className="wpn-audit-details__empty">
+                          No field-level changes recorded for this event.
+                        </p>
+                      )}
+                    </div>
                   </td>
                 </tr>
-              ) : (
-                entries.map((entry) => {
-                  const meta = actionMeta(entry.action);
-                  const changes = diffFields(entry);
-                  const isOpen = expanded === entry.auditId;
-                  const actor =
-                    entry.actorName ?? (entry.actorUserId ? shortId(entry.actorUserId) : "System");
-                  const actorTitle = entry.actorUserId ?? undefined;
-                  return (
-                    <Fragment key={entry.auditId}>
-                      <tr>
-                        <td className="wpn-users-table__muted">
-                          <Tooltip label={formatTimestamp(entry.createdAt)} placement="top">
-                            <span>{formatRelativeTime(entry.createdAt)}</span>
-                          </Tooltip>
-                        </td>
-                        <td>
-                          <div className="wpn-users-identity">
-                            <span className="wpn-avatar wpn-avatar--fallback">
-                              {getInitials(actor)}
-                            </span>
-                            <span className="wpn-users-identity__copy">
-                              <span className="wpn-users-identity__name" title={actorTitle}>
-                                {actor}
-                              </span>
-                              {entry.actorName && entry.actorUserId ? (
-                                <span className="wpn-users-identity__email" title={actorTitle}>
-                                  {shortId(entry.actorUserId)}
-                                </span>
-                              ) : null}
-                            </span>
-                          </div>
-                        </td>
-                        <td>
-                          <span className={`wpn-users-pill wpn-audit-pill--${meta.tone}`}>
-                            {meta.label}
-                          </span>
-                        </td>
-                        <td>
-                          <span className="wpn-users-org">{entityLabel(entry.entityType)}</span>
-                          <span className="wpn-users-org__country">{summarize(entry)}</span>
-                        </td>
-                        <td className="wpn-users-table__muted wpn-audit-ip">
-                          {entry.ipAddress ?? "—"}
-                        </td>
-                        <td>
-                          <div className="wpn-users-actions">
-                            <button
-                              type="button"
-                              className="wpn-users-action wpn-users-action--primary"
-                              aria-label={isOpen ? "Hide details" : "Show details"}
-                              aria-expanded={isOpen}
-                              onClick={() =>
-                                setExpanded((current) =>
-                                  current === entry.auditId ? null : entry.auditId,
-                                )
-                              }
-                            >
-                              <Icon name={isOpen ? "collapse" : "expand"} />
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                      {isOpen ? (
-                        <tr className="wpn-audit-details-row">
-                          <td colSpan={6}>
-                            <div className="wpn-audit-details">
-                              <dl className="wpn-audit-meta">
-                                <div className="wpn-audit-meta__item">
-                                  <dt>Occurred</dt>
-                                  <dd>{formatTimestamp(entry.createdAt)}</dd>
-                                </div>
-                                {entry.projectId ? (
-                                  <div className="wpn-audit-meta__item">
-                                    <dt>Project</dt>
-                                    <dd>{entry.projectId}</dd>
-                                  </div>
-                                ) : null}
-                                {entry.pageKey ? (
-                                  <div className="wpn-audit-meta__item">
-                                    <dt>Page</dt>
-                                    <dd>{entry.pageKey}</dd>
-                                  </div>
-                                ) : null}
-                                {entry.entityId ? (
-                                  <div className="wpn-audit-meta__item">
-                                    <dt>{entityLabel(entry.entityType)} id</dt>
-                                    <dd>{entry.entityId}</dd>
-                                  </div>
-                                ) : null}
-                                {entry.ipAddress ? (
-                                  <div className="wpn-audit-meta__item">
-                                    <dt>IP address</dt>
-                                    <dd>{entry.ipAddress}</dd>
-                                  </div>
-                                ) : null}
-                                {entry.userAgent ? (
-                                  <div className="wpn-audit-meta__item wpn-audit-meta__item--wide">
-                                    <dt>User agent</dt>
-                                    <dd>{entry.userAgent}</dd>
-                                  </div>
-                                ) : null}
-                              </dl>
-
-                              {changes.length > 0 ? (
-                                <table className="wpn-audit-changes">
-                                  <thead>
-                                    <tr>
-                                      <th scope="col">Field</th>
-                                      <th scope="col">Before</th>
-                                      <th scope="col">After</th>
-                                    </tr>
-                                  </thead>
-                                  <tbody>
-                                    {changes.map((change) => (
-                                      <tr key={change.field}>
-                                        <th scope="row">{change.field}</th>
-                                        <td className="wpn-audit-changes__before">
-                                          {change.before ?? "—"}
-                                        </td>
-                                        <td className="wpn-audit-changes__after">
-                                          {change.after ?? "—"}
-                                        </td>
-                                      </tr>
-                                    ))}
-                                  </tbody>
-                                </table>
-                              ) : (
-                                <p className="wpn-audit-details__empty">
-                                  No field-level changes recorded for this event.
-                                </p>
-                              )}
-                            </div>
-                          </td>
-                        </tr>
-                      ) : null}
-                    </Fragment>
-                  );
-                })
-              )}
-            </tbody>
-          </table>
-        </div>
-
-        <TablePagination
-          page={page}
-          pageSize={pageSize}
-          totalItems={total}
-          itemLabel="events"
-          onPageChange={setPage}
-          onPageSizeChange={(next) => {
-            setPageSize(next);
-            setPage(1);
-          }}
-        />
-      </div>
+              ) : null}
+            </Fragment>
+          );
+        }}
+        pagination={
+          <TablePagination
+            page={page}
+            pageSize={pageSize}
+            totalItems={total}
+            itemLabel="events"
+            onPageChange={setPage}
+            onPageSizeChange={(next) => {
+              setPageSize(next);
+              setPage(1);
+            }}
+          />
+        }
+      />
     </div>
   );
 }

@@ -1,13 +1,11 @@
 import { useState } from "react";
 import { fetchAnalyticsPages } from "../../../services/analyticsApi";
-import type { AnalyticsFilters } from "../../../types/analytics.types";
-import { TablePagination, TableSkeleton } from "../../primitives";
+import type { AnalyticsFilters, PageVisitRow } from "../../../types/analytics.types";
+import { DataTable, TablePagination } from "../../primitives";
 import { dashboardNumberFormat, formatDuration } from "./dashboardFormat";
 import { widgetView } from "./dashboardStatus";
-import { WidgetMessageRow } from "./DashboardWidgetMessage";
+import { WidgetMessage } from "./DashboardWidgetMessage";
 import { useDashboardFetch, useKnownTotal } from "./useDashboardFetch";
-
-const PAGE_VISITS_COLUMNS = 4;
 
 interface PageVisitsTableProps {
   filters: AnalyticsFilters;
@@ -31,82 +29,78 @@ export function PageVisitsTable({ filters, reloadToken, projectName }: PageVisit
 
   return (
     <div className="wpn-dashboard-pages">
-      <div className="wpn-users-table-wrap">
-        <table
-          className={[
-            "wpn-users-table",
-            "wpn-dashboard-pages__table",
-            loading && loaded ? "wpn-users-table--refetching" : "",
-          ]
-            .filter(Boolean)
-            .join(" ")}
-        >
-          <thead>
-            <tr>
-              <th scope="col">Project</th>
-              <th scope="col">Page</th>
-              <th scope="col" className="wpn-dashboard-pages__numeric">
-                Visits
-              </th>
-              <th scope="col" className="wpn-dashboard-pages__numeric">
-                Average duration
-              </th>
-            </tr>
-          </thead>
-          <tbody>
-            {view === "loading" ? (
-              <TableSkeleton
-                rows={Math.min(pageSize, 5)}
-                columns={["text", "text", "text", "text"]}
-                label="Loading page visits..."
-              />
-            ) : view === "error" ? (
-              <WidgetMessageRow
-                colSpan={PAGE_VISITS_COLUMNS}
-                tone="error"
-                icon="alert"
-                title={error ?? ""}
-              />
-            ) : view === "empty" ? (
-              <WidgetMessageRow
-                colSpan={PAGE_VISITS_COLUMNS}
+      <DataTable<PageVisitRow>
+        state={view}
+        items={rows}
+        getRowKey={(row) => `${row.projectId}:${row.pageKey}`}
+        cardWrap={false}
+        tableClassName="wpn-dashboard-pages__table"
+        refetching={loading && loaded}
+        skeleton={{
+          rows: Math.min(pageSize, 5),
+          columns: ["text", "text", "text", "text"],
+          label: "Loading page visits...",
+        }}
+        head={
+          <>
+            <th scope="col">Project</th>
+            <th scope="col">Page</th>
+            <th scope="col" className="wpn-dashboard-pages__numeric">
+              Visits
+            </th>
+            <th scope="col" className="wpn-dashboard-pages__numeric">
+              Average duration
+            </th>
+          </>
+        }
+        errorRow={
+          <tr>
+            <td colSpan={4}>
+              <WidgetMessage tone="error" icon="alert" title={error ?? ""} />
+            </td>
+          </tr>
+        }
+        emptyRow={
+          <tr>
+            <td colSpan={4}>
+              <WidgetMessage
                 tone="empty"
                 icon="layers"
                 title="No page visits yet"
                 detail="Visits appear once signed-in users browse pages in this range."
               />
-            ) : (
-              rows.map((row) => (
-                <tr key={`${row.projectId}:${row.pageKey}`} className="wpn-dashboard-reveal">
-                  <td>
-                    <span className="wpn-users-org">{projectName(row.projectId)}</span>
-                  </td>
-                  <td className="wpn-dashboard-pages__page" title={row.pageKey}>
-                    {row.pageKey}
-                  </td>
-                  <td className="wpn-dashboard-pages__numeric">
-                    {dashboardNumberFormat.format(row.visits)}
-                  </td>
-                  <td className="wpn-dashboard-pages__numeric wpn-users-table__muted">
-                    {formatDuration(row.avgDurationMs)}
-                  </td>
-                </tr>
-              ))
-            )}
-          </tbody>
-        </table>
-      </div>
-
-      <TablePagination
-        page={page}
-        pageSize={pageSize}
-        totalItems={total}
-        itemLabel="pages"
-        onPageChange={setPage}
-        onPageSizeChange={(next) => {
-          setPageSize(next);
-          setPage(1);
-        }}
+            </td>
+          </tr>
+        }
+        renderRow={(row) => (
+          <tr className="wpn-dashboard-reveal">
+            <td>
+              <span className="wpn-users-org">{projectName(row.projectId)}</span>
+            </td>
+            <td className="wpn-dashboard-pages__page" title={row.pageKey}>
+              {row.pageKey}
+            </td>
+            <td className="wpn-dashboard-pages__numeric">
+              {dashboardNumberFormat.format(row.visits)}
+            </td>
+            <td className="wpn-dashboard-pages__numeric wpn-users-table__muted">
+              {formatDuration(row.avgDurationMs)}
+            </td>
+          </tr>
+        )}
+        pagination={
+          <TablePagination
+            page={page}
+            pageSize={pageSize}
+            totalItems={total}
+            itemLabel="pages"
+            onPageChange={setPage}
+            onPageSizeChange={(next) => {
+              setPageSize(next);
+              setPage(1);
+            }}
+          />
+        }
       />
     </div>
   );

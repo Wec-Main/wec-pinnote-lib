@@ -1,11 +1,9 @@
 import type { TopUserRecord } from "../../../types/analytics.types";
 import { getInitials } from "../../../utils/format";
-import { TableSkeleton } from "../../primitives";
+import { DataTable } from "../../primitives";
 import { dashboardNumberFormat } from "./dashboardFormat";
 import { widgetView } from "./dashboardStatus";
-import { WidgetMessageRow } from "./DashboardWidgetMessage";
-
-const TOP_USERS_COLUMNS = 5;
+import { WidgetMessage } from "./DashboardWidgetMessage";
 
 interface TopUsersTableProps {
   rows: TopUserRecord[] | null;
@@ -19,77 +17,70 @@ export function TopUsersTable({ rows, refreshing }: TopUsersTableProps) {
     error: null,
     isEmpty: rows?.length === 0,
   });
+  const items = rows ?? [];
 
   return (
     <section className="wpn-dashboard-section wpn-dashboard-top__panel">
       <h3 className="wpn-dashboard-section__title">Top users</h3>
 
-      <div className="wpn-users-table-wrap">
-        <table
-          className={[
-            "wpn-users-table",
-            "wpn-dashboard-ranked",
-            refreshing ? "wpn-users-table--refetching" : "",
-          ]
-            .filter(Boolean)
-            .join(" ")}
-        >
-          <thead>
-            <tr>
-              <th scope="col" className="wpn-dashboard-ranked__rank">
-                #
-              </th>
-              <th scope="col">User</th>
-              <th scope="col" className="wpn-dashboard-pages__numeric">
-                Visits
-              </th>
-              <th scope="col" className="wpn-dashboard-pages__numeric">
-                Active days
-              </th>
-              <th scope="col">Last visit</th>
-            </tr>
-          </thead>
-          <tbody>
-            {view === "loading" ? (
-              <TableSkeleton
-                rows={5}
-                columns={["text", "identity", "text", "text", "text"]}
-                label="Loading top users..."
-              />
-            ) : view === "empty" ? (
-              <WidgetMessageRow
-                colSpan={TOP_USERS_COLUMNS}
-                tone="empty"
-                icon="users"
-                title="No user activity yet"
-              />
-            ) : (
-              (rows ?? []).map((row, index) => (
-                <tr key={row.userId} className="wpn-dashboard-reveal">
-                  <td className="wpn-dashboard-ranked__rank wpn-users-table__muted">{index + 1}</td>
-                  <td>
-                    <div className="wpn-users-identity">
-                      <span className="wpn-avatar wpn-avatar--fallback">
-                        {getInitials(row.userName)}
-                      </span>
-                      <span className="wpn-users-identity__name" title={row.userId}>
-                        {row.userName}
-                      </span>
-                    </div>
-                  </td>
-                  <td className="wpn-dashboard-pages__numeric">
-                    {dashboardNumberFormat.format(row.visits)}
-                  </td>
-                  <td className="wpn-dashboard-pages__numeric">
-                    {dashboardNumberFormat.format(row.activeDays)}
-                  </td>
-                  <td className="wpn-users-table__muted">{row.lastVisitDay}</td>
-                </tr>
-              ))
-            )}
-          </tbody>
-        </table>
-      </div>
+      <DataTable<TopUserRecord>
+        state={view}
+        items={items}
+        getRowKey={(row) => row.userId}
+        cardWrap={false}
+        tableClassName="wpn-dashboard-ranked"
+        refetching={refreshing}
+        skeleton={{
+          rows: 5,
+          columns: ["text", "identity", "text", "text", "text"],
+          label: "Loading top users...",
+        }}
+        head={
+          <>
+            <th scope="col" className="wpn-dashboard-ranked__rank">
+              #
+            </th>
+            <th scope="col">User</th>
+            <th scope="col" className="wpn-dashboard-pages__numeric">
+              Visits
+            </th>
+            <th scope="col" className="wpn-dashboard-pages__numeric">
+              Active days
+            </th>
+            <th scope="col">Last visit</th>
+          </>
+        }
+        errorRow={null}
+        emptyRow={
+          <tr>
+            <td colSpan={5}>
+              <WidgetMessage tone="empty" icon="users" title="No user activity yet" />
+            </td>
+          </tr>
+        }
+        renderRow={(row, index) => (
+          <tr className="wpn-dashboard-reveal">
+            <td className="wpn-dashboard-ranked__rank wpn-users-table__muted">{index + 1}</td>
+            <td>
+              <div className="wpn-users-identity">
+                <span className="wpn-avatar wpn-avatar--fallback">
+                  {getInitials(row.userName)}
+                </span>
+                <span className="wpn-users-identity__name" title={row.userId}>
+                  {row.userName}
+                </span>
+              </div>
+            </td>
+            <td className="wpn-dashboard-pages__numeric">
+              {dashboardNumberFormat.format(row.visits)}
+            </td>
+            <td className="wpn-dashboard-pages__numeric">
+              {dashboardNumberFormat.format(row.activeDays)}
+            </td>
+            <td className="wpn-users-table__muted">{row.lastVisitDay}</td>
+          </tr>
+        )}
+      />
     </section>
   );
 }

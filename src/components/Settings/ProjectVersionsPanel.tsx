@@ -1,4 +1,12 @@
-import { Icon, RefreshButton, Switch, TableSkeleton, Tooltip, type IconName } from "../primitives";
+import {
+  DataTable,
+  Icon,
+  RefreshButton,
+  resolveDataTableState,
+  Switch,
+  Tooltip,
+  type IconName,
+} from "../primitives";
 import { useProjectVersioning } from "./useProjectVersioning";
 import { projectVersionLabel } from "../../utils/projectVersionLabel";
 import { formatRelativeTime, formatTimestamp } from "../../utils/format";
@@ -191,121 +199,116 @@ export function ProjectVersionsPanel({
         </div>
       ) : null}
 
-      <div className="wpn-users-table-wrap">
-        <table
-          className={["wpn-users-table", loading && loaded ? "wpn-users-table--refetching" : ""]
-            .filter(Boolean)
-            .join(" ")}
-        >
-          <thead>
-            <tr>
-              <th>Version</th>
-              <th>Status</th>
-              <th>Active</th>
-              <th className="wpn-users-table__actions-head">Actions</th>
+      <DataTable<ProjectVersion>
+        state={resolveDataTableState({
+          loading,
+          loaded,
+          error,
+          isEmpty: versions.length === 0,
+        })}
+        items={versions}
+        getRowKey={(version) => version.id}
+        cardWrap={false}
+        refetching={loading && loaded}
+        skeleton={{
+          rows: 3,
+          columns: ["identity", "pill", "pill", "actions"],
+          label: "Loading versions",
+        }}
+        head={
+          <>
+            <th>Version</th>
+            <th>Status</th>
+            <th>Active</th>
+            <th className="wpn-users-table__actions-head">Actions</th>
+          </>
+        }
+        errorRow={
+          <tr>
+            <td colSpan={4} className="wpn-users-table__empty">
+              <Icon name="alert" className="wpn-users-table__empty-icon" />
+              <span>{error}</span>
+              <button type="button" className="wpn-btn wpn-btn--ghost" onClick={reload}>
+                Retry
+              </button>
+            </td>
+          </tr>
+        }
+        emptyRow={
+          <tr>
+            <td colSpan={4} className="wpn-users-table__empty">
+              <Icon name="copy" className="wpn-users-table__empty-icon" />
+              <span>No versions yet.</span>
+            </td>
+          </tr>
+        }
+        renderRow={(version) => {
+          const isActive = version.id === project?.currentProjectVersionId;
+          const timeline = versionTimeline(version);
+          const label = projectVersionLabel(version);
+          return (
+            <tr className={isActive ? "wpn-versioning-row--active" : undefined}>
+              <td>
+                <div className="wpn-users-identity">
+                  <div className="wpn-users-identity__copy">
+                    <span className="wpn-users-identity__name">{label}</span>
+                    <span
+                      className="wpn-users-identity__email"
+                      title={formatTimestamp(timeline.at)}
+                    >
+                      {timeline.label} {formatRelativeTime(timeline.at)}
+                    </span>
+                  </div>
+                </div>
+              </td>
+              <td>
+                <span className={`wpn-users-pill wpn-users-pill--status-${version.status}`}>
+                  {version.status}
+                </span>
+              </td>
+              <td>
+                {isActive ? (
+                  <span className="wpn-users-pill wpn-users-pill--status-active">Active</span>
+                ) : (
+                  <Tooltip label="Make this the active version" placement="top">
+                    <button
+                      type="button"
+                      className="wpn-users-pill wpn-users-pill--status-inactive wpn-versioning-active-btn"
+                      disabled={busy}
+                      onClick={() => void setActiveVersion(version.id)}
+                    >
+                      Set active
+                    </button>
+                  </Tooltip>
+                )}
+              </td>
+              <td>
+                <div className="wpn-users-actions">
+                  {version.status === "draft" ? (
+                    <Tooltip label={publishBlockedReason ?? `Publish ${label}`} placement="left">
+                      <button
+                        type="button"
+                        className="wpn-versioning-publish"
+                        aria-label={`Publish ${label}`}
+                        disabled={busy || trackingOff}
+                        onClick={() => void publishVersion(version.id)}
+                      >
+                        <Icon name="upload" className="wpn-versioning-publish__icon" />
+                        Publish
+                      </button>
+                    </Tooltip>
+                  ) : (
+                    <span className="wpn-versioning-published">
+                      <Icon name="check" className="wpn-versioning-published__icon" />
+                      Published
+                    </span>
+                  )}
+                </div>
+              </td>
             </tr>
-          </thead>
-          <tbody>
-            {loading && !loaded ? (
-              <TableSkeleton
-                rows={3}
-                columns={["identity", "pill", "pill", "actions"]}
-                label="Loading versions"
-              />
-            ) : error && versions.length === 0 ? (
-              <tr>
-                <td colSpan={4} className="wpn-users-table__empty">
-                  <Icon name="alert" className="wpn-users-table__empty-icon" />
-                  <span>{error}</span>
-                  <button type="button" className="wpn-btn wpn-btn--ghost" onClick={reload}>
-                    Retry
-                  </button>
-                </td>
-              </tr>
-            ) : versions.length === 0 ? (
-              <tr>
-                <td colSpan={4} className="wpn-users-table__empty">
-                  <Icon name="copy" className="wpn-users-table__empty-icon" />
-                  <span>No versions yet.</span>
-                </td>
-              </tr>
-            ) : (
-              versions.map((version) => {
-                const isActive = version.id === project?.currentProjectVersionId;
-                const timeline = versionTimeline(version);
-                const label = projectVersionLabel(version);
-                return (
-                  <tr
-                    key={version.id}
-                    className={isActive ? "wpn-versioning-row--active" : undefined}
-                  >
-                    <td>
-                      <div className="wpn-users-identity">
-                        <div className="wpn-users-identity__copy">
-                          <span className="wpn-users-identity__name">{label}</span>
-                          <span
-                            className="wpn-users-identity__email"
-                            title={formatTimestamp(timeline.at)}
-                          >
-                            {timeline.label} {formatRelativeTime(timeline.at)}
-                          </span>
-                        </div>
-                      </div>
-                    </td>
-                    <td>
-                      <span className={`wpn-users-pill wpn-users-pill--status-${version.status}`}>
-                        {version.status}
-                      </span>
-                    </td>
-                    <td>
-                      {isActive ? (
-                        <span className="wpn-users-pill wpn-users-pill--status-active">Active</span>
-                      ) : (
-                        <Tooltip label="Make this the active version" placement="top">
-                          <button
-                            type="button"
-                            className="wpn-users-pill wpn-users-pill--status-inactive wpn-versioning-active-btn"
-                            disabled={busy}
-                            onClick={() => void setActiveVersion(version.id)}
-                          >
-                            Set active
-                          </button>
-                        </Tooltip>
-                      )}
-                    </td>
-                    <td>
-                      <div className="wpn-users-actions">
-                        {version.status === "draft" ? (
-                          <Tooltip
-                            label={publishBlockedReason ?? `Publish ${label}`}
-                            placement="left"
-                          >
-                            <button
-                              type="button"
-                              className="wpn-versioning-publish"
-                              aria-label={`Publish ${label}`}
-                              disabled={busy || trackingOff}
-                              onClick={() => void publishVersion(version.id)}
-                            >
-                              <Icon name="upload" className="wpn-versioning-publish__icon" />
-                              Publish
-                            </button>
-                          </Tooltip>
-                        ) : (
-                          <span className="wpn-versioning-published">
-                            <Icon name="check" className="wpn-versioning-published__icon" />
-                            Published
-                          </span>
-                        )}
-                      </div>
-                    </td>
-                  </tr>
-                );
-              })
-            )}
-          </tbody>
-        </table>
-      </div>
+          );
+        }}
+      />
     </div>
   );
 }
