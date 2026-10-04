@@ -1,4 +1,4 @@
-import { withJitter } from "../utils/backoff";
+import { computeBackoffDelay, withJitter } from "../utils/backoff";
 
 export type PatchSendResult = "ok" | "conflict" | "retry" | "drop";
 
@@ -29,7 +29,7 @@ const defaultSchedule = (run: () => void, delayMs: number): (() => void) => {
 };
 
 export function nextBackoffMs(attempts: number, baseMs: number, maxMs: number): number {
-  return Math.min(maxMs, baseMs * 2 ** Math.max(0, attempts - 1));
+  return computeBackoffDelay(Math.max(0, attempts - 1), { baseMs, maxMs });
 }
 
 export class PatchQueue<J> {

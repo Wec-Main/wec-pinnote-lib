@@ -13,7 +13,7 @@ import { useAiStreamConnection } from "../hooks/useAiStream";
 import { useTokenGetter } from "../hooks/useTokenGetter";
 import { fetchAiMe } from "../services/aiApi";
 import { AnnotationApiError } from "../types/annotation.types";
-import { withJitter } from "../utils/backoff";
+import { computeBackoffDelay, withJitter } from "../utils/backoff";
 import { aiMeCacheKey } from "../ai/cacheKeys";
 import {
   fetchResource,
@@ -178,7 +178,9 @@ export function AiRuntimeProvider({
 
   useEffect(() => {
     if (!enabled || !meRetrying) return;
-    const delay = withJitter(Math.min(ME_RETRY_BASE_MS * 2 ** meRetryAttempt, ME_RETRY_MAX_MS));
+    const delay = withJitter(
+      computeBackoffDelay(meRetryAttempt, { baseMs: ME_RETRY_BASE_MS, maxMs: ME_RETRY_MAX_MS }),
+    );
     const retry = () => {
       setMeRetryAttempt((attempt) => attempt + 1);
       refreshMe();
